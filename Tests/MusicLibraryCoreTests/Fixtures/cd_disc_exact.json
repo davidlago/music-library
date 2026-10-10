@@ -1,0 +1,139 @@
+{
+ "id": "49HHV7Eb8UKF3aQiNmu1GR8vKTY-",
+ "offsets": [
+  150
+ ],
+ "sectors": 95462,
+ "releases": [
+  {
+   "id": "rel-2disc",
+   "title": "Ettella Diamant (Deluxe)",
+   "country": "DE",
+   "barcode": "8586010200415",
+   "release-group": {
+    "id": "rg-rel-2disc"
+   },
+   "artist-credit": [
+    {
+     "name": "Ettella Diamant",
+     "joinphrase": "",
+     "artist": {
+      "id": "a1",
+      "name": "Ettella Diamant"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "DR E006",
+     "label": {
+      "name": "Deadred Records"
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "track-count": 12,
+     "discs": [
+      {
+       "id": "OTHER-DISC-ID"
+      }
+     ]
+    },
+    {
+     "position": 2,
+     "format": "CD",
+     "track-count": 6,
+     "discs": [
+      {
+       "id": "49HHV7Eb8UKF3aQiNmu1GR8vKTY-"
+      }
+     ]
+    }
+   ],
+   "date": "2010"
+  },
+  {
+   "id": "rel-orig",
+   "title": "Ettella Diamant",
+   "country": "SK",
+   "barcode": "8586010200415",
+   "release-group": {
+    "id": "rg-rel-orig"
+   },
+   "artist-credit": [
+    {
+     "name": "Ettella Diamant",
+     "joinphrase": "",
+     "artist": {
+      "id": "a1",
+      "name": "Ettella Diamant"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "DR E006",
+     "label": {
+      "name": "Deadred Records"
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "track-count": 6,
+     "discs": [
+      {
+       "id": "49HHV7Eb8UKF3aQiNmu1GR8vKTY-"
+      }
+     ]
+    }
+   ],
+   "date": "2004"
+  },
+  {
+   "id": "rel-none",
+   "title": "Unrelated",
+   "country": "SK",
+   "barcode": "8586010200415",
+   "release-group": {
+    "id": "rg-rel-none"
+   },
+   "artist-credit": [
+    {
+     "name": "Ettella Diamant",
+     "joinphrase": "",
+     "artist": {
+      "id": "a1",
+      "name": "Ettella Diamant"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "DR E006",
+     "label": {
+      "name": "Deadred Records"
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "track-count": 9,
+     "discs": [
+      {
+       "id": "X"
+      }
+     ]
+    }
+   ],
+   "date": "2000"
+  }
+ ]
+}

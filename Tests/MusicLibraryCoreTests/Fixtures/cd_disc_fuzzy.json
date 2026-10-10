@@ -1,0 +1,153 @@
+{
+ "releases": [
+  {
+   "id": "rel-nodate",
+   "title": "No Date Edition",
+   "country": "SK",
+   "barcode": "8586010200415",
+   "release-group": {
+    "id": "rg-rel-nodate"
+   },
+   "artist-credit": [
+    {
+     "name": "Ettella Diamant",
+     "joinphrase": "",
+     "artist": {
+      "id": "a1",
+      "name": "Ettella Diamant"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "DR E006",
+     "label": {
+      "name": "Deadred Records"
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "track-count": 6,
+     "discs": []
+    }
+   ]
+  },
+  {
+   "id": "rel-y",
+   "title": "Second Disc Edition",
+   "country": "SK",
+   "barcode": "8586010200415",
+   "release-group": {
+    "id": "rg-rel-y"
+   },
+   "artist-credit": [
+    {
+     "name": "Ettella Diamant",
+     "joinphrase": "",
+     "artist": {
+      "id": "a1",
+      "name": "Ettella Diamant"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "DR E006",
+     "label": {
+      "name": "Deadred Records"
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "track-count": 8,
+     "discs": []
+    },
+    {
+     "position": 2,
+     "format": "CD",
+     "track-count": 6,
+     "discs": []
+    }
+   ],
+   "date": "2001"
+  },
+  {
+   "id": "rel-z",
+   "title": "Too Many Tracks",
+   "country": "SK",
+   "barcode": "8586010200415",
+   "release-group": {
+    "id": "rg-rel-z"
+   },
+   "artist-credit": [
+    {
+     "name": "Ettella Diamant",
+     "joinphrase": "",
+     "artist": {
+      "id": "a1",
+      "name": "Ettella Diamant"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "DR E006",
+     "label": {
+      "name": "Deadred Records"
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "track-count": 10,
+     "discs": []
+    }
+   ],
+   "date": "1990"
+  },
+  {
+   "id": "rel-w",
+   "title": "Earliest Edition",
+   "country": "SK",
+   "barcode": "8586010200415",
+   "release-group": {
+    "id": "rg-rel-w"
+   },
+   "artist-credit": [
+    {
+     "name": "Ettella Diamant",
+     "joinphrase": "",
+     "artist": {
+      "id": "a1",
+      "name": "Ettella Diamant"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "DR E006",
+     "label": {
+      "name": "Deadred Records"
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "track-count": 6,
+     "discs": []
+    }
+   ],
+   "date": "1999"
+  }
+ ]
+}

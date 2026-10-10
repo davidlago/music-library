@@ -1,0 +1,24 @@
+{
+ "entities": {
+  "Q173643": {
+   "id": "Q173643",
+   "descriptions": {
+    "en": {
+     "language": "en",
+     "value": "1969 studio album by the Beatles"
+    }
+   },
+   "sitelinks": {
+    "enwiki": {
+     "site": "enwiki",
+     "title": "Abbey Road",
+     "badges": [
+      "Q17437798"
+     ],
+     "url": "https://en.wikipedia.org/wiki/Abbey_Road"
+    }
+   },
+   "claims": {}
+  }
+ }
+}

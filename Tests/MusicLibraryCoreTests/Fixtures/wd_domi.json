@@ -1,0 +1,40 @@
+{
+ "entities": {
+  "Q113436721": {
+   "id": "Q113436721",
+   "descriptions": {
+    "en": {
+     "language": "en",
+     "value": "French-American jazz duo"
+    }
+   },
+   "sitelinks": {
+    "enwiki": {
+     "site": "enwiki",
+     "title": "Domi and JD Beck",
+     "badges": [],
+     "url": "https://en.wikipedia.org/wiki/Domi_and_JD_Beck"
+    }
+   },
+   "claims": {
+    "P18": [
+     {
+      "mainsnak": {
+       "snaktype": "value",
+       "property": "P18",
+       "hash": "49a4a6b1f66b61844c33635fb6fc44988f26dde3",
+       "datavalue": {
+        "value": "Domi and JD Beck at History (cropped).jpg",
+        "type": "string"
+       },
+       "datatype": "commonsMedia"
+      },
+      "type": "statement",
+      "id": "Q113436721$2c52a4d8-4672-472d-0107-e1532b3a0498",
+      "rank": "normal"
+     }
+    ]
+   }
+  }
+ }
+}

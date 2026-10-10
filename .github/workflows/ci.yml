@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select the newest stable Xcode
+        run: |
+          xcode="$(ls -d /Applications/Xcode_*.app | grep -iv beta | sort -V | tail -1)"
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+          swift --version
+
+      - name: Install ffmpeg
+        run: brew install ffmpeg
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+      - name: Version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev+${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build app (Apple Silicon + Intel)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ github.run_number }}
+          UNIVERSAL: "1"
+        run: scripts/build-app.sh
+
+      - name: Package
+        id: package
+        run: |
+          name="MusicLibrary-${{ steps.version.outputs.version }}-macOS.zip"
+          ditto -c -k --keepParent build/MusicLibrary.app "$name"
+          shasum -a 256 "$name" > "$name.sha256"
+          cat "$name.sha256"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: MusicLibrary-macOS
+          path: |
+            ${{ steps.package.outputs.name }}
+            ${{ steps.package.outputs.name }}.sha256
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: MusicLibrary-macOS
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<'NOTES'
+          ### Install
+
+          1. Download `MusicLibrary-*-macOS.zip` below, unzip it and move **MusicLibrary.app** to Applications (Apple Silicon and Intel, macOS 14+).
+          2. The app isn't notarized: on first launch open **System Settings ▸ Privacy & Security** and click **Open Anyway**, or run `xattr -dr com.apple.quarantine /Applications/MusicLibrary.app`.
+          3. Install ffmpeg: `brew install ffmpeg`.
+
+          See the [README](https://github.com/davidlago/music-library#readme) for details.
+          NOTES
+          gh release create "$GITHUB_REF_NAME" MusicLibrary-*-macOS.zip MusicLibrary-*-macOS.zip.sha256 \
+            --repo "$GITHUB_REPOSITORY" --title "Music Library ${GITHUB_REF_NAME#v}" --notes-file notes.md

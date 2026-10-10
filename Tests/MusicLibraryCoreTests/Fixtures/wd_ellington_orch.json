@@ -1,0 +1,33 @@
+{
+ "entities": {
+  "Q1264385": {
+   "id": "Q1264385",
+   "descriptions": {
+    "en": {
+     "language": "en",
+     "value": "US musical group; jazz band led by Duke Ellington"
+    }
+   },
+   "sitelinks": {},
+   "claims": {
+    "P18": [
+     {
+      "mainsnak": {
+       "snaktype": "value",
+       "property": "P18",
+       "hash": "0e6ed07d81be7d9169ad897b35107fe44e3136b3",
+       "datavalue": {
+        "value": "Duke Ellington Big Band.jpg",
+        "type": "string"
+       },
+       "datatype": "commonsMedia"
+      },
+      "type": "statement",
+      "id": "Q1264385$EF16CC08-DDCA-4EEA-9285-A1A0778034CA",
+      "rank": "normal"
+     }
+    ]
+   }
+  }
+ }
+}

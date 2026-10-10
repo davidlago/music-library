@@ -1,0 +1,47 @@
+{
+ "count": 1,
+ "releases": [
+  {
+   "id": "d3dc4be9-9749-4959-99e5-133d0cb467fe",
+   "title": "Ettella Diamant",
+   "date": "2004",
+   "country": "SK",
+   "barcode": "8586010200415",
+   "artist-credit": [
+    {
+     "name": "Ettella Diamant",
+     "artist": {
+      "id": "43b30031-071e-42df-ac2c-4f7a301e235b",
+      "name": "Ettella Diamant",
+      "sort-name": "Ettella Diamant"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "DR E006",
+     "label": {
+      "id": "01635848-98af-4a1e-989a-14ca8a9f5946",
+      "name": "Deadred Records"
+     }
+    }
+   ],
+   "release-group": {
+    "id": "1e18709f-ae50-39de-aef5-3cce3229791b",
+    "type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+    "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+    "title": "Ettella Diamant",
+    "primary-type": "EP"
+   },
+   "media": [
+    {
+     "id": "4f4c658c-4aa1-3ade-af01-22450de1c201",
+     "format": "CD",
+     "disc-count": 1,
+     "track-count": 6
+    }
+   ],
+   "track-count": 6
+  }
+ ]
+}
