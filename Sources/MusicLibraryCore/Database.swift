@@ -109,6 +109,11 @@ public final class Database: @unchecked Sendable {
         }
     }
 
+    /// Writes a compacted, self-contained copy of the database (WAL included) to a new file at `path`.
+    public func vacuum(into path: String) throws {
+        try exec("VACUUM INTO ?", [.text(path)])
+    }
+
     private func migrate() throws {
         let version = try query("PRAGMA user_version") { $0.int(0) ?? 0 }.first ?? 0
         if version < 1 {

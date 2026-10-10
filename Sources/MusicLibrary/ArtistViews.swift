@@ -55,6 +55,7 @@ struct ArtistsView: View {
                                 Button("Show Music DNA") { model.showMusicDNA(a.name) }
                                     .disabled(model.collaborations.person(named: a.name) == nil)
                                 Button("Update Artist Info") { model.refreshArtistInfo([a.name]) }
+                                AddToExportListButton([.artist(a.name)])
                             }
                     }
                 }
@@ -202,6 +203,7 @@ struct ArtistDetail: View {
         }
         .navigationTitle(name)
         .toolbar {
+            ToolbarItem { AddToExportListButton([.artist(artist.name)]) }
             ToolbarItem {
                 Button { model.refreshArtistInfo([artist.name]) } label: {
                     Label("Update Artist Info", systemImage: "arrow.clockwise")
@@ -358,6 +360,7 @@ struct ArtistDetail: View {
                         .frame(width: 140, alignment: .leading)
                     }
                     .buttonStyle(.plain)
+                    .contextMenu { AddToExportListButton(album: a) }
                 }
             }
         }
@@ -513,6 +516,7 @@ struct ArtistSongRow: View {
                 if !model.playlists.isEmpty { Divider() }
                 Button("New Playlist…") { model.createPlaylist(adding: [track.id]) }
             }
+            AddToExportListButton(tracks: [track])
             Divider()
             Button("Show in Finder") { model.showInFinder([track]) }
         }

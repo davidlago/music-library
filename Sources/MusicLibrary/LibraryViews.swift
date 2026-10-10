@@ -79,6 +79,7 @@ struct TrackTable: View {
             if !model.playlists.isEmpty { Divider() }
             Button("New Playlist…") { model.createPlaylist(adding: chosen.map(\.id)) }
         }
+        AddToExportListButton(tracks: chosen)
         if ids.count == 1 { Button("Get Info") { showInfo(for: ids) } }
         if ids.count == 1, let track = chosen.first {
             let people = model.people(on: track)
@@ -148,6 +149,10 @@ struct AlbumsView: View {
                             .frame(width: 150, alignment: .leading)
                         }
                         .buttonStyle(.plain)
+                        .contextMenu {
+                            Button("Play") { model.player.play(queue: model.tracks(of: a), startAt: 0) }
+                            AddToExportListButton(album: a)
+                        }
                     }
                 }
             }
@@ -230,6 +235,7 @@ struct PlaylistView: View {
                 Button("Play") { play(from: positions.min() ?? 0) }
                 Button("Play Next") { model.player.playNext(positions.sorted().compactMap { tracks.indices.contains($0) ? tracks[$0] : nil }) }
                 Button("Show in Finder") { model.showInFinder(positions.sorted().compactMap { tracks.indices.contains($0) ? tracks[$0] : nil }) }
+                AddToExportListButton(tracks: positions.sorted().compactMap { tracks.indices.contains($0) ? tracks[$0] : nil })
                 Divider()
                 Button("Remove from Playlist") { remove(positions) }
             }
@@ -247,6 +253,8 @@ struct PlaylistView: View {
             ToolbarItemGroup {
                 Button("Play", systemImage: "play.fill") { play(from: 0) }.disabled(tracks.isEmpty)
                 Button("Export…", systemImage: "square.and.arrow.up") { model.exportPlaylist(playlist) }.disabled(tracks.isEmpty)
+                    .help("Copy this playlist into a single folder with an .m3u file")
+                AddToExportListButton([.playlist(playlist.id)])
             }
         }
         .onAppear(perform: reload)

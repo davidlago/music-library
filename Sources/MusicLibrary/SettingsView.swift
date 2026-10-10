@@ -33,6 +33,19 @@ struct GeneralSettings: View {
                 Text("Changing the folder opens (or creates) a library there. Existing files and the database are not moved or migrated.")
                     .font(.caption).foregroundStyle(.subtext)
             }
+            Section("Export") {
+                LabeledContent("Destination") {
+                    VStack(alignment: .trailing) {
+                        Text(model.exportDestination?.path ?? "None").textSelection(.enabled).lineLimit(2).truncationMode(.middle)
+                        HStack {
+                            if model.exportDestination != nil { Button("Clear") { model.clearExportDestination() } }
+                            Button("Choose…") { model.chooseExportDestination() }
+                        }
+                    }
+                }
+                Text("Where the Export List is copied to, such as a USB music player or a backup drive.")
+                    .font(.caption).foregroundStyle(.subtext)
+            }
             Section("MusicBrainz") {
                 TextField("Contact email", text: $model.mbContact, prompt: Text("you@example.com"))
                 Text("Sent in the User-Agent of MusicBrainz requests, as their API etiquette asks.")
