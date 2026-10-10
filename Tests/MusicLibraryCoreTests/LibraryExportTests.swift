@@ -132,4 +132,52 @@ import Testing
         #expect(plan.covers.isEmpty && plan.skipped == 1)
         #expect(plan.bytesNeeded == plan.files.reduce(0) { $0 + $1.size })
     }
+
+    @Test func databaseBackupBringsArtistImagesUpToDate() async throws {
+        let (root, db, tracks) = try await makeLibrary()
+        let images = root.appendingPathComponent("Artist Images")
+        try FileManager.default.createDirectory(at: images, withIntermediateDirectories: true)
+        try Data("new".utf8).write(to: images.appendingPathComponent("a.jpg"))
+        try Data("refreshed photo".utf8).write(to: images.appendingPathComponent("b.jpg"))
+        let dest = try TestSupport.tempDir()
+
+        try LibraryExporter().export(tracks: tracks, libraryRoot: root, to: dest)
+        #expect(!FileManager.default.fileExists(atPath: dest.appendingPathComponent("Artist Images").path))
+
+        let destImages = dest.appendingPathComponent("Artist Images")
+        try FileManager.default.createDirectory(at: destImages, withIntermediateDirectories: true)
+        try Data("old".utf8).write(to: destImages.appendingPathComponent("b.jpg"))
+        try Data("only here".utf8).write(to: destImages.appendingPathComponent("c.jpg"))
+        let summary = try LibraryExporter().export(tracks: tracks, database: db, libraryRoot: root, to: dest)
+        #expect(summary.artistImages == 2 && summary.copied == 0)
+        #expect(try Data(contentsOf: destImages.appendingPathComponent("a.jpg")) == Data("new".utf8))
+        #expect(try Data(contentsOf: destImages.appendingPathComponent("b.jpg")) == Data("refreshed photo".utf8))
+        #expect(try Data(contentsOf: destImages.appendingPathComponent("c.jpg")) == Data("only here".utf8))
+        #expect(try LibraryExporter().plan(tracks: tracks, libraryRoot: root, destination: dest, artistImages: true).artistImages.isEmpty)
+    }
+
+    @Test func previewMergesDestinationWithWhatWillBeCopied() async throws {
+        let (root, db, tracks) = try await makeLibrary()
+        let dest = try TestSupport.tempDir()
+        try LibraryExporter().export(tracks: [tracks[0]], playlists: [ExportPlaylist(name: "Mix", tracks: [tracks[0]])],
+                                     database: db, libraryRoot: root, to: dest)
+        let other = dest.appendingPathComponent("Music/Zed/Old (1990)")
+        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        for name in ["01 - x.flac", "02 - y.mp3", "notes.txt", ".03 - z.mp3.mlpart"] { try Data("abcd".utf8).write(to: other.appendingPathComponent(name)) }
+
+        let preview = try ExportPreview.make(tracks: tracks, libraryRoot: root, destination: dest)
+        #expect(preview.isAvailable)
+        #expect(preview.folders.map(\.path) == ["Music/Art/A", "Music/Art/B", "Music/Zed/Old (1990)"])
+        let a = preview.folders[0], b = preview.folders[1], old = preview.folders[2]
+        #expect(a.artist == "Art" && a.album == "A" && a.existingFiles == 1 && a.incomingFiles == 1 && a.hasCover && !a.incomingCover && !a.isNew)
+        #expect(b.isNew && b.incomingFiles == 1 && !b.incomingCover && b.incomingBytes > 0)
+        #expect(old.existingFiles == 2 && old.existingBytes == 8 && old.incomingFiles == 0 && old.album == "Old (1990)")
+        #expect(Set(preview.incoming.keys) == [tracks[1].path, tracks[2].path])
+        #expect(preview.existingFiles == 3 && preview.existingAlbums == 2)
+        #expect(preview.playlists == ["Mix.m3u"])
+        #expect(preview.database != nil)
+
+        let missing = try ExportPreview.make(tracks: tracks, libraryRoot: root, destination: dest.appendingPathComponent("gone"))
+        #expect(!missing.isAvailable && missing.folders.isEmpty)
+    }
 }

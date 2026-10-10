@@ -44,7 +44,7 @@ final class AppModel {
         static let exportList = "exportList"
         static let exportDatabase = "exportBackupDatabase"
         static let exportPlaylistFiles = "exportPlaylistFiles"
-        static let exportDestination = "lastExportDestination"
+        static let exportDestination = "exportDestination"
     }
 
     var themeID: String {
@@ -126,6 +126,12 @@ final class AppModel {
     }
     var exportBackupDatabase: Bool { didSet { UserDefaults.standard.set(exportBackupDatabase, forKey: Keys.exportDatabase) } }
     var exportPlaylistFiles: Bool { didSet { UserDefaults.standard.set(exportPlaylistFiles, forKey: Keys.exportPlaylistFiles) } }
+    /// Where the Export List is copied to (e.g. a USB music player), kept between launches.
+    private(set) var exportDestination: URL? {
+        didSet { UserDefaults.standard.set(exportDestination?.path, forKey: Keys.exportDestination) }
+    }
+    /// Bumped when an export ends, so views showing the destination's contents rescan it.
+    private(set) var exportRevision = 0
 
     var mbContact: String { didSet { UserDefaults.standard.set(mbContact, forKey: Keys.contact); applyContact() } }
     var acoustIDKey: String { didSet { UserDefaults.standard.set(acoustIDKey, forKey: Keys.acoustID) } }
@@ -176,6 +182,7 @@ final class AppModel {
         exportList = defaults.data(forKey: Keys.exportList).flatMap { try? JSONDecoder().decode([ExportItem].self, from: $0) } ?? []
         exportBackupDatabase = defaults.bool(forKey: Keys.exportDatabase)
         exportPlaylistFiles = defaults.object(forKey: Keys.exportPlaylistFiles) == nil ? true : defaults.bool(forKey: Keys.exportPlaylistFiles)
+        exportDestination = defaults.string(forKey: Keys.exportDestination).map { URL(fileURLWithPath: $0, isDirectory: true) }
         ejectAfterRip = defaults.object(forKey: Keys.ejectAfterRip) == nil ? true : defaults.bool(forKey: Keys.ejectAfterRip)
         matchOutputRate = defaults.object(forKey: Keys.matchRate) == nil ? true : defaults.bool(forKey: Keys.matchRate)
         matchOutputBitDepth = defaults.object(forKey: Keys.matchBitDepth) == nil ? true : defaults.bool(forKey: Keys.matchBitDepth)
@@ -745,32 +752,50 @@ final class AppModel {
         return exportList.flatMap(tracks(for:)).filter { seen.insert($0.id).inserted }
     }
 
-    /// Picks a destination folder, then copies the export list into it using the library's own layout.
-    func runExportList() {
+    /// Playlists in the export list that get an .m3u file (when that option is on).
+    var exportPlaylistsToWrite: [ExportPlaylist] {
+        guard exportPlaylistFiles else { return [] }
+        return exportList.compactMap { item in
+            switch item {
+            case .playlist(let id): return playlists.first { $0.id == id }.map { ExportPlaylist(name: $0.name, tracks: tracks(for: item)) }
+            case .smartPlaylist(let id): return smartPlaylists.first { $0.id == id }.map { ExportPlaylist(name: $0.name, tracks: tracks(for: item)) }
+            default: return nil
+            }
+        }.filter { !$0.tracks.isEmpty }
+    }
+
+    func chooseExportDestination() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
-        panel.prompt = "Export Here"
-        panel.message = "Choose where to export (e.g. your music player or a backup drive). Files already there are kept."
-        if let last = UserDefaults.standard.string(forKey: Keys.exportDestination) {
-            panel.directoryURL = URL(fileURLWithPath: last, isDirectory: true)
-        }
+        panel.prompt = "Use as Destination"
+        panel.message = "Choose where to export to (e.g. your music player or a backup drive). Files already there are kept."
+        if let current = exportDestination { panel.directoryURL = current }
         guard panel.runModal() == .OK, let dest = panel.url else { return }
-        UserDefaults.standard.set(dest.path, forKey: Keys.exportDestination)
         if dest.standardizedFileURL.path == libraryRoot.standardizedFileURL.path {
             errorMessage = "Choose a folder other than the library itself."
             return
         }
+        exportDestination = dest
+    }
 
+    func clearExportDestination() { exportDestination = nil }
+
+    var exportDestinationAvailable: Bool {
+        var isDir: ObjCBool = false
+        return exportDestination.map { FileManager.default.fileExists(atPath: $0.path, isDirectory: &isDir) && isDir.boolValue } ?? false
+    }
+
+    /// Copies the export list into the destination using the library's own layout.
+    func runExportList() {
+        guard let dest = exportDestination else { chooseExportDestination(); return }
+        guard exportDestinationAvailable else {
+            errorMessage = "“\(dest.lastPathComponent)” isn't available. Connect the drive or choose another destination."
+            return
+        }
         let tracks = exportListTracks
-        let playlistFiles: [ExportPlaylist] = exportPlaylistFiles ? exportList.compactMap { item in
-            switch item {
-            case .playlist(let id): return self.playlists.first { $0.id == id }.map { ExportPlaylist(name: $0.name, tracks: self.tracks(for: item)) }
-            case .smartPlaylist(let id): return self.smartPlaylists.first { $0.id == id }.map { ExportPlaylist(name: $0.name, tracks: self.tracks(for: item)) }
-            default: return nil
-            }
-        } : []
+        let playlistFiles = exportPlaylistsToWrite
         let backup = exportBackupDatabase ? database : nil
         let root = libraryRoot
         let volume = try? dest.resourceValues(forKeys: [.volumeURLKey, .volumeIsEjectableKey, .volumeIsRemovableKey, .volumeIsInternalKey])
@@ -790,13 +815,15 @@ final class AppModel {
                 }
             }
             let result = await withTaskCancellationHandler { await job.value } onCancel: { job.cancel() }
-            guard let self, self.exportState?.destination == dest else { return }
+            guard let self else { return }
+            self.exportTask = nil
+            self.exportRevision += 1
+            guard self.exportState?.destination == dest else { return }
             switch result {
             case .success(let summary): self.exportState?.summary = summary
             case .failure(is CancellationError): self.exportState = nil
             case .failure(let error): self.exportState?.error = error.localizedDescription
             }
-            self.exportTask = nil
         }
     }
 

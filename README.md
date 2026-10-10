@@ -33,8 +33,10 @@
 - **Listening history and Last.fm.** Time listened and plays per album and artist, and optional scrobbling with an offline queue.
 - **Themes.** System, Catppuccin (all four flavors, or auto light/dark), Nord, Dracula, Solarized, Gruvbox, Tokyo Night and Rosé Pine.
 - **Take it with you.** Add albums, songs, artists and playlists to the Export List and copy them to a USB player
-  or drive in the library's own `Music/Artist/Album` layout. Files already there are never overwritten, and playlists
-  get `.m3u` files. Turn on the database option to also back up `library.sqlite` to the drive, for a full library backup.
+  or drive in the library's own `Music/Artist/Album` layout, covers included. The destination is remembered, and the
+  page shows side by side what you're adding and what the drive already has, highlighting what will actually be copied.
+  Files already there are never overwritten, and playlists get `.m3u` files. Turn on the database option to also back
+  up `library.sqlite` and the artist photos to the drive, for a full library backup.
   A single playlist can still be exported to its own folder.
 
 ## Tour
