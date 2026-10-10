@@ -160,6 +160,7 @@ struct TopHitsStrip: View {
                         .frame(width: size + 16)
                     }
                     .buttonStyle(.plain)
+                    .contextMenu { AddToExportListButton([.artist(a.name)]) }
                 }
                 ForEach(albums.prefix(40)) { a in
                     NavigationLink(value: a) {
@@ -172,6 +173,7 @@ struct TopHitsStrip: View {
                         .frame(width: size + 16, alignment: .leading)
                     }
                     .buttonStyle(.plain)
+                    .contextMenu { AddToExportListButton(album: a) }
                 }
             }
             .padding(.horizontal, 16)
@@ -323,6 +325,8 @@ struct SmartPlaylistView: View {
                 Button("Shuffle", systemImage: "shuffle") { model.player.play(queue: tracks.shuffled(), startAt: 0) }.disabled(tracks.isEmpty)
                 Button("Edit Rules…", systemImage: "slider.horizontal.3") { model.editSmartPlaylist(playlist) }
                 Button("Export…", systemImage: "square.and.arrow.up") { model.export(name: playlist.name, tracks: tracks) }.disabled(tracks.isEmpty)
+                    .help("Copy this playlist into a single folder with an .m3u file")
+                AddToExportListButton([.smartPlaylist(playlist.id)])
             }
         }
         .onAppear(perform: load)

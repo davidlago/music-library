@@ -48,6 +48,7 @@ struct AlbumDetail: View {
         }
         .navigationTitle(title)
         .toolbar {
+            ToolbarItem { AddToExportListButton(album: album) }
             ToolbarItem {
                 Button { model.refreshAlbumInfo(album) } label: { Label("Update Album Info", systemImage: "arrow.clockwise") }
                     .disabled(model.albumInfo.isFetching(album))
@@ -421,6 +422,7 @@ struct AlbumTrackRow: View {
                 if !model.playlists.isEmpty { Divider() }
                 Button("New Playlist…") { model.createPlaylist(adding: [track.id]) }
             }
+            AddToExportListButton(tracks: [track])
             Divider()
             Button("Show in Finder") { model.showInFinder([track]) }
         }

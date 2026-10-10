@@ -99,27 +99,6 @@ struct MissingToolsBanner: View {
     }
 }
 
-struct ExportSheet: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            let state = model.exportState
-            Text("Exporting “\(state?.playlistName ?? "")”").font(.headline)
-            if let error = state?.error {
-                Text(error).foregroundStyle(.red)
-                Button("Close") { model.exportState = nil }.keyboardShortcut(.defaultAction)
-            } else {
-                ProgressView(value: Double(state?.done ?? 0), total: Double(max(state?.total ?? 1, 1)))
-                Text("\(state?.done ?? 0) of \(state?.total ?? 0) tracks")
-                    .font(.caption).foregroundStyle(.subtext)
-            }
-        }
-        .padding(20)
-        .frame(width: 380)
-    }
-}
-
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
 
@@ -143,6 +122,11 @@ struct SidebarView: View {
                         .tag(SidebarItem.cd(disc.id))
                 }
             }
+            Section("Export") {
+                Label("Export List", systemImage: "externaldrive")
+                    .badge(model.exportList.count)
+                    .tag(SidebarItem.exportList)
+            }
             Section {
                 ForEach(model.playlists) { p in
                     PlaylistRow(playlist: p).tag(SidebarItem.playlist(p.id))
@@ -163,6 +147,7 @@ struct SidebarView: View {
                         .tag(SidebarItem.smartPlaylist(p.id))
                         .contextMenu {
                             Button("Edit…") { model.editSmartPlaylist(p) }
+                            AddToExportListButton([.smartPlaylist(p.id)])
                             Button("Delete", role: .destructive) { model.deleteSmartPlaylist(p.id) }
                         }
                 }
@@ -199,6 +184,7 @@ struct PlaylistRow: View {
         }
         .contextMenu {
             Button("Rename") { model.renamingPlaylistID = playlist.id }
+            AddToExportListButton([.playlist(playlist.id)])
             Button("Delete", role: .destructive) { model.deletePlaylist(playlist.id) }
         }
     }
@@ -224,6 +210,7 @@ struct DetailRouter: View {
         case .albums: AlbumsView()
         case .artists: ArtistsView()
         case .importQueue: ImportView()
+        case .exportList: ExportListView()
         case .cd(let path):
             if let disc = model.cd.discs.first(where: { $0.id == path }) {
                 CDView(disc: disc).id(path)

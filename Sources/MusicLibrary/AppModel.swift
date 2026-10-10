@@ -4,7 +4,7 @@ import MusicLibraryCore
 import SwiftUI
 
 enum SidebarItem: Hashable {
-    case songs, albums, artists, insights, musicDNA, importQueue
+    case songs, albums, artists, insights, musicDNA, importQueue, exportList
     case playlist(Int64)
     case smartPlaylist(Int64)
     case cd(String)
@@ -17,10 +17,15 @@ struct SmartPlaylistDraft: Identifiable {
 }
 
 struct ExportState: Equatable {
-    var playlistName: String
+    var title: String
     var done = 0
     var total = 0
     var error: String?
+    /// Set when an export to the library layout finishes; playlist exports close the sheet instead.
+    var summary: LibraryExportSummary?
+    var destination: URL?
+    /// The removable drive holding `destination`, offered for ejecting when the export is done.
+    var ejectableVolume: URL?
 }
 
 @MainActor @Observable
@@ -36,6 +41,10 @@ final class AppModel {
         static let recentSearches = "recentSearches"
         static let theme = "theme"
         static let dnaDepth = "musicDNADepth"
+        static let exportList = "exportList"
+        static let exportDatabase = "exportBackupDatabase"
+        static let exportPlaylistFiles = "exportPlaylistFiles"
+        static let exportDestination = "lastExportDestination"
     }
 
     var themeID: String {
@@ -110,6 +119,13 @@ final class AppModel {
     var errorMessage: String?
     var renamingPlaylistID: Int64?
     var exportState: ExportState?
+    @ObservationIgnored private var exportTask: Task<Void, Never>?
+    /// What "Export…" on the Export List page copies (albums, songs, artists, playlists).
+    private(set) var exportList: [ExportItem] {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(exportList), forKey: Keys.exportList) }
+    }
+    var exportBackupDatabase: Bool { didSet { UserDefaults.standard.set(exportBackupDatabase, forKey: Keys.exportDatabase) } }
+    var exportPlaylistFiles: Bool { didSet { UserDefaults.standard.set(exportPlaylistFiles, forKey: Keys.exportPlaylistFiles) } }
 
     var mbContact: String { didSet { UserDefaults.standard.set(mbContact, forKey: Keys.contact); applyContact() } }
     var acoustIDKey: String { didSet { UserDefaults.standard.set(acoustIDKey, forKey: Keys.acoustID) } }
@@ -157,6 +173,9 @@ final class AppModel {
         recentSearches = defaults.stringArray(forKey: Keys.recentSearches) ?? []
         themeID = defaults.string(forKey: Keys.theme) ?? Theme.system.id
         dnaDepth = min(3, max(1, defaults.object(forKey: Keys.dnaDepth) == nil ? 2 : defaults.integer(forKey: Keys.dnaDepth)))
+        exportList = defaults.data(forKey: Keys.exportList).flatMap { try? JSONDecoder().decode([ExportItem].self, from: $0) } ?? []
+        exportBackupDatabase = defaults.bool(forKey: Keys.exportDatabase)
+        exportPlaylistFiles = defaults.object(forKey: Keys.exportPlaylistFiles) == nil ? true : defaults.bool(forKey: Keys.exportPlaylistFiles)
         ejectAfterRip = defaults.object(forKey: Keys.ejectAfterRip) == nil ? true : defaults.bool(forKey: Keys.ejectAfterRip)
         matchOutputRate = defaults.object(forKey: Keys.matchRate) == nil ? true : defaults.bool(forKey: Keys.matchRate)
         matchOutputBitDepth = defaults.object(forKey: Keys.matchBitDepth) == nil ? true : defaults.bool(forKey: Keys.matchBitDepth)
@@ -396,9 +415,10 @@ final class AppModel {
 
     // MARK: Albums
 
-    func tracks(of album: AlbumSummary) -> [Track] {
-        let key = AlbumInfoStore.key(album)
-        return tracks.filter { SearchIndex.albumKey(album: $0.album, artist: $0.effectiveAlbumArtist) == key }
+    func tracks(of album: AlbumSummary) -> [Track] { tracks(ofAlbumKey: AlbumInfoStore.key(album)) }
+
+    func tracks(ofAlbumKey key: String) -> [Track] {
+        tracks.filter { SearchIndex.albumKey(album: $0.album, artist: $0.effectiveAlbumArtist) == key }
             .sorted { (($0.metadata.discNo ?? 1), ($0.trackNo ?? 0)) < (($1.metadata.discNo ?? 1), ($1.trackNo ?? 0)) }
     }
 
@@ -674,7 +694,7 @@ final class AppModel {
         panel.message = "Choose a folder (e.g. your MP3 player) to export \"\(name)\" to"
         guard panel.runModal() == .OK, let dest = panel.url else { return }
         let root = libraryRoot
-        exportState = ExportState(playlistName: name, total: tracks.count)
+        exportState = ExportState(title: name, total: tracks.count)
         let progress: @Sendable (Int, Int) -> Void = { [weak self] done, total in
             Task { @MainActor in self?.exportState?.done = done; self?.exportState?.total = total }
         }
@@ -690,6 +710,109 @@ final class AppModel {
             case .failure(let error):
                 self?.exportState?.error = error.localizedDescription
             }
+        }
+    }
+
+    // MARK: Export list
+
+    func addToExportList(_ items: [ExportItem]) {
+        let new = items.filter { !exportList.contains($0) }
+        guard !new.isEmpty else { return }
+        exportList += new
+    }
+
+    func removeFromExportList(_ items: Set<ExportItem>) { exportList.removeAll { items.contains($0) } }
+
+    func clearExportList() { exportList = [] }
+
+    func isInExportList(_ item: ExportItem) -> Bool { exportList.contains(item) }
+
+    /// The item's tracks as they are now (playlists and smart playlists can change after being added).
+    func tracks(for item: ExportItem) -> [Track] {
+        switch item {
+        case .library: return tracks
+        case .album(let album, let artist): return tracks(ofAlbumKey: SearchIndex.albumKey(album: album, artist: artist))
+        case .artist(let name): return tracks(ofArtist: name)
+        case .track(let id): return trackByID[id].map { [$0] } ?? []
+        case .playlist(let id): return playlistTracks(id)
+        case .smartPlaylist(let id): return smartPlaylists.first { $0.id == id }.map(smartPlaylistTracks) ?? []
+        }
+    }
+
+    /// Every track in the export list once, in list order.
+    var exportListTracks: [Track] {
+        var seen = Set<Int64>()
+        return exportList.flatMap(tracks(for:)).filter { seen.insert($0.id).inserted }
+    }
+
+    /// Picks a destination folder, then copies the export list into it using the library's own layout.
+    func runExportList() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Export Here"
+        panel.message = "Choose where to export (e.g. your music player or a backup drive). Files already there are kept."
+        if let last = UserDefaults.standard.string(forKey: Keys.exportDestination) {
+            panel.directoryURL = URL(fileURLWithPath: last, isDirectory: true)
+        }
+        guard panel.runModal() == .OK, let dest = panel.url else { return }
+        UserDefaults.standard.set(dest.path, forKey: Keys.exportDestination)
+        if dest.standardizedFileURL.path == libraryRoot.standardizedFileURL.path {
+            errorMessage = "Choose a folder other than the library itself."
+            return
+        }
+
+        let tracks = exportListTracks
+        let playlistFiles: [ExportPlaylist] = exportPlaylistFiles ? exportList.compactMap { item in
+            switch item {
+            case .playlist(let id): return self.playlists.first { $0.id == id }.map { ExportPlaylist(name: $0.name, tracks: self.tracks(for: item)) }
+            case .smartPlaylist(let id): return self.smartPlaylists.first { $0.id == id }.map { ExportPlaylist(name: $0.name, tracks: self.tracks(for: item)) }
+            default: return nil
+            }
+        } : []
+        let backup = exportBackupDatabase ? database : nil
+        let root = libraryRoot
+        let volume = try? dest.resourceValues(forKeys: [.volumeURLKey, .volumeIsEjectableKey, .volumeIsRemovableKey, .volumeIsInternalKey])
+        let ejectable = volume?.volumeIsEjectable == true || volume?.volumeIsRemovable == true || volume?.volumeIsInternal == false
+        exportState = ExportState(title: dest.lastPathComponent, destination: dest, ejectableVolume: ejectable ? volume?.volume : nil)
+        let progress: @Sendable (Int, Int) -> Void = { [weak self] done, total in
+            Task { @MainActor in
+                guard self?.exportState?.summary == nil else { return }
+                self?.exportState?.done = done; self?.exportState?.total = total
+            }
+        }
+        exportTask = Task { [weak self] in
+            let job = Task.detached { () -> Result<LibraryExportSummary, Error> in
+                Result {
+                    try LibraryExporter().export(tracks: tracks, playlists: playlistFiles, database: backup,
+                                                 libraryRoot: root, to: dest, progress: progress)
+                }
+            }
+            let result = await withTaskCancellationHandler { await job.value } onCancel: { job.cancel() }
+            guard let self, self.exportState?.destination == dest else { return }
+            switch result {
+            case .success(let summary): self.exportState?.summary = summary
+            case .failure(is CancellationError): self.exportState = nil
+            case .failure(let error): self.exportState?.error = error.localizedDescription
+            }
+            self.exportTask = nil
+        }
+    }
+
+    func cancelExport() {
+        exportTask?.cancel()
+        if exportTask == nil { exportState = nil }
+    }
+
+    /// Ejects the drive the last export went to, if it's removable.
+    func ejectExportDestination() {
+        guard let volume = exportState?.ejectableVolume else { return }
+        exportState = nil
+        do {
+            try NSWorkspace.shared.unmountAndEjectDevice(at: volume)
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

@@ -32,7 +32,10 @@
 - **Bit-perfect playback.** The output device follows each track's sample rate and bit depth, and the original format is restored when you quit.
 - **Listening history and Last.fm.** Time listened and plays per album and artist, and optional scrobbling with an offline queue.
 - **Themes.** System, Catppuccin (all four flavors, or auto light/dark), Nord, Dracula, Solarized, Gruvbox, Tokyo Night and Rosé Pine.
-- **Take it with you.** Export any playlist (files and an `.m3u`) to a folder or an MP3 player.
+- **Take it with you.** Add albums, songs, artists and playlists to the Export List and copy them to a USB player
+  or drive in the library's own `Music/Artist/Album` layout. Files already there are never overwritten, and playlists
+  get `.m3u` files. Turn on the database option to also back up `library.sqlite` to the drive, for a full library backup.
+  A single playlist can still be exported to its own folder.
 
 ## Tour
 
