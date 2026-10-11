@@ -56,6 +56,28 @@ import Testing
         #expect(p("https://reviews.example.com/x") == "Example")
     }
 
+    @Test func nonWebRelationsAreDropped() throws {
+        let json = #"""
+        {"id": "rg1", "title": "Evil", "relations": [
+          {"type": "review", "url": {"resource": "file:///Volumes/X/evil.app"}},
+          {"type": "review", "url": {"resource": "x-custom://pitchfork.com/run"}},
+          {"type": "review", "url": {"resource": "https://pitchfork.com/reviews/albums/x"}},
+          {"type": "allmusic", "url": {"resource": "file:///Volumes/X/evil.command"}}]}
+        """#
+        let rg = try ArtistInfoParser.parseReleaseGroup(Data(json.utf8))
+        #expect(rg.urls.map(\.1.absoluteString) == ["https://pitchfork.com/reviews/albums/x"])
+        let tampered = MBReleaseGroup(id: "rg1", title: "Evil", primaryType: nil, secondaryTypes: [], firstReleaseDate: nil,
+                                      genres: [], rating: nil, ratingVotes: 0, score: nil, artist: "",
+                                      urls: [("review", URL(string: "file:///Volumes/X/evil.app")!),
+                                             ("allmusic", URL(string: "file:///Volumes/X/evil.command")!)])
+        for group in [rg, tampered] {
+            let info = AlbumInfo.assemble(title: "Evil", releaseGroup: group, release: nil, wikidata: nil, wikipedia: nil, lastfm: nil)
+            #expect(info.links.allSatisfy(\.url.isWebLink))
+        }
+        let lf = try ArtistInfoParser.parseLastFMAlbum(Data(#"{"album": {"url": "x-custom://run"}}"#.utf8))
+        #expect(lf?.url == nil)
+    }
+
     @Test func typeLabels() {
         var i = AlbumInfo(title: "x")
         #expect(i.typeLabel == nil)
