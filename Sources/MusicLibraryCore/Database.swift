@@ -201,7 +201,7 @@ public final class Database: @unchecked Sendable {
     private static let trackOrder = "ORDER BY artist COLLATE NOCASE, album COLLATE NOCASE, disc_no, track_no, title COLLATE NOCASE"
 
     private static func track(_ r: Row) -> Track {
-        Track(
+        var t = Track(
             id: r.int64(0), path: r.string(1) ?? "",
             metadata: TrackMetadata(
                 title: r.string(2) ?? "", artist: r.string(3) ?? "", album: r.string(4) ?? "",
@@ -212,6 +212,8 @@ public final class Database: @unchecked Sendable {
             addedAt: Date(timeIntervalSince1970: r.double(17)))
             .withDetails(composer: r.string(18), json: r.string(19))
             .withAudio(codec: r.string(20), rate: r.int(21), bits: r.int(22), bitrate: r.int(23), channels: r.int(24))
+        t.metadata.validateMBIDs()
+        return t
     }
 
     static func searchText(_ m: TrackMetadata) -> String {

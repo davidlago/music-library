@@ -290,9 +290,8 @@ extension InfoFetcher {
 
 extension MusicBrainzClient {
     public func lookupReleaseGroup(id: String) async throws -> MBReleaseGroup {
-        var c = URLComponents(string: "\(Self.baseURL)/release-group/\(id)")!
-        c.percentEncodedQuery = "inc=url-rels+genres+ratings&fmt=json"
-        return try ArtistInfoParser.parseReleaseGroup(try await fetchData(c.url!))
+        let url = try Self.lookupURL("release-group", id: id, query: "inc=url-rels+genres+ratings&fmt=json")
+        return try ArtistInfoParser.parseReleaseGroup(try await fetchData(url))
     }
 
     public func searchReleaseGroups(title: String, artist: String) async throws -> [MBReleaseGroup] {

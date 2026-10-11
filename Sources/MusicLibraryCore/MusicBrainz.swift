@@ -11,6 +11,32 @@ public enum NetworkError: Error, LocalizedError {
     }
 }
 
+/// MusicBrainz identifiers are UUIDs. IDs from file tags and library databases are untrusted, so they are
+/// validated before they are stored or put into a URL.
+public enum MBID {
+    /// The lowercase canonical form, or nil when `value` is not a UUID.
+    public static func validated(_ value: String?) -> String? {
+        guard let v = value?.trimmingCharacters(in: .whitespacesAndNewlines), v.count == 36,
+              let uuid = UUID(uuidString: v) else { return nil }
+        return uuid.uuidString.lowercased()
+    }
+
+    public static func validated(_ values: [String]) -> [String] { values.compactMap { validated($0) } }
+}
+
+extension TrackMetadata {
+    /// Drops MusicBrainz IDs that aren't UUIDs and lowercases the rest.
+    public mutating func validateMBIDs() {
+        mbRecordingId = MBID.validated(mbRecordingId)
+        mbReleaseId = MBID.validated(mbReleaseId)
+        extended.mbReleaseGroupId = MBID.validated(extended.mbReleaseGroupId) ?? ""
+        extended.mbReleaseTrackId = MBID.validated(extended.mbReleaseTrackId) ?? ""
+        extended.mbArtistIds = MBID.validated(extended.mbArtistIds)
+        extended.mbAlbumArtistIds = MBID.validated(extended.mbAlbumArtistIds)
+        extended.mbWorkIds = MBID.validated(extended.mbWorkIds)
+    }
+}
+
 public struct DiscRelease: Sendable, Identifiable, Hashable {
     public var id: String
     public var title: String
@@ -280,6 +306,17 @@ public actor MusicBrainzClient {
         if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
     }
 
+    /// `<baseURL>/<entity>/<id>?<query>`; throws unless `id` is a MusicBrainz ID.
+    static func lookupURL(_ entity: String, id: String, query: String) throws -> URL {
+        guard let mbid = MBID.validated(id) else { throw NetworkError.badResponse("not a MusicBrainz \(entity) ID") }
+        guard var c = URLComponents(string: baseURL) else { throw NetworkError.badResponse("bad MusicBrainz URL") }
+        c.path += "/\(entity)/\(mbid)"
+        // Set percent-encoded: URLComponents would encode '+', which MusicBrainz reads as a space.
+        c.percentEncodedQuery = query
+        guard let url = c.url else { throw NetworkError.badResponse("bad MusicBrainz \(entity) URL") }
+        return url
+    }
+
     /// Throttled GET shared by the lookups in other files.
     func fetchData(_ url: URL) async throws -> Data { try await fetch(url) }
 
@@ -332,10 +369,8 @@ public actor MusicBrainzClient {
     }
 
     public func fetchRelease(id: String) async throws -> ReleaseInfo {
-        var c = URLComponents(string: "\(Self.baseURL)/release/\(id)")!
-        // URLComponents would percent-encode '+', which MusicBrainz reads as a space.
-        c.percentEncodedQuery = "inc=recordings+artist-credits+release-groups+labels+isrcs+genres+recording-level-rels+work-rels+work-level-rels+artist-rels&fmt=json"
-        return try MusicBrainzParser.parseRelease(try await fetch(c.url!))
+        let url = try Self.lookupURL("release", id: id, query: "inc=recordings+artist-credits+release-groups+labels+isrcs+genres+recording-level-rels+work-rels+work-level-rels+artist-rels&fmt=json")
+        return try MusicBrainzParser.parseRelease(try await fetch(url))
     }
 }
 

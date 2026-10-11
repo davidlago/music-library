@@ -44,6 +44,7 @@ SwiftUI's `@State`/`@Environment` macro plugin is not shipped with the CLT, so t
 - Track paths come from a `library.sqlite` that may have been made elsewhere: read, copy, trash or export a track's file only through `Track.resolvedFileURL(root:)`/`coverURL(root:)` or `LibraryPath.resolve` (they reject `..`, absolute paths and symlinks leading outside the folder). `fileURL(root:)` is for display.
 - `.TOC.plist` is read from every mounted volume (not only real CDs), so it is untrusted: `CDTOC.parse` rejects blocks outside the Red Book range (`CDTOC.maxBlock`) and non-increasing tracks; keep block arithmetic overflow-safe.
 - Source files are never modified; tags are written only to the library copy (mp3, flac, m4a).
+- MusicBrainz IDs from tags and `library.sqlite` are untrusted: `TagReader.parse` and DB row loading drop non-UUIDs via `TrackMetadata.validateMBIDs()`, and ID lookups build URLs with `MusicBrainzClient.lookupURL` (throws on invalid IDs). Never force-unwrap a URL built from an ID.
 - Secrets (API keys, shared secrets, session keys) go in the keychain via `KeychainStore` (`Keychain.swift`), never in `UserDefaults`; values older versions left in defaults are moved over once with `migratedString(for:from:key:)`.
 - MusicBrainz requests are rate limited (>=1.1 s) and identify the app with `AppInfo.userAgent`; tests must not hit the network unless `MUSICLIB_LIVE_TESTS=1`.
 - Exported playlists: build `.m3u` text only with `PlaylistExporter.m3uContents`, which keeps tag/path line breaks (control characters, U+2028/U+2029) from starting new entries.
