@@ -451,6 +451,7 @@ struct AlbumTrackRow: View {
                 }
             }
             Spacer()
+            LikeButton(model: model, track: track, showsUnliked: hovering)
             if let plays = total?.plays, plays > 0 {
                 Text("\(plays)×").font(.caption).foregroundStyle(.subtext).monospacedDigit().help("\(plays) plays")
             }
@@ -464,6 +465,7 @@ struct AlbumTrackRow: View {
         .contextMenu {
             Button("Play", action: play)
             QueueMenuButtons(player: model.player) { [track] }
+            LikeMenuButton(tracks: [track])
             Menu("Add to Playlist") {
                 ForEach(model.playlists) { p in Button(p.name) { model.add([track.id], toPlaylist: p.id) } }
                 if !model.playlists.isEmpty { Divider() }

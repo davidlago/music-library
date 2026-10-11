@@ -108,7 +108,33 @@ struct ThemedSheet: ViewModifier {
     }
 }
 
+/// A sidebar row's count. The native badge's number is too faint on some themes, so themes draw their own pill;
+/// the System theme keeps the native badge. Zero shows nothing, like `.badge`.
+struct SidebarBadge: ViewModifier {
+    @Environment(\.theme) private var theme
+    let count: Int
+
+    func body(content: Content) -> some View {
+        if let p = theme.palette {
+            HStack(spacing: 4) {
+                content
+                Spacer(minLength: 0)
+                if count != 0 {
+                    Text(count.formatted())
+                        .font(.caption.weight(.semibold)).monospacedDigit()
+                        .foregroundStyle(Color(p.badgeText))
+                        .padding(.horizontal, 6).padding(.vertical, 1)
+                        .background(Capsule().fill(Color(p.badgeFill)))
+                }
+            }
+        } else {
+            content.badge(count)
+        }
+    }
+}
+
 extension View {
+    func sidebarBadge(_ count: Int) -> some View { modifier(SidebarBadge(count: count)) }
     func themedRoot(_ theme: Theme) -> some View { modifier(ThemedRoot(theme: theme)) }
     func themedScrollBackground() -> some View { modifier(ThemedScrollBackground()) }
     func themedSheet() -> some View { modifier(ThemedSheet()) }

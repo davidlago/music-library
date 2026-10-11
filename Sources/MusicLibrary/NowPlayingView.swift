@@ -70,7 +70,10 @@ struct NowPlayingView: View {
             HStack(alignment: .top, spacing: 40) {
                 cover(player.cover, side: side)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(m.title).font(.largeTitle.bold()).lineLimit(2)
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(m.title).font(.largeTitle.bold()).lineLimit(2)
+                        LikeButton(model: model, track: track, font: .title)
+                    }
                     Text(m.artist).font(.title2).foregroundStyle(.subtext).lineLimit(1)
                     Text(albumLine(m)).font(.title3).foregroundStyle(.subtext).lineLimit(1)
                     FormatCaption(player: player, font: .callout, lineLimit: 2)
@@ -88,7 +91,10 @@ struct NowPlayingView: View {
             VStack(spacing: 8) {
                 cover(player.cover, side: side)
                     .padding(.bottom, 12)
-                Text(m.title).font(.title.bold()).lineLimit(2).multilineTextAlignment(.center)
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(m.title).font(.title.bold()).lineLimit(2).multilineTextAlignment(.center)
+                    LikeButton(model: model, track: track, font: .title2)
+                }
                 Text(m.artist).font(.title3).foregroundStyle(.subtext).lineLimit(1)
                 Text(albumLine(m)).font(.headline).foregroundStyle(.subtext).lineLimit(1)
                 FormatCaption(player: player, font: .callout, lineLimit: 2)

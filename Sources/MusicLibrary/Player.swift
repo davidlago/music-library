@@ -29,6 +29,9 @@ final class Player {
     @ObservationIgnored var onPlaybackEnded: (@MainActor () -> Void)?
     /// The queue ran out; pressing play again starts the last track over as a new play.
     @ObservationIgnored private var finishedQueue = false
+    /// The current song was restored at launch and isn't loaded yet: playing it loads it from `currentTime`.
+    /// Until then the output device is left alone and no play is recorded.
+    @ObservationIgnored private var restoredPaused = false
     @ObservationIgnored let matcher: OutputMatcher
     @ObservationIgnored private var loadGeneration = 0
 
@@ -84,9 +87,23 @@ final class Player {
     func moveQueued(from offsets: IndexSet, to destination: Int) { queue.moveQueued(from: offsets, to: destination) }
     func moveUpcoming(from offsets: IndexSet, to destination: Int) { queue.moveUpcoming(from: offsets, to: destination) }
 
+    /// The queue to save when the app quits.
+    var snapshot: PlayQueue.Snapshot? { queue.snapshot(position: currentTime) }
+
+    /// Puts back a queue saved at the last quit, paused where it was.
+    func restore(_ snapshot: PlayQueue.Snapshot, track: (Int64) -> Track?) {
+        guard currentTrack == nil, let position = queue.restore(snapshot, track: track), let current = currentTrack else { return }
+        restoredPaused = true
+        isPlaying = false
+        duration = current.duration
+        currentTime = min(position, max(0, current.duration - 1))
+        loadCover(for: current)
+    }
+
     func stop() {
         onPlaybackEnded?()
         finishedQueue = false
+        restoredPaused = false
         loadGeneration += 1
         avPlayer.pause()
         avPlayer.replaceCurrentItem(with: nil)
@@ -94,8 +111,9 @@ final class Player {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
-    /// Starts the queue's current song.
-    private func loadCurrent() {
+    /// Starts the queue's current song, from `position` seconds in.
+    private func loadCurrent(at position: Double = 0) {
+        restoredPaused = false
         guard let track = queue.current else { return }
         guard let url = track.resolvedFileURL(root: root), FileManager.default.fileExists(atPath: url.path) else {
             lastError = "File missing: \(track.path)"
@@ -108,7 +126,7 @@ final class Player {
         avPlayer.pause()
         avPlayer.replaceCurrentItem(with: nil)
         isPlaying = true
-        currentTime = 0
+        currentTime = position
         duration = track.duration
         loadCover(for: track)
         let matchRate = matchOutputRate
@@ -125,11 +143,11 @@ final class Player {
             }
             guard let self, generation == self.loadGeneration else { return }
             self.outputState = state
-            self.start(url: url)
+            self.start(url: url, at: position)
         }
     }
 
-    private func start(url: URL) {
+    private func start(url: URL, at position: Double) {
         let item = AVPlayerItem(url: url)
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         endObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self] _ in
@@ -138,7 +156,11 @@ final class Player {
         finishedQueue = false
         avPlayer.replaceCurrentItem(with: item)
         avPlayer.volume = volume
+        // Without a completion handler the seek may be asked for before the item is ready.
+        if position > 0 { avPlayer.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) }
         if isPlaying { onWillPlay?(); avPlayer.play() }
+        // The time observer can still deliver the previous song's position after `loadCurrent` reset it.
+        currentTime = position
         updateNowPlaying()
         if let track = currentTrack { onTrackStart?(track) }
     }
@@ -168,6 +190,10 @@ final class Player {
 
     func togglePlayPause() {
         guard let track = currentTrack else { return }
+        if restoredPaused {
+            loadCurrent(at: currentTime)
+            return
+        }
         // Songs queued after the queue ran out play instead of the last song again.
         if !isPlaying && finishedQueue && queue.advance() {
             loadCurrent()

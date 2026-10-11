@@ -118,29 +118,38 @@ struct SidebarView: View {
             }
             Section("Import") {
                 Label("Import", systemImage: "square.and.arrow.down")
-                    .badge(model.importer.pendingCount)
+                    .sidebarBadge(model.importer.pendingCount)
                     .tag(SidebarItem.importQueue)
                 ForEach(model.cd.discs) { disc in
                     Label(disc.title, systemImage: "opticaldisc")
-                        .badge(disc.isRipping ? disc.remainingCount : 0)
+                        .sidebarBadge(disc.isRipping ? disc.remainingCount : 0)
                         .tag(SidebarItem.cd(disc.id))
                 }
             }
             Section("Library Catalog") {
                 Label("Library CDs", systemImage: "building.columns").tag(SidebarItem.catalog)
                 Label("My Checkouts", systemImage: "books.vertical")
-                    .badge(model.catalog.cdCheckouts.count)
+                    .sidebarBadge(model.catalog.cdCheckouts.count)
                     .tag(SidebarItem.catalogCheckouts)
                 Label(model.catalog.listTitle, systemImage: "bookmark")
-                    .badge(model.catalog.listEntries.count)
+                    .sidebarBadge(model.catalog.listEntries.count)
                     .tag(SidebarItem.catalogList)
             }
             Section("Export") {
                 Label("Export List", systemImage: "externaldrive")
-                    .badge(model.exportList.count)
+                    .sidebarBadge(model.exportList.count)
                     .tag(SidebarItem.exportList)
             }
             Section {
+                Label(AppModel.likedSongsName, systemImage: "heart.fill")
+                    .sidebarBadge(model.likedDates.count)
+                    .tag(SidebarItem.likedSongs)
+                    .contextMenu {
+                        Button("Play") { model.player.play(queue: model.likedTracks, startAt: 0, source: AppModel.likedSongsName) }
+                        QueueMenuButtons(player: model.player) { model.likedTracks }
+                        Divider()
+                        AddToExportListButton([.likedSongs])
+                    }
                 ForEach(model.playlists) { p in
                     PlaylistRow(playlist: p).tag(SidebarItem.playlist(p.id))
                 }
@@ -156,7 +165,7 @@ struct SidebarView: View {
             Section {
                 ForEach(model.smartPlaylists) { p in
                     Label(p.name, systemImage: "gearshape")
-                        .badge(model.smartPlaylistCounts[p.id] ?? 0)
+                        .sidebarBadge(model.smartPlaylistCounts[p.id] ?? 0)
                         .tag(SidebarItem.smartPlaylist(p.id))
                         .contextMenu {
                             Button("Play") { model.player.play(queue: model.smartPlaylistTracks(p), startAt: 0, source: p.name) }
@@ -195,7 +204,7 @@ struct PlaylistRow: View {
                     .onExitCommand { model.renamingPlaylistID = nil }
                     .onAppear { draft = playlist.name; focused = true }
             } else {
-                Label(playlist.name, systemImage: "music.note.list").badge(playlist.trackCount)
+                Label(playlist.name, systemImage: "music.note.list").sidebarBadge(playlist.trackCount)
             }
         }
         .contextMenu {
@@ -233,6 +242,7 @@ struct DetailRouter: View {
         case .catalog: CatalogView()
         case .catalogCheckouts: CatalogCheckoutsView()
         case .catalogList: CatalogListView()
+        case .likedSongs: LikedSongsView()
         case .cd(let path):
             if let disc = model.cd.discs.first(where: { $0.id == path }) {
                 CDView(disc: disc).id(path)

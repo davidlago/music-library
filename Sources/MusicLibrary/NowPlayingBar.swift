@@ -144,13 +144,17 @@ struct NowPlayingBar: View {
                     }
                     Spacer(minLength: 0)
                 }
-                .frame(width: 320, alignment: .leading)
+                .frame(width: 300, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(player.currentTrack == nil)
             .help("Show Now Playing")
             .onHover { hovering = $0 }
+            Group {
+                if let track = player.currentTrack { LikeButton(model: model, track: track, font: .title3) }
+            }
+            .frame(width: 20)
 
             TransportControls()
             ScrubberView()

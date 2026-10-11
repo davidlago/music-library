@@ -17,6 +17,7 @@ struct TrackTable: View {
 
     var body: some View {
         Table(sorted, selection: $selection, sortOrder: $sortOrder) {
+            TableColumn(Text(Image(systemName: "heart")).accessibilityLabel("Liked")) { LikeButton(model: model, track: $0) }.width(22)
             TableColumn("Title", value: \.title)
             TableColumn("Artist", value: \.artist)
             TableColumn("Album", value: \.album)
@@ -74,6 +75,7 @@ struct TrackTable: View {
             if let idx = list.firstIndex(where: { ids.contains($0.id) }) { model.player.play(queue: list, startAt: idx, source: source) }
         }
         QueueMenuButtons(player: model.player) { chosen }
+        LikeMenuButton(tracks: chosen)
         Menu("Add to Playlist") {
             ForEach(model.playlists) { p in
                 Button(p.name) { model.add(chosen.map(\.id), toPlaylist: p.id) }
@@ -222,6 +224,7 @@ struct PlaylistView: View {
                         Text("\(t.artist) — \(t.album)").font(.caption).foregroundStyle(.subtext).lineLimit(1)
                     }
                     Spacer()
+                    LikeButton(model: model, track: t)
                     Text(formatTime(t.duration)).monospacedDigit().foregroundStyle(.subtext)
                 }
                 .tag(position)
@@ -237,6 +240,7 @@ struct PlaylistView: View {
             if !positions.isEmpty {
                 Button("Play") { play(from: positions.min() ?? 0) }
                 QueueMenuButtons(player: model.player) { positions.sorted().compactMap { tracks.indices.contains($0) ? tracks[$0] : nil } }
+                LikeMenuButton(tracks: positions.sorted().compactMap { tracks.indices.contains($0) ? tracks[$0] : nil })
                 Button("Show in Finder") { model.showInFinder(positions.sorted().compactMap { tracks.indices.contains($0) ? tracks[$0] : nil }) }
                 AddToExportListButton(tracks: positions.sorted().compactMap { tracks.indices.contains($0) ? tracks[$0] : nil })
                 Divider()
@@ -301,5 +305,66 @@ struct ArtistMenuButtons: View {
         Button("Play") { model.player.play(queue: model.tracks(ofArtist: artist.name), startAt: 0, source: name) }
         Button("Shuffle") { model.player.play(queue: model.tracks(ofArtist: artist.name).shuffled(), startAt: 0, source: name) }
         QueueMenuButtons(player: model.player) { model.tracks(ofArtist: artist.name) }
+    }
+}
+
+/// The special Liked Songs playlist: every liked song, most recently liked first. It can't be renamed or deleted.
+struct LikedSongsView: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let tracks = model.likedTracks
+        let name = AppModel.likedSongsName
+        TrackTable(tracks: tracks, emptyState: ("No Liked Songs", "Click the heart next to a song to add it here."), source: name)
+            .navigationTitle(name)
+            .navigationSubtitle("\(songCount(tracks.count)) · \(formatLongDuration(tracks.reduce(0) { $0 + $1.duration }))")
+            .toolbar {
+                ToolbarItemGroup {
+                    Button("Play", systemImage: "play.fill") { model.player.play(queue: tracks, startAt: 0, source: name) }.disabled(tracks.isEmpty)
+                    Button("Shuffle", systemImage: "shuffle") { model.player.play(queue: tracks.shuffled(), startAt: 0, source: name) }.disabled(tracks.isEmpty)
+                    Button("Export…", systemImage: "square.and.arrow.up") { model.export(name: name, tracks: tracks) }.disabled(tracks.isEmpty)
+                        .help("Copy this playlist into a single folder with an .m3u file")
+                    AddToExportListButton([.likedSongs])
+                }
+            }
+    }
+}
+
+/// The heart that adds a song to Liked Songs. Takes the model instead of reading it from the environment, so it
+/// works inside `Table` cells.
+struct LikeButton: View {
+    @Environment(\.theme) private var theme
+    let model: AppModel
+    let track: Track
+    var font: Font = .body
+    /// False hides the empty heart (rows show it on hover); a liked song always shows its heart.
+    var showsUnliked = true
+
+    var body: some View {
+        let liked = model.isLiked(track)
+        Button { model.toggleLike(track) } label: {
+            Image(systemName: liked ? "heart.fill" : "heart")
+                .font(font)
+                .foregroundStyle(liked ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.subtext))
+                .symbolEffect(.bounce, value: liked)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .opacity(liked || showsUnliked ? 1 : 0)
+        .help(liked ? "Remove from Liked Songs" : "Add to Liked Songs")
+        .accessibilityLabel(liked ? "Remove from Liked Songs" : "Add to Liked Songs")
+    }
+}
+
+/// Like or unlike songs from a context menu: unlikes only when every one is already liked.
+struct LikeMenuButton: View {
+    @Environment(AppModel.self) private var model
+    let tracks: [Track]
+
+    var body: some View {
+        let allLiked = !tracks.isEmpty && tracks.allSatisfy(model.isLiked)
+        Button(allLiked ? "Remove from Liked Songs" : "Add to Liked Songs", systemImage: allLiked ? "heart.slash" : "heart") {
+            model.setLiked(tracks, !allLiked)
+        }
     }
 }

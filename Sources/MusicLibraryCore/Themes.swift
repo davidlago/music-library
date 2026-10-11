@@ -87,6 +87,10 @@ public struct ThemePalette: Hashable, Sendable {
         return (0..<4).map { i in card.mix(series, 1 - (1 - faintest) * Double(i) / 3) }
     }
 
+    /// Count badges (sidebar): a `subtext` pill with the number in the sidebar color, so it reads as a cut-out.
+    public var badgeFill: RGB { subtext }
+    public var badgeText: RGB { mantle }
+
     /// For "unknown" buckets next to the ramp.
     public var neutral: RGB { card.mix(subtext, 0.5) }
 }

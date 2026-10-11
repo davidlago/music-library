@@ -160,3 +160,59 @@ import Testing
         #expect(order(q) == ["A", "X", "Y", "Z", "C", "B", "D"])
     }
 }
+
+@Suite struct PlayQueueSnapshotTests {
+    let library: [Int64: Track] = Dictionary(uniqueKeysWithValues: ["A", "B", "C", "X", "Y"].enumerated().map { i, t in
+        (Int64(i + 1), Track(id: Int64(i + 1), path: "\(t).flac", metadata: TrackMetadata(title: t), duration: 60, format: "flac", sha256: t))
+    })
+
+    func tracks(_ titles: String...) -> [Track] { titles.map { t in library.values.first { $0.title == t }! } }
+    func order(_ q: PlayQueue) -> [String] { q.entries.map(\.track.title) }
+
+    /// Playing B of [A, B, C] with X and Y queued with Play Next.
+    func saved() -> PlayQueue.Snapshot {
+        var q = PlayQueue()
+        q.replace(with: tracks("A", "B", "C"), startAt: 1, source: "Album")
+        q.playNext(tracks("X", "Y"))
+        return q.snapshot(position: 42)!
+    }
+
+    @Test func roundTrips() throws {
+        let snapshot = saved()
+        #expect(snapshot == PlayQueue.Snapshot(trackIds: [1, 2, 4, 5, 3], index: 1, queuedCount: 2, source: "Album", position: 42))
+        let decoded = try JSONDecoder().decode(PlayQueue.Snapshot.self, from: JSONEncoder().encode(snapshot))
+        var q = PlayQueue()
+        #expect(q.restore(decoded) { library[$0] } == 42)
+        #expect(order(q) == ["A", "B", "X", "Y", "C"])
+        #expect(q.current?.title == "B")
+        #expect(q.queued.map(\.track.title) == ["X", "Y"])
+        #expect(q.source == "Album")
+        #expect(PlayQueue().snapshot(position: 0) == nil)
+    }
+
+    @Test func dropsRemovedSongs() {
+        var q = PlayQueue()
+        // A removed: B stays current at its position.
+        #expect(q.restore(saved()) { $0 == 1 ? nil : library[$0] } == 42)
+        #expect(order(q) == ["B", "X", "Y", "C"] && q.current?.title == "B")
+        // B removed: the queued X plays next, from the start, and Y stays queued.
+        #expect(q.restore(saved()) { $0 == 2 ? nil : library[$0] } == 0)
+        #expect(q.current?.title == "X" && q.queued.map(\.track.title) == ["Y"])
+        // Everything from B on removed: falls back to A.
+        #expect(q.restore(saved()) { $0 == 1 ? library[$0] : nil } == 0)
+        #expect(order(q) == ["A"] && q.current?.title == "A")
+        // Nothing left.
+        #expect(q.restore(saved()) { _ in nil } == nil)
+        #expect(q.current == nil && q.entries.isEmpty)
+    }
+
+    @Test func toleratesBadValues() {
+        var q = PlayQueue()
+        let bad = PlayQueue.Snapshot(trackIds: [1, 2], index: Int.max, queuedCount: Int.max, source: nil, position: .nan)
+        #expect(q.restore(bad) { library[$0] } == 0)
+        #expect(q.current?.title == "B")
+        let negative = PlayQueue.Snapshot(trackIds: [1, 2], index: -5, queuedCount: -1, source: nil, position: -3)
+        #expect(q.restore(negative) { library[$0] } == 0)
+        #expect(q.current?.title == "A" && q.queued.isEmpty)
+    }
+}

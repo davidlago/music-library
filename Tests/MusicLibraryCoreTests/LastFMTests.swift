@@ -240,6 +240,7 @@ final class StubTransport: @unchecked Sendable {
             }
             #expect(p.series.contrast(with: p.card) >= 3, "\(name): chart series on card \(p.series.contrast(with: p.card))")
             #expect(p.accent.contrast(with: p.base) >= 3, "\(name): accent on base \(p.accent.contrast(with: p.base))")
+            #expect(p.badgeText.contrast(with: p.badgeFill) >= 4.3, "\(name): badge \(p.badgeText.contrast(with: p.badgeFill))")
         }
     }
 
