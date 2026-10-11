@@ -115,6 +115,7 @@ struct SidebarView: View {
                 Label("Artists", systemImage: "music.mic").tag(SidebarItem.artists)
                 Label("Insights", systemImage: "chart.bar.xaxis").tag(SidebarItem.insights)
                 Label("Music DNA", systemImage: "point.3.connected.trianglepath.dotted").tag(SidebarItem.musicDNA)
+                Label("Concerts", systemImage: "ticket").tag(SidebarItem.concerts)
             }
             Section("Import") {
                 Label("Import", systemImage: "square.and.arrow.down")
@@ -235,6 +236,7 @@ struct DetailRouter: View {
         case .songs: SongsView()
         case .insights: InsightsView()
         case .musicDNA: MusicDNAView()
+        case .concerts: ConcertsView()
         case .albums: AlbumsView()
         case .artists: ArtistsView()
         case .importQueue: ImportView()

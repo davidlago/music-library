@@ -1,0 +1,71 @@
+{
+  "success": true,
+  "pagination": {"page": 1, "perPage": 50, "totalItems": 3, "totalPages": 1},
+  "events": [
+    {
+      "@type": "Concert",
+      "name": "Big Thief at Paradise Rock Club",
+      "identifier": "jambase:13800001",
+      "url": "https://www.jambase.com/show/big-thief-paradise-rock-club-20261105",
+      "eventStatus": "scheduled",
+      "startDate": "2026-11-05T20:00:00",
+      "doorTime": "2026-11-05T19:00:00",
+      "location": {
+        "@type": "MusicVenue",
+        "name": "Paradise Rock Club",
+        "identifier": "jambase:2541",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "967 Commonwealth Ave",
+          "addressLocality": "Boston",
+          "postalCode": "02215",
+          "addressRegion": {"@type": "State", "identifier": "US-MA", "name": "Massachusetts", "alternateName": "MA"},
+          "addressCountry": {"@type": "Country", "identifier": "US", "name": "United States", "alternateName": "USA"},
+          "x-timezone": "America/New_York"
+        },
+        "geo": {"@type": "GeoCoordinates", "latitude": 42.3519, "longitude": -71.1189}
+      },
+      "offers": [{"@type": "Offer", "identifier": "axs:123", "url": "https://www.axs.com/events/123/big-thief-tickets",
+                  "category": "ticketingLinkPrimary",
+                  "priceSpecification": {"@type": "PriceSpecification", "minPrice": 35, "maxPrice": 35, "priceCurrency": "USD"}}],
+      "performer": [
+        {"@type": "MusicGroup", "name": "Squirrel Flower", "identifier": "jambase:1000002",
+         "url": "https://www.jambase.com/band/squirrel-flower", "x-isHeadliner": false, "x-performanceRank": 2,
+         "x-numUpcomingEvents": 12},
+        {"@type": "MusicGroup", "name": "Big Thief", "identifier": "jambase:1000001",
+         "url": "https://www.jambase.com/band/big-thief", "x-isHeadliner": true, "x-performanceRank": 1,
+         "x-numUpcomingEvents": 31}
+      ]
+    },
+    {
+      "@type": "Festival",
+      "name": "Boston Calling 2027",
+      "identifier": "jambase:13800002",
+      "url": "https://www.jambase.com/festival/boston-calling-2027",
+      "eventStatus": "rescheduled",
+      "startDate": "2027-05-21",
+      "endDate": "2027-05-23",
+      "location": {
+        "name": "Harvard Athletic Complex",
+        "address": {"addressLocality": "Allston", "addressRegion": {"identifier": "US-MA", "name": "Massachusetts"},
+                    "addressCountry": {"identifier": "US"}, "x-timezone": "America/New_York"},
+        "geo": {"latitude": 42.3667, "longitude": -71.1255}
+      },
+      "performer": [
+        {"name": "Hozier", "identifier": "jambase:1000010", "x-isHeadliner": true, "x-performanceRank": 1, "x-performanceDate": "2027-05-21"},
+        {"name": "Big Thief", "identifier": "jambase:1000001", "url": "https://www.jambase.com/band/big-thief",
+         "x-isHeadliner": false, "x-performanceRank": 7, "x-performanceDate": "2027-05-22"}
+      ]
+    },
+    {
+      "@type": "Concert",
+      "name": "Big Thief Tribute Night at Lizard Lounge",
+      "identifier": "jambase:13800003",
+      "url": "javascript:alert(1)",
+      "startDate": "2026-11-20T21:00:00",
+      "location": {"name": "Lizard Lounge", "address": {"addressLocality": "Cambridge"}, "geo": {"latitude": 42.3773, "longitude": -71.1193}},
+      "performer": [{"name": "Thieves Like Us", "identifier": "jambase:1000099", "x-isHeadliner": true}]
+    }
+  ],
+  "request": {"endpoint": "https://api.data.jambase.com/v3/events", "method": "GET"}
+}

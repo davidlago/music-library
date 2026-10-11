@@ -201,6 +201,7 @@ struct ArtistDetail: View {
                 statTiles(info)
                 if let bio = info?.bio { about(bio, info!) }
                 if let links = info?.links.filter(\.url.isWebLink), !links.isEmpty { linksSection(links) }
+                ArtistConcertsSection(artist: artist.name, mbid: info?.mbid)
                 if !albums.isEmpty { albumsSection }
                 songsSection
             }

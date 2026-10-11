@@ -11,6 +11,7 @@ struct SettingsView: View {
             PlaybackSettings().tabItem { Label("Playback", systemImage: "play.circle") }
             AppearanceSettings().tabItem { Label("Appearance", systemImage: "paintpalette") }
             LastFMSettings().tabItem { Label("Last.fm", systemImage: "dot.radiowaves.left.and.right") }
+            ConcertSettings().tabItem { Label("Concerts", systemImage: "ticket") }
             LibraryCatalogSettings().tabItem { Label("Library", systemImage: "building.columns") }
         }
         .frame(width: 600)

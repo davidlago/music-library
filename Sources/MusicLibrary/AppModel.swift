@@ -4,7 +4,7 @@ import MusicLibraryCore
 import SwiftUI
 
 enum SidebarItem: Hashable {
-    case songs, albums, artists, insights, musicDNA, importQueue, exportList, catalog, catalogCheckouts, catalogList
+    case songs, albums, artists, insights, musicDNA, concerts, importQueue, exportList, catalog, catalogCheckouts, catalogList
     case likedSongs
     case playlist(Int64)
     case smartPlaylist(Int64)
@@ -190,6 +190,8 @@ final class AppModel {
     @ObservationIgnored let albumInfo = AlbumInfoStore()
     /// The public library's catalog of music CDs.
     @ObservationIgnored let catalog = LibraryCatalogStore()
+    /// Upcoming concerts near home.
+    @ObservationIgnored let concerts = ConcertStore()
     @ObservationIgnored private var currentPlay: (track: Track, startedAt: Date, tracker: ListenTracker)?
     @ObservationIgnored private var terminationObserver: NSObjectProtocol?
     @ObservationIgnored private(set) var importer: ImportController!
@@ -594,6 +596,11 @@ final class AppModel {
     func artistSummary(named name: String) -> ArtistSummary? {
         let key = ArtistInfoStore.key(name)
         return artists.first { ArtistInfoStore.key($0.name) == key }
+    }
+
+    /// The library's artists to look for on the Concerts page, with their MusicBrainz IDs where known.
+    func concertArtists() -> [ConcertArtist] {
+        artists.map { ConcertArtist(name: $0.name, mbid: artistInfo.info(for: $0.name)?.mbid) }
     }
 
     func refreshArtistInfo(_ names: [String]) {
