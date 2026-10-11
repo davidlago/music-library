@@ -4,7 +4,8 @@ import Foundation
 import MusicLibraryCore
 
 /// Artist photos, bios and links, fetched in the background and cached in the library
-/// (database rows plus photos in `<library>/Artist Images`).
+/// (database rows plus photos in `<library>/Artist Images`). A photo the user chose (`artist_photos`) wins over the
+/// downloaded one, and updating the info never replaces it.
 @MainActor @Observable
 final class ArtistInfoStore {
     private enum Keys { static let autoSync = "artistInfoAutoSync" }
@@ -21,7 +22,10 @@ final class ArtistInfoStore {
     }
 
     private(set) var infos: [String: ArtistInfo] = [:]
+    /// Downloaded photos, by artist key.
     private(set) var imageFiles: [String: String] = [:]
+    /// Photos the user chose, by artist key.
+    private(set) var chosenPhotos: [String: ArtistPhotoChoice] = [:]
     /// The artist being fetched right now.
     private(set) var current: String?
     private(set) var remaining = 0
@@ -49,8 +53,25 @@ final class ArtistInfoStore {
 
     var imageDirectory: URL? { root?.appendingPathComponent("Artist Images", isDirectory: true) }
 
+    /// The photo shown for an artist: the chosen one, else the downloaded one. Changes whenever the photo does.
+    func imageFile(for name: String) -> String? {
+        let key = Self.key(name)
+        return chosenPhotos[key]?.file ?? imageFiles[key]
+    }
+
+    func hasChosenPhoto(_ name: String) -> Bool { chosenPhotos[Self.key(name)] != nil }
+
+    /// Who to credit for the photo shown ("Photo: …"); nil for the user's own images.
+    func photoCredit(for name: String) -> (label: String, url: URL?)? {
+        if let chosen = chosenPhotos[Self.key(name)] {
+            return chosen.credit.map { ($0, chosen.creditURL) }
+        }
+        return info(for: name)?.imageCreditURL.map { ("Wikimedia Commons", $0) }
+    }
+
     func imageURL(for name: String) -> URL? {
-        guard let file = imageFiles[Self.key(name)] else { return nil }
+        // File names come from library.sqlite, which may have been made elsewhere.
+        guard let file = imageFile(for: name), ArtistPhotoChoice.isSafeFileName(file) else { return nil }
         return imageDirectory?.appendingPathComponent(file)
     }
 
@@ -78,6 +99,44 @@ final class ArtistInfoStore {
         let cached = (try? database?.artistInfos()) ?? [:]
         infos = cached.mapValues(\.info)
         imageFiles = cached.compactMapValues(\.imageFile)
+        chosenPhotos = (try? database?.artistPhotos()) ?? [:]
+    }
+
+    // MARK: Chosen photos
+
+    /// Makes `jpeg` the artist's photo. Saved under a new name each time, so views showing the old one reload.
+    func setPhoto(_ jpeg: Data, for name: String, credit: String?, creditURL: URL?) throws {
+        guard let database, let dir = imageDirectory else { throw CocoaError(.fileNoSuchFile) }
+        let key = Self.key(name)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let file = "\(Self.fileStem(name))-\(UUID().uuidString.prefix(8).lowercased()).jpg"
+        let url = dir.appendingPathComponent(file)
+        try jpeg.write(to: url, options: .atomic)
+        let choice = ArtistPhotoChoice(file: file, credit: credit, creditURL: creditURL?.webLink)
+        do {
+            try database.saveArtistPhoto(key: key, choice)
+        } catch {
+            try? FileManager.default.removeItem(at: url)
+            throw error
+        }
+        let old = chosenPhotos[key]?.file
+        chosenPhotos[key] = choice
+        if let old { removeImageFile(old) }
+    }
+
+    /// Goes back to the downloaded photo.
+    func removeChosenPhoto(for name: String) throws {
+        let key = Self.key(name)
+        guard let database, let old = chosenPhotos[key]?.file else { return }
+        try database.saveArtistPhoto(key: key, nil)
+        chosenPhotos[key] = nil
+        removeImageFile(old)
+    }
+
+    private func removeImageFile(_ file: String) {
+        guard ArtistPhotoChoice.isSafeFileName(file), let url = imageDirectory?.appendingPathComponent(file) else { return }
+        images.removeObject(forKey: url.path as NSString)
+        try? FileManager.default.removeItem(at: url)
     }
 
     func needsSync(_ name: String, now: Date = Date()) -> Bool {
@@ -148,9 +207,12 @@ final class ArtistInfoStore {
     private func saveImage(_ data: Data, for name: String) throws -> String {
         guard let dir = imageDirectory else { throw CocoaError(.fileNoSuchFile) }
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let hash = SHA256.hash(data: Data(Self.key(name).utf8)).prefix(10).map { String(format: "%02x", $0) }.joined()
-        let file = "\(hash).jpg"
+        let file = "\(Self.fileStem(name)).jpg"
         try data.write(to: dir.appendingPathComponent(file), options: .atomic)
         return file
+    }
+
+    private static func fileStem(_ name: String) -> String {
+        SHA256.hash(data: Data(key(name).utf8)).prefix(10).map { String(format: "%02x", $0) }.joined()
     }
 }

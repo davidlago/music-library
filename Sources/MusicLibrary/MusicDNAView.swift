@@ -244,7 +244,7 @@ struct PersonBubble: View {
 
     var body: some View {
         let color = DNAColor.of(person.category)
-        let hasPhoto = model.artistInfo.imageFiles[ArtistInfoStore.key(person.name)] != nil
+        let hasPhoto = model.artistInfo.imageFile(for: person.name) != nil
         ZStack {
             Circle().fill(theme.isThemed ? theme.card : Color(nsColor: .controlBackgroundColor))
             Circle().fill(color.opacity(0.16))

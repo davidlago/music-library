@@ -25,7 +25,42 @@ enum CoverImage {
     }
 }
 
-/// What the album page opens the cover sheet with: nothing, or an image dropped on the cover.
+/// Images the user brings to the cover and artist photo sheets: a file, a picture dragged from a web page (downloaded),
+/// or the clipboard.
+enum ImageInput {
+    struct Failure: Error { let message: String }
+
+    enum Pasted {
+        case file(URL)
+        case image(Data)
+    }
+
+    static func load(_ url: URL) async -> Result<(data: Data, source: String), Failure> {
+        if url.isFileURL {
+            let data = await Task.detached { try? Data(contentsOf: url) }.value
+            guard let data else { return .failure(Failure(message: "Couldn't read \(url.lastPathComponent).")) }
+            return .success((data, url.lastPathComponent))
+        }
+        guard let link = url.webLink else { return .failure(Failure(message: "Couldn't open that.")) }
+        var request = URLRequest(url: link)
+        request.setValue(AppInfo.userAgent, forHTTPHeaderField: "User-Agent")
+        guard let (data, _) = try? await URLSession.shared.data(for: request), NSImage(data: data) != nil else {
+            return .failure(Failure(message: "Couldn't download that image."))
+        }
+        return .success((data, "Image from \(link.host() ?? "the web")"))
+    }
+
+    /// A copied file, else a copied image; nil when the clipboard has neither.
+    static func pasted() -> Pasted? {
+        let pb = NSPasteboard.general
+        if let url = (pb.readObjects(forClasses: [NSURL.self]) as? [URL])?.first, url.isFileURL { return .file(url) }
+        if let img = NSImage(pasteboard: pb), let data = img.tiffRepresentation { return .image(data) }
+        return nil
+    }
+}
+
+/// What the album page opens the cover sheet with: nothing, or an image dropped on the cover. The artist page opens
+/// the photo sheet the same way.
 struct CoverSheetRequest: Identifiable {
     let id = UUID()
     var image: Data?
@@ -289,33 +324,21 @@ struct AlbumCoverSheet: View {
     }
 
     private func paste() {
-        let pb = NSPasteboard.general
-        if let url = (pb.readObjects(forClasses: [NSURL.self]) as? [URL])?.first, url.isFileURL {
-            Task { await load(url) }
-        } else if let img = NSImage(pasteboard: pb), let data = img.tiffRepresentation {
-            chosen = nil
-            use(data, source: "Pasted image")
-        } else {
-            message = "There's no image on the clipboard."
+        switch ImageInput.pasted() {
+        case .file(let url): Task { await load(url) }
+        case .image(let data): chosen = nil; use(data, source: "Pasted image")
+        case nil: message = "There's no image on the clipboard."
         }
     }
 
     /// A file, or an image dragged from a web page (downloaded).
     private func load(_ url: URL) async {
         chosen = nil
-        if url.isFileURL {
-            let data = await Task.detached { try? Data(contentsOf: url) }.value
-            if let data { use(data, source: url.lastPathComponent) } else { message = "Couldn't read \(url.lastPathComponent)." }
-        } else if let link = url.webLink {
-            downloading = true
-            defer { downloading = false }
-            var request = URLRequest(url: link)
-            request.setValue(AppInfo.userAgent, forHTTPHeaderField: "User-Agent")
-            if let (data, _) = try? await URLSession.shared.data(for: request), NSImage(data: data) != nil {
-                use(data, source: "Image from \(link.host() ?? "the web")")
-            } else {
-                message = "Couldn't download that image."
-            }
+        downloading = !url.isFileURL
+        defer { downloading = false }
+        switch await ImageInput.load(url) {
+        case .success(let image): use(image.data, source: image.source)
+        case .failure(let failure): message = failure.message
         }
     }
 

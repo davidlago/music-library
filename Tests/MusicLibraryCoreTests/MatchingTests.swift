@@ -197,4 +197,16 @@ struct LiveTests {
         print("LIVE cover: \(cover?.count ?? 0) bytes, jpeg=\(cover.map(ImageTools.isJPEG) ?? false)")
         #expect((cover?.count ?? 0) > 1000)
     }
+
+    @Test func artistPhotoSearch() async throws {
+        let finder = ArtistPhotoFinder()
+        let found = try await finder.search("Radiohead")
+        print("LIVE artist photos: \(found.filter { $0.source == .deezer }.count) Deezer, \(found.filter { $0.source == .commons }.count) Commons")
+        let deezer = try #require(found.first { $0.source == .deezer })
+        #expect((try await finder.thumbnail(deezer)?.count ?? 0) > 1000)
+        let commons = try #require(found.first { $0.source == .commons })
+        let photo = try await finder.image(for: commons)
+        print("LIVE Commons photo \(commons.title): \(photo?.count ?? 0) bytes")
+        #expect((photo?.count ?? 0) > 1000)
+    }
 }

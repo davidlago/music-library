@@ -40,7 +40,7 @@ public final class Database: @unchecked Sendable {
     private var db: OpaquePointer?
     private let lock = NSRecursiveLock()
     private var transactionDepth = 0
-    static let schemaVersion = 12
+    static let schemaVersion = 13
 
     public init(path: String) throws {
         if sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nil) != SQLITE_OK {
@@ -212,6 +212,12 @@ public final class Database: @unchecked Sendable {
             try exec("""
             CREATE TABLE IF NOT EXISTS liked_tracks(
                 track_id INTEGER PRIMARY KEY REFERENCES tracks(id) ON DELETE CASCADE, liked_at REAL NOT NULL)
+            """)
+        }
+        if version < 13 {
+            try exec("""
+            CREATE TABLE IF NOT EXISTS artist_photos(
+                key TEXT PRIMARY KEY, file TEXT NOT NULL, credit TEXT, credit_url TEXT, updated_at REAL NOT NULL)
             """)
         }
         try exec("PRAGMA user_version=\(Self.schemaVersion)")
@@ -476,6 +482,27 @@ public final class Database: @unchecked Sendable {
         }
         var out: [String: (info: ArtistInfo, imageFile: String?)] = [:]
         for case let (key, info, file)? in rows { out[key] = (info, file) }
+        return out
+    }
+
+    /// The photo the user chose for an artist (with nil, back to the downloaded one).
+    public func saveArtistPhoto(key: String, _ choice: ArtistPhotoChoice?) throws {
+        guard let c = choice else {
+            try exec("DELETE FROM artist_photos WHERE key=?", [.text(key)])
+            return
+        }
+        try exec("INSERT OR REPLACE INTO artist_photos(key,file,credit,credit_url,updated_at) VALUES(?,?,?,?,?)",
+                 [.text(key), .text(c.file), .text(c.credit), .text(c.creditURL?.absoluteString), .double(Date().timeIntervalSince1970)])
+    }
+
+    /// Chosen photos by artist key. Rows are untrusted: unsafe file names are dropped and credit links must be web links.
+    public func artistPhotos() throws -> [String: ArtistPhotoChoice] {
+        let rows = try query("SELECT key, file, credit, credit_url FROM artist_photos") { r -> (String, ArtistPhotoChoice)? in
+            guard let key = r.string(0), let file = r.string(1), ArtistPhotoChoice.isSafeFileName(file) else { return nil }
+            return (key, ArtistPhotoChoice(file: file, credit: r.string(2), creditURL: r.string(3).flatMap(URL.init(webLink:))))
+        }
+        var out: [String: ArtistPhotoChoice] = [:]
+        for case let (key, choice)? in rows { out[key] = choice }
         return out
     }
 
