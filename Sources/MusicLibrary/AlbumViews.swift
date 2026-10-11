@@ -58,7 +58,7 @@ struct AlbumDetail: View {
         .onAppear(perform: load)
         .onChange(of: model.libraryVersion) { load() }
         .task(id: album.id) {
-            let url = model.coverURL(forAlbum: album)
+            guard let url = model.coverURL(forAlbum: album) else { cover = nil; return }
             let data = await Task.detached { try? Data(contentsOf: url) }.value
             cover = data.flatMap(NSImage.init(data:))
         }
