@@ -44,7 +44,7 @@ struct InsightsView: View {
     @AppStorage("listeningPeriod") private var period = ListeningStats.Period.month
 
     enum Pane: String, CaseIterable, Identifiable {
-        case library = "Library", listening = "Listening"
+        case library = "Library", listening = "Listening", owned = "Owned"
         var id: String { rawValue }
     }
 
@@ -67,6 +67,12 @@ struct InsightsView: View {
                     } else {
                         ProgressView("Crunching the numbers…").frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
+                case .owned:
+                    if let stats = model.ownershipStats {
+                        OwnedContent(stats: stats)
+                    } else {
+                        ProgressView("Crunching the numbers…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
             }
         }
@@ -75,12 +81,13 @@ struct InsightsView: View {
             ToolbarItem(placement: .principal) {
                 Picker("Insights", selection: $pane) { ForEach(Pane.allCases) { Text($0.rawValue).tag($0) } }
                     .pickerStyle(.segmented).labelsHidden().fixedSize()
-                    .help("Your collection, or what you listen to")
+                    .help("Your collection, what you listen to, or the albums you own and what you paid")
             }
         }
         .onAppear(perform: load)
         .onChange(of: model.libraryVersion) { load() }
         .onChange(of: model.historyVersion) { load() }
+        .onChange(of: model.purchasesVersion) { load() }
         .onChange(of: pane) { load() }
         .onChange(of: period) { load() }
     }
@@ -89,6 +96,7 @@ struct InsightsView: View {
         switch pane {
         case .library: model.loadStatsIfNeeded()
         case .listening: model.loadListeningIfNeeded(period)
+        case .owned: model.loadOwnershipIfNeeded()
         }
     }
 }

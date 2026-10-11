@@ -41,9 +41,15 @@
   playlist that keeps itself up to date.
 - **Music DNA.** See who played, wrote and produced with whom across your library, and click your way from one
   collaborator to the next. Any name in the app opens it.
-- **Insights.** Two panes: your collection (by decade, genre, artist, audio quality, growth, track length and most-credited
-  people) and your listening (top songs, artists and albums, activity over time, when you listen, the genres and eras you
-  play, skips, streaks and favorites to rediscover) over 7 days, 30 days, 12 months or all time. Everything is clickable.
+- **Insights.** Three panes: your collection (by decade, genre, artist, audio quality, growth, track length and most-credited
+  people), your listening (top songs, artists and albums, activity over time, when you listen, the genres and eras you
+  play, skips, streaks and favorites to rediscover) over 7 days, 30 days, 12 months or all time, and the albums you own
+  (money spent over time, average price, cost per play and per hour, top artists, best value and unplayed purchases).
+  Everything is clickable.
+- **Fix missing covers.** Change an album's cover from its page: pick one from MusicBrainz's Cover Art Archive, or use
+  an image file, a picture dragged from the web or one you copied. It can be embedded in the album's files too.
+- **Albums you own.** Mark an album as yours on its page, with when you bought it and what you paid; ripping a CD asks
+  the same.
 
 **Play it**
 

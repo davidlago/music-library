@@ -37,6 +37,12 @@ final class CDDisc: Identifiable {
     var searchArtist = ""
     var statusLine = ""
     var message: String?
+    /// Your answer to "Do you own this CD?" (nil until answered), with the purchase date and price.
+    var owned: Bool?
+    var purchasedOn: PurchaseDay?
+    var price: Decimal?
+    /// Set once ripping has started, from then on changes to the answer are saved right away.
+    var ownershipSaved = false
     @ObservationIgnored var task: Task<Void, Never>?
     @ObservationIgnored var removed = false
 
@@ -51,6 +57,8 @@ final class CDDisc: Identifiable {
     var title: String { release?.album ?? volume.name }
     var selectedCandidate: DiscRelease? { candidates.first { $0.id == selectedCandidateID } }
     var selectedCount: Int { rows.filter { $0.selected && !$0.status.isFinished }.count }
+    /// The library album the matched release is imported as (`SearchIndex.albumKey`).
+    var albumKey: String? { release.map { SearchIndex.albumKey(album: $0.album, artist: $0.albumArtist) } }
     var remainingCount: Int {
         rows.filter { $0.selected && ($0.status == .pending || $0.status.isActive) }.count
     }
@@ -147,6 +155,7 @@ final class CDController {
             guard !disc.removed, disc.selectedCandidateID == candidate.id else { return }
             disc.release = release
             disc.medium = candidate.mediumPosition
+            prefillOwnership(disc)
             disc.cover = (try? await model.coverArt.fetchFront(releaseId: release.id, releaseGroupId: release.releaseGroupId)) ?? nil
             buildRows(disc)
             disc.lookup = .matched
@@ -197,6 +206,24 @@ final class CDController {
         do { try NSWorkspace.shared.unmountAndEjectDevice(at: disc.volume.url) } catch { model.errorMessage = error.localizedDescription }
     }
 
+    // MARK: Ownership
+
+    /// Fills in the ownership answer from the library when the album is already marked as owned (re-ripping a disc).
+    private func prefillOwnership(_ disc: CDDisc) {
+        guard disc.owned == nil, !disc.ownershipSaved, let key = disc.albumKey, let p = model.purchases[key] else { return }
+        disc.owned = true
+        disc.purchasedOn = p.purchasedOn
+        disc.price = p.price
+    }
+
+    /// Saves the answer for the matched album: owned with its details, or not owned. Unanswered changes nothing.
+    func saveOwnership(_ disc: CDDisc) {
+        guard let owned = disc.owned, let release = disc.release, let key = disc.albumKey else { return }
+        model.setPurchase(owned ? AlbumPurchase(album: release.album, artist: release.albumArtist,
+                                                purchasedOn: disc.purchasedOn, price: disc.price) : nil,
+                          forKey: key)
+    }
+
     // MARK: Ripping
 
     func toggleAll(_ disc: CDDisc, _ on: Bool) {
@@ -212,6 +239,8 @@ final class CDController {
         let importer = CDImporter(tools: model.tools)
         let volume = disc.volume
         let cover = disc.cover
+        saveOwnership(disc)
+        disc.ownershipSaved = true
         disc.isRipping = true
         disc.task = Task { [weak self] in
             let targets = disc.rows.filter { $0.selected && !$0.status.isFinished }.map(\.id)

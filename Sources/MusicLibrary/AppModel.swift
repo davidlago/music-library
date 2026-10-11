@@ -120,6 +120,16 @@ final class AppModel {
     private(set) var historyVersion = 0
     @ObservationIgnored private var listeningRequest: (period: ListeningStats.Period, library: Int, history: Int, at: Date)?
     @ObservationIgnored private var listeningTask: Task<Void, Never>?
+    /// Albums you own, with purchase date and price (keyed by `AlbumInfoStore.key`).
+    private(set) var purchases: [String: AlbumPurchase] = [:]
+    /// Bumped whenever `purchases` changes.
+    private(set) var purchasesVersion = 0
+    /// Bumped when an album gets a new cover, so views showing the same cover.jpg load it again.
+    private(set) var coverRevision = 0
+    /// The Owned pane of Insights.
+    private(set) var ownershipStats: OwnershipStats?
+    @ObservationIgnored private var ownershipRequest: (library: Int, purchases: Int, history: Int)?
+    @ObservationIgnored private var ownershipTask: Task<Void, Never>?
     private(set) var albums: [AlbumSummary] = []
     private(set) var artists: [ArtistSummary] = []
     private(set) var playlists: [Playlist] = []
@@ -271,6 +281,8 @@ final class AppModel {
             artistInfo.open(database: database, root: libraryRoot)
             albumInfo.open(database: database)
             catalog.open(database: database)
+            purchases = (try? database?.albumPurchases()) ?? [:]
+            purchasesVersion += 1
             reloadLibrary()
             Task { await backfillAudioFormats() }
         } catch {
@@ -313,6 +325,7 @@ final class AppModel {
         playTotals = [:]; artistPlayTotals = [:]; albumPlayTotals = [:]; albumAddedDates = [:]
         index = .empty; searchResults = SearchResults(); stats = nil; statsVersion = -1
         listening = nil; listeningRequest = nil
+        purchases = [:]; ownershipStats = nil; ownershipRequest = nil
         openLibrary()
     }
 
@@ -493,6 +506,45 @@ final class AppModel {
         albumInfo.refresh([albumRequest(album)], fetcher: artistFetcher)
     }
 
+    /// Gives the album a new cover (JPEG): its `cover.jpg` and, with `embed`, the art inside its files.
+    func replaceCover(of album: AlbumSummary, with jpeg: Data, embed: Bool,
+                      progress: @escaping @Sendable (Int, Int) -> Void) async throws -> AlbumCoverWriter.Result {
+        let writer = AlbumCoverWriter(root: libraryRoot, tools: tools)
+        let albumTracks = tracks(of: album)
+        defer {
+            coverRevision += 1
+            player.reloadCover()
+            reloadLibrary()
+        }
+        return try await Task.detached(priority: .userInitiated) {
+            try await writer.apply(jpeg, to: albumTracks, embed: embed, progress: progress)
+        }.value
+    }
+
+    func album(forKey key: String) -> AlbumSummary? {
+        albums.first { AlbumInfoStore.key($0) == key }
+    }
+
+    // MARK: Ownership
+
+    func purchase(for album: AlbumSummary) -> AlbumPurchase? { purchases[AlbumInfoStore.key(album)] }
+
+    /// Records that you own the album (with nil, that you don't).
+    func setPurchase(_ purchase: AlbumPurchase?, forKey key: String) {
+        guard let db = database, purchases[key] != purchase else { return }
+        do {
+            try db.saveAlbumPurchase(key: key, purchase)
+            purchases[key] = purchase
+            purchasesVersion += 1
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func setPurchase(_ purchase: AlbumPurchase?, for album: AlbumSummary) {
+        setPurchase(purchase, forKey: AlbumInfoStore.key(album))
+    }
+
     func artistSummary(named name: String) -> ArtistSummary? {
         let key = ArtistInfoStore.key(name)
         return artists.first { ArtistInfoStore.key($0.name) == key }
@@ -626,6 +678,23 @@ final class AppModel {
             await MainActor.run { [weak self] in
                 guard let self, self.listeningRequest?.at == request.at else { return }
                 self.listening = stats
+            }
+        }
+    }
+
+    /// Computes the Owned pane's stats in the background unless the library, purchases and history are unchanged.
+    func loadOwnershipIfNeeded() {
+        let request = (library: libraryVersion, purchases: purchasesVersion, history: historyVersion)
+        if let r = ownershipRequest, r == request, ownershipStats != nil { return }
+        ownershipRequest = request
+        let all = tracks, owned = purchases, totals = playTotals
+        ownershipTask?.cancel()
+        ownershipTask = Task.detached(priority: .userInitiated) {
+            let stats = OwnershipStats(tracks: all, purchases: owned, playTotals: totals)
+            guard !Task.isCancelled else { return }
+            await MainActor.run { [weak self] in
+                guard let self, let r = self.ownershipRequest, r == request else { return }
+                self.ownershipStats = stats
             }
         }
     }

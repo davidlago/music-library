@@ -82,7 +82,7 @@ private struct QueueRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            CoverThumb(url: model.coverURL(for: track), size: 36)
+            CoverThumb(url: model.coverURL(for: track), size: 36, revision: model.coverRevision)
             VStack(alignment: .leading, spacing: 1) {
                 Text(track.title).lineLimit(1)
                     .fontWeight(isCurrent ? .semibold : .regular)

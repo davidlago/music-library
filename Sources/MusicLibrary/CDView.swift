@@ -5,6 +5,7 @@ struct CDView: View {
     @Environment(AppModel.self) private var model
     @Bindable var disc: CDDisc
     @State private var showWrongAlbum = false
+    @State private var askOwnership = false
 
     private var hasExactMatch: Bool { disc.candidates.contains { $0.exactMatch } }
 
@@ -20,6 +21,7 @@ struct CDView: View {
             }
             lookupStatus
             if disc.lookup == .matched { wrongAlbumSection }
+            if disc.release != nil { CDOwnershipPanel(disc: disc) }
             trackList
             Divider()
             footer.padding(12)
@@ -29,6 +31,10 @@ struct CDView: View {
         .onChange(of: disc.lookup) { _, new in
             if new == .matched { showWrongAlbum = !hasExactMatch }
         }
+        .onChange(of: disc.owned) { if disc.ownershipSaved { model.cd.saveOwnership(disc) } }
+        .onChange(of: disc.purchasedOn) { if disc.ownershipSaved { model.cd.saveOwnership(disc) } }
+        .onChange(of: disc.price) { if disc.ownershipSaved { model.cd.saveOwnership(disc) } }
+        .sheet(isPresented: $askOwnership) { CDOwnershipSheet(disc: disc) { model.cd.rip(disc) }.themedSheet() }
     }
 
     @ViewBuilder
@@ -246,7 +252,9 @@ struct CDView: View {
                         .disabled(disc.selectedCount == 0 || !model.ffmpegAvailable || disc.lookup == .looking)
                         .help("Rip the checked tracks to FLAC and match them in the Import queue")
                 }
-                Button("Rip \(disc.selectedCount) Track\(disc.selectedCount == 1 ? "" : "s")") { model.cd.rip(disc) }
+                Button("Rip \(disc.selectedCount) Track\(disc.selectedCount == 1 ? "" : "s")") {
+                    if disc.owned == nil { askOwnership = true } else { model.cd.rip(disc) }
+                }
                     .buttonStyle(.borderedProminent)
                     .disabled(disc.release == nil || disc.selectedCount == 0 || !model.ffmpegAvailable)
             }
