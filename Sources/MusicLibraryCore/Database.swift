@@ -40,7 +40,7 @@ public final class Database: @unchecked Sendable {
     private var db: OpaquePointer?
     private let lock = NSRecursiveLock()
     private var transactionDepth = 0
-    static let schemaVersion = 10
+    static let schemaVersion = 11
 
     public init(path: String) throws {
         if sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nil) != SQLITE_OK {
@@ -200,6 +200,13 @@ public final class Database: @unchecked Sendable {
         }
         if version < 10 {
             try exec("CREATE TABLE IF NOT EXISTS catalog_previews(work_id TEXT PRIMARY KEY, json TEXT NOT NULL, fetched_at REAL NOT NULL)")
+        }
+        if version < 11 {
+            try exec("""
+            CREATE TABLE IF NOT EXISTS album_ownership(
+                key TEXT PRIMARY KEY, album TEXT NOT NULL, artist TEXT NOT NULL,
+                purchased_on TEXT, price TEXT, updated_at REAL NOT NULL)
+            """)
         }
         try exec("PRAGMA user_version=\(Self.schemaVersion)")
     }
@@ -459,6 +466,29 @@ public final class Database: @unchecked Sendable {
         var out: [String: AlbumInfo] = [:]
         for case let (key, info)? in rows { out[key] = info }
         return out
+    }
+
+    // MARK: Album ownership
+
+    /// Saves (or with nil, forgets) that you own the album with this key (`SearchIndex.albumKey`).
+    public func saveAlbumPurchase(key: String, _ purchase: AlbumPurchase?) throws {
+        guard let p = purchase else {
+            try exec("DELETE FROM album_ownership WHERE key=?", [.text(key)])
+            return
+        }
+        try exec("INSERT OR REPLACE INTO album_ownership(key,album,artist,purchased_on,price,updated_at) VALUES(?,?,?,?,?,?)",
+                 [.text(key), .text(p.album), .text(p.artist), .text(p.purchasedOn?.string),
+                  .text(AlbumPurchase.priceText(p.price)), .double(Date().timeIntervalSince1970)])
+    }
+
+    /// Owned albums by key. Dates and prices that don't parse (the file may come from elsewhere) read as unknown.
+    public func albumPurchases() throws -> [String: AlbumPurchase] {
+        let rows = try query("SELECT key, album, artist, purchased_on, price FROM album_ownership") { r in
+            (r.string(0) ?? "", AlbumPurchase(album: r.string(1) ?? "", artist: r.string(2) ?? "",
+                                              purchasedOn: r.string(3).flatMap(PurchaseDay.init(string:)),
+                                              price: AlbumPurchase.price(text: r.string(4))))
+        }
+        return Dictionary(rows, uniquingKeysWith: { a, _ in a })
     }
 
     // MARK: Library catalog

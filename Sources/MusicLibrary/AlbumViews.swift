@@ -12,6 +12,9 @@ struct AlbumDetail: View {
     @State private var cover: NSImage?
     @State private var descriptionExpanded = false
     @State private var showAllCredits = false
+    @State private var coverSheet: CoverSheetRequest?
+    @State private var hoveringCover = false
+    @State private var coverDropTargeted = false
 
     private var title: String { album.album.isEmpty ? "Unknown Album" : album.album }
 
@@ -50,6 +53,11 @@ struct AlbumDetail: View {
         .toolbar {
             ToolbarItem { AddToExportListButton(album: album) }
             ToolbarItem {
+                Button { coverSheet = CoverSheetRequest() } label: { Label("Change Cover…", systemImage: "photo") }
+                    .disabled(tracks.isEmpty)
+                    .help("Find a cover on MusicBrainz or use an image of your own")
+            }
+            ToolbarItem {
                 Button { model.refreshAlbumInfo(album) } label: { Label("Update Album Info", systemImage: "arrow.clockwise") }
                     .disabled(model.albumInfo.isFetching(album))
                     .help("Download the latest description, rating, links and track list")
@@ -57,7 +65,8 @@ struct AlbumDetail: View {
         }
         .onAppear(perform: load)
         .onChange(of: model.libraryVersion) { load() }
-        .task(id: album.id) {
+        .sheet(item: $coverSheet) { AlbumCoverSheet(album: album, tracks: tracks, request: $0).themedSheet() }
+        .task(id: "\(album.id)|\(model.coverRevision)") {
             guard let url = model.coverURL(forAlbum: album) else { cover = nil; return }
             let data = await Task.detached { try? Data(contentsOf: url) }.value
             cover = data.flatMap(NSImage.init(data:))
@@ -73,20 +82,7 @@ struct AlbumDetail: View {
 
     private func header(_ info: AlbumInfo?, coverSize: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Group {
-                if let cover {
-                    Image(nsImage: cover).resizable().scaledToFill()
-                } else {
-                    ZStack {
-                        Rectangle().fill(theme.fill)
-                        Image(systemName: "music.note").font(.system(size: coverSize / 4)).foregroundStyle(.subtext)
-                    }
-                }
-            }
-            .frame(width: coverSize, height: coverSize)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
-            .padding(.bottom, 10)
+            coverArt(size: coverSize).padding(.bottom, 10)
 
             Text(typeLine(info)).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.subtext)
             Text(title).font(.system(size: 30, weight: .bold)).lineLimit(3).minimumScaleFactor(0.7)
@@ -123,6 +119,49 @@ struct AlbumDetail: View {
             .padding(.top, 6)
             listening(info).padding(.top, 8)
         }
+    }
+
+    /// The cover, with "Change Cover…" on hover (or "Add Cover…" when there is none); dropping an image on it opens
+    /// the cover sheet with that image.
+    private func coverArt(size: CGFloat) -> some View {
+        ZStack(alignment: .bottomTrailing) {
+            Group {
+                if let cover {
+                    Image(nsImage: cover).resizable().scaledToFill()
+                } else {
+                    ZStack {
+                        Rectangle().fill(theme.fill)
+                        VStack(spacing: 12) {
+                            Image(systemName: "music.note").font(.system(size: size / 4)).foregroundStyle(.subtext)
+                            if !tracks.isEmpty {
+                                Button("Add Cover…") { coverSheet = CoverSheetRequest() }
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(width: size, height: size)
+            if cover != nil, hoveringCover, !tracks.isEmpty {
+                Button { coverSheet = CoverSheetRequest() } label: { Label("Change Cover…", systemImage: "photo") }
+                    .controlSize(.small)
+                    .padding(10)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay { if coverDropTargeted { RoundedRectangle(cornerRadius: 12).strokeBorder(theme.accent, lineWidth: 3) } }
+        .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
+        .onHover { hoveringCover = $0 }
+        .contextMenu {
+            Button(cover == nil ? "Add Cover…" : "Change Cover…") { coverSheet = CoverSheetRequest() }.disabled(tracks.isEmpty)
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first, url.isFileURL, !tracks.isEmpty else { return false }
+            let data = try? Data(contentsOf: url)
+            guard let data, NSImage(data: data) != nil else { return false }
+            coverSheet = CoverSheetRequest(image: data, source: url.lastPathComponent)
+            return true
+        } isTargeted: { coverDropTargeted = $0 }
     }
 
     @ViewBuilder
@@ -199,6 +238,9 @@ struct AlbumDetail: View {
 
     @ViewBuilder
     private func sections(_ info: AlbumInfo?) -> some View {
+        if !album.album.isEmpty {
+            AlbumOwnershipSection(album: album, plays: tracks.reduce(0) { $0 + (model.playTotals[$1.id]?.plays ?? 0) })
+        }
         if let text = info?.description { about(text, info!) }
         else if model.albumInfo.isFetching(album) {
             Label("Looking up album info…", systemImage: "arrow.down.circle").font(.callout).foregroundStyle(.subtext)

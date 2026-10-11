@@ -143,6 +143,11 @@ final class Player {
         if let track = currentTrack { onTrackStart?(track) }
     }
 
+    /// Reloads the current track's cover, after it was replaced.
+    func reloadCover() {
+        if let track = currentTrack { loadCover(for: track) }
+    }
+
     private func loadCover(for track: Track) {
         cover = track.coverURL(root: root).flatMap { NSImage(contentsOf: $0) }
         updateNowPlaying()

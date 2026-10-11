@@ -36,6 +36,8 @@ func songCount(_ n: Int) -> String { n == 1 ? "1 song" : "\(n.formatted()) songs
 struct CoverThumb: View {
     let url: URL?
     var size: CGFloat = 140
+    /// Pass `AppModel.coverRevision` so a replaced cover.jpg is loaded again.
+    var revision = 0
     @State private var image: NSImage?
 
     var body: some View {
@@ -49,7 +51,7 @@ struct CoverThumb: View {
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: 6))
-        .task(id: url) {
+        .task(id: "\(url?.path ?? "")|\(revision)") {
             guard let url else { image = nil; return }
             let data = await Task.detached { try? Data(contentsOf: url) }.value
             image = data.flatMap { NSImage(data: $0) }

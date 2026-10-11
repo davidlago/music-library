@@ -56,7 +56,8 @@ public struct DiscRelease: Sendable, Identifiable, Hashable {
 }
 
 public enum MusicBrainzParser {
-    static func parseDiscReleases(_ data: Data, discID: String?, trackCount: Int) throws -> [DiscRelease] {
+    /// With no `trackCount`, a release's first medium is used.
+    static func parseDiscReleases(_ data: Data, discID: String?, trackCount: Int?) throws -> [DiscRelease] {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw NetworkError.badResponse("MusicBrainz disc lookup is not a JSON object")
         }
@@ -71,7 +72,11 @@ public enum MusicBrainzParser {
                 exact = chosen != nil
             }
             if chosen == nil {
-                chosen = media.first { ($0["track-count"] as? Int) == trackCount }
+                if let trackCount {
+                    chosen = media.first { ($0["track-count"] as? Int) == trackCount }
+                } else {
+                    chosen = media.first ?? [:]
+                }
             }
             guard let medium = chosen else { continue }
             let labels = rel["label-info"] as? [[String: Any]] ?? []
@@ -97,11 +102,26 @@ public enum MusicBrainzParser {
         }.map(\.element)
     }
 
+    /// Search results kept in MusicBrainz's order (best match first), with invalid IDs dropped.
+    public static func parseCoverSearch(_ data: Data) throws -> [DiscRelease] {
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw NetworkError.badResponse("MusicBrainz search is not a JSON object")
+        }
+        let order = (root["releases"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
+        let byId = Dictionary(try parseDiscReleases(data, discID: nil, trackCount: nil).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        return order.compactMap { id in
+            guard var r = byId[id], let valid = MBID.validated(r.id) else { return nil }
+            r.id = valid
+            r.releaseGroupId = MBID.validated(r.releaseGroupId)
+            return r
+        }
+    }
+
     public static func parseDiscLookup(_ data: Data, discID: String, trackCount: Int) throws -> [DiscRelease] {
         try parseDiscReleases(data, discID: discID, trackCount: trackCount)
     }
 
-    public static func parseReleaseSearch(_ data: Data, trackCount: Int) throws -> [DiscRelease] {
+    public static func parseReleaseSearch(_ data: Data, trackCount: Int?) throws -> [DiscRelease] {
         try parseDiscReleases(data, discID: nil, trackCount: trackCount)
     }
 
@@ -368,6 +388,17 @@ public actor MusicBrainzClient {
         return try MusicBrainzParser.parseReleaseSearch(try await fetch(c.url!), trackCount: trackCount)
     }
 
+    /// Releases by title and artist, any track count, in MusicBrainz's relevance order (for finding cover art).
+    public func searchReleases(album: String, artist: String) async throws -> [DiscRelease] {
+        var parts: [String] = []
+        if !album.isEmpty { parts.append("release:\"\(Self.luceneEscape(album))\"") }
+        if !artist.isEmpty { parts.append("artist:\"\(Self.luceneEscape(artist))\"") }
+        guard !parts.isEmpty else { return [] }
+        var c = URLComponents(string: "\(Self.baseURL)/release")!
+        c.queryItems = [.init(name: "query", value: parts.joined(separator: " AND ")), .init(name: "fmt", value: "json"), .init(name: "limit", value: "25")]
+        return try MusicBrainzParser.parseCoverSearch(try await fetch(c.url!))
+    }
+
     public func fetchRelease(id: String) async throws -> ReleaseInfo {
         let url = try Self.lookupURL("release", id: id, query: "inc=recordings+artist-credits+release-groups+labels+isrcs+genres+recording-level-rels+work-rels+work-level-rels+artist-rels&fmt=json")
         return try MusicBrainzParser.parseRelease(try await fetch(url))
@@ -392,9 +423,9 @@ public struct CoverArtClient: Sendable {
 
     /// `size` is 250, 500 or 1200.
     public func fetchFront(releaseId: String, releaseGroupId: String?, size: Int = 500) async throws -> Data? {
-        if !releaseId.isEmpty,
-           let d = try await get("https://coverartarchive.org/release/\(releaseId)/front-\(size)") { return d }
-        if let rg = releaseGroupId, !rg.isEmpty {
+        if let id = MBID.validated(releaseId),
+           let d = try await get("https://coverartarchive.org/release/\(id)/front-\(size)") { return d }
+        if let rg = MBID.validated(releaseGroupId) {
             return try await get("https://coverartarchive.org/release-group/\(rg)/front-\(size)")
         }
         return nil
