@@ -95,8 +95,7 @@ final class Player {
     /// Starts the queue's current song.
     private func loadCurrent() {
         guard let track = queue.current else { return }
-        let url = track.fileURL(root: root)
-        guard FileManager.default.fileExists(atPath: url.path) else {
+        guard let url = track.resolvedFileURL(root: root), FileManager.default.fileExists(atPath: url.path) else {
             lastError = "File missing: \(track.path)"
             if queue.advance() { loadCurrent() } else { isPlaying = false }
             return
@@ -143,8 +142,7 @@ final class Player {
     }
 
     private func loadCover(for track: Track) {
-        let coverURL = track.albumDirectory(root: root).appendingPathComponent("cover.jpg")
-        cover = NSImage(contentsOf: coverURL)
+        cover = track.coverURL(root: root).flatMap { NSImage(contentsOf: $0) }
         updateNowPlaying()
     }
 

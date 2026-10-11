@@ -84,7 +84,7 @@ struct TrackInfoSheet: View {
         let m = track.metadata
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 16) {
-                CoverThumb(url: track.albumDirectory(root: model.libraryRoot).appendingPathComponent("cover.jpg"), size: 120)
+                CoverThumb(url: track.coverURL(root: model.libraryRoot), size: 120)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(m.title).font(.title2.bold())
                     Text(m.artist)
