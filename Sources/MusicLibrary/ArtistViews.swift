@@ -13,7 +13,7 @@ struct ArtistPhoto: View {
     @State private var image: NSImage?
 
     var body: some View {
-        let file = model.artistInfo.imageFiles[ArtistInfoStore.key(name)]
+        let file = model.artistInfo.imageFile(for: name)
         ZStack {
             if let image {
                 Image(nsImage: image).resizable().scaledToFill()
@@ -34,6 +34,7 @@ struct ArtistsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.theme) private var theme
     @State private var filter = ""
+    @State private var photoArtist: ArtistSummary?
     @AppStorage("artistSort") private var sort = ArtistSort.name
 
     enum ArtistSort: String, CaseIterable, Identifiable {
@@ -56,6 +57,7 @@ struct ArtistsView: View {
                                 Button("Show Music DNA") { model.showMusicDNA(a.name) }
                                     .disabled(model.collaborations.person(named: a.name) == nil)
                                 Button("Update Artist Info") { model.refreshArtistInfo([a.name]) }
+                                Button("Change Photo…") { photoArtist = a }.disabled(a.name.isEmpty)
                                 AddToExportListButton([.artist(a.name)])
                             }
                     }
@@ -70,6 +72,7 @@ struct ArtistsView: View {
                 ContentUnavailableView.search(text: filter)
             }
         }
+        .sheet(item: $photoArtist) { ArtistPhotoSheet(name: $0.name, request: CoverSheetRequest()).themedSheet() }
         .navigationTitle("Artists")
         .navigationSubtitle(filter.isEmpty ? "\(model.artists.count) artists" : "\(shown.count) of \(model.artists.count) artists")
     }
@@ -184,6 +187,9 @@ struct ArtistDetail: View {
     @State private var albums: [AlbumSummary] = []
     @State private var bioExpanded = false
     @State private var showAllSongs = false
+    @State private var photoSheet: CoverSheetRequest?
+    @State private var hoveringPhoto = false
+    @State private var photoDropTargeted = false
 
     private var name: String { artist.name.isEmpty ? "Unknown Artist" : artist.name }
 
@@ -206,6 +212,11 @@ struct ArtistDetail: View {
         .toolbar {
             ToolbarItem { AddToExportListButton([.artist(artist.name)]) }
             ToolbarItem {
+                Button { photoSheet = CoverSheetRequest() } label: { Label("Change Photo…", systemImage: "person.crop.circle") }
+                    .disabled(artist.name.isEmpty)
+                    .help("Search for or upload a photo of \(name)")
+            }
+            ToolbarItem {
                 Button { model.refreshArtistInfo([artist.name]) } label: {
                     Label("Update Artist Info", systemImage: "arrow.clockwise")
                 }
@@ -213,6 +224,7 @@ struct ArtistDetail: View {
                 .help("Download the latest photo, bio and links")
             }
         }
+        .sheet(item: $photoSheet) { ArtistPhotoSheet(name: artist.name, request: $0).themedSheet() }
         .onAppear(perform: load)
         .onChange(of: model.libraryVersion) { load() }
     }
@@ -226,8 +238,7 @@ struct ArtistDetail: View {
 
     private func hero(_ info: ArtistInfo?) -> some View {
         HStack(alignment: .center, spacing: 28) {
-            ArtistPhoto(name: artist.name, size: 190)
-                .shadow(color: .black.opacity(0.25), radius: 16, y: 6)
+            photo(size: 190)
             VStack(alignment: .leading, spacing: 8) {
                 Text("ARTIST").font(.caption.weight(.semibold)).foregroundStyle(.subtext).tracking(1.2)
                 Text(name).font(.system(size: 36, weight: .bold)).lineLimit(2).minimumScaleFactor(0.6)
@@ -288,6 +299,31 @@ struct ArtistDetail: View {
         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
     }
 
+    /// The photo, with "Change Photo…" on hover; dropping an image on it opens the photo sheet with that image.
+    private func photo(size: CGFloat) -> some View {
+        ZStack(alignment: .bottom) {
+            ArtistPhoto(name: artist.name, size: size)
+            if hoveringPhoto, !artist.name.isEmpty {
+                Button { photoSheet = CoverSheetRequest() } label: { Label("Change Photo…", systemImage: "photo") }
+                    .controlSize(.small)
+                    .padding(.bottom, 14)
+            }
+        }
+        .overlay { if photoDropTargeted { Circle().strokeBorder(theme.accent, lineWidth: 3) } }
+        .shadow(color: .black.opacity(0.25), radius: 16, y: 6)
+        .onHover { hoveringPhoto = $0 }
+        .contextMenu {
+            Button("Change Photo…") { photoSheet = CoverSheetRequest() }.disabled(artist.name.isEmpty)
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first, url.isFileURL, !artist.name.isEmpty else { return false }
+            let data = try? Data(contentsOf: url)
+            guard let data, NSImage(data: data) != nil else { return false }
+            photoSheet = CoverSheetRequest(image: data, source: url.lastPathComponent)
+            return true
+        } isTargeted: { photoDropTargeted = $0 }
+    }
+
     private func statTiles(_ info: ArtistInfo?) -> some View {
         let p = model.artistPlayTotals[ArtistInfoStore.key(artist.name)] ?? PlayTotal()
         let total = tracks.reduce(0) { $0 + $1.duration }
@@ -326,8 +362,12 @@ struct ArtistDetail: View {
                         Text("From \(source)").font(.caption).foregroundStyle(.subtext)
                     }
                 }
-                if let credit = info.imageCreditURL?.webLink {
-                    Link("Photo: Wikimedia Commons", destination: credit).font(.caption)
+                if let credit = model.artistInfo.photoCredit(for: artist.name) {
+                    if let url = credit.url?.webLink {
+                        Link("Photo: \(credit.label)", destination: url).font(.caption)
+                    } else {
+                        Text("Photo: \(credit.label)").font(.caption).foregroundStyle(.subtext)
+                    }
                 }
             }
         }
@@ -448,7 +488,7 @@ private struct ArtistBackdrop: View {
                                             startPoint: .leading, endPoint: .trailing))
             }
         }
-        .task(id: model.artistInfo.imageFiles[ArtistInfoStore.key(name)]) { image = await model.artistInfo.image(for: name) }
+        .task(id: model.artistInfo.imageFile(for: name)) { image = await model.artistInfo.image(for: name) }
     }
 }
 

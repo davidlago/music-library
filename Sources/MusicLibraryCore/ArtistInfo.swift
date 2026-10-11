@@ -400,16 +400,19 @@ public struct InfoFetcher: Sendable {
         self.musicBrainz = musicBrainz
         self.lastfm = lastfm
         self.lastfmUser = lastfmUser
-        self.get = get ?? { url in
-            var request = URLRequest(url: url)
-            request.setValue(AppInfo.userAgent, forHTTPHeaderField: "User-Agent")
-            request.timeoutInterval = 20
-            let (data, response) = try await URLSession.shared.data(for: request)
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            if code == 404 { return nil }
-            guard code == 200 else { throw NetworkError.http(code, url.absoluteString) }
-            return data
-        }
+        self.get = get ?? Self.download
+    }
+
+    /// A GET identifying the app; nil for a 404.
+    public static let download: Get = { url in
+        var request = URLRequest(url: url)
+        request.setValue(AppInfo.userAgent, forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 20
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if code == 404 { return nil }
+        guard code == 200 else { throw NetworkError.http(code, url.absoluteString) }
+        return data
     }
 
     /// `taggedIds` are the MusicBrainz artist IDs from the artist's tracks.
