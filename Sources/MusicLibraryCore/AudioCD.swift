@@ -22,6 +22,8 @@ public struct CDTrack: Sendable, Equatable {
 
 public struct CDTOC: Sendable, Equatable {
     public static let dataGapFrames = 11400
+    /// Red Book limit (100 minutes of 75 frames per second); `.TOC.plist` values outside it are rejected.
+    public static let maxBlock = 100 * 60 * 75
 
     public var firstTrack: Int
     public var lastTrack: Int
@@ -50,6 +52,12 @@ public struct CDTOC: Sendable, Equatable {
         }
         all.sort { $0.number < $1.number }
         guard !all.isEmpty else { throw CDError.malformedTOC("no tracks") }
+        guard all.allSatisfy({ (0...maxBlock).contains($0.startBlock) }) else {
+            throw CDError.malformedTOC("track start out of range")
+        }
+        for (a, b) in zip(all, all.dropFirst()) where a.number == b.number || a.startBlock >= b.startBlock {
+            throw CDError.malformedTOC("track starts are not increasing")
+        }
 
         var kept = all
         var firstDropped: CDTrack?
@@ -66,6 +74,7 @@ public struct CDTOC: Sendable, Equatable {
         } else {
             throw CDError.malformedTOC("no leadout")
         }
+        guard leadout <= maxBlock else { throw CDError.malformedTOC("leadout out of range") }
         guard leadout > last.startBlock else { throw CDError.malformedTOC("leadout precedes last track") }
         return CDTOC(firstTrack: kept[0].number, lastTrack: last.number, leadout: leadout, tracks: kept)
     }
@@ -73,7 +82,8 @@ public struct CDTOC: Sendable, Equatable {
     public func sectors(of track: CDTrack) -> Int {
         guard let idx = tracks.firstIndex(where: { $0.number == track.number }) else { return 0 }
         let end = idx + 1 < tracks.count ? tracks[idx + 1].startBlock : leadout
-        return max(0, end - track.startBlock)
+        let (diff, overflow) = end.subtractingReportingOverflow(track.startBlock)
+        return overflow ? 0 : max(0, diff)
     }
 
     public func duration(of track: CDTrack) -> Double { Double(sectors(of: track)) / 75 }

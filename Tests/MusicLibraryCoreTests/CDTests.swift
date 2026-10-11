@@ -74,6 +74,31 @@ func makeSimulatedCD(trackCount: Int = 2, seconds: Double = 1) async throws -> A
         #expect(throws: CDError.self) { try CDTOC.parse(try plist(sessions: [])) }
         #expect(throws: CDError.self) { try CDTOC.parse(try plist(sessions: [["Track Array": [track(1, 150, data: true)]]])) }
     }
+
+    @Test func rejectsOutOfRangeOrUnorderedBlocks() {
+        let cases: [[[String: Any]]] = [
+            [["Leadout Block": 50000, "Track Array": [track(1, Int.max), track(2, Int.min)]]],
+            [["Leadout Block": 50000, "Track Array": [track(1, -1), track(2, 10000)]]],
+            [["Leadout Block": 50000, "Track Array": [track(1, 150), track(2, CDTOC.maxBlock + 1)]]],
+            [["Leadout Block": Int.max, "Track Array": [track(1, 150)]]],
+            [["Leadout Block": 50000, "Track Array": [track(1, 20000), track(2, 10000)]]],
+            [["Leadout Block": 50000, "Track Array": [track(1, 150), track(2, 150)]]],
+            [["Leadout Block": 50000, "Track Array": [track(1, 150), track(1, 10000)]]],
+            [["Leadout Block": 50000, "Track Array": [track(1, 150), track(2, Int.min, data: true)]]],
+        ]
+        for sessions in cases {
+            #expect(throws: CDError.self) { try CDTOC.parse(try plist(sessions: sessions)) }
+        }
+    }
+
+    @Test func sectorsDoNotOverflow() {
+        let toc = CDTOC(firstTrack: 1, lastTrack: 2, leadout: 0, tracks: [
+            CDTrack(number: 1, startBlock: Int.min, isData: false, session: 1),
+            CDTrack(number: 2, startBlock: Int.max, isData: false, session: 1),
+        ])
+        #expect(toc.sectors(of: toc.tracks[0]) == 0)
+        #expect(toc.sectors(of: toc.tracks[1]) == 0)
+    }
 }
 
 @Suite struct AudioCDVolumeTests {
