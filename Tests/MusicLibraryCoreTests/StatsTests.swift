@@ -178,7 +178,8 @@ import Testing
     @Test func periodTotals() {
         let s = stats(.week)
         #expect(s.listens == 6 && s.plays == 4 && s.skipped == 2)
-        #expect(s.listened == 284 * 2 + 562 * 2 + 15)
+        let expected: Double = 284 * 2 + 562 * 2 + 15
+        #expect(s.listened == expected)
         #expect(s.dayCount == 7 && s.activeDays == 3)
         #expect(s.previousListened == 0)
         #expect(s.songs.total == 2)
