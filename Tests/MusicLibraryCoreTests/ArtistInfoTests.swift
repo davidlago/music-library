@@ -52,7 +52,7 @@ import Testing
         let a = try ArtistInfoParser.parseArtist(Data(json.utf8))
         #expect(a.urls.map(\.1.absoluteString) == ["https://www.discogs.com/artist/1"])
         let info = ArtistInfo.assemble(name: "Evil", mb: a, wikidata: nil, wikipedia: nil, lastfm: nil)
-        #expect(info.links.allSatisfy(\.url.isWebLink))
+        #expect(!info.links.contains { !$0.url.isWebLink })
 
         let wp = try ArtistInfoParser.parseWikipediaSummary(Data(#"{"extract": "x", "content_urls": {"desktop": {"page": "file:///etc/passwd"}}}"#.utf8))
         #expect(wp?.pageURL == nil)

@@ -72,7 +72,7 @@ import Testing
                                              ("allmusic", URL(string: "file:///Volumes/X/evil.command")!)])
         for group in [rg, tampered] {
             let info = AlbumInfo.assemble(title: "Evil", releaseGroup: group, release: nil, wikidata: nil, wikipedia: nil, lastfm: nil)
-            #expect(info.links.allSatisfy(\.url.isWebLink))
+            #expect(!info.links.contains { !$0.url.isWebLink })
         }
         let lf = try ArtistInfoParser.parseLastFMAlbum(Data(#"{"album": {"url": "x-custom://run"}}"#.utf8))
         #expect(lf?.url == nil)
