@@ -51,7 +51,8 @@ struct ArtistsView: View {
                         NavigationLink(value: a) { ArtistCard(artist: a) }
                             .buttonStyle(.plain)
                             .contextMenu {
-                                Button("Play") { model.player.play(queue: model.tracks(ofArtist: a.name), startAt: 0) }
+                                ArtistMenuButtons(artist: a)
+                                Divider()
                                 Button("Show Music DNA") { model.showMusicDNA(a.name) }
                                     .disabled(model.collaborations.person(named: a.name) == nil)
                                 Button("Update Artist Info") { model.refreshArtistInfo([a.name]) }
@@ -264,6 +265,11 @@ struct ArtistDetail: View {
                         .buttonStyle(.bordered)
                         .help("See who \(name) worked with")
                     }
+                    Menu {
+                        QueueMenuButtons(player: model.player) { tracks }
+                    } label: { Image(systemName: "ellipsis") }
+                        .menuStyle(.button).buttonStyle(.bordered).menuIndicator(.hidden).fixedSize()
+                        .help("Play Next or Add to Queue")
                 }
                 .controlSize(.large)
                 .disabled(tracks.isEmpty)
@@ -401,7 +407,7 @@ struct ArtistDetail: View {
 
     private func play(_ list: [Track], at index: Int) {
         guard list.indices.contains(index) else { return }
-        model.player.play(queue: list, startAt: index)
+        model.player.play(queue: list, startAt: index, source: name)
     }
 
     static func icon(_ kind: ArtistLink.Kind) -> String {
@@ -510,7 +516,7 @@ struct ArtistSongRow: View {
         .onTapGesture(count: 2, perform: play)
         .contextMenu {
             Button("Play", action: play)
-            Button("Play Next") { model.player.playNext([track]) }
+            QueueMenuButtons(player: model.player) { [track] }
             Menu("Add to Playlist") {
                 ForEach(model.playlists) { p in Button(p.name) { model.add([track.id], toPlaylist: p.id) } }
                 if !model.playlists.isEmpty { Divider() }

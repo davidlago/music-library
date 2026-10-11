@@ -35,7 +35,7 @@ struct SearchResultsView: View {
                     TopHitsStrip(artists: results.artists, albums: results.albums)
                     Divider()
                 }
-                TrackTable(tracks: results.tracks)
+                TrackTable(tracks: results.tracks, source: "Search")
             }
             .navigationTitle("Search")
             .navigationSubtitle(results.tracks.isEmpty ? "" : "\(songCount(results.tracks.count)) · \(formatLongDuration(results.totalDuration))")
@@ -90,7 +90,7 @@ struct SearchHeader: View {
 
     private func play(shuffled: Bool) {
         let list = shuffled ? results.tracks.shuffled() : results.tracks
-        if !list.isEmpty { model.player.play(queue: list, startAt: 0) }
+        if !list.isEmpty { model.player.play(queue: list, startAt: 0, source: "Search") }
     }
 }
 
@@ -160,7 +160,11 @@ struct TopHitsStrip: View {
                         .frame(width: size + 16)
                     }
                     .buttonStyle(.plain)
-                    .contextMenu { AddToExportListButton([.artist(a.name)]) }
+                    .contextMenu {
+                        ArtistMenuButtons(artist: a)
+                        Divider()
+                        AddToExportListButton([.artist(a.name)])
+                    }
                 }
                 ForEach(albums.prefix(40)) { a in
                     NavigationLink(value: a) {
@@ -173,7 +177,11 @@ struct TopHitsStrip: View {
                         .frame(width: size + 16, alignment: .leading)
                     }
                     .buttonStyle(.plain)
-                    .contextMenu { AddToExportListButton(album: a) }
+                    .contextMenu {
+                        AlbumMenuButtons(album: a)
+                        Divider()
+                        AddToExportListButton(album: a)
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -316,13 +324,13 @@ struct SmartPlaylistView: View {
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
             Divider()
-            TrackTable(tracks: tracks, emptyState: ("No Matches Yet", "Songs matching these rules will appear here as you add them."))
+            TrackTable(tracks: tracks, emptyState: ("No Matches Yet", "Songs matching these rules will appear here as you add them."), source: playlist.name)
         }
         .navigationTitle(playlist.name)
         .toolbar {
             ToolbarItemGroup {
-                Button("Play", systemImage: "play.fill") { model.player.play(queue: tracks, startAt: 0) }.disabled(tracks.isEmpty)
-                Button("Shuffle", systemImage: "shuffle") { model.player.play(queue: tracks.shuffled(), startAt: 0) }.disabled(tracks.isEmpty)
+                Button("Play", systemImage: "play.fill") { model.player.play(queue: tracks, startAt: 0, source: playlist.name) }.disabled(tracks.isEmpty)
+                Button("Shuffle", systemImage: "shuffle") { model.player.play(queue: tracks.shuffled(), startAt: 0, source: playlist.name) }.disabled(tracks.isEmpty)
                 Button("Edit Rules…", systemImage: "slider.horizontal.3") { model.editSmartPlaylist(playlist) }
                 Button("Export…", systemImage: "square.and.arrow.up") { model.export(name: playlist.name, tracks: tracks) }.disabled(tracks.isEmpty)
                     .help("Copy this playlist into a single folder with an .m3u file")

@@ -82,6 +82,32 @@ struct VolumeControl: View {
     }
 }
 
+/// Shows or hides the queue inspector; from the expanded Now Playing view it also collapses that.
+struct QueueButton: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let shown = model.showsQueue && !model.nowPlayingExpanded
+        Button {
+            withAnimation(.spring(duration: 0.35)) {
+                if model.nowPlayingExpanded {
+                    model.nowPlayingExpanded = false
+                    model.showsQueue = true
+                } else {
+                    model.showsQueue.toggle()
+                }
+            }
+        } label: {
+            Image(systemName: "list.bullet").font(.title3)
+                .foregroundStyle(shown ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.subtext))
+        }
+        .buttonStyle(.borderless)
+        .help(shown ? "Hide Queue" : "Show Queue")
+        .accessibilityLabel("Queue")
+    }
+}
+
 struct NowPlayingBar: View {
     @Environment(AppModel.self) private var model
     @Environment(\.theme) private var theme
@@ -129,6 +155,7 @@ struct NowPlayingBar: View {
             TransportControls()
             ScrubberView()
             VolumeControl()
+            QueueButton()
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
         .background(theme.bar)

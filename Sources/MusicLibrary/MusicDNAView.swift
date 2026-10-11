@@ -5,18 +5,17 @@ import SwiftUI
 // MARK: Links to Music DNA
 
 /// A person's name that opens their Music DNA. Looks like plain text until hovered.
+/// `open` (usually `model.showMusicDNA`) comes from the parent rather than the environment: these links are
+/// used in `Table` cells, which don't always get the app model from the environment and crash reading it.
 struct PersonLink: View {
-    @Environment(AppModel.self) private var model
     @Environment(\.theme) private var theme
     let name: String
-    /// Runs before navigating, e.g. to close the sheet the link is in.
-    var onOpen: (() -> Void)?
+    let open: (String) -> Void
     @State private var hovering = false
 
     var body: some View {
         Button {
-            onOpen?()
-            model.showMusicDNA(name)
+            open(name)
         } label: {
             Text(name)
                 .underline(hovering)
@@ -36,22 +35,22 @@ struct PersonLink: View {
 /// Several names from a tag value ("A; B") as links, separated by commas.
 struct PersonLinks: View {
     let names: [String]
-    var onOpen: (() -> Void)?
+    let open: (String) -> Void
 
-    init(_ value: String, onOpen: (() -> Void)? = nil) {
+    init(_ value: String, open: @escaping (String) -> Void) {
         names = CollaborationGraph.splitNames(value)
-        self.onOpen = onOpen
+        self.open = open
     }
 
-    init(names: [String], onOpen: (() -> Void)? = nil) {
+    init(names: [String], open: @escaping (String) -> Void) {
         self.names = names
-        self.onOpen = onOpen
+        self.open = open
     }
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(Array(names.enumerated()), id: \.offset) { i, name in
-                PersonLink(name: name, onOpen: onOpen)
+                PersonLink(name: name, open: open)
                 if i < names.count - 1 { Text(", ") }
             }
         }
@@ -500,7 +499,7 @@ struct DNADetailPanel: View {
                         ForEach(graph.collaborators(of: center.id, limit: 10), id: \.person.id) { c in
                             HStack {
                                 Circle().fill(DNAColor.of(c.person.category)).frame(width: 7, height: 7)
-                                PersonLink(name: c.person.name)
+                                PersonLink(name: c.person.name) { model.showMusicDNA($0) }
                                 Spacer()
                                 Text("\(c.shared)").font(.caption).monospacedDigit().foregroundStyle(.subtext)
                                     .help("\(c.shared) shared track\(c.shared == 1 ? "" : "s")")

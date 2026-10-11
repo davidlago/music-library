@@ -132,7 +132,7 @@ struct ImportDetail: View {
             TextField("Label", text: $entry.metadata.extended.label)
             TextField("Catalog #", text: $entry.metadata.extended.catalogNumber)
             DisclosureGroup("More details & credits") {
-                MetadataDetailsView(metadata: entry.metadata).padding(.top, 4)
+                MetadataDetailsView(metadata: entry.metadata) { model.showMusicDNA($0) }.padding(.top, 4)
             }
         }
         .frame(minWidth: 280)
@@ -179,7 +179,7 @@ struct ImportDetail: View {
             .onSubmit { Task { await importer.search(entry) } }
 
             Table(entry.candidates, selection: $pick) {
-                TableColumn("") { c in CandidateThumb(candidate: c) }.width(40)
+                TableColumn("") { c in CandidateThumb(candidate: c, importer: importer) }.width(40)
                 TableColumn("Title", value: \.title)
                 TableColumn("Artist", value: \.artist)
                 TableColumn("Album", value: \.album)
@@ -216,13 +216,14 @@ struct ImportDetail: View {
     }
 }
 
+/// Shown in a `Table` cell, so it gets the importer from its parent rather than the environment (see `PersonLink`).
 struct CandidateThumb: View {
-    @Environment(AppModel.self) private var model
     let candidate: MatchCandidate
+    let importer: ImportController
     @State private var data: Data?
 
     var body: some View {
         DataImage(data: data, size: 32)
-            .task(id: candidate.id) { data = await model.importer.thumbnail(for: candidate) }
+            .task(id: candidate.id) { data = await importer.thumbnail(for: candidate) }
     }
 }

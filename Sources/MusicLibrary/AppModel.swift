@@ -45,6 +45,7 @@ final class AppModel {
         static let exportDatabase = "exportBackupDatabase"
         static let exportPlaylistFiles = "exportPlaylistFiles"
         static let exportDestination = "exportDestination"
+        static let showsQueue = "showsQueue"
     }
 
     var themeID: String {
@@ -65,6 +66,10 @@ final class AppModel {
         }
     }
     var nowPlayingExpanded = false
+    /// The queue in the window's inspector.
+    var showsQueue = UserDefaults.standard.bool(forKey: Keys.showsQueue) {
+        didSet { UserDefaults.standard.set(showsQueue, forKey: Keys.showsQueue) }
+    }
     /// Albums and artists pushed onto the content area.
     var navigationPath = NavigationPath()
     var searchText = "" {
@@ -618,6 +623,10 @@ final class AppModel {
 
     func coverURL(forAlbum a: AlbumSummary) -> URL {
         libraryRoot.appendingPathComponent(a.firstTrackPath).deletingLastPathComponent().appendingPathComponent("cover.jpg")
+    }
+
+    func coverURL(for track: Track) -> URL {
+        track.albumDirectory(root: libraryRoot).appendingPathComponent("cover.jpg")
     }
 
     func removeFromLibrary(_ ids: Set<Int64>) {

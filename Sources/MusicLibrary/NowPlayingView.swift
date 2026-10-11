@@ -19,6 +19,7 @@ struct NowPlayingView: View {
                 .keyboardShortcut(.escape, modifiers: [])
                 .help("Hide Now Playing")
                 Spacer()
+                QueueButton()
             }
             .padding(.horizontal, 16).padding(.top, 10)
 
@@ -119,11 +120,11 @@ struct NowPlayingView: View {
     private func details(_ m: TrackMetadata) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             if !m.albumArtist.isEmpty && m.albumArtist != m.artist { row("Album Artist", m.albumArtist) }
-            if !m.composer.isEmpty { PeopleRow(label: "Composer", names: CollaborationGraph.splitNames(m.composer), labelWidth: 120) }
+            if !m.composer.isEmpty { PeopleRow(label: "Composer", names: CollaborationGraph.splitNames(m.composer), labelWidth: 120) { model.showMusicDNA($0) } }
             if !m.genre.isEmpty { row("Genre", m.genre) }
             if let n = m.trackNo { row("Track", m.trackTotal.map { "\(n) of \($0)" } ?? "\(n)") }
             if let d = m.discNo, (m.discTotal ?? 1) > 1 { row("Disc", "\(d) of \(m.discTotal ?? d)") }
-            MetadataDetailsView(metadata: m, labelWidth: 120, showsEmptyState: false)
+            MetadataDetailsView(metadata: m, labelWidth: 120, showsEmptyState: false) { model.showMusicDNA($0) }
         }
     }
 
