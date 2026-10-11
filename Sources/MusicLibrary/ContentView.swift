@@ -61,6 +61,9 @@ struct MainWindow: View {
             }
             .background(theme.isThemed ? theme.background : Color.clear)
         }
+        .inspector(isPresented: $model.showsQueue) {
+            QueueView().inspectorColumnWidth(min: 260, ideal: 320, max: 460)
+        }
         .toolbarBackground(theme.toolbar, for: .windowToolbar)
         .toolbarBackground(theme.isThemed ? .visible : .automatic, for: .windowToolbar)
         .searchable(text: $model.searchText, placement: .toolbar, prompt: "Search or filter (genre:jazz)")
@@ -146,6 +149,9 @@ struct SidebarView: View {
                         .badge(model.smartPlaylistCounts[p.id] ?? 0)
                         .tag(SidebarItem.smartPlaylist(p.id))
                         .contextMenu {
+                            Button("Play") { model.player.play(queue: model.smartPlaylistTracks(p), startAt: 0, source: p.name) }
+                            QueueMenuButtons(player: model.player) { model.smartPlaylistTracks(p) }
+                            Divider()
                             Button("Edit…") { model.editSmartPlaylist(p) }
                             AddToExportListButton([.smartPlaylist(p.id)])
                             Button("Delete", role: .destructive) { model.deleteSmartPlaylist(p.id) }
@@ -183,6 +189,9 @@ struct PlaylistRow: View {
             }
         }
         .contextMenu {
+            Button("Play") { model.player.play(queue: model.playlistTracks(playlist.id), startAt: 0, source: playlist.name) }
+            QueueMenuButtons(player: model.player) { model.playlistTracks(playlist.id) }
+            Divider()
             Button("Rename") { model.renamingPlaylistID = playlist.id }
             AddToExportListButton([.playlist(playlist.id)])
             Button("Delete", role: .destructive) { model.deletePlaylist(playlist.id) }

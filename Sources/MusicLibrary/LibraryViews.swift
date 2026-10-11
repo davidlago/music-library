@@ -6,6 +6,8 @@ struct TrackTable: View {
     let tracks: [Track]
     /// Title and message shown when `tracks` is empty; defaults suit the whole library or a search.
     var emptyState: (title: String, message: String)?
+    /// What the list is, for the queue's "Next from …".
+    var source: String?
     @State private var selection = Set<Track.ID>()
     @State private var sortOrder: [KeyPathComparator<Track>] = []
     @State private var pendingRemoval: Set<Track.ID>?
@@ -28,7 +30,7 @@ struct TrackTable: View {
             if !ids.isEmpty { menu(for: ids) }
         } primaryAction: { ids in
             let list = sorted
-            if let idx = list.firstIndex(where: { ids.contains($0.id) }) { model.player.play(queue: list, startAt: idx) }
+            if let idx = list.firstIndex(where: { ids.contains($0.id) }) { model.player.play(queue: list, startAt: idx, source: source) }
         }
         .themedScrollBackground()
         .sheet(item: $infoTrack) { TrackInfoSheet(track: $0).themedSheet() }
@@ -69,9 +71,9 @@ struct TrackTable: View {
         let chosen = sorted.filter { ids.contains($0.id) }
         Button("Play") {
             let list = sorted
-            if let idx = list.firstIndex(where: { ids.contains($0.id) }) { model.player.play(queue: list, startAt: idx) }
+            if let idx = list.firstIndex(where: { ids.contains($0.id) }) { model.player.play(queue: list, startAt: idx, source: source) }
         }
-        Button("Play Next") { model.player.playNext(chosen) }
+        QueueMenuButtons(player: model.player) { chosen }
         Menu("Add to Playlist") {
             ForEach(model.playlists) { p in
                 Button(p.name) { model.add(chosen.map(\.id), toPlaylist: p.id) }
@@ -99,7 +101,7 @@ struct SongsView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        TrackTable(tracks: model.tracks)
+        TrackTable(tracks: model.tracks, source: "Songs")
             .navigationTitle("Songs")
             .navigationSubtitle(model.tracks.count == 1 ? "1 song" : "\(model.tracks.count) songs")
     }
@@ -150,7 +152,8 @@ struct AlbumsView: View {
                         }
                         .buttonStyle(.plain)
                         .contextMenu {
-                            Button("Play") { model.player.play(queue: model.tracks(of: a), startAt: 0) }
+                            AlbumMenuButtons(album: a)
+                            Divider()
                             AddToExportListButton(album: a)
                         }
                     }
@@ -233,7 +236,7 @@ struct PlaylistView: View {
         .contextMenu(forSelectionType: Int.self) { positions in
             if !positions.isEmpty {
                 Button("Play") { play(from: positions.min() ?? 0) }
-                Button("Play Next") { model.player.playNext(positions.sorted().compactMap { tracks.indices.contains($0) ? tracks[$0] : nil }) }
+                QueueMenuButtons(player: model.player) { positions.sorted().compactMap { tracks.indices.contains($0) ? tracks[$0] : nil } }
                 Button("Show in Finder") { model.showInFinder(positions.sorted().compactMap { tracks.indices.contains($0) ? tracks[$0] : nil }) }
                 AddToExportListButton(tracks: positions.sorted().compactMap { tracks.indices.contains($0) ? tracks[$0] : nil })
                 Divider()
@@ -264,7 +267,7 @@ struct PlaylistView: View {
 
     private func reload() { tracks = model.playlistTracks(playlist.id) }
 
-    private func play(from position: Int) { model.player.play(queue: tracks, startAt: position) }
+    private func play(from position: Int) { model.player.play(queue: tracks, startAt: position, source: playlist.name) }
 
     private func removeSelected() { remove(selection) }
 
@@ -272,5 +275,31 @@ struct PlaylistView: View {
         model.removeFromPlaylist(playlist.id, positions: Array(positions))
         selection = []
         reload()
+    }
+}
+
+/// Context menu for an album cover: play it or queue it.
+struct AlbumMenuButtons: View {
+    @Environment(AppModel.self) private var model
+    let album: AlbumSummary
+
+    var body: some View {
+        let title = album.album.isEmpty ? "Unknown Album" : album.album
+        Button("Play") { model.player.play(queue: model.tracks(of: album), startAt: 0, source: title) }
+        Button("Shuffle") { model.player.play(queue: model.tracks(of: album).shuffled(), startAt: 0, source: title) }
+        QueueMenuButtons(player: model.player) { model.tracks(of: album) }
+    }
+}
+
+/// Context menu items for an artist: play or queue all their songs.
+struct ArtistMenuButtons: View {
+    @Environment(AppModel.self) private var model
+    let artist: ArtistSummary
+
+    var body: some View {
+        let name = artist.name.isEmpty ? "Unknown Artist" : artist.name
+        Button("Play") { model.player.play(queue: model.tracks(ofArtist: artist.name), startAt: 0, source: name) }
+        Button("Shuffle") { model.player.play(queue: model.tracks(ofArtist: artist.name).shuffled(), startAt: 0, source: name) }
+        QueueMenuButtons(player: model.player) { model.tracks(ofArtist: artist.name) }
     }
 }

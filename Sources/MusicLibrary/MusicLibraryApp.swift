@@ -28,6 +28,8 @@ struct MusicLibraryApp: App {
                     .keyboardShortcut("o", modifiers: .command)
             }
             CommandGroup(after: .toolbar) {
+                Button(model.showsQueue ? "Hide Queue" : "Show Queue") { model.showsQueue.toggle() }
+                    .keyboardShortcut("u", modifiers: [.command, .option])
                 Picker("Theme", selection: Binding(get: { model.themeID }, set: { model.themeID = $0 })) {
                     ForEach(Theme.all) { Text($0.name).tag($0.id) }
                 }

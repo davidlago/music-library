@@ -7,8 +7,7 @@ private struct ImageBox: @unchecked Sendable { let image: NSImage }
 
 @MainActor @Observable
 final class Player {
-    var queue: [Track] = []
-    var index: Int?
+    private(set) var queue = PlayQueue()
     var isPlaying = false
     var currentTime: Double = 0
     var duration: Double = 0
@@ -35,10 +34,7 @@ final class Player {
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var endObserver: NSObjectProtocol?
 
-    var currentTrack: Track? {
-        guard let index, queue.indices.contains(index) else { return nil }
-        return queue[index]
-    }
+    var currentTrack: Track? { queue.current }
 
     init(root: URL, matcher: OutputMatcher) {
         self.root = root
@@ -57,16 +53,34 @@ final class Player {
         setupRemoteCommands()
     }
 
-    func play(queue: [Track], startAt: Int) {
-        guard queue.indices.contains(startAt) else { return }
-        self.queue = queue
-        load(index: startAt)
+    /// Plays `tracks` from `startAt`, replacing the queue. `source` names the list ("Next from …").
+    func play(queue tracks: [Track], startAt: Int, source: String? = nil) {
+        guard tracks.indices.contains(startAt) else { return }
+        queue.replace(with: tracks, startAt: startAt, source: source)
+        loadCurrent()
     }
 
-    func playNext(_ tracks: [Track]) {
-        guard !tracks.isEmpty else { return }
-        if let index { queue.insert(contentsOf: tracks, at: index + 1) } else { play(queue: tracks, startAt: 0) }
+    /// Queues `tracks` to play right after the current song; plays them if nothing is playing.
+    func playNext(_ tracks: [Track]) { enqueue { $0.playNext(tracks) } }
+
+    /// Queues `tracks` after anything already queued; plays them if nothing is playing.
+    func addToQueue(_ tracks: [Track]) { enqueue { $0.addToQueue(tracks) } }
+
+    private func enqueue(_ change: (inout PlayQueue) -> Void) {
+        let idle = currentTrack == nil
+        change(&queue)
+        if idle && currentTrack != nil { loadCurrent() }
     }
+
+    /// Plays a queue entry now (double-click in the queue).
+    func jump(to id: PlayQueue.Entry.ID) {
+        if queue.jump(to: id) { loadCurrent() } else if id == queue.currentEntry?.id { seek(to: 0) }
+    }
+
+    func removeFromQueue(_ ids: Set<PlayQueue.Entry.ID>) { queue.remove(ids) }
+    func clearQueued() { queue.clearQueued() }
+    func moveQueued(from offsets: IndexSet, to destination: Int) { queue.moveQueued(from: offsets, to: destination) }
+    func moveUpcoming(from offsets: IndexSet, to destination: Int) { queue.moveUpcoming(from: offsets, to: destination) }
 
     func stop() {
         onPlaybackEnded?()
@@ -74,18 +88,17 @@ final class Player {
         loadGeneration += 1
         avPlayer.pause()
         avPlayer.replaceCurrentItem(with: nil)
-        queue = []; index = nil; isPlaying = false; currentTime = 0; duration = 0; cover = nil; outputState = nil
+        queue.clear(); isPlaying = false; currentTime = 0; duration = 0; cover = nil; outputState = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
-    private func load(index newIndex: Int) {
-        guard queue.indices.contains(newIndex) else { return }
-        index = newIndex
-        let track = queue[newIndex]
+    /// Starts the queue's current song.
+    private func loadCurrent() {
+        guard let track = queue.current else { return }
         let url = track.fileURL(root: root)
         guard FileManager.default.fileExists(atPath: url.path) else {
             lastError = "File missing: \(track.path)"
-            if newIndex + 1 < queue.count { load(index: newIndex + 1) } else { isPlaying = false }
+            if queue.advance() { loadCurrent() } else { isPlaying = false }
             return
         }
         lastError = nil
@@ -136,8 +149,8 @@ final class Player {
     }
 
     private func trackEnded() {
-        if let index, index + 1 < queue.count {
-            load(index: index + 1)
+        if queue.advance() {
+            loadCurrent()
         } else {
             isPlaying = false
             avPlayer.seek(to: .zero)
@@ -150,6 +163,11 @@ final class Player {
 
     func togglePlayPause() {
         guard let track = currentTrack else { return }
+        // Songs queued after the queue ran out play instead of the last song again.
+        if !isPlaying && finishedQueue && queue.advance() {
+            loadCurrent()
+            return
+        }
         if isPlaying { avPlayer.pause() } else { avPlayer.play() }
         isPlaying.toggle()
         updateNowPlaying()
@@ -160,13 +178,12 @@ final class Player {
     }
 
     func next() {
-        guard let index, index + 1 < queue.count else { return }
-        load(index: index + 1)
+        if queue.advance() { loadCurrent() }
     }
 
     func previous() {
-        guard let index else { return }
-        if currentTime > 3 || index == 0 { seek(to: 0) } else { load(index: index - 1) }
+        guard currentTrack != nil else { return }
+        if currentTime > 3 || !queue.goBack() { seek(to: 0) } else { loadCurrent() }
     }
 
     func seek(to seconds: Double) {

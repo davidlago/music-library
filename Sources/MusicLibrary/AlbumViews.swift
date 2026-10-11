@@ -112,6 +112,11 @@ struct AlbumDetail: View {
                     .buttonStyle(.borderedProminent)
                 Button { play(tracks.shuffled(), at: 0) } label: { Label("Shuffle", systemImage: "shuffle") }
                     .buttonStyle(.bordered)
+                Menu {
+                    QueueMenuButtons(player: model.player) { tracks }
+                } label: { Image(systemName: "ellipsis") }
+                    .menuStyle(.button).buttonStyle(.bordered).menuIndicator(.hidden).fixedSize()
+                    .help("Play Next or Add to Queue")
             }
             .controlSize(.large)
             .disabled(tracks.isEmpty)
@@ -368,7 +373,7 @@ struct AlbumDetail: View {
 
     private func play(_ list: [Track], at index: Int) {
         guard list.indices.contains(index) else { return }
-        model.player.play(queue: list, startAt: index)
+        model.player.play(queue: list, startAt: index, source: title)
     }
 }
 
@@ -416,7 +421,7 @@ struct AlbumTrackRow: View {
         .onTapGesture(count: 2, perform: play)
         .contextMenu {
             Button("Play", action: play)
-            Button("Play Next") { model.player.playNext([track]) }
+            QueueMenuButtons(player: model.player) { [track] }
             Menu("Add to Playlist") {
                 ForEach(model.playlists) { p in Button(p.name) { model.add([track.id], toPlaylist: p.id) } }
                 if !model.playlists.isEmpty { Divider() }

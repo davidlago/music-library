@@ -19,6 +19,7 @@ struct NowPlayingView: View {
                 .keyboardShortcut(.escape, modifiers: [])
                 .help("Hide Now Playing")
                 Spacer()
+                QueueButton()
             }
             .padding(.horizontal, 16).padding(.top, 10)
 
