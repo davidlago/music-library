@@ -167,13 +167,13 @@ public struct PlaylistExporter: Sendable {
         var entries: [(file: String, artist: String, title: String, duration: Double)] = []
         progress(0, tracks.count)
         for (i, t) in tracks.enumerated() {
+            guard let src = t.resolvedFileURL(root: libraryRoot) else { throw LibraryExportError.unsafePath(t.path) }
             let ext = (t.path as NSString).pathExtension
             let artist = t.artist.isEmpty ? "Unknown Artist" : t.artist
             let title = t.title.isEmpty ? ((t.path as NSString).lastPathComponent as NSString).deletingPathExtension : t.title
             let nn = String(format: "%0\(width)d", i + 1)
             let stem = Organizer.sanitize("\(nn) - \(artist) - \(title)", maxBytes: Organizer.maxComponentBytes - ext.utf8.count - 1)
             let fileName = "\(stem).\(ext)"
-            let src = t.fileURL(root: libraryRoot)
             let dst = folder.appendingPathComponent(fileName)
             let srcSize = (try fm.attributesOfItem(atPath: src.path)[.size] as? NSNumber)?.int64Value ?? -1
             let dstSize = (try? fm.attributesOfItem(atPath: dst.path)[.size] as? NSNumber)?.int64Value

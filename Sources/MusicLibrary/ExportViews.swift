@@ -56,7 +56,7 @@ struct ExportListView: View {
             let root = model.libraryRoot
             totalBytes = nil
             totalBytes = await Task.detached(priority: .utility) {
-                tracks.reduce(Int64(0)) { $0 + (LibraryExporter.size(of: $1.fileURL(root: root)) ?? 0) }
+                tracks.reduce(Int64(0)) { $0 + ($1.resolvedFileURL(root: root).flatMap(LibraryExporter.size(of:)) ?? 0) }
             }.value
         }
         .task(id: PreviewKey(destination: model.exportDestination, tracks: TrackSet(tracks), artistImages: model.exportBackupDatabase,
