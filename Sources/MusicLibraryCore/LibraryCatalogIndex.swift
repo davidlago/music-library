@@ -237,27 +237,34 @@ public struct CatalogIndex: Sendable {
     public var count: Int { entries.count }
 
     public init(records: [CatalogRecord], details: [String: CatalogAlbumDetails]) {
-        entries = records.map { r in
-            let d = details[r.id]
-            let info = d?.album
-            let item = r.item
-            let tracks = info?.tracklist ?? []
-            let albumTitles = [item.title, item.subtitle ?? "", d?.mbTitle ?? ""]
-            let albumArtists = [item.artist, item.author ?? "", d?.mbArtist ?? ""]
-            let trackArtists = Array(Set(tracks.map(\.artist)))
-            let genres = info?.genres ?? []
-            let length = tracks.compactMap(\.duration).reduce(0, +)
-            let all = albumTitles + albumArtists + trackArtists + tracks.map(\.title) + genres
-                + [d?.label ?? "", item.series ?? "", item.callNumber ?? "", info?.typeLabel ?? ""]
-            return Entry(
-                record: r, details: d, all: IndexedText(all), album: IndexedText(albumTitles), title: IndexedText(tracks.map(\.title)),
-                artist: IndexedText(albumArtists + trackArtists), albumArtist: IndexedText(albumArtists), genre: IndexedText(genres),
-                label: IndexedText([d?.label ?? ""]), person: IndexedText(albumArtists + trackArtists),
-                format: IndexedText([d?.media ?? "", "cd"]), genres: genres, year: d?.year ?? item.year,
-                length: length > 0 ? length : nil, trackCount: tracks.count, discCount: Set(tracks.map(\.disc)).count,
-                rating: info?.rating, sortTitle: CatalogText.key(item.displayTitle),
-                sortArtist: CatalogText.key(item.artist.isEmpty ? (d?.mbArtist ?? "") : item.artist))
-        }
+        entries = records.map { Self.entry($0, details[$0.id]) }
+    }
+
+    /// Built step by step with explicit types: as one expression it's too much for the type checker.
+    static func entry(_ r: CatalogRecord, _ d: CatalogAlbumDetails?) -> Entry {
+        let info: AlbumInfo? = d?.album
+        let item: CatalogItem = r.item
+        let tracks: [TracklistEntry] = info?.tracklist ?? []
+        let trackTitles: [String] = tracks.map(\.title)
+        let albumTitles: [String] = [item.title, item.subtitle ?? "", d?.mbTitle ?? ""]
+        let albumArtists: [String] = [item.artist, item.author ?? "", d?.mbArtist ?? ""]
+        let trackArtists: [String] = Array(Set(tracks.map(\.artist)))
+        let allArtists: [String] = albumArtists + trackArtists
+        let genres: [String] = info?.genres ?? []
+        let length: Double = tracks.compactMap(\.duration).reduce(0, +)
+        var all: [String] = albumTitles
+        all += allArtists
+        all += trackTitles
+        all += genres
+        all += [d?.label ?? "", item.series ?? "", item.callNumber ?? "", info?.typeLabel ?? ""]
+        let sortArtist: String = item.artist.isEmpty ? (d?.mbArtist ?? "") : item.artist
+        return Entry(
+            record: r, details: d, all: IndexedText(all), album: IndexedText(albumTitles), title: IndexedText(trackTitles),
+            artist: IndexedText(allArtists), albumArtist: IndexedText(albumArtists), genre: IndexedText(genres),
+            label: IndexedText([d?.label ?? ""]), person: IndexedText(allArtists),
+            format: IndexedText([d?.media ?? "", "cd"]), genres: genres, year: d?.year ?? item.year,
+            length: length > 0 ? length : nil, trackCount: tracks.count, discCount: Set(tracks.map(\.disc)).count,
+            rating: info?.rating, sortTitle: CatalogText.key(item.displayTitle), sortArtist: CatalogText.key(sortArtist))
     }
 
     /// The records matching `query` that are owned by any of `libraries` (all when nil), in `sort` order.
