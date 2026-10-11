@@ -170,6 +170,8 @@ final class AppModel {
     @ObservationIgnored let coverArt = CoverArtClient()
     @ObservationIgnored let outputMatcher = OutputMatcher()
     @ObservationIgnored let player: Player
+    /// Apple Music previews of catalog CDs.
+    @ObservationIgnored let previews = PreviewPlayer()
     @ObservationIgnored let scrobbler = Scrobbler()
     @ObservationIgnored let artistInfo = ArtistInfoStore()
     @ObservationIgnored let albumInfo = AlbumInfoStore()
@@ -213,6 +215,8 @@ final class AppModel {
             self.advancePlay(track, position: position, playing: playing)
         }
         player.onPlaybackEnded = { [unowned self] in self.finishPlay() }
+        player.onWillPlay = { [unowned self] in self.previews.stop() }
+        previews.onWillPlay = { [unowned self] in if self.player.isPlaying { self.player.togglePlayPause() } }
         artistInfo.onAutoSyncEnabled = { [unowned self] in self.syncArtistInfo() }
         catalog.makeEnricher = { [unowned self] client in
             CatalogEnricher(catalog: { path in try await client.get(path, priority: .background) }, musicBrainz: self.musicBrainz, info: self.artistFetcher)
@@ -942,7 +946,11 @@ final class AppModel {
                   NSApp.keyWindow?.identifier?.rawValue.contains("Settings") != true,
                   NSApp.keyWindow?.title != "Settings",
                   !(NSApp.keyWindow?.firstResponder is NSText) else { return event }
-            MainActor.assumeIsolated { self?.player.togglePlayPause() }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                // A catalog preview, while one is loaded, else the library's player.
+                if self.previews.current != nil { self.previews.togglePlayPause() } else { self.player.togglePlayPause() }
+            }
             return nil
         }
     }

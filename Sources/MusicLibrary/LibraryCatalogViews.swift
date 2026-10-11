@@ -376,6 +376,8 @@ struct CatalogDetail: View {
     @State private var cover: NSImage?
     @State private var descriptionExpanded = false
     @State private var loadingCopies = false
+    @State private var hoveredPreview: Int?
+    @State private var refreshPreviews = false
 
     var body: some View {
         let catalog = model.catalog
@@ -395,8 +397,8 @@ struct CatalogDetail: View {
                         .frame(width: min(460, geo.size.width * 0.42))
                         ScrollView {
                             VStack(alignment: .leading, spacing: 26) {
-                                copiesSection
                                 trackList(details)
+                                copiesSection
                                 editionsSection(details)
                             }
                             .padding(.vertical, 28).padding(.trailing, 28).padding(.leading, 4)
@@ -406,8 +408,8 @@ struct CatalogDetail: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 26) {
                             header(details, coverSize: min(300, geo.size.width - 48))
-                            copiesSection
                             trackList(details)
+                            copiesSection
                             sections(details)
                             editionsSection(details)
                         }
@@ -419,7 +421,10 @@ struct CatalogDetail: View {
         .navigationTitle(item.displayTitle)
         .toolbar {
             ToolbarItem {
-                Button { catalog.ensureDetails(item, force: true) } label: { Label("Look Up Again", systemImage: "arrow.clockwise") }
+                Button {
+                    catalog.ensureDetails(item, force: true)
+                    refreshPreviews = true
+                } label: { Label("Look Up Again", systemImage: "arrow.clockwise") }
                     .disabled(catalog.isLookingUp(item))
                     .help("Match this CD on MusicBrainz again and refresh its track list, cover and info")
             }
@@ -434,6 +439,14 @@ struct CatalogDetail: View {
         .task(id: "\(item.id)|\(details?.releaseId ?? details?.releaseGroupId ?? "")") {
             if let image = await catalog.cover(for: item, large: true) { cover = image }
         }
+        // Previews of CDs you don't have, once the MusicBrainz lookup (barcodes, Apple Music links) is done.
+        .task(id: "\(item.id)|\(catalog.isLookingUp(item))|\(details?.fetchedAt.timeIntervalSince1970 ?? 0)") {
+            guard !catalog.isLookingUp(item), catalog.ownedAlbum(item) == nil else { return }
+            let force = refreshPreviews
+            refreshPreviews = false
+            await catalog.loadPreviews(item, force: force)
+        }
+        .onDisappear { model.previews.stop() }
     }
 
     // MARK: Header
@@ -632,46 +645,132 @@ struct CatalogDetail: View {
 
     // MARK: Tracks
 
+    /// The Apple Music album for previews: only for CDs that aren't in your library.
+    private var previewAlbum: AppleAlbum? {
+        model.catalog.ownedAlbum(item) == nil ? model.catalog.previews[item.id]?.album : nil
+    }
+
     @ViewBuilder
     private func trackList(_ details: CatalogAlbumDetails?) -> some View {
         let tracks = details?.tracklist ?? []
         let contents = model.catalog.works[item.id]?.contents.first
+        let apple = previewAlbum
         if !tracks.isEmpty {
+            let lined = apple.map { ApplePreviewMatcher.lineUp(tracks.map { .init(disc: $0.disc, number: $0.number, title: $0.title) }, with: $0) } ?? [:]
+            let queue = tracks.indices.compactMap { lined[$0] }
             let discs = Array(Set(tracks.map(\.disc))).sorted()
             VStack(alignment: .leading, spacing: 10) {
-                SectionHeader(title: "Tracks")
+                tracksHeader(queue)
                 card {
                     ForEach(discs, id: \.self) { disc in
-                        if discs.count > 1 {
-                            HStack {
-                                Image(systemName: "opticaldisc").foregroundStyle(.subtext)
-                                Text("Disc \(disc)").font(.callout.weight(.semibold))
-                                Spacer()
-                            }
-                            .padding(.horizontal, 14).padding(.top, disc == discs.first ? 10 : 18).padding(.bottom, 4)
-                        }
-                        ForEach(tracks.filter { $0.disc == disc }) { entry in
+                        if discs.count > 1 { discHeader(disc, first: disc == discs.first) }
+                        ForEach(tracks.indices.filter { tracks[$0].disc == disc }, id: \.self) { i in
+                            let entry = tracks[i]
                             trackRow(number: entry.number, title: entry.title,
-                                     artist: entry.artist == (details?.mbArtist ?? "") ? nil : entry.artist, duration: entry.duration)
+                                     artist: entry.artist == (details?.mbArtist ?? "") ? nil : entry.artist, duration: entry.duration,
+                                     preview: lined[i], queue: queue)
                         }
                     }
                 }
+                previewsFooter(queue)
             }
         } else if let contents, !contents.tracks.isEmpty {
+            let lined = apple.map { ApplePreviewMatcher.lineUp(contents.tracks.enumerated().map { .init(number: $0.offset + 1, title: $0.element) }, with: $0) } ?? [:]
+            let queue = contents.tracks.indices.compactMap { lined[$0] }
             VStack(alignment: .leading, spacing: 10) {
-                SectionHeader(title: "Tracks")
+                tracksHeader(queue)
                 card {
                     ForEach(Array(contents.tracks.enumerated()), id: \.offset) { i, title in
-                        trackRow(number: i + 1, title: title, artist: nil, duration: nil)
+                        trackRow(number: i + 1, title: title, artist: nil, duration: nil, preview: lined[i], queue: queue)
                     }
                 }
                 Text("From the library's catalog record.").font(.caption).foregroundStyle(.subtext)
+                previewsFooter(queue)
+            }
+        } else if let apple, !apple.tracks.isEmpty {
+            // No track list from MusicBrainz or the catalog: Apple Music's own.
+            let queue = apple.previews
+            let discs = Array(Set(apple.tracks.map(\.disc))).sorted()
+            VStack(alignment: .leading, spacing: 10) {
+                tracksHeader(queue)
+                card {
+                    ForEach(discs, id: \.self) { disc in
+                        if discs.count > 1 { discHeader(disc, first: disc == discs.first) }
+                        ForEach(apple.tracks.filter { $0.disc == disc }) { t in
+                            trackRow(number: t.number, title: t.title, artist: t.artist == apple.artist ? nil : t.artist,
+                                     duration: t.duration, preview: t.previewURL == nil ? nil : t, queue: queue)
+                        }
+                    }
+                }
+                previewsFooter(queue)
             }
         } else if model.catalog.isLookingUp(item) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeader(title: "Tracks")
                 HStack { ProgressView().controlSize(.small); Text("Looking up the track list…").foregroundStyle(.subtext) }
             }
+        } else {
+            previewsFooter([])
+        }
+    }
+
+    private func discHeader(_ disc: Int, first: Bool) -> some View {
+        HStack {
+            Image(systemName: "opticaldisc").foregroundStyle(.subtext)
+            Text("Disc \(disc)").font(.callout.weight(.semibold))
+            Spacer()
+        }
+        .padding(.horizontal, 14).padding(.top, first ? 10 : 18).padding(.bottom, 4)
+    }
+
+    /// "Tracks", with a button that plays the previews in track list order.
+    private func tracksHeader(_ queue: [ApplePreviewTrack]) -> some View {
+        let previews = model.previews
+        let playingHere = previews.isPlaying && previews.current.map(queue.contains) == true
+        return HStack(alignment: .firstTextBaseline) {
+            SectionHeader(title: "Tracks")
+            Spacer()
+            if !queue.isEmpty {
+                Button {
+                    if previews.current.map(queue.contains) == true { previews.togglePlayPause() } else { previews.play(queue) }
+                } label: {
+                    Label(playingHere ? "Pause Preview" : "Play Previews", systemImage: playingHere ? "pause.fill" : "play.fill")
+                }
+                .buttonStyle(.bordered)
+                .help("Play 30-second previews of the songs from Apple Music, one after another")
+            }
+        }
+    }
+
+    /// Where the previews come from (with a link to the album on Apple Music), or why there are none.
+    @ViewBuilder
+    private func previewsFooter(_ queue: [ApplePreviewTrack]) -> some View {
+        let catalog = model.catalog
+        if catalog.ownedAlbum(item) == nil {
+            let found = catalog.previews[item.id]
+            Group {
+                if catalog.previewsLoading.contains(item.id) {
+                    HStack(spacing: 6) { ProgressView().controlSize(.mini); Text("Finding previews on Apple Music…") }
+                } else if let error = catalog.previewsError[item.id] {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                } else if let album = found?.album {
+                    HStack(spacing: 10) {
+                        Label(queue.isEmpty ? "Apple Music's “\(album.title)” has different songs, so there are no previews here."
+                                            : "\(queue.count) song preview\(queue.count == 1 ? "" : "s") from Apple Music",
+                              systemImage: "music.note")
+                        if let url = album.pageURL?.webLink {
+                            Link("Listen on Apple Music", destination: url).help(url.absoluteString)
+                        }
+                    }
+                    if let error = model.previews.lastError, model.previews.current.map(queue.contains) == true {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                    }
+                } else if found != nil {
+                    Label("No previews: this CD wasn't found on Apple Music.", systemImage: "music.note")
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.subtext)
         }
     }
 
@@ -682,11 +781,27 @@ struct CatalogDetail: View {
             .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(theme.separator.opacity(0.5), lineWidth: 0.5))
     }
 
-    private func trackRow(number: Int, title: String, artist: String?, duration: Double?) -> some View {
-        HStack(spacing: 12) {
-            Text(String(number)).monospacedDigit().foregroundStyle(.subtext).frame(width: 24)
+    private func trackRow(number: Int, title: String, artist: String?, duration: Double?,
+                          preview: ApplePreviewTrack? = nil, queue: [ApplePreviewTrack] = []) -> some View {
+        let previews = model.previews
+        let isCurrent = preview.map(previews.isCurrent) ?? false
+        let playing = isCurrent && previews.isPlaying
+        return HStack(spacing: 12) {
+            ZStack {
+                if let preview, isCurrent || hoveredPreview == preview.id {
+                    Button { previews.toggle(preview, in: queue) } label: {
+                        Image(systemName: playing ? "pause.fill" : "play.fill").foregroundStyle(theme.accent)
+                            .frame(width: 24, height: 20).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(playing ? "Pause the preview" : "Play a 30-second preview from Apple Music")
+                } else {
+                    Text(String(number)).monospacedDigit().foregroundStyle(.subtext)
+                }
+            }
+            .frame(width: 24)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).lineLimit(1)
+                Text(title).lineLimit(1).foregroundStyle(isCurrent ? theme.accent : .primary)
                 if let artist, !artist.isEmpty {
                     PersonLinks(artist) { model.showMusicDNA($0) }.font(.caption)
                 }
@@ -695,6 +810,20 @@ struct CatalogDetail: View {
             Text(duration.map(formatTime) ?? "").monospacedDigit().foregroundStyle(.subtext).frame(width: 46, alignment: .trailing)
         }
         .padding(.horizontal, 14).padding(.vertical, 7)
+        .background(alignment: .bottomLeading) {
+            if isCurrent {
+                GeometryReader { g in
+                    Capsule().fill(theme.accent.opacity(0.7))
+                        .frame(width: max(0, g.size.width - 28) * previews.progress, height: 2)
+                        .offset(x: 14, y: g.size.height - 2)
+                }
+            }
+        }
+        .contentShape(Rectangle())
+        .onHover { inside in
+            guard let preview else { return }
+            if inside { hoveredPreview = preview.id } else if hoveredPreview == preview.id { hoveredPreview = nil }
+        }
     }
 
     // MARK: Copies

@@ -144,6 +144,10 @@ final class LibraryCatalogStore {
     /// Why copies couldn't be loaded (rate limited, offline…), by work.
     private(set) var copiesError: [String: String] = [:]
     private(set) var works: [String: CatalogWorkDetails] = [:]
+    /// Apple Music matches for song previews, by work ID.
+    private(set) var previews: [String: CatalogPreviews] = [:]
+    private(set) var previewsLoading: Set<String> = []
+    private(set) var previewsError: [String: String] = [:]
     private(set) var lookingUp: String?
     private(set) var lookupRemaining = 0
     private(set) var lookupError: String?
@@ -216,6 +220,7 @@ final class LibraryCatalogStore {
     @ObservationIgnored private var coverTasks: [String: Task<NSImage?, Never>] = [:]
     @ObservationIgnored private var copiesFetched: [String: Date] = [:]
     @ObservationIgnored let cache = LibraryCatalogCache.shared
+    @ObservationIgnored let previewFinder = ApplePreviewFinder(client: ApplePreviewClient(country: Locale.current.region?.identifier ?? "US"))
 
     init() {
         let defaults = UserDefaults.standard
@@ -246,6 +251,7 @@ final class LibraryCatalogStore {
         cancelLookups()
         self.database = database
         details = (try? database?.catalogDetails()) ?? [:]
+        previews = (try? database?.catalogPreviews()) ?? [:]
         records = (try? database?.catalogRecords()) ?? [:]
         rebuildIndex()
     }
@@ -654,6 +660,34 @@ final class LibraryCatalogStore {
         downloadQueue = []
         lookingUp = nil
         lookupRemaining = 0
+    }
+
+    // MARK: Previews
+
+    /// Whether a title's Apple Music match is missing or old, or wasn't found before its MusicBrainz details
+    /// (with barcodes and Apple Music links) came in.
+    func needsPreviews(_ item: CatalogItem, now: Date = Date()) -> Bool {
+        guard let p = previews[item.id] else { return true }
+        if p.isStale(now: now) { return true }
+        if !p.isMatched, let d = details[item.id], d.fetchedAt > p.fetchedAt { return true }
+        return false
+    }
+
+    /// Finds the title on Apple Music for its song previews, if it isn't cached (or always, with `force`).
+    /// Only called for a title the user opened: Apple allows about 20 requests a minute.
+    func loadPreviews(_ item: CatalogItem, force: Bool = false) async {
+        guard force || needsPreviews(item), !previewsLoading.contains(item.id) else { return }
+        previewsLoading.insert(item.id)
+        defer { previewsLoading.remove(item.id) }
+        previewsError[item.id] = nil
+        do {
+            let found = try await previewFinder.previews(for: item, details: details[item.id], upcs: works[item.id]?.upcs ?? [])
+            previews[item.id] = found
+            try? database?.saveCatalogPreviews(found)
+        } catch {
+            guard !Task.isCancelled else { return }
+            previewsError[item.id] = "Couldn't reach Apple Music: \(error.localizedDescription)"
+        }
     }
 
     // MARK: Covers

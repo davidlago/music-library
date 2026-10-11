@@ -40,7 +40,7 @@ public final class Database: @unchecked Sendable {
     private var db: OpaquePointer?
     private let lock = NSRecursiveLock()
     private var transactionDepth = 0
-    static let schemaVersion = 9
+    static let schemaVersion = 10
 
     public init(path: String) throws {
         if sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nil) != SQLITE_OK {
@@ -197,6 +197,9 @@ public final class Database: @unchecked Sendable {
         }
         if version < 9 {
             try exec("CREATE TABLE IF NOT EXISTS catalog_items(work_id TEXT PRIMARY KEY, json TEXT NOT NULL, last_seen REAL NOT NULL)")
+        }
+        if version < 10 {
+            try exec("CREATE TABLE IF NOT EXISTS catalog_previews(work_id TEXT PRIMARY KEY, json TEXT NOT NULL, fetched_at REAL NOT NULL)")
         }
         try exec("PRAGMA user_version=\(Self.schemaVersion)")
     }
@@ -472,6 +475,25 @@ public final class Database: @unchecked Sendable {
         }
         var out: [String: CatalogAlbumDetails] = [:]
         for case let d? in rows { out[d.workId] = d }
+        return out
+    }
+
+    public func saveCatalogPreviews(_ previews: CatalogPreviews) throws {
+        let json = String(decoding: try JSONEncoder().encode(previews), as: UTF8.self)
+        try exec("INSERT OR REPLACE INTO catalog_previews(work_id,json,fetched_at) VALUES(?,?,?)",
+                 [.text(previews.workId), .text(json), .double(previews.fetchedAt.timeIntervalSince1970)])
+    }
+
+    /// Cached Apple Music matches. Preview and page URLs read back are checked again: the file may come from elsewhere.
+    public func catalogPreviews() throws -> [String: CatalogPreviews] {
+        let rows = try query("SELECT json FROM catalog_previews") { r -> CatalogPreviews? in
+            r.string(0).flatMap { try? JSONDecoder().decode(CatalogPreviews.self, from: Data($0.utf8)) }
+        }
+        var out: [String: CatalogPreviews] = [:]
+        for case var p? in rows {
+            p.album?.validateURLs()
+            out[p.workId] = p
+        }
         return out
     }
 
