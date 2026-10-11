@@ -145,12 +145,30 @@ extension Optional where Wrapped: Sendable {
 public struct PlaylistExporter: Sendable {
     public init() {}
 
+    /// Tag text and paths can contain line breaks, which would start new playlist entries: in the `#EXTINF`
+    /// text they become spaces, in the file line they are percent-encoded.
     public static func m3uContents(entries: [(file: String, artist: String, title: String, duration: Double)]) -> String {
         var s = "#EXTM3U\n"
         for e in entries {
-            s += "#EXTINF:\(Int(e.duration.rounded())),\(e.artist) - \(e.title)\n\(e.file)\n"
+            let info = m3uSafe("\(e.artist) - \(e.title)") { _ in " " }
+            let file = m3uSafe(e.file) { scalar in
+                String(scalar).utf8.map { "%" + ($0 < 16 ? "0" : "") + String($0, radix: 16, uppercase: true) }.joined()
+            }
+            s += "#EXTINF:\(Int(e.duration.rounded())),\(info)\n\(file)\n"
         }
         return s
+    }
+
+    private static func m3uSafe(_ text: String, replacing: (Unicode.Scalar) -> String) -> String {
+        var out = ""
+        for scalar in text.unicodeScalars {
+            if scalar.properties.generalCategory == .control || scalar == "\u{2028}" || scalar == "\u{2029}" {
+                out += replacing(scalar)
+            } else {
+                out.unicodeScalars.append(scalar)
+            }
+        }
+        return out
     }
 
     /// Returns the playlist folder. Existing files with the same size are not recopied; nothing is deleted.

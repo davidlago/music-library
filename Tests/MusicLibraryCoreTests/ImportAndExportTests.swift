@@ -77,6 +77,14 @@ import Testing
 }
 
 @Suite struct PlaylistExporterTests {
+    @Test func m3uKeepsTagLineBreaksOutOfTheEntryList() {
+        let m3u = PlaylistExporter.m3uContents(entries: [
+            (file: "a\nhttp://evil.example/x.mp3", artist: "Art\r\n#EXTINF:1,x", title: "Song\nhttp://evil.example/y.mp3\u{2028}/tmp/z\u{2029}.mp3\u{85}q", duration: 1),
+        ])
+        #expect(m3u == "#EXTM3U\n#EXTINF:1,Art  #EXTINF:1,x - Song http://evil.example/y.mp3 /tmp/z .mp3 q\na%0Ahttp://evil.example/x.mp3\n")
+        #expect(m3u.split(whereSeparator: \.isNewline).count == 3)
+    }
+
     @Test func exportsFilesAndM3UIncrementally() async throws {
         let (root, db, service) = try TestSupport.makeLibrary()
         let srcDir = try TestSupport.tempDir()
