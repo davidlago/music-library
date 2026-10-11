@@ -145,7 +145,7 @@ final class AppModel {
     private(set) var exportRevision = 0
 
     var mbContact: String { didSet { UserDefaults.standard.set(mbContact, forKey: Keys.contact); applyContact() } }
-    var acoustIDKey: String { didSet { UserDefaults.standard.set(acoustIDKey, forKey: Keys.acoustID) } }
+    var acoustIDKey: String { didSet { KeychainStore.app.set(acoustIDKey, for: Keys.acoustID) } }
     var autoMatch: Bool { didSet { UserDefaults.standard.set(autoMatch, forKey: Keys.autoMatch) } }
     var ejectAfterRip: Bool { didSet { UserDefaults.standard.set(ejectAfterRip, forKey: Keys.ejectAfterRip) } }
     var matchOutputRate: Bool {
@@ -184,7 +184,7 @@ final class AppModel {
         let root = defaults.string(forKey: Keys.root).map { URL(fileURLWithPath: $0, isDirectory: true) } ?? LibraryLocation.defaultRoot
         libraryRoot = root
         mbContact = defaults.string(forKey: Keys.contact) ?? ""
-        acoustIDKey = defaults.string(forKey: Keys.acoustID) ?? ""
+        acoustIDKey = KeychainStore.app.migratedString(for: Keys.acoustID, from: defaults, key: Keys.acoustID) ?? ""
         autoMatch = defaults.object(forKey: Keys.autoMatch) == nil ? true : defaults.bool(forKey: Keys.autoMatch)
         musicBrainz = MusicBrainzClient(contact: defaults.string(forKey: Keys.contact) ?? "")
         recentSearches = defaults.stringArray(forKey: Keys.recentSearches) ?? []
@@ -269,7 +269,8 @@ final class AppModel {
 
     func probeAudioFormat(_ track: Track) async -> AudioFormat? {
         guard let db = database, tools.ffprobe != nil else { return nil }
-        guard let info = try? await TagReader(tools: tools).read(track.fileURL(root: libraryRoot)), let audio = info.audio else { return nil }
+        guard let url = track.resolvedFileURL(root: libraryRoot),
+              let info = try? await TagReader(tools: tools).read(url), let audio = info.audio else { return nil }
         try? db.updateAudioFormat(id: track.id, audio)
         return audio
     }
@@ -281,7 +282,7 @@ final class AppModel {
         var updated = false
         for track in missing {
             guard database === db else { return }
-            if let info = try? await reader.read(track.fileURL(root: root)), let audio = info.audio {
+            if let url = track.resolvedFileURL(root: root), let info = try? await reader.read(url), let audio = info.audio {
                 try? db.updateAudioFormat(id: track.id, audio)
                 updated = true
             }
@@ -569,7 +570,7 @@ final class AppModel {
         statsTask = Task.detached(priority: .userInitiated) {
             let covers = CoverLookup(root: root)
             let stats = LibraryStats(tracks: all, hasCover: covers.hasCover, fileSize: { t in
-                (try? FileManager.default.attributesOfItem(atPath: t.fileURL(root: root).path)[.size] as? NSNumber)?.int64Value
+                t.resolvedFileURL(root: root).flatMap(LibraryExporter.size(of:))
             })
             guard !Task.isCancelled else { return }
             await MainActor.run { [weak self] in
@@ -650,12 +651,12 @@ final class AppModel {
         return albums.flatMap { (try? db.tracks(album: $0.album, artist: name)) ?? [] }
     }
 
-    func coverURL(forAlbum a: AlbumSummary) -> URL {
-        libraryRoot.appendingPathComponent(a.firstTrackPath).deletingLastPathComponent().appendingPathComponent("cover.jpg")
+    func coverURL(forAlbum a: AlbumSummary) -> URL? {
+        LibraryPath.coverURL(forTrackAt: a.firstTrackPath, root: libraryRoot)
     }
 
-    func coverURL(for track: Track) -> URL {
-        track.albumDirectory(root: libraryRoot).appendingPathComponent("cover.jpg")
+    func coverURL(for track: Track) -> URL? {
+        track.coverURL(root: libraryRoot)
     }
 
     func removeFromLibrary(_ ids: Set<Int64>) {
@@ -663,8 +664,8 @@ final class AppModel {
         for id in ids {
             do {
                 guard let t = try db.track(id: id) else { continue }
-                let url = t.fileURL(root: libraryRoot)
-                if FileManager.default.fileExists(atPath: url.path) {
+                // A path leading outside the library isn't a library file: only the entry is removed.
+                if let url = t.resolvedFileURL(root: libraryRoot), FileManager.default.fileExists(atPath: url.path) {
                     try FileManager.default.trashItem(at: url, resultingItemURL: nil)
                 }
                 try db.deleteTrack(id: id)
@@ -676,7 +677,7 @@ final class AppModel {
     }
 
     func showInFinder(_ ts: [Track]) {
-        NSWorkspace.shared.activateFileViewerSelecting(ts.map { $0.fileURL(root: libraryRoot) })
+        NSWorkspace.shared.activateFileViewerSelecting(ts.compactMap { $0.resolvedFileURL(root: libraryRoot) })
     }
 
     // MARK: Playlists

@@ -68,8 +68,12 @@ public struct Track: Identifiable, Hashable, Sendable {
         self.format = format; self.sha256 = sha256; self.addedAt = addedAt; self.audioFormat = audioFormat
     }
 
+    /// Where the file would be, for display. Use `resolvedFileURL(root:)` to read, copy or move it.
     public func fileURL(root: URL) -> URL { root.appendingPathComponent(path) }
-    public func albumDirectory(root: URL) -> URL { fileURL(root: root).deletingLastPathComponent() }
+    /// The file, or nil when the stored path leads outside `root` (via "..", an absolute path or a symlink).
+    public func resolvedFileURL(root: URL) -> URL? { LibraryPath.resolve(path, in: root) }
+    /// The album's cover.jpg, or nil when the stored path leads outside `root`.
+    public func coverURL(root: URL) -> URL? { LibraryPath.coverURL(forTrackAt: path, root: root) }
 }
 
 public struct Playlist: Identifiable, Hashable, Sendable {

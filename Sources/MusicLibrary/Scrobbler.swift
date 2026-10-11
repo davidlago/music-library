@@ -23,8 +23,8 @@ final class Scrobbler {
         case needsReauthorization(String)
     }
 
-    var apiKey: String { didSet { UserDefaults.standard.set(apiKey, forKey: Keys.apiKey); credentialsChanged() } }
-    var sharedSecret: String { didSet { UserDefaults.standard.set(sharedSecret, forKey: Keys.secret); credentialsChanged() } }
+    var apiKey: String { didSet { keychain.set(apiKey, for: Keys.apiKey); credentialsChanged() } }
+    var sharedSecret: String { didSet { keychain.set(sharedSecret, for: Keys.secret); credentialsChanged() } }
     var scrobblingEnabled: Bool { didSet { UserDefaults.standard.set(scrobblingEnabled, forKey: Keys.enabled) } }
     var sendsNowPlaying: Bool { didSet { UserDefaults.standard.set(sendsNowPlaying, forKey: Keys.nowPlaying) } }
 
@@ -39,6 +39,7 @@ final class Scrobbler {
     /// The track currently playing has been scrobbled.
     private(set) var currentPlayScrobbled = false
 
+    @ObservationIgnored private let keychain = KeychainStore.app
     @ObservationIgnored private let queue: ScrobbleQueue
     @ObservationIgnored private var client: LastFMClient
     @ObservationIgnored private var tracker: ListenTracker?
@@ -66,15 +67,19 @@ final class Scrobbler {
 
     init(queueURL: URL = Scrobbler.defaultQueueURL) {
         let d = UserDefaults.standard
-        apiKey = d.string(forKey: Keys.apiKey) ?? ""
-        sharedSecret = d.string(forKey: Keys.secret) ?? ""
+        let keychain = KeychainStore.app
+        let storedKey = keychain.migratedString(for: Keys.apiKey, from: d, key: Keys.apiKey) ?? ""
+        let storedSecret = keychain.migratedString(for: Keys.secret, from: d, key: Keys.secret) ?? ""
+        apiKey = storedKey
+        sharedSecret = storedSecret
         scrobblingEnabled = d.object(forKey: Keys.enabled) == nil ? true : d.bool(forKey: Keys.enabled)
         sendsNowPlaying = d.object(forKey: Keys.nowPlaying) == nil ? true : d.bool(forKey: Keys.nowPlaying)
-        if let key = d.string(forKey: Keys.sessionKey), let user = d.string(forKey: Keys.username) {
+        if let key = keychain.migratedString(for: Keys.sessionKey, from: d, key: Keys.sessionKey),
+           let user = d.string(forKey: Keys.username) {
             session = LastFMSession(key: key, username: user)
         }
         queue = ScrobbleQueue(url: queueURL)
-        client = LastFMClient(apiKey: d.string(forKey: Keys.apiKey) ?? "", secret: d.string(forKey: Keys.secret) ?? "")
+        client = LastFMClient(apiKey: storedKey, secret: storedSecret)
         queue.dropExpired()
         pendingCount = queue.count
         flush()
@@ -144,7 +149,7 @@ final class Scrobbler {
         isAuthorizing = false
         pendingAuthURL = nil
         lastError = nil
-        UserDefaults.standard.set(s.key, forKey: Keys.sessionKey)
+        keychain.set(s.key, for: Keys.sessionKey)
         UserDefaults.standard.set(s.username, forKey: Keys.username)
         retryDelay = 30
         flush()
@@ -154,7 +159,7 @@ final class Scrobbler {
         cancelAuthorization()
         session = nil
         sessionInvalid = false
-        UserDefaults.standard.removeObject(forKey: Keys.sessionKey)
+        keychain.remove(Keys.sessionKey)
         UserDefaults.standard.removeObject(forKey: Keys.username)
     }
 

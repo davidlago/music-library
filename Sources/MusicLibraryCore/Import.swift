@@ -145,12 +145,30 @@ extension Optional where Wrapped: Sendable {
 public struct PlaylistExporter: Sendable {
     public init() {}
 
+    /// Tag text and paths can contain line breaks, which would start new playlist entries: in the `#EXTINF`
+    /// text they become spaces, in the file line they are percent-encoded.
     public static func m3uContents(entries: [(file: String, artist: String, title: String, duration: Double)]) -> String {
         var s = "#EXTM3U\n"
         for e in entries {
-            s += "#EXTINF:\(Int(e.duration.rounded())),\(e.artist) - \(e.title)\n\(e.file)\n"
+            let info = m3uSafe("\(e.artist) - \(e.title)") { _ in " " }
+            let file = m3uSafe(e.file) { scalar in
+                String(scalar).utf8.map { "%" + ($0 < 16 ? "0" : "") + String($0, radix: 16, uppercase: true) }.joined()
+            }
+            s += "#EXTINF:\(Int(e.duration.rounded())),\(info)\n\(file)\n"
         }
         return s
+    }
+
+    private static func m3uSafe(_ text: String, replacing: (Unicode.Scalar) -> String) -> String {
+        var out = ""
+        for scalar in text.unicodeScalars {
+            if scalar.properties.generalCategory == .control || scalar == "\u{2028}" || scalar == "\u{2029}" {
+                out += replacing(scalar)
+            } else {
+                out.unicodeScalars.append(scalar)
+            }
+        }
+        return out
     }
 
     /// Returns the playlist folder. Existing files with the same size are not recopied; nothing is deleted.
@@ -167,13 +185,13 @@ public struct PlaylistExporter: Sendable {
         var entries: [(file: String, artist: String, title: String, duration: Double)] = []
         progress(0, tracks.count)
         for (i, t) in tracks.enumerated() {
+            guard let src = t.resolvedFileURL(root: libraryRoot) else { throw LibraryExportError.unsafePath(t.path) }
             let ext = (t.path as NSString).pathExtension
             let artist = t.artist.isEmpty ? "Unknown Artist" : t.artist
             let title = t.title.isEmpty ? ((t.path as NSString).lastPathComponent as NSString).deletingPathExtension : t.title
             let nn = String(format: "%0\(width)d", i + 1)
             let stem = Organizer.sanitize("\(nn) - \(artist) - \(title)", maxBytes: Organizer.maxComponentBytes - ext.utf8.count - 1)
             let fileName = "\(stem).\(ext)"
-            let src = t.fileURL(root: libraryRoot)
             let dst = folder.appendingPathComponent(fileName)
             let srcSize = (try fm.attributesOfItem(atPath: src.path)[.size] as? NSNumber)?.int64Value ?? -1
             let dstSize = (try? fm.attributesOfItem(atPath: dst.path)[.size] as? NSNumber)?.int64Value

@@ -156,6 +156,28 @@ import Testing
         #expect(try LibraryExporter().plan(tracks: tracks, libraryRoot: root, destination: dest, artistImages: true).artistImages.isEmpty)
     }
 
+    @Test func pathsLeadingOutsideTheLibraryOrDestinationAreRefused() async throws {
+        let (root, _, tracks) = try await makeLibrary()
+        let fm = FileManager.default
+        let outside = try TestSupport.tempDir()
+        try Data("secret".utf8).write(to: outside.appendingPathComponent("id_rsa"))
+        try fm.createSymbolicLink(at: root.appendingPathComponent("Music/Out"), withDestinationURL: outside)
+        var evil = tracks[0]
+        for path in ["../../" + outside.lastPathComponent + "/id_rsa", outside.appendingPathComponent("id_rsa").path, "Music/Out/id_rsa"] {
+            evil.path = path
+            let dest = try TestSupport.tempDir()
+            #expect(throws: LibraryExportError.self) { try LibraryExporter().export(tracks: [evil], libraryRoot: root, to: dest) }
+            #expect(throws: LibraryExportError.self) { try PlaylistExporter().export(name: "P", tracks: [evil], libraryRoot: root, to: dest) }
+            #expect(files(in: dest).isEmpty)
+        }
+
+        // A destination folder that is a symlink elsewhere doesn't get written through.
+        let dest = try TestSupport.tempDir()
+        try fm.createSymbolicLink(at: dest.appendingPathComponent("Music"), withDestinationURL: outside)
+        #expect(throws: LibraryExportError.self) { try LibraryExporter().export(tracks: tracks, libraryRoot: root, to: dest) }
+        #expect(try fm.contentsOfDirectory(atPath: outside.path) == ["id_rsa"])
+    }
+
     @Test func previewMergesDestinationWithWhatWillBeCopied() async throws {
         let (root, db, tracks) = try await makeLibrary()
         let dest = try TestSupport.tempDir()

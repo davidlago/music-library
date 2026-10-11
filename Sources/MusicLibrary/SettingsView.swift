@@ -163,7 +163,7 @@ struct LastFMSettings: View {
             } header: {
                 Text("API account")
             } footer: {
-                Text("Last.fm needs an API key and shared secret for each app. Both are stored in this app's preferences on this Mac.")
+                Text("Last.fm needs an API key and shared secret for each app. Both are stored in your keychain on this Mac.")
                     .font(.caption).foregroundStyle(.subtext)
             }
             Section("Account") {

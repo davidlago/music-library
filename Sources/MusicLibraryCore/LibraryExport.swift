@@ -5,6 +5,7 @@ public enum LibraryExportError: Error, LocalizedError {
     case insufficientSpace(needed: Int64, available: Int64)
     case missingSource(String)
     case copyFailed(path: String, code: Int32)
+    case unsafePath(String)
 
     public var errorDescription: String? {
         switch self {
@@ -13,6 +14,7 @@ public enum LibraryExportError: Error, LocalizedError {
             return "Not enough space at the destination: \(f.string(fromByteCount: needed)) needed, \(f.string(fromByteCount: available)) available."
         case .missingSource(let p): return "File missing from the library: \(p)"
         case .copyFailed(let p, let code): return "Could not copy \(p): \(String(cString: strerror(code)))"
+        case .unsafePath(let p): return "Not a path inside the library: \(p)"
         }
     }
 }
@@ -66,10 +68,13 @@ public struct LibraryExporter: Sendable {
         var plan = Plan()
         var seenTracks = Set<String>(), seenDirs = Set<String>()
         for t in tracks where seenTracks.insert(t.path).inserted {
-            if fm.fileExists(atPath: destination.appendingPathComponent(t.path).path) {
+            guard let source = LibraryPath.resolve(t.path, in: libraryRoot), let target = LibraryPath.resolve(t.path, in: destination) else {
+                throw LibraryExportError.unsafePath(t.path)
+            }
+            if fm.fileExists(atPath: target.path) {
                 plan.skipped += 1
             } else {
-                guard let size = Self.size(of: libraryRoot.appendingPathComponent(t.path)) else {
+                guard let size = Self.size(of: source) else {
                     throw LibraryExportError.missingSource(t.path)
                 }
                 plan.files.append((t.path, size))
@@ -77,8 +82,8 @@ public struct LibraryExporter: Sendable {
             let dir = (t.path as NSString).deletingLastPathComponent
             guard seenDirs.insert(dir).inserted else { continue }
             let cover = (dir as NSString).appendingPathComponent("cover.jpg")
-            if !fm.fileExists(atPath: destination.appendingPathComponent(cover).path),
-               let size = Self.size(of: libraryRoot.appendingPathComponent(cover)) {
+            if let source = LibraryPath.resolve(cover, in: libraryRoot), let target = LibraryPath.resolve(cover, in: destination),
+               !fm.fileExists(atPath: target.path), let size = Self.size(of: source) {
                 plan.covers.append((cover, size))
             }
         }
@@ -87,8 +92,8 @@ public struct LibraryExporter: Sendable {
             let names = (try? fm.contentsOfDirectory(atPath: libraryRoot.appendingPathComponent(dir).path)) ?? []
             for name in names.sorted() where !name.hasPrefix(".") {
                 let path = (dir as NSString).appendingPathComponent(name)
-                guard let size = Self.size(of: libraryRoot.appendingPathComponent(path)),
-                      Self.size(of: destination.appendingPathComponent(path)) != size else { continue }
+                guard let source = LibraryPath.resolve(path, in: libraryRoot), let target = LibraryPath.resolve(path, in: destination),
+                      let size = Self.size(of: source), Self.size(of: target) != size else { continue }
                 plan.artistImages.append((path, size))
             }
         }
@@ -120,8 +125,10 @@ public struct LibraryExporter: Sendable {
         for (kind, file) in work {
             try Task.checkCancellation()
             // Artist photos are replaced when they change; music and covers never are.
-            try Self.copy(libraryRoot.appendingPathComponent(file.path), to: destination.appendingPathComponent(file.path),
-                          label: file.path, replacing: kind == .artistImage)
+            guard let source = LibraryPath.resolve(file.path, in: libraryRoot), let target = LibraryPath.resolve(file.path, in: destination) else {
+                throw LibraryExportError.unsafePath(file.path)
+            }
+            try Self.copy(source, to: target, label: file.path, replacing: kind == .artistImage)
             switch kind {
             case .track: summary.copied += 1; summary.bytesCopied += file.size
             case .cover: summary.covers += 1
