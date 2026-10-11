@@ -30,6 +30,34 @@ import Testing
         #expect(k("free streaming", "https://open.spotify.com/artist/1") == .spotify)
         #expect(k("streaming", "https://music.apple.com/us/artist/1") == .appleMusic)
         #expect(k("other databases", "https://d-nb.info/gnd/1") == nil)
+        #expect(k("official homepage", "file:///Volumes/X/evil.app") == nil)
+        #expect(k("social network", "x-apple-foo://instagram.com/x") == nil)
+        #expect(k("wikipedia", "javascript:alert(1)") == nil)
+    }
+
+    @Test func onlyWebLinksAreAccepted() throws {
+        #expect(URL(string: "https://example.com/x")!.isWebLink)
+        #expect(URL(string: "HTTP://example.com")!.isWebLink)
+        #expect(!URL(string: "file:///Applications/Calculator.app")!.isWebLink)
+        #expect(!URL(string: "https:relative")!.isWebLink)
+        #expect(URL(webLink: "smb://host/share") == nil)
+        #expect(URL(webLink: "https://musicbrainz.org") != nil)
+
+        let json = #"""
+        {"id": "a1", "name": "Evil", "relations": [
+          {"type": "official homepage", "url": {"resource": "file:///Volumes/X/evil.app"}},
+          {"type": "bandcamp", "url": {"resource": "x-custom://run"}},
+          {"type": "discogs", "url": {"resource": "https://www.discogs.com/artist/1"}}]}
+        """#
+        let a = try ArtistInfoParser.parseArtist(Data(json.utf8))
+        #expect(a.urls.map(\.1.absoluteString) == ["https://www.discogs.com/artist/1"])
+        let info = ArtistInfo.assemble(name: "Evil", mb: a, wikidata: nil, wikipedia: nil, lastfm: nil)
+        #expect(!info.links.contains { !$0.url.isWebLink })
+
+        let wp = try ArtistInfoParser.parseWikipediaSummary(Data(#"{"extract": "x", "content_urls": {"desktop": {"page": "file:///etc/passwd"}}}"#.utf8))
+        #expect(wp?.pageURL == nil)
+        let lf = try ArtistInfoParser.parseLastFMArtist(Data(#"{"artist": {"url": "file:///etc/passwd"}}"#.utf8))
+        #expect(lf?.url == nil)
     }
 
     @Test func wikidataAndWikipedia() throws {

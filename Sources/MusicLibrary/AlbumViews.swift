@@ -203,10 +203,10 @@ struct AlbumDetail: View {
         else if model.albumInfo.isFetching(album) {
             Label("Looking up album info…", systemImage: "arrow.down.circle").font(.callout).foregroundStyle(.subtext)
         }
-        if let reviews = info?.reviews, !reviews.isEmpty { linkChips("Reviews", reviews) }
+        if let reviews = info?.reviews.filter(\.url.isWebLink), !reviews.isEmpty { linkChips("Reviews", reviews) }
         details
         credits
-        if let links = info?.links.filter({ $0.kind != .review }), !links.isEmpty { linkChips("Links", links) }
+        if let links = info?.links.filter({ $0.kind != .review && $0.url.isWebLink }), !links.isEmpty { linkChips("Links", links) }
     }
 
     private func about(_ text: String, _ info: AlbumInfo) -> some View {
@@ -219,7 +219,7 @@ struct AlbumDetail: View {
                         .buttonStyle(.link)
                 }
                 if let source = info.descriptionSource {
-                    if let url = info.descriptionURL { Link("From \(source)", destination: url).font(.caption) }
+                    if let url = info.descriptionURL?.webLink { Link("From \(source)", destination: url).font(.caption) }
                     else { Text("From \(source)").font(.caption).foregroundStyle(.subtext) }
                 }
             }

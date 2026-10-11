@@ -49,6 +49,25 @@ public struct ArtistInfo: Codable, Hashable, Sendable {
     }
 }
 
+extension URL {
+    /// An http(s) URL with a host. Links from MusicBrainz (community edited), Wikipedia, Last.fm and the
+    /// `artist_info`/`album_info` caches (a library can come from elsewhere) are only shown and opened when
+    /// this holds: other schemes (`file:`, custom app schemes) could launch local apps or trigger other apps.
+    public var isWebLink: Bool {
+        guard let scheme = scheme?.lowercased(), scheme == "http" || scheme == "https" else { return false }
+        return host?.isEmpty == false
+    }
+
+    /// The URL if it is a web link (see `isWebLink`), else nil.
+    public var webLink: URL? { isWebLink ? self : nil }
+
+    /// Parses a web link from untrusted data; nil for anything that isn't http(s) with a host.
+    public init?(webLink string: String) {
+        guard let url = URL(string: string), url.isWebLink else { return nil }
+        self = url
+    }
+}
+
 public struct ArtistLink: Codable, Hashable, Sendable, Identifiable {
     public enum Kind: String, Codable, Sendable, CaseIterable {
         case official, wikipedia, review, lastfm, bandcamp, spotify, appleMusic, tidal, deezer, youtube, soundcloud,
@@ -98,6 +117,7 @@ public struct ArtistLink: Codable, Hashable, Sendable, Identifiable {
 
     /// Classifies a MusicBrainz URL relation; nil for links not worth showing (library catalogs, VIAF…).
     static func classify(relationType: String, url: URL) -> Kind? {
+        guard url.isWebLink else { return nil }
         let host = (url.host ?? "").lowercased().replacingOccurrences(of: "www.", with: "")
         func on(_ domains: String...) -> Bool { domains.contains { host == $0 || host.hasSuffix("." + $0) } }
         switch relationType.lowercased() {
@@ -164,7 +184,7 @@ public enum ArtistInfoParser {
         let genres = topGenres(o["genres"], limit: 8)
         let urls: [(String, URL)] = (o["relations"] as? [[String: Any]] ?? []).compactMap { r in
             guard let type = r["type"] as? String, let res = (r["url"] as? [String: Any])?["resource"] as? String,
-                  let url = URL(string: res), r["ended"] as? Bool != true else { return nil }
+                  let url = URL(webLink: res), r["ended"] as? Bool != true else { return nil }
             return (type, url)
         }
         func str(_ v: Any?) -> String? { (v as? String).flatMap { $0.isEmpty ? nil : $0 } }
@@ -220,7 +240,7 @@ public enum ArtistInfoParser {
         guard (o["type"] as? String) != "disambiguation", let extract = o["extract"] as? String, !extract.isEmpty else { return nil }
         let page = ((o["content_urls"] as? [String: Any])?["desktop"] as? [String: Any])?["page"] as? String
         let original = (o["originalimage"] as? [String: Any])?["source"] as? String
-        return WikipediaSummary(extract: extract, pageURL: page.flatMap(URL.init(string:)),
+        return WikipediaSummary(extract: extract, pageURL: page.flatMap(URL.init(webLink:)),
                                 imageFile: original.flatMap(commonsFileName(fromUploadURL:)))
     }
 
@@ -270,7 +290,7 @@ public enum ArtistInfoParser {
         func int(_ v: Any?) -> Int? { (v as? Int) ?? Int(v as? String ?? "") }
         let stats = a["stats"] as? [String: Any] ?? [:]
         let summary = ((a["bio"] as? [String: Any])?["summary"] as? String).map(cleanLastFMBio)
-        return LastFMArtist(bio: summary.flatMap { $0.isEmpty ? nil : $0 }, url: (a["url"] as? String).flatMap(URL.init(string:)),
+        return LastFMArtist(bio: summary.flatMap { $0.isEmpty ? nil : $0 }, url: (a["url"] as? String).flatMap(URL.init(webLink:)),
                             listeners: int(stats["listeners"]), playcount: int(stats["playcount"]),
                             userPlaycount: int(stats["userplaycount"]))
     }

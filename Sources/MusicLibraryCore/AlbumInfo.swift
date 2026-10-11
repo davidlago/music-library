@@ -87,7 +87,7 @@ extension ArtistInfoParser {
         let rating = o["rating"] as? [String: Any]
         let urls: [(String, URL)] = (o["relations"] as? [[String: Any]] ?? []).compactMap { r in
             guard let type = r["type"] as? String, let res = (r["url"] as? [String: Any])?["resource"] as? String,
-                  let url = URL(string: res), r["ended"] as? Bool != true else { return nil }
+                  let url = URL(webLink: res), r["ended"] as? Bool != true else { return nil }
             return (type, url)
         }
         return MBReleaseGroup(
@@ -127,7 +127,7 @@ extension ArtistInfoParser {
         guard let a = o["album"] as? [String: Any] else { return nil }
         func int(_ v: Any?) -> Int? { (v as? Int) ?? Int(v as? String ?? "") }
         let wiki = ((a["wiki"] as? [String: Any])?["summary"] as? String).map(cleanLastFMBio)
-        return LastFMAlbum(wiki: wiki.flatMap { $0.isEmpty ? nil : $0 }, url: (a["url"] as? String).flatMap(URL.init(string:)),
+        return LastFMAlbum(wiki: wiki.flatMap { $0.isEmpty ? nil : $0 }, url: (a["url"] as? String).flatMap(URL.init(webLink:)),
                            listeners: int(a["listeners"]), userPlaycount: int(a["userplaycount"]))
     }
 }
@@ -172,6 +172,7 @@ extension AlbumInfo {
             var seen = Set<ArtistLink.Kind>()
             for (type, url) in rg.urls {
                 if type.lowercased() == "review" {
+                    guard url.isWebLink else { continue }
                     var link = ArtistLink(kind: .review, url: url)
                     link.label = ArtistLink.publication(for: url)
                     if !info.links.contains(where: { $0.url == url }) { info.links.append(link) }

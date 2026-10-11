@@ -194,7 +194,7 @@ struct ArtistDetail: View {
                 hero(info)
                 statTiles(info)
                 if let bio = info?.bio { about(bio, info!) }
-                if let links = info?.links, !links.isEmpty { linksSection(links) }
+                if let links = info?.links.filter(\.url.isWebLink), !links.isEmpty { linksSection(links) }
                 if !albums.isEmpty { albumsSection }
                 songsSection
             }
@@ -320,13 +320,13 @@ struct ArtistDetail: View {
                         .buttonStyle(.link)
                 }
                 if let source = info.bioSource {
-                    if let url = info.bioURL {
+                    if let url = info.bioURL?.webLink {
                         Link("From \(source)", destination: url).font(.caption)
                     } else {
                         Text("From \(source)").font(.caption).foregroundStyle(.subtext)
                     }
                 }
-                if let credit = info.imageCreditURL {
+                if let credit = info.imageCreditURL?.webLink {
                     Link("Photo: Wikimedia Commons", destination: credit).font(.caption)
                 }
             }
