@@ -145,7 +145,7 @@ final class AppModel {
     private(set) var exportRevision = 0
 
     var mbContact: String { didSet { UserDefaults.standard.set(mbContact, forKey: Keys.contact); applyContact() } }
-    var acoustIDKey: String { didSet { UserDefaults.standard.set(acoustIDKey, forKey: Keys.acoustID) } }
+    var acoustIDKey: String { didSet { KeychainStore.app.set(acoustIDKey, for: Keys.acoustID) } }
     var autoMatch: Bool { didSet { UserDefaults.standard.set(autoMatch, forKey: Keys.autoMatch) } }
     var ejectAfterRip: Bool { didSet { UserDefaults.standard.set(ejectAfterRip, forKey: Keys.ejectAfterRip) } }
     var matchOutputRate: Bool {
@@ -184,7 +184,7 @@ final class AppModel {
         let root = defaults.string(forKey: Keys.root).map { URL(fileURLWithPath: $0, isDirectory: true) } ?? LibraryLocation.defaultRoot
         libraryRoot = root
         mbContact = defaults.string(forKey: Keys.contact) ?? ""
-        acoustIDKey = defaults.string(forKey: Keys.acoustID) ?? ""
+        acoustIDKey = KeychainStore.app.migratedString(for: Keys.acoustID, from: defaults, key: Keys.acoustID) ?? ""
         autoMatch = defaults.object(forKey: Keys.autoMatch) == nil ? true : defaults.bool(forKey: Keys.autoMatch)
         musicBrainz = MusicBrainzClient(contact: defaults.string(forKey: Keys.contact) ?? "")
         recentSearches = defaults.stringArray(forKey: Keys.recentSearches) ?? []
