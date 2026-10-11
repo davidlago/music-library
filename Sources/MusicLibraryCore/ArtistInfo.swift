@@ -442,9 +442,8 @@ public struct InfoFetcher: Sendable {
 
 extension MusicBrainzClient {
     public func lookupArtist(id: String) async throws -> MBArtist {
-        var c = URLComponents(string: "\(Self.baseURL)/artist/\(id)")!
-        c.percentEncodedQuery = "inc=url-rels+genres&fmt=json"
-        return try ArtistInfoParser.parseArtist(try await fetchData(c.url!))
+        let url = try Self.lookupURL("artist", id: id, query: "inc=url-rels+genres&fmt=json")
+        return try ArtistInfoParser.parseArtist(try await fetchData(url))
     }
 
     public func searchArtists(name: String) async throws -> [MBArtist] {

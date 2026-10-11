@@ -145,6 +145,7 @@ public struct TagReader: Sendable {
         e.mbAlbumArtistIds = list("musicbrainz_albumartistid", "musicbrainz_album_artist_id")
         e.mbWorkIds = list("musicbrainz_workid", "musicbrainz_work_id")
         m.extended = e
+        m.validateMBIDs()
 
         let duration = (format["duration"] as? String).flatMap(Double.init) ?? 0
         var coverIndex: Int?

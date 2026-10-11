@@ -104,6 +104,56 @@ import Testing
     }
 }
 
+@Suite struct MBIDValidationTests {
+    let okComputer = "d4635a34-caf5-3b35-9a5b-d805f1126633"
+
+    @Test func onlyUUIDsAreAccepted() {
+        #expect(MBID.validated(okComputer) == okComputer)
+        #expect(MBID.validated(" D4635A34-CAF5-3B35-9A5B-D805F1126633\n") == okComputer)
+        for bad in [nil, "", "a b", "r1", "../../artist/x", "\(okComputer)?inc=x", "{\(okComputer)}", "\(okComputer)#x"] {
+            #expect(MBID.validated(bad) == nil)
+        }
+        #expect(MBID.validated([okComputer, "a b"]) == [okComputer])
+    }
+
+    @Test func lookupURLsRejectInvalidIDs() async throws {
+        let url = try MusicBrainzClient.lookupURL("release", id: okComputer, query: "inc=genres+ratings&fmt=json")
+        #expect(url.absoluteString == "https://musicbrainz.org/ws/2/release/\(okComputer)?inc=genres+ratings&fmt=json")
+        for bad in ["a b", "\"<>", "../../x", "x?y#z"] {
+            #expect(throws: NetworkError.self) { try MusicBrainzClient.lookupURL("artist", id: bad, query: "fmt=json") }
+        }
+        // Rejected before any request is made.
+        let mb = MusicBrainzClient(contact: "musiclibrary-tests")
+        await #expect(throws: NetworkError.self) { try await mb.fetchRelease(id: "a b") }
+        await #expect(throws: NetworkError.self) { try await mb.lookupReleaseGroup(id: "a b") }
+        await #expect(throws: NetworkError.self) { try await mb.lookupArtist(id: "a b") }
+    }
+
+    @Test func tagsDropInvalidIDs() throws {
+        let probe = """
+        {"format": {"tags": {"title": "T", "MUSICBRAINZ_ALBUMID": "a b", "MUSICBRAINZ_TRACKID": "4A7FEA2E-545B-4C63-BC9A-9943CC3A29D7",
+          "MUSICBRAINZ_RELEASEGROUPID": "../x", "MUSICBRAINZ_ARTISTID": "a74b1b7f-71a5-4011-9441-d0b5e4122711; <bad>"}}}
+        """
+        let m = try TagReader.parse(probeJSON: Data(probe.utf8)).metadata
+        #expect(m.mbReleaseId == nil)
+        #expect(m.mbRecordingId == "4a7fea2e-545b-4c63-bc9a-9943cc3a29d7")
+        #expect(m.extended.mbReleaseGroupId.isEmpty)
+        #expect(m.extended.mbArtistIds == ["a74b1b7f-71a5-4011-9441-d0b5e4122711"])
+    }
+
+    @Test func databaseRowsDropInvalidIDs() throws {
+        let db = try Database(path: ":memory:")
+        var m = TrackMetadata(title: "T", mbRecordingId: "a b", mbReleaseId: okComputer)
+        m.extended.mbReleaseGroupId = "x y"
+        m.extended.mbAlbumArtistIds = ["<bad>", "a74b1b7f-71a5-4011-9441-d0b5e4122711"]
+        let t = try db.insertTrack(Track(path: "p", metadata: m, duration: 1, format: "flac", sha256: "s"))
+        let loaded = try #require(try db.track(id: t.id)).metadata
+        #expect(loaded.mbRecordingId == nil && loaded.mbReleaseId == okComputer)
+        #expect(loaded.extended.mbReleaseGroupId.isEmpty)
+        #expect(loaded.extended.mbAlbumArtistIds == ["a74b1b7f-71a5-4011-9441-d0b5e4122711"])
+    }
+}
+
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["MUSICLIB_LIVE_TESTS"] == "1"))
 struct LiveDiscTests {
     @Test func vectorDiscLookup() async throws {
