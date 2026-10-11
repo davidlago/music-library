@@ -4,7 +4,7 @@ import MusicLibraryCore
 import SwiftUI
 
 enum SidebarItem: Hashable {
-    case songs, albums, artists, insights, musicDNA, importQueue, exportList
+    case songs, albums, artists, insights, musicDNA, importQueue, exportList, catalog, catalogCheckouts, catalogList
     case playlist(Int64)
     case smartPlaylist(Int64)
     case cd(String)
@@ -173,6 +173,8 @@ final class AppModel {
     @ObservationIgnored let scrobbler = Scrobbler()
     @ObservationIgnored let artistInfo = ArtistInfoStore()
     @ObservationIgnored let albumInfo = AlbumInfoStore()
+    /// The public library's catalog of music CDs.
+    @ObservationIgnored let catalog = LibraryCatalogStore()
     @ObservationIgnored private var currentPlay: (track: Track, startedAt: Date, tracker: ListenTracker)?
     @ObservationIgnored private var terminationObserver: NSObjectProtocol?
     @ObservationIgnored private(set) var importer: ImportController!
@@ -212,6 +214,9 @@ final class AppModel {
         }
         player.onPlaybackEnded = { [unowned self] in self.finishPlay() }
         artistInfo.onAutoSyncEnabled = { [unowned self] in self.syncArtistInfo() }
+        catalog.makeEnricher = { [unowned self] client in
+            CatalogEnricher(catalog: { path in try await client.get(path, priority: .background) }, musicBrainz: self.musicBrainz, info: self.artistFetcher)
+        }
         importer = ImportController(model: self)
         cd = CDController(model: self)
         let matcher = outputMatcher
@@ -221,6 +226,8 @@ final class AppModel {
         }
         applyAppearance()
         openLibrary()
+        // Keep a downloaded library catalog current (it's only downloaded once Library CDs has been opened).
+        if !catalog.downloadDates.isEmpty { catalog.downloadCatalogs() }
         installSpaceBarMonitor()
         cd.start()
     }
@@ -259,6 +266,7 @@ final class AppModel {
             player.root = libraryRoot
             artistInfo.open(database: database, root: libraryRoot)
             albumInfo.open(database: database)
+            catalog.open(database: database)
             reloadLibrary()
             Task { await backfillAudioFormats() }
         } catch {
@@ -328,21 +336,37 @@ final class AppModel {
         let all = tracks
         let root = libraryRoot
         let smart = smartPlaylists
+        let albumList = albums
         Task.detached(priority: .userInitiated) {
             let covers = CoverLookup(root: root)
             let index = SearchIndex(tracks: all, hasCover: covers.hasCover)
             let graph = CollaborationGraph(tracks: all)
+            let ownership = Self.catalogOwnership(albums: albumList, tracks: all)
             let counts = Dictionary(uniqueKeysWithValues: smart.map { ($0.id, index.tracks(matching: SearchQuery.parse($0.query)).count) })
             await MainActor.run { [weak self] in
                 guard let self, self.indexGeneration == generation else { return }
                 self.index = index
                 self.collaborations = graph
+                self.catalog.ownership = ownership
                 self.smartPlaylistCounts = counts
                 self.libraryVersion += 1
                 self.runSearch()
                 self.syncArtistInfo()
             }
         }
+    }
+
+    /// Library albums by title and artist, and by the MusicBrainz release group their tracks are tagged with.
+    nonisolated static func catalogOwnership(albums: [AlbumSummary], tracks: [Track]) -> CatalogOwnership {
+        let byKey = Dictionary(albums.map { (SearchIndex.albumKey(album: $0.album, artist: $0.artist), $0) }, uniquingKeysWith: { a, _ in a })
+        var releaseGroups: [String: AlbumSummary] = [:]
+        for t in tracks {
+            let rg = t.metadata.extended.mbReleaseGroupId
+            guard !rg.isEmpty, releaseGroups[rg] == nil,
+                  let album = byKey[SearchIndex.albumKey(album: t.album, artist: t.effectiveAlbumArtist)] else { continue }
+            releaseGroups[rg] = album
+        }
+        return CatalogOwnership(albums: albums, releaseGroups: releaseGroups)
     }
 
     // MARK: Listening history

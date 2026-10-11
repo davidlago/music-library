@@ -11,6 +11,7 @@ struct SettingsView: View {
             PlaybackSettings().tabItem { Label("Playback", systemImage: "play.circle") }
             AppearanceSettings().tabItem { Label("Appearance", systemImage: "paintpalette") }
             LastFMSettings().tabItem { Label("Last.fm", systemImage: "dot.radiowaves.left.and.right") }
+            LibraryCatalogSettings().tabItem { Label("Library", systemImage: "building.columns") }
         }
         .frame(width: 600)
         .themedRoot(model.theme)
@@ -242,5 +243,110 @@ struct LastFMSettings: View {
                 }
             }
         }
+    }
+}
+
+struct LibraryCatalogSettings: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var catalog = model.catalog
+        Form {
+            Section {
+                Text("Browse your public library's music CDs, see which libraries have them on the shelf and which are already in your music library. Works with library catalogs run on Aspen Discovery, like the Minuteman Library Network.")
+                    .font(.callout).foregroundStyle(.subtext)
+            }
+            Section("Catalog") {
+                CatalogSiteField()
+                Picker("My library", selection: $catalog.homeLibrary) {
+                    Text("None").tag("")
+                    ForEach(catalog.libraryChoices) { Text($0.name).tag($0.name) }
+                }
+                Text("Selected when browsing, listed first in availability, and offered for “Available now at”.")
+                    .font(.caption).foregroundStyle(.subtext)
+            }
+            Section {
+                TextField("Library card number or username", text: $catalog.username)
+                SecureField("PIN or password", text: $catalog.password)
+                LabeledContent("Status") { accountStatus }
+                if catalog.isSignedIn {
+                    Picker("List for Music Library", selection: $catalog.listId) {
+                        Text("None").tag("")
+                        ForEach(catalog.userLists) { Text($0.title).tag($0.id) }
+                    }
+                    .disabled(catalog.userLists.isEmpty)
+                    if catalog.userLists.isEmpty, let url = catalog.webURL("/MyAccount/Lists") {
+                        Link("You have no lists yet. Create one on the library's website.", destination: url).font(.caption)
+                    }
+                }
+            } header: {
+                Text("Account")
+            } footer: {
+                Text("Used to show what you have checked out, and to add CDs to one of your lists on the library's website so you know what to look for. The password is stored in your keychain on this Mac.")
+                    .font(.caption).foregroundStyle(.subtext)
+            }
+            CatalogDownloadSettings()
+            Section("Album details") {
+                Toggle("Look up track lists, covers and info on MusicBrainz as CDs load", isOn: $catalog.autoLookup)
+                Text("Each CD is matched by its barcode (or its title and artist) once, then remembered in your library database. This also recognizes CDs you already have when the catalog spells them differently.")
+                    .font(.caption).foregroundStyle(.subtext)
+            }
+        }
+        .formStyle(.grouped)
+        .themedScrollBackground()
+        .frame(height: 640)
+        .onAppear { if catalog.libraries.isEmpty { catalog.loadLibraries() } }
+    }
+
+    @ViewBuilder
+    private var accountStatus: some View {
+        let catalog = model.catalog
+        HStack {
+            switch catalog.account {
+            case .signedOut:
+                Text("Not signed in").foregroundStyle(.subtext)
+            case .signingIn:
+                ProgressView().controlSize(.small)
+                Text("Signing in…").foregroundStyle(.subtext)
+            case .signedIn(let name):
+                Label("Signed in as \(name)", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            case .failed(let message):
+                Label(message, systemImage: "exclamationmark.circle.fill").foregroundStyle(.orange).lineLimit(2)
+            }
+            if catalog.isSignedIn {
+                Button("Sign Out") { catalog.signOut() }
+            } else {
+                Button("Sign In") { catalog.signIn() }
+                    .disabled(catalog.username.isEmpty || catalog.password.isEmpty || catalog.account == .signingIn)
+            }
+        }
+    }
+}
+
+/// The catalog's address, applied when you press Return or leave the field: changing the site signs out and
+/// starts over, so it shouldn't happen on every keystroke.
+struct CatalogSiteField: View {
+    @Environment(AppModel.self) private var model
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        TextField("Website", text: $draft, prompt: Text(LibraryCatalogStore.defaultSite))
+            .focused($focused)
+            .onSubmit(apply)
+            .onChange(of: focused) { _, isFocused in if !isFocused { apply() } }
+            .onAppear { draft = model.catalog.siteAddress }
+    }
+
+    private func apply() {
+        let trimmed = draft.trimmingCharacters(in: .whitespaces)
+        let candidate = trimmed.isEmpty ? LibraryCatalogStore.defaultSite : trimmed
+        // Only addresses that look like a site (a dotted host); otherwise keep the current one.
+        guard let url = URL(string: candidate.contains("://") ? candidate : "https://\(candidate)"),
+              let host = url.host, host.contains(".") else {
+            draft = model.catalog.siteAddress
+            return
+        }
+        model.catalog.siteAddress = candidate
     }
 }

@@ -40,7 +40,7 @@ public final class Database: @unchecked Sendable {
     private var db: OpaquePointer?
     private let lock = NSRecursiveLock()
     private var transactionDepth = 0
-    static let schemaVersion = 7
+    static let schemaVersion = 9
 
     public init(path: String) throws {
         if sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nil) != SQLITE_OK {
@@ -191,6 +191,12 @@ public final class Database: @unchecked Sendable {
         }
         if version < 7 {
             try exec("CREATE TABLE IF NOT EXISTS album_info(key TEXT PRIMARY KEY, json TEXT NOT NULL, fetched_at REAL NOT NULL)")
+        }
+        if version < 8 {
+            try exec("CREATE TABLE IF NOT EXISTS catalog_info(work_id TEXT PRIMARY KEY, json TEXT NOT NULL, fetched_at REAL NOT NULL)")
+        }
+        if version < 9 {
+            try exec("CREATE TABLE IF NOT EXISTS catalog_items(work_id TEXT PRIMARY KEY, json TEXT NOT NULL, last_seen REAL NOT NULL)")
         }
         try exec("PRAGMA user_version=\(Self.schemaVersion)")
     }
@@ -449,6 +455,46 @@ public final class Database: @unchecked Sendable {
         }
         var out: [String: AlbumInfo] = [:]
         for case let (key, info)? in rows { out[key] = info }
+        return out
+    }
+
+    // MARK: Library catalog
+
+    public func saveCatalogDetails(_ details: CatalogAlbumDetails) throws {
+        let json = String(decoding: try JSONEncoder().encode(details), as: UTF8.self)
+        try exec("INSERT OR REPLACE INTO catalog_info(work_id,json,fetched_at) VALUES(?,?,?)",
+                 [.text(details.workId), .text(json), .double(details.fetchedAt.timeIntervalSince1970)])
+    }
+
+    public func catalogDetails() throws -> [String: CatalogAlbumDetails] {
+        let rows = try query("SELECT json FROM catalog_info") { r -> CatalogAlbumDetails? in
+            r.string(0).flatMap { try? JSONDecoder().decode(CatalogAlbumDetails.self, from: Data($0.utf8)) }
+        }
+        var out: [String: CatalogAlbumDetails] = [:]
+        for case let d? in rows { out[d.workId] = d }
+        return out
+    }
+
+    /// Writes downloaded catalog records and deletes `removed`, in one transaction.
+    public func saveCatalogRecords(_ records: [CatalogRecord], removing removed: [String] = []) throws {
+        let encoder = JSONEncoder()
+        try transaction {
+            for r in records {
+                let json = String(decoding: try encoder.encode(r), as: UTF8.self)
+                try exec("INSERT OR REPLACE INTO catalog_items(work_id,json,last_seen) VALUES(?,?,?)",
+                         [.text(r.id), .text(json), .double(r.lastSeen.timeIntervalSince1970)])
+            }
+            for id in removed { try exec("DELETE FROM catalog_items WHERE work_id=?", [.text(id)]) }
+        }
+    }
+
+    public func catalogRecords() throws -> [String: CatalogRecord] {
+        let decoder = JSONDecoder()
+        let rows = try query("SELECT json FROM catalog_items") { r -> CatalogRecord? in
+            r.string(0).flatMap { try? decoder.decode(CatalogRecord.self, from: Data($0.utf8)) }
+        }
+        var out: [String: CatalogRecord] = [:]
+        for case let record? in rows { out[record.id] = record }
         return out
     }
 

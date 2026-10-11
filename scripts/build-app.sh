@@ -4,6 +4,10 @@
 #   VERSION=1.2.0   version shown in Finder and About (default: 0.0.0-dev)
 #   BUILD=42        build number (default: 1)
 #   UNIVERSAL=1     build for both Apple Silicon and Intel (needs Xcode, not just the Command Line Tools)
+#   SIGN_IDENTITY="Apple Development: …"
+#                   sign with this certificate instead of ad hoc. Keychain access is tied to an ad-hoc build's exact
+#                   code hash, so macOS asks once after every rebuild; a certificate with a Team ID (like a free Apple
+#                   Development one from Xcode) keeps access across builds.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -59,5 +63,5 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-codesign --force --sign - "$APP"
+codesign --force --sign "${SIGN_IDENTITY:--}" "$APP"
 echo "Built $APP ($VERSION, $(lipo -archs "$APP/Contents/MacOS/MusicLibrary"))"

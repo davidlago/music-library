@@ -80,7 +80,8 @@ struct ThemedRoot: ViewModifier {
         let colors = ThemeColors(palette: theme.palette(dark: scheme == .dark))
         content
             .environment(\.theme, colors)
-            .tint(colors.palette.map { Color($0.accent) })
+            // System gets the system accent explicitly: with no tint, AppKit controls keep the last theme's.
+            .tint(colors.palette.map { Color($0.accent) } ?? Color.accentColor)
             .foregroundStyle(colors.primaryText, colors.secondaryText, colors.tertiaryText)
             .background(colors.isThemed ? colors.background : Color.clear)
             .preferredColorScheme(theme.forcedDark.map { $0 ? .dark : .light })

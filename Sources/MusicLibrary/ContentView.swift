@@ -57,6 +57,7 @@ struct MainWindow: View {
                     DetailRouter()
                         .navigationDestination(for: AlbumSummary.self) { AlbumDetail(album: $0) }
                         .navigationDestination(for: ArtistSummary.self) { ArtistDetail(artist: $0) }
+                        .navigationDestination(for: CatalogItem.self) { CatalogDetail(item: $0) }
                 }
             }
             .background(theme.isThemed ? theme.background : Color.clear)
@@ -124,6 +125,15 @@ struct SidebarView: View {
                         .badge(disc.isRipping ? disc.remainingCount : 0)
                         .tag(SidebarItem.cd(disc.id))
                 }
+            }
+            Section("Library Catalog") {
+                Label("Library CDs", systemImage: "building.columns").tag(SidebarItem.catalog)
+                Label("My Checkouts", systemImage: "books.vertical")
+                    .badge(model.catalog.cdCheckouts.count)
+                    .tag(SidebarItem.catalogCheckouts)
+                Label(model.catalog.listTitle, systemImage: "bookmark")
+                    .badge(model.catalog.listEntries.count)
+                    .tag(SidebarItem.catalogList)
             }
             Section("Export") {
                 Label("Export List", systemImage: "externaldrive")
@@ -220,6 +230,9 @@ struct DetailRouter: View {
         case .artists: ArtistsView()
         case .importQueue: ImportView()
         case .exportList: ExportListView()
+        case .catalog: CatalogView()
+        case .catalogCheckouts: CatalogCheckoutsView()
+        case .catalogList: CatalogListView()
         case .cd(let path):
             if let disc = model.cd.discs.first(where: { $0.id == path }) {
                 CDView(disc: disc).id(path)

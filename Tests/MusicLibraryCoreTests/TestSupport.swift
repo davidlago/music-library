@@ -10,11 +10,15 @@ enum TestSupport {
         return dir
     }
 
-    static func fixture(_ name: String) throws -> Data {
-        guard let url = Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures") else {
+    static func fixture(_ name: String, ext: String = "json") throws -> Data {
+        guard let url = Bundle.module.url(forResource: name, withExtension: ext, subdirectory: "Fixtures") else {
             throw CocoaError(.fileNoSuchFile)
         }
         return try Data(contentsOf: url)
+    }
+
+    static func html(_ name: String) throws -> String {
+        String(decoding: try fixture(name, ext: "html"), as: UTF8.self)
     }
 
     @discardableResult
