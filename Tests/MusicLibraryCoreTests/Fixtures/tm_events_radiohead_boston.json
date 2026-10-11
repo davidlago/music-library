@@ -1,0 +1,87 @@
+{
+  "_embedded": {
+    "events": [
+      {
+        "name": "Radiohead",
+        "type": "event",
+        "id": "G5vYZb9Kc1aB1",
+        "test": false,
+        "url": "https://www.ticketmaster.com/radiohead-boston-massachusetts-11-14-2026/event/01006139A1B2C3D4",
+        "dates": {
+          "start": {"localDate": "2026-11-14", "localTime": "19:30:00", "dateTime": "2026-11-15T00:30:00Z",
+                    "dateTBD": false, "dateTBA": false, "timeTBA": false, "noSpecificTime": false},
+          "timezone": "America/New_York",
+          "status": {"code": "onsale"}
+        },
+        "classifications": [{"primary": true, "segment": {"name": "Music"}, "genre": {"name": "Rock"}}],
+        "priceRanges": [{"type": "standard", "currency": "USD", "min": 89.5, "max": 249.5},
+                        {"type": "standard including fees", "currency": "USD", "min": 104.25, "max": 281.0}],
+        "distance": 2.71,
+        "units": "MILES",
+        "_embedded": {
+          "venues": [{
+            "name": "TD Garden", "type": "venue", "id": "KovZpZAEdntA", "postalCode": "02114",
+            "timezone": "America/New_York",
+            "city": {"name": "Boston"}, "state": {"name": "Massachusetts", "stateCode": "MA"},
+            "country": {"name": "United States Of America", "countryCode": "US"},
+            "address": {"line1": "100 Legends Way"},
+            "location": {"longitude": "-71.06213", "latitude": "42.366119"}
+          }],
+          "attractions": [
+            {"name": "Radiohead", "id": "K8vZ9171ob7",
+             "externalLinks": {"musicbrainz": [{"id": "a74b1b7f-71a5-4011-9441-d0b5e4122711"}]},
+             "classifications": [{"segment": {"name": "Music"}}]},
+            {"name": "Sleater-Kinney", "id": "K8vZ9171Gq0",
+             "externalLinks": {"musicbrainz": [{"id": "3e1d7e9d-9f3f-4b4a-9a8f-9a1f2c3b4d5e"}]},
+             "classifications": [{"segment": {"name": "Music"}}]}
+          ]
+        }
+      },
+      {
+        "name": "Radiohead - In Rainbows Tour",
+        "type": "event",
+        "id": "G5vYZb9Kc1aB2",
+        "url": "https://www.ticketmaster.com/event/01006139A1B2C3D5",
+        "dates": {
+          "start": {"localDate": "2026-10-30", "dateTBD": false, "dateTBA": false, "timeTBA": true, "noSpecificTime": false},
+          "timezone": "America/New_York",
+          "status": {"code": "cancelled"}
+        },
+        "_embedded": {
+          "venues": [{
+            "name": "Xfinity Center", "city": {"name": "Mansfield"}, "state": {"name": "Massachusetts", "stateCode": "MA"},
+            "country": {"countryCode": "US"},
+            "location": {"longitude": "-71.2381", "latitude": "42.0034"}
+          }],
+          "attractions": [{"name": "Radiohead", "id": "K8vZ9171ob7"}]
+        }
+      },
+      {
+        "name": "Test Event Do Not Buy",
+        "type": "event",
+        "id": "Z7r9jZ1A7test",
+        "test": true,
+        "dates": {"start": {"localDate": "2026-11-01"}},
+        "_embedded": {"venues": [{"name": "Test Venue"}]}
+      },
+      {
+        "name": "Broken date",
+        "type": "event",
+        "id": "G5vYZbroken",
+        "dates": {"start": {"localDate": "next tuesday"}}
+      },
+      {
+        "name": "Radiohead",
+        "type": "event",
+        "id": "G5vYZb9Kc1aB3",
+        "url": "file:///etc/passwd",
+        "dates": {"start": {"localDate": "2026-12-02", "localTime": "20:00:00"}, "status": {"code": "postponed"}},
+        "_embedded": {
+          "venues": [{"name": "MGM Music Hall at Fenway", "city": {"name": "Boston"}, "state": {"stateCode": "MA"},
+                      "location": {"longitude": "-71.0970", "latitude": "42.3466"}}]
+        }
+      }
+    ]
+  },
+  "page": {"size": 50, "totalElements": 5, "totalPages": 1, "number": 0}
+}

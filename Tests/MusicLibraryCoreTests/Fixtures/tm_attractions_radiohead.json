@@ -1,0 +1,36 @@
+{
+  "_embedded": {
+    "attractions": [
+      {
+        "name": "Radiohead Tribute: Karma Police",
+        "type": "attraction",
+        "id": "K8vZ9171oZ7",
+        "url": "https://www.ticketmaster.com/karma-police-tickets/artist/1234567",
+        "classifications": [{"primary": true, "segment": {"id": "KZFzniwnSyZfZ7v7nJ", "name": "Music"}}],
+        "upcomingEvents": {"_total": 14, "ticketmaster": 14}
+      },
+      {
+        "name": "Radiohead",
+        "type": "attraction",
+        "id": "K8vZ9171ob7",
+        "url": "https://www.ticketmaster.com/radiohead-tickets/artist/763468",
+        "externalLinks": {
+          "musicbrainz": [{"id": "a74b1b7f-71a5-4011-9441-d0b5e4122711"}],
+          "homepage": [{"url": "https://www.radiohead.com/"}]
+        },
+        "classifications": [{"primary": true, "segment": {"id": "KZFzniwnSyZfZ7v7nJ", "name": "Music"}}],
+        "upcomingEvents": {"_total": 22, "ticketmaster": 20, "tmr": 2}
+      },
+      {
+        "name": "Radiohead",
+        "type": "attraction",
+        "id": "K8vZbadlink",
+        "url": "javascript:alert(1)",
+        "externalLinks": {"musicbrainz": [{"id": "not-a-uuid"}]},
+        "classifications": [{"primary": true, "segment": {"id": "KZFzniwnSyZFZ7v7nE", "name": "Sports"}}],
+        "upcomingEvents": {"_total": 1}
+      }
+    ]
+  },
+  "page": {"size": 20, "totalElements": 3, "totalPages": 1, "number": 0}
+}

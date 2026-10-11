@@ -61,6 +61,9 @@
 - **Playlists and smart playlists.** Regular playlists you arrange yourself, and smart ones defined by a search.
 - **Listening history and Last.fm.** Plays and time listened per song, album and artist, and optional scrobbling with an
   offline queue.
+- **Concerts near you.** Artist pages list their upcoming shows near your ZIP code, and the Concerts page gathers every
+  show by an artist in your library, month by month. Listings come from Ticketmaster and JamBase (which covers small
+  clubs and independent venues), with free keys for either or both.
 
 **Your public library's CDs**
 
@@ -184,6 +187,9 @@ When a new version first reads your saved keys and passwords, macOS asks once to
 - Add your email under **Settings ▸ General ▸ MusicBrainz**; MusicBrainz asks apps to identify who's making requests.
 - To scrobble, create a free [Last.fm API account](https://www.last.fm/api/account/create), enter the key and shared secret in
   **Settings ▸ Last.fm** and click **Connect**.
+- For concerts near you, open **Settings ▸ Concerts**, enter your ZIP code and add a free
+  [Ticketmaster](https://developer.ticketmaster.com/products-and-docs/apis/getting-started/) and/or [JamBase](https://data.jambase.com) API key
+  (for Ticketmaster, the Consumer Key of the app in your developer account).
 - For your public library's CDs, open **Settings ▸ Library**, check the catalog address and your library, and sign in if
   you'd like your checkouts and lists.
 
@@ -199,7 +205,9 @@ The library, your listening history and your settings stay on your Mac. The app 
 things up: MusicBrainz and the Cover Art Archive (matching, covers, artist and album info), Wikipedia, Wikidata and
 Wikimedia Commons (descriptions and photos), AcoustID (only if you add a key), Last.fm (only if you connect it), and your
 library's catalog website (only once you open Library CDs; your card number and PIN are sent only to that site), and
-Apple's iTunes Search API (only when you open a library CD you don't have, for its song previews). API keys,
+Apple's iTunes Search API (only when you open a library CD you don't have, for its song previews), Apple's geocoder (to
+find your ZIP code), and Ticketmaster and JamBase (only with your keys; they receive your artists' names and the area
+you're searching, not your ZIP code). API keys,
 secrets and your PIN are kept in your keychain. Downloading artist and album info can be turned off in
 **Settings ▸ General**, and looking up library CDs in **Settings ▸ Library**.
 
@@ -227,7 +235,8 @@ Releases page.
 Metadata from [MusicBrainz](https://musicbrainz.org) and the [Cover Art Archive](https://coverartarchive.org); descriptions and photos
 from [Wikipedia](https://www.wikipedia.org), [Wikidata](https://www.wikidata.org) and [Wikimedia Commons](https://commons.wikimedia.org)
 (each photo links to its source and license in the app); fingerprints from [AcoustID](https://acoustid.org); scrobbling via
-[Last.fm](https://www.last.fm); audio work by [FFmpeg](https://ffmpeg.org); library catalogs by
+[Last.fm](https://www.last.fm); concert listings from [Ticketmaster](https://www.ticketmaster.com) and
+[JamBase](https://www.jambase.com); audio work by [FFmpeg](https://ffmpeg.org); library catalogs by
 [Aspen Discovery](https://aspendiscovery.org).
 
 ## License
