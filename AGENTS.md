@@ -43,3 +43,4 @@ SwiftUI's `@State`/`@Environment` macro plugin is not shipped with the CLT, so t
 - Library layout: `<root>/Music/<AlbumArtist|Artist>/<Album> (<Year>)/<NN> - <Title>.<ext>`, DB at `<root>/library.sqlite`, track paths stored relative to root.
 - Source files are never modified; tags are written only to the library copy (mp3, flac, m4a).
 - MusicBrainz requests are rate limited (>=1.1 s) and identify the app with `AppInfo.userAgent`; tests must not hit the network unless `MUSICLIB_LIVE_TESTS=1`.
+- Exported playlists: build `.m3u` text only with `PlaylistExporter.m3uContents`, which keeps tag/path line breaks (control characters, U+2028/U+2029) from starting new entries.
