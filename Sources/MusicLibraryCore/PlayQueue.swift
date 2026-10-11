@@ -116,6 +116,61 @@ public struct PlayQueue: Sendable {
         entries[i].isQueued = false
     }
 
+    // MARK: Saving between launches
+
+    /// The queue as track IDs, saved when the app quits so it can be restored at the next launch.
+    public struct Snapshot: Codable, Equatable, Sendable {
+        public var trackIds: [Int64]
+        public var index: Int
+        /// How many entries after the current one were queued with Play Next.
+        public var queuedCount: Int
+        public var source: String?
+        /// Where in the current song playback was.
+        public var position: Double
+
+        public init(trackIds: [Int64], index: Int, queuedCount: Int, source: String?, position: Double) {
+            self.trackIds = trackIds; self.index = index; self.queuedCount = queuedCount
+            self.source = source; self.position = position
+        }
+    }
+
+    /// Nil when nothing is loaded.
+    public func snapshot(position: Double) -> Snapshot? {
+        guard let index else { return nil }
+        return Snapshot(trackIds: entries.map(\.track.id), index: index, queuedCount: queuedRange.count, source: source,
+                        position: position.isFinite ? max(0, position) : 0)
+    }
+
+    /// Restores a saved queue, looking its tracks up by ID and dropping the ones no longer in the library. When
+    /// the current song is gone, the next one (or else the previous one) becomes current, from its start.
+    /// Returns where to resume in the current song, or nil if nothing could be restored.
+    @discardableResult
+    public mutating func restore(_ snapshot: Snapshot, track: (Int64) -> Track?) -> Double? {
+        clear()
+        // The file could hold anything: keep the arithmetic in range.
+        let count = snapshot.trackIds.count
+        let index = min(max(snapshot.index, 0), count)
+        let queuedEnd = index + 1 + min(max(snapshot.queuedCount, 0), count)
+        var restored: [Entry] = []
+        var current: Int?
+        var currentKept = false
+        for (i, id) in snapshot.trackIds.enumerated() {
+            guard let t = track(id) else { continue }
+            if i >= index && current == nil {
+                current = restored.count
+                currentKept = i == index
+            }
+            // Play Next songs stay queued right after the current song (setCurrent clears the current one's flag).
+            restored.append(makeEntry(t, queued: i > index && i < queuedEnd))
+        }
+        if current == nil, !restored.isEmpty { current = restored.count - 1 }
+        guard let current else { return nil }
+        entries = restored
+        setCurrent(current)
+        source = snapshot.source
+        return currentKept && snapshot.position.isFinite ? max(0, snapshot.position) : 0
+    }
+
     // MARK: Editing
 
     /// Removes upcoming entries; the current song and the ones already played stay.

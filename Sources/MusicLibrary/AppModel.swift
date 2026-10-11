@@ -5,6 +5,7 @@ import SwiftUI
 
 enum SidebarItem: Hashable {
     case songs, albums, artists, insights, musicDNA, importQueue, exportList, catalog, catalogCheckouts, catalogList
+    case likedSongs
     case playlist(Int64)
     case smartPlaylist(Int64)
     case cd(String)
@@ -133,6 +134,8 @@ final class AppModel {
     private(set) var albums: [AlbumSummary] = []
     private(set) var artists: [ArtistSummary] = []
     private(set) var playlists: [Playlist] = []
+    /// When each liked song was liked; the Liked Songs playlist.
+    private(set) var likedDates: [Int64: Date] = [:]
     private(set) var totalTracks = 0
     private(set) var libraryRoot: URL
     private(set) var database: Database?
@@ -219,6 +222,8 @@ final class AppModel {
         player.onTrackStart = { [unowned self] track in
             scrobbler.trackStarted(track)
             self.startPlay(track)
+            // Saved now too, so a crash keeps the queue (the position is saved on quit).
+            self.savePlayerState()
         }
         player.onProgress = { [unowned self] track, position, playing in
             scrobbler.progress(track, position: position, playing: playing)
@@ -235,11 +240,15 @@ final class AppModel {
         cd = CDController(model: self)
         let matcher = outputMatcher
         terminationObserver = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.finishPlay() }
+            MainActor.assumeIsolated {
+                self?.finishPlay()
+                self?.savePlayerState()
+            }
             matcher.restoreAll()
         }
         applyAppearance()
         openLibrary()
+        restorePlayerState()
         // Keep a downloaded library catalog current (it's only downloaded once Library CDs has been opened).
         if !catalog.downloadDates.isEmpty { catalog.downloadCatalogs() }
         installSpaceBarMonitor()
@@ -321,7 +330,7 @@ final class AppModel {
         libraryRoot = url
         UserDefaults.standard.set(url.path, forKey: Keys.root)
         database = nil
-        tracks = []; albums = []; artists = []; playlists = []; smartPlaylists = []; totalTracks = 0
+        tracks = []; albums = []; artists = []; playlists = []; smartPlaylists = []; likedDates = [:]; totalTracks = 0
         playTotals = [:]; artistPlayTotals = [:]; albumPlayTotals = [:]; albumAddedDates = [:]
         index = .empty; searchResults = SearchResults(); stats = nil; statsVersion = -1
         listening = nil; listeningRequest = nil
@@ -337,6 +346,7 @@ final class AppModel {
             artists = try db.artists()
             playlists = try db.playlists()
             smartPlaylists = try db.smartPlaylists()
+            likedDates = try db.likedTrackDates()
             playTotals = try db.playTotals()
             totalTracks = tracks.count
             trackByID = Dictionary(tracks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
@@ -384,6 +394,42 @@ final class AppModel {
             releaseGroups[rg] = album
         }
         return CatalogOwnership(albums: albums, releaseGroups: releaseGroups)
+    }
+
+    // MARK: Player state
+
+    /// The play queue and position at the last quit, for the library it belongs to.
+    private struct SavedPlayerState: Codable {
+        var libraryRoot: String
+        var queue: PlayQueue.Snapshot
+    }
+
+    static var playerStateURL: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
+        return base.appendingPathComponent("MusicLibrary/player-state.json")
+    }
+
+    func savePlayerState() {
+        let url = Self.playerStateURL
+        guard let queue = player.snapshot else {
+            try? FileManager.default.removeItem(at: url)
+            return
+        }
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try JSONEncoder().encode(SavedPlayerState(libraryRoot: libraryRoot.path, queue: queue)).write(to: url, options: .atomic)
+        } catch {
+            // Not worth interrupting anything for; the queue just won't come back.
+        }
+    }
+
+    /// Puts back the queue saved at the last quit, paused at the same spot in the same song.
+    private func restorePlayerState() {
+        guard let data = try? Data(contentsOf: Self.playerStateURL),
+              let saved = try? JSONDecoder().decode(SavedPlayerState.self, from: data),
+              saved.libraryRoot == libraryRoot.path else { return }
+        player.restore(saved.queue) { trackByID[$0] }
     }
 
     // MARK: Listening history
@@ -824,6 +870,34 @@ final class AppModel {
         try? database?.moveTracks(inPlaylist: id, fromOffsets: offsets, toOffset: offset)
     }
 
+    // MARK: Liked songs
+
+    static let likedSongsName = "Liked Songs"
+
+    func isLiked(_ track: Track) -> Bool { likedDates[track.id] != nil }
+
+    /// Liked songs, most recently liked first.
+    var likedTracks: [Track] {
+        likedDates.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
+            .compactMap { trackByID[$0.key] }
+    }
+
+    func setLiked(_ tracks: [Track], _ liked: Bool) {
+        guard let db = database, !tracks.isEmpty else { return }
+        let ids = tracks.map(\.id)
+        let now = Date()
+        do {
+            try db.setLiked(ids, liked, at: now)
+            for id in ids {
+                if liked { if likedDates[id] == nil { likedDates[id] = now } } else { likedDates[id] = nil }
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func toggleLike(_ track: Track) { setLiked([track], !isLiked(track)) }
+
     func exportPlaylist(_ playlist: Playlist) {
         export(name: playlist.name, tracks: playlistTracks(playlist.id))
     }
@@ -878,6 +952,7 @@ final class AppModel {
         case .artist(let name): return tracks(ofArtist: name)
         case .track(let id): return trackByID[id].map { [$0] } ?? []
         case .playlist(let id): return playlistTracks(id)
+        case .likedSongs: return likedTracks
         case .smartPlaylist(let id): return smartPlaylists.first { $0.id == id }.map(smartPlaylistTracks) ?? []
         }
     }
@@ -894,6 +969,7 @@ final class AppModel {
         return exportList.compactMap { item in
             switch item {
             case .playlist(let id): return playlists.first { $0.id == id }.map { ExportPlaylist(name: $0.name, tracks: tracks(for: item)) }
+            case .likedSongs: return ExportPlaylist(name: Self.likedSongsName, tracks: tracks(for: item))
             case .smartPlaylist(let id): return smartPlaylists.first { $0.id == id }.map { ExportPlaylist(name: $0.name, tracks: tracks(for: item)) }
             default: return nil
             }

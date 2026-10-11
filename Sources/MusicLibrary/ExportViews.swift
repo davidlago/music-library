@@ -10,6 +10,7 @@ enum ExportItem: Codable, Hashable, Identifiable {
     case track(Int64)
     case playlist(Int64)
     case smartPlaylist(Int64)
+    case likedSongs
 
     var id: Self { self }
 }
@@ -506,6 +507,7 @@ struct ExportItemRow: View {
         case .track: "music.note"
         case .playlist: "music.note.list"
         case .smartPlaylist: "gearshape"
+        case .likedSongs: "heart.fill"
         }
     }
 
@@ -517,6 +519,7 @@ struct ExportItemRow: View {
         case .track(let id): return model.trackByID[id].map { $0.title.isEmpty ? ($0.path as NSString).lastPathComponent : $0.title } ?? "Removed Song"
         case .playlist(let id): return model.playlists.first { $0.id == id }?.name ?? "Deleted Playlist"
         case .smartPlaylist(let id): return model.smartPlaylists.first { $0.id == id }?.name ?? "Deleted Playlist"
+        case .likedSongs: return AppModel.likedSongsName
         }
     }
 
@@ -528,7 +531,7 @@ struct ExportItemRow: View {
         case .track(let id):
             guard let t = model.trackByID[id] else { return "No longer in the library" }
             return "Song · " + [t.artist, t.album].filter { !$0.isEmpty }.joined(separator: " — ")
-        case .playlist: return "Playlist · \(songCount(count))"
+        case .playlist, .likedSongs: return "Playlist · \(songCount(count))"
         case .smartPlaylist: return "Smart Playlist · \(songCount(count))"
         }
     }

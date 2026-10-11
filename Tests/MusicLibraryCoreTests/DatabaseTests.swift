@@ -108,6 +108,21 @@ import Testing
         #expect(try db.trackCount() == 2)
     }
 
+    @Test func likedSongs() throws {
+        let db = try Database(path: ":memory:")
+        let t = try (1...3).map { try db.insertTrack(makeTrack($0)) }
+        let first = Date(timeIntervalSince1970: 1_000), later = Date(timeIntervalSince1970: 2_000)
+        try db.setLiked([t[0].id, t[1].id], true, at: first)
+        // Liking again keeps the original date.
+        try db.setLiked([t[0].id], true, at: later)
+        #expect(try db.likedTrackDates() == [t[0].id: first, t[1].id: first])
+        try db.setLiked([t[1].id, t[2].id], false)
+        #expect(try db.likedTrackDates() == [t[0].id: first])
+        // Removing a track from the library unlikes it.
+        try db.deleteTrack(id: t[0].id)
+        #expect(try db.likedTrackDates().isEmpty)
+    }
+
     @Test func renamePlaylist() throws {
         let db = try Database(path: ":memory:")
         let p = try db.createPlaylist(name: "Old")

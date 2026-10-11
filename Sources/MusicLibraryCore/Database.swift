@@ -40,7 +40,7 @@ public final class Database: @unchecked Sendable {
     private var db: OpaquePointer?
     private let lock = NSRecursiveLock()
     private var transactionDepth = 0
-    static let schemaVersion = 11
+    static let schemaVersion = 12
 
     public init(path: String) throws {
         if sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nil) != SQLITE_OK {
@@ -206,6 +206,12 @@ public final class Database: @unchecked Sendable {
             CREATE TABLE IF NOT EXISTS album_ownership(
                 key TEXT PRIMARY KEY, album TEXT NOT NULL, artist TEXT NOT NULL,
                 purchased_on TEXT, price TEXT, updated_at REAL NOT NULL)
+            """)
+        }
+        if version < 12 {
+            try exec("""
+            CREATE TABLE IF NOT EXISTS liked_tracks(
+                track_id INTEGER PRIMARY KEY REFERENCES tracks(id) ON DELETE CASCADE, liked_at REAL NOT NULL)
             """)
         }
         try exec("PRAGMA user_version=\(Self.schemaVersion)")
@@ -404,6 +410,30 @@ public final class Database: @unchecked Sendable {
         SELECT \(cols) FROM playlist_tracks pt JOIN tracks t ON t.id = pt.track_id
         WHERE pt.playlist_id=? ORDER BY pt.position
         """, [.int(playlistId)], map: Self.track)
+    }
+
+    // MARK: Liked songs
+
+    /// When each liked track was liked.
+    public func likedTrackDates() throws -> [Int64: Date] {
+        let rows = try query("SELECT track_id, liked_at FROM liked_tracks") { r in
+            (r.int64(0), Date(timeIntervalSince1970: r.double(1)))
+        }
+        return Dictionary(rows, uniquingKeysWith: { a, _ in a })
+    }
+
+    /// Likes or unlikes tracks. Liking a track that is already liked keeps its original date.
+    public func setLiked(_ trackIds: [Int64], _ liked: Bool, at date: Date = Date()) throws {
+        try transaction {
+            for id in trackIds {
+                if liked {
+                    try exec("INSERT OR IGNORE INTO liked_tracks(track_id,liked_at) VALUES(?,?)",
+                             [.int(id), .double(date.timeIntervalSince1970)])
+                } else {
+                    try exec("DELETE FROM liked_tracks WHERE track_id=?", [.int(id)])
+                }
+            }
+        }
     }
 
     // MARK: Plays
