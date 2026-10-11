@@ -114,6 +114,12 @@ final class AppModel {
     private(set) var statsVersion = -1
     @ObservationIgnored private var indexGeneration = 0
     @ObservationIgnored private var statsTask: Task<Void, Never>?
+    /// Listening stats for the period last asked for.
+    private(set) var listening: ListeningStats?
+    /// Bumped whenever a listen is recorded.
+    private(set) var historyVersion = 0
+    @ObservationIgnored private var listeningRequest: (period: ListeningStats.Period, library: Int, history: Int, at: Date)?
+    @ObservationIgnored private var listeningTask: Task<Void, Never>?
     private(set) var albums: [AlbumSummary] = []
     private(set) var artists: [ArtistSummary] = []
     private(set) var playlists: [Playlist] = []
@@ -293,6 +299,7 @@ final class AppModel {
         tracks = []; albums = []; artists = []; playlists = []; smartPlaylists = []; totalTracks = 0
         playTotals = [:]; artistPlayTotals = [:]; albumPlayTotals = [:]; albumAddedDates = [:]
         index = .empty; searchResults = SearchResults(); stats = nil; statsVersion = -1
+        listening = nil; listeningRequest = nil
         openLibrary()
     }
 
@@ -367,6 +374,7 @@ final class AppModel {
         artistPlayTotals[key] = (artistPlayTotals[key] ?? PlayTotal()) + delta
         let albumKey = SearchIndex.albumKey(album: play.track.album, artist: play.track.effectiveAlbumArtist)
         albumPlayTotals[albumKey] = (albumPlayTotals[albumKey] ?? PlayTotal()) + delta
+        historyVersion += 1
     }
 
     /// Per-artist and per-album aggregates of the library and its listening history.
@@ -568,6 +576,27 @@ final class AppModel {
                 guard let self, self.libraryVersion == version else { return }
                 self.stats = stats
                 self.statsVersion = version
+            }
+        }
+    }
+
+    /// Computes listening stats for `period` in the background unless they're up to date. They're also refreshed
+    /// after a few minutes, so "today" and the period's window move along while the app stays open.
+    func loadListeningIfNeeded(_ period: ListeningStats.Period) {
+        if let r = listeningRequest, r.period == period, r.library == libraryVersion, r.history == historyVersion,
+           Date().timeIntervalSince(r.at) < 300 { return }
+        guard let db = database else { return }
+        let request = (period: period, library: libraryVersion, history: historyVersion, at: Date())
+        listeningRequest = request
+        let plays = (try? db.plays()) ?? []
+        let all = tracks
+        listeningTask?.cancel()
+        listeningTask = Task.detached(priority: .userInitiated) {
+            let stats = ListeningStats(plays: plays, tracks: all, period: period, now: request.at)
+            guard !Task.isCancelled else { return }
+            await MainActor.run { [weak self] in
+                guard let self, self.listeningRequest?.at == request.at else { return }
+                self.listening = stats
             }
         }
     }

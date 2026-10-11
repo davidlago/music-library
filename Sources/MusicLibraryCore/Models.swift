@@ -99,6 +99,20 @@ public struct PlayTotal: Hashable, Sendable {
     }
 }
 
+/// One listen from the `plays` table.
+public struct Play: Hashable, Sendable {
+    public var trackId: Int64
+    public var startedAt: Date
+    /// Seconds actually listened.
+    public var listened: Double
+    /// Long enough to count (the scrobble rule).
+    public var counted: Bool
+
+    public init(trackId: Int64, startedAt: Date, listened: Double, counted: Bool) {
+        self.trackId = trackId; self.startedAt = startedAt; self.listened = listened; self.counted = counted
+    }
+}
+
 /// A saved search whose tracks are recomputed from the library whenever it is shown.
 public struct SmartPlaylist: Identifiable, Hashable, Sendable {
     public var id: Int64
