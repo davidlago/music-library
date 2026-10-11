@@ -19,6 +19,8 @@ struct ThemeColors {
     var series: Color { palette.map { Color($0.series) } ?? VizColor.series }
     /// The unfilled part of bar and progress tracks.
     var track: Color { palette.map { Color($0.surface).opacity(0.7) } ?? Color.primary.opacity(0.07) }
+    /// Reference marks drawn next to `series`, like the library's share beside your listening.
+    var neutral: Color { palette.map { Color($0.neutral) } ?? VizColor.tier(.unknown) }
     /// Subtle fills for hover states and chips.
     var fill: Color { palette.map { Color($0.surface).opacity(0.55) } ?? Color.primary.opacity(0.06) }
 

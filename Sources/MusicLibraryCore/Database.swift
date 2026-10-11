@@ -404,6 +404,13 @@ public final class Database: @unchecked Sendable {
         return Dictionary(rows, uniquingKeysWith: { a, _ in a })
     }
 
+    /// Every listen, oldest first.
+    public func plays() throws -> [Play] {
+        try query("SELECT track_id, started_at, listened, counted FROM plays ORDER BY started_at") { r in
+            Play(trackId: r.int64(0), startedAt: Date(timeIntervalSince1970: r.double(1)), listened: r.double(2), counted: (r.int(3) ?? 0) != 0)
+        }
+    }
+
     // MARK: Artist info
 
     public func saveArtistInfo(key: String, _ info: ArtistInfo, imageFile: String?) throws {

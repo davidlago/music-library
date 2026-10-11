@@ -40,21 +40,56 @@ enum VizColor {
 
 struct InsightsView: View {
     @Environment(AppModel.self) private var model
+    @AppStorage("insightsPane") private var pane = Pane.library
+    @AppStorage("listeningPeriod") private var period = ListeningStats.Period.month
+
+    enum Pane: String, CaseIterable, Identifiable {
+        case library = "Library", listening = "Listening"
+        var id: String { rawValue }
+    }
 
     var body: some View {
         Group {
             if model.totalTracks == 0 {
                 ContentUnavailableView("No Insights Yet", systemImage: "chart.bar.xaxis",
                                        description: Text("Import some music and this page fills in with stats about your collection."))
-            } else if let stats = model.stats {
-                InsightsContent(stats: stats)
             } else {
-                ProgressView("Crunching the numbers…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                switch pane {
+                case .library:
+                    if let stats = model.stats {
+                        InsightsContent(stats: stats)
+                    } else {
+                        ProgressView("Crunching the numbers…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                case .listening:
+                    if let stats = model.listening, stats.period == period || !stats.hasHistory {
+                        ListeningContent(stats: stats, period: $period)
+                    } else {
+                        ProgressView("Crunching the numbers…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
             }
         }
         .navigationTitle("Insights")
-        .onAppear { model.loadStatsIfNeeded() }
-        .onChange(of: model.libraryVersion) { model.loadStatsIfNeeded() }
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("Insights", selection: $pane) { ForEach(Pane.allCases) { Text($0.rawValue).tag($0) } }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    .help("Your collection, or what you listen to")
+            }
+        }
+        .onAppear(perform: load)
+        .onChange(of: model.libraryVersion) { load() }
+        .onChange(of: model.historyVersion) { load() }
+        .onChange(of: pane) { load() }
+        .onChange(of: period) { load() }
+    }
+
+    private func load() {
+        switch pane {
+        case .library: model.loadStatsIfNeeded()
+        case .listening: model.loadListeningIfNeeded(period)
+        }
     }
 }
 
@@ -124,13 +159,17 @@ extension InsightCard where Accessory == EmptyView {
 }
 
 struct RankedItem: Identifiable {
-    var id: String { name }
+    var id: String { key ?? name }
     var name: String
     var value: Double
     var detail: String
     var query: String?
     /// Opens this person's Music DNA instead of searching.
     var person: String?
+    /// A second line under the name, e.g. the artist of a song.
+    var subtitle: String?
+    /// Identity when names can repeat (songs with the same title).
+    var key: String?
 }
 
 /// A clickable ranked list with proportional bars; shows the top few and expands to the rest.
@@ -152,7 +191,11 @@ struct RankedBars: View {
                     if let person = item.person { model.showMusicDNA(person) } else if let q = item.query { model.search(q) }
                 } label: {
                     HStack(spacing: 10) {
-                        Text(item.name).lineLimit(1).frame(width: 150, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(item.name).lineLimit(1)
+                            if let subtitle = item.subtitle { Text(subtitle).font(.caption).foregroundStyle(.subtext).lineLimit(1) }
+                        }
+                        .frame(width: 150, alignment: .leading)
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 Capsule().fill(theme.track)
@@ -319,26 +362,44 @@ struct Chip: View {
 // MARK: Hero
 
 struct HeroTiles: View {
-    @Environment(\.theme) private var theme
     let stats: LibraryStats
 
     var body: some View {
         let lossless = stats.trackCount == 0 ? 0 : Double(stats.losslessCount) / Double(stats.trackCount)
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-            tile(stats.trackCount.formatted(), stats.trackCount == 1 ? "Song" : "Songs", "music.note")
-            tile(stats.albumCount.formatted(), stats.albumCount == 1 ? "Album" : "Albums", "square.stack")
-            tile(stats.artistCount.formatted(), stats.artistCount == 1 ? "Artist" : "Artists", "music.mic")
-            tile(formatLongDuration(stats.totalDuration), "Of music", "clock")
-            tile((stats.bytesAreEstimated ? "≈ " : "") + ByteCountFormatter.string(fromByteCount: stats.totalBytes, countStyle: .file), "On disk", "internaldrive")
-            tile(lossless.formatted(.percent.precision(.fractionLength(0))), "Lossless", "waveform")
+        TileGrid {
+            InsightTile(value: stats.trackCount.formatted(), label: stats.trackCount == 1 ? "Song" : "Songs", icon: "music.note")
+            InsightTile(value: stats.albumCount.formatted(), label: stats.albumCount == 1 ? "Album" : "Albums", icon: "square.stack")
+            InsightTile(value: stats.artistCount.formatted(), label: stats.artistCount == 1 ? "Artist" : "Artists", icon: "music.mic")
+            InsightTile(value: formatLongDuration(stats.totalDuration), label: "Of music", icon: "clock")
+            InsightTile(value: (stats.bytesAreEstimated ? "≈ " : "") + ByteCountFormatter.string(fromByteCount: stats.totalBytes, countStyle: .file),
+                        label: "On disk", icon: "internaldrive")
+            InsightTile(value: lossless.formatted(.percent.precision(.fractionLength(0))), label: "Lossless", icon: "waveform")
         }
     }
+}
 
-    private func tile(_ value: String, _ label: String, _ icon: String) -> some View {
+struct TileGrid<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12, alignment: .top)], spacing: 12, content: content)
+    }
+}
+
+/// A big number with a label, and optionally a line of context under it.
+struct InsightTile: View {
+    @Environment(\.theme) private var theme
+    let value: String
+    let label: String
+    let icon: String
+    var detail: String?
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Image(systemName: icon).font(.callout).foregroundStyle(.subtext)
             Text(value).font(.system(size: 26, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.6)
             Text(label).font(.caption).foregroundStyle(.subtext)
+            if let detail { Text(detail).font(.caption2).foregroundStyle(.subtext).lineLimit(1).minimumScaleFactor(0.8) }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -668,35 +729,42 @@ struct FunFact: Identifiable {
     var query: String?
 }
 
-struct FunFactsCard: View {
+/// A grid of fun facts; facts with a query search for it when clicked.
+struct FactsGrid: View {
     @Environment(\.theme) private var theme
     @Environment(AppModel.self) private var model
+    let facts: [FunFact]
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 12, alignment: .top)], alignment: .leading, spacing: 12) {
+            ForEach(facts) { f in
+                Button { if let q = f.query { model.search(q) } } label: {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: f.icon).font(.title3).foregroundStyle(theme.series).frame(width: 26)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(f.title).font(.caption).foregroundStyle(.subtext)
+                            Text(f.value).font(.title3.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.7)
+                            Text(f.detail).font(.caption).foregroundStyle(.subtext).lineLimit(2)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(theme.fill.opacity(0.7)))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(f.query.map { "Search \($0)" } ?? "")
+            }
+        }
+    }
+}
+
+struct FunFactsCard: View {
     let stats: LibraryStats
 
     var body: some View {
-        InsightCard(title: "Fun Facts") {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 12, alignment: .top)], alignment: .leading, spacing: 12) {
-                ForEach(facts) { f in
-                    Button { if let q = f.query { model.search(q) } } label: {
-                        HStack(alignment: .top, spacing: 10) {
-                            Image(systemName: f.icon).font(.title3).foregroundStyle(theme.series).frame(width: 26)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(f.title).font(.caption).foregroundStyle(.subtext)
-                                Text(f.value).font(.title3.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.7)
-                                Text(f.detail).font(.caption).foregroundStyle(.subtext).lineLimit(2)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(theme.fill.opacity(0.7)))
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help(f.query.map { "Search \($0)" } ?? "")
-                }
-            }
-        }
+        InsightCard(title: "Fun Facts") { FactsGrid(facts: facts) }
     }
 
     private func albumQuery(_ a: LibraryStats.AlbumRef) -> String {

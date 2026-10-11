@@ -28,7 +28,7 @@
 - **Music DNA.** See who played, wrote and produced with whom across your library, and click your way from one collaborator to the next.
 - **Search that understands music.** `genre:jazz year:1955-1965 is:hires`, `credit:"rudy van gelder"`, `added:30d`, `missing:cover`…
   with autocomplete and typo correction. Save any search as a smart playlist that keeps itself up to date.
-- **Insights.** Your collection by decade, genre, artist, audio quality and growth, plus fun facts, all clickable.
+- **Insights.** Two panes: your collection by decade, genre, artist, audio quality and growth, and your listening (top songs, artists and albums, when you listen, the eras you favor, skips, streaks and favorites to rediscover) over 7 days, 30 days, 12 months or all time. Fun facts in both, all clickable.
 - **Bit-perfect playback.** The output device follows each track's sample rate and bit depth, and the original format is restored when you quit.
 - **Listening history and Last.fm.** Time listened and plays per album and artist, and optional scrobbling with an offline queue.
 - **Themes.** System, Catppuccin (all four flavors, or auto light/dark), Nord, Dracula, Solarized, Gruvbox, Tokyo Night and Rosé Pine.
