@@ -20,12 +20,12 @@ struct PeopleRow: View {
     let label: String
     let names: [String]
     var labelWidth: CGFloat = 170
-    var onOpen: (() -> Void)?
+    let open: (String) -> Void
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(label).foregroundStyle(.subtext).frame(width: labelWidth, alignment: .trailing)
-            PersonLinks(names: names, onOpen: onOpen).frame(maxWidth: .infinity, alignment: .leading)
+            PersonLinks(names: names, open: open).frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.callout)
     }
@@ -35,8 +35,8 @@ struct MetadataDetailsView: View {
     let metadata: TrackMetadata
     var labelWidth: CGFloat = 170
     var showsEmptyState = true
-    /// Runs before a name link navigates away (e.g. to close a sheet).
-    var onOpenPerson: (() -> Void)?
+    /// Opens a person's Music DNA (see `PersonLink`).
+    let openPerson: (String) -> Void
 
     /// Fields whose values are people's names.
     static let peopleFields: Set<String> = ["Lyricist", "Writer", "Arranger", "Conductor", "Producer", "Engineer", "Mixer", "Remixer", "Performers"]
@@ -46,7 +46,7 @@ struct MetadataDetailsView: View {
             ForEach(Array(metadata.extended.displayFields.enumerated()), id: \.offset) { _, field in
                 if Self.peopleFields.contains(field.label) {
                     let names = CollaborationGraph.splitNames(field.value).map(CollaborationGraph.stripParenthetical)
-                    PeopleRow(label: field.label, names: names, labelWidth: labelWidth, onOpen: onOpenPerson)
+                    PeopleRow(label: field.label, names: names, labelWidth: labelWidth, open: openPerson)
                 } else {
                     row(field.label, field.value)
                 }
@@ -56,7 +56,7 @@ struct MetadataDetailsView: View {
                 Text("Credits").font(.subheadline.bold()).padding(.top, 6)
                 ForEach(Array(people.enumerated()), id: \.offset) { _, p in
                     HStack(alignment: .firstTextBaseline) {
-                        PersonLink(name: p.name, onOpen: onOpenPerson)
+                        PersonLink(name: p.name, open: openPerson)
                             .frame(width: labelWidth, alignment: .trailing)
                         Text(p.roles.joined(separator: ", ")).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -95,7 +95,7 @@ struct TrackInfoSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 6) {
                     info("Album Artist", m.albumArtist)
-                    if !m.composer.isEmpty { PeopleRow(label: "Composer", names: CollaborationGraph.splitNames(m.composer)) { dismiss() } }
+                    if !m.composer.isEmpty { PeopleRow(label: "Composer", names: CollaborationGraph.splitNames(m.composer), open: openPerson) }
                     info("Year", m.year.map(String.init) ?? "")
                     info("Track", numberPair(m.trackNo, m.trackTotal))
                     info("Disc", numberPair(m.discNo, m.discTotal))
@@ -110,7 +110,7 @@ struct TrackInfoSheet: View {
                     info("MusicBrainz Recording ID", m.mbRecordingId ?? "")
                     info("MusicBrainz Release ID", m.mbReleaseId ?? "")
                     info("File", track.fileURL(root: model.libraryRoot).path)
-                    MetadataDetailsView(metadata: m, onOpenPerson: { dismiss() })
+                    MetadataDetailsView(metadata: m, openPerson: openPerson)
                 }
             }
             HStack {
@@ -120,6 +120,12 @@ struct TrackInfoSheet: View {
         }
         .padding(20)
         .frame(width: 600, height: 560)
+    }
+
+    /// Closes the sheet before showing the person's Music DNA.
+    private func openPerson(_ name: String) {
+        dismiss()
+        model.showMusicDNA(name)
     }
 
     private func numberPair(_ n: Int?, _ total: Int?) -> String {

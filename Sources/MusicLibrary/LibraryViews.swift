@@ -20,7 +20,7 @@ struct TrackTable: View {
             TableColumn("Title", value: \.title)
             TableColumn("Artist", value: \.artist)
             TableColumn("Album", value: \.album)
-            TableColumn("Composer", value: \.composer) { PersonLinks($0.composer) }
+            TableColumn("Composer", value: \.composer) { PersonLinks($0.composer) { model.showMusicDNA($0) } }
             TableColumn("Year", value: \.yearSort) { Text($0.year.map(String.init) ?? "") }.width(50)
             TableColumn("Track", value: \.trackSort) { Text($0.trackNo.map(String.init) ?? "") }.width(50)
             TableColumn("Time", value: \.duration) { Text(formatTime($0.duration)).monospacedDigit() }.width(60)

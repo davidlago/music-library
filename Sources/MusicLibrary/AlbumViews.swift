@@ -302,7 +302,7 @@ struct AlbumDetail: View {
                 SectionHeader(title: "Credits")
                 ForEach(shown, id: \.name) { p in
                     HStack(alignment: .firstTextBaseline) {
-                        PersonLink(name: p.name)
+                        PersonLink(name: p.name) { model.showMusicDNA($0) }
                             .fontWeight(.medium)
                             .contextMenu {
                                 Button("Show Music DNA") { model.showMusicDNA(p.name) }
@@ -405,7 +405,7 @@ struct AlbumTrackRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(track.title).lineLimit(1).fontWeight(isCurrent ? .semibold : .regular)
                 if !track.artist.isEmpty, ArtistInfoStore.key(track.artist) != ArtistInfoStore.key(albumArtist) {
-                    PersonLinks(names: CollaborationGraph.splitArtists(track.artist)).font(.caption)
+                    PersonLinks(names: CollaborationGraph.splitArtists(track.artist)) { model.showMusicDNA($0) }.font(.caption)
                 }
             }
             Spacer()
