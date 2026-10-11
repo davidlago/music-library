@@ -63,7 +63,7 @@ final class Player {
     /// Queues `tracks` to play right after the current song; plays them if nothing is playing.
     func playNext(_ tracks: [Track]) { enqueue { $0.playNext(tracks) } }
 
-    /// Queues `tracks` after anything already queued; plays them if nothing is playing.
+    /// Appends `tracks` to the end of the queue; plays them if nothing is playing.
     func addToQueue(_ tracks: [Track]) { enqueue { $0.addToQueue(tracks) } }
 
     private func enqueue(_ change: (inout PlayQueue) -> Void) {

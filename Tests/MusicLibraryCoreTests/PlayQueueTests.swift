@@ -12,11 +12,11 @@ import Testing
     func titles(_ entries: ArraySlice<PlayQueue.Entry>) -> [String] { entries.map(\.track.title) }
     func order(_ q: PlayQueue) -> [String] { q.entries.map(\.track.title) }
 
-    /// Playing A of [A, B, C] with X and Y queued.
+    /// Playing A of [A, B, C] with X and Y queued with Play Next.
     func queueWithXY() -> PlayQueue {
         var q = PlayQueue()
         q.replace(with: tracks("A", "B", "C"), startAt: 0, source: "Album")
-        q.addToQueue(tracks("X", "Y"))
+        q.playNext(tracks("X", "Y"))
         return q
     }
 
@@ -42,14 +42,35 @@ import Testing
         #expect(!q.hasNext)
     }
 
-    @Test func addToQueueKeepsQueueOrderWhilePlayingQueuedSongs() {
+    @Test func playNextGoesAheadOfEarlierQueuedSongs() {
         var q = queueWithXY()
         q.advance()
         #expect(q.current?.title == "X")
         #expect(titles(q.queued) == ["Y"])
-        q.addToQueue(tracks("Z"))
-        #expect(titles(q.queued) == ["Y", "Z"])
+        q.playNext(tracks("Z"))
+        #expect(titles(q.queued) == ["Z", "Y"])
         #expect(titles(q.upcoming) == ["B", "C"])
+    }
+
+    @Test func addToQueueAppendsToTheEnd() {
+        var q = queueWithXY()
+        q.addToQueue(tracks("D", "E"))
+        #expect(titles(q.queued) == ["X", "Y"])
+        #expect(titles(q.upcoming) == ["B", "C", "D", "E"])
+        #expect(q.source == nil)
+        q.addToQueue(tracks("F"))
+        var played: [String] = []
+        while q.advance() { played.append(q.current!.title) }
+        #expect(played == ["X", "Y", "B", "C", "D", "E", "F"])
+    }
+
+    @Test func addToQueueAtTheEndOfTheListPlaysNext() {
+        var q = PlayQueue()
+        q.replace(with: tracks("A", "B"), startAt: 1)
+        #expect(!q.hasNext)
+        q.addToQueue(tracks("C"))
+        #expect(q.hasNext)
+        #expect(titles(q.upcoming) == ["C"])
     }
 
     @Test func queueingWithNothingPlayingStartsTheTracks() {
@@ -73,7 +94,7 @@ import Testing
         var q = queueWithXY()
         q.advance(); q.advance(); q.advance()
         #expect(q.current?.title == "B")
-        q.addToQueue(tracks("Z"))
+        q.playNext(tracks("Z"))
         let wentBack = q.goBack()
         #expect(wentBack)
         #expect(q.current?.title == "Y")
@@ -128,7 +149,7 @@ import Testing
     @Test func reorderWithinSections() {
         var q = PlayQueue()
         q.replace(with: tracks("A", "B", "C", "D"), startAt: 0)
-        q.addToQueue(tracks("X", "Y", "Z"))
+        q.playNext(tracks("X", "Y", "Z"))
         q.moveQueued(from: [0], to: 3)
         #expect(titles(q.queued) == ["Y", "Z", "X"])
         q.moveQueued(from: [2], to: 0)

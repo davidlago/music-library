@@ -1,22 +1,22 @@
 import Foundation
 
 /// The player's queue, Spotify style: the list playback started from (an album, a playlist, the songs on
-/// screen) plus songs queued with Play Next or Add to Queue. Queued songs play before the rest of the list,
-/// whatever happens to the list; starting something new replaces both.
+/// screen) plus songs queued with Play Next, which play before the rest of the list whatever happens to it.
+/// Add to Queue appends to the end of the list. Starting something new replaces everything.
 ///
-/// `entries` holds everything in play order with `index` at the current song. Queued songs that haven't
-/// played yet always sit right after it, so they can be shown as their own section.
+/// `entries` holds everything in play order with `index` at the current song. Songs queued with Play Next
+/// that haven't played yet always sit right after it, so they can be shown as their own section.
 public struct PlayQueue: Sendable {
     public struct Entry: Identifiable, Hashable, Sendable {
         public let id: Int
         public let track: Track
-        /// Added with Play Next or Add to Queue and not played yet.
+        /// Added with Play Next and not played yet.
         public fileprivate(set) var isQueued: Bool
     }
 
     public private(set) var entries: [Entry] = []
     public private(set) var index: Int?
-    /// What the list is ("Kind of Blue", a playlist name), for "Next from …".
+    /// What the list is ("Kind of Blue", a playlist name), for "Next from …"; nil once songs are appended.
     public private(set) var source: String?
     private var nextID = 0
 
@@ -24,7 +24,7 @@ public struct PlayQueue: Sendable {
 
     public var currentEntry: Entry? { index.map { entries[$0] } }
     public var current: Track? { currentEntry?.track }
-    /// Queued songs, in the order they will play.
+    /// Songs queued with Play Next, in the order they will play.
     public var queued: ArraySlice<Entry> { entries[queuedRange] }
     /// The rest of the list, after the queued songs.
     public var upcoming: ArraySlice<Entry> { entries[queuedRange.upperBound...] }
@@ -53,16 +53,21 @@ public struct PlayQueue: Sendable {
         source = nil
     }
 
-    /// Queues `tracks` ahead of anything already queued. With nothing playing, they become the list.
-    public mutating func playNext(_ tracks: [Track]) { insertQueued(tracks, at: queuedRange.lowerBound) }
-
-    /// Queues `tracks` after anything already queued. With nothing playing, they become the list.
-    public mutating func addToQueue(_ tracks: [Track]) { insertQueued(tracks, at: queuedRange.upperBound) }
-
-    private mutating func insertQueued(_ tracks: [Track], at position: Int) {
+    /// Queues `tracks` to play right after the current song, ahead of anything queued with Play Next.
+    /// With nothing playing, they become the list.
+    public mutating func playNext(_ tracks: [Track]) {
         guard !tracks.isEmpty else { return }
         guard index != nil else { replace(with: tracks, startAt: 0); return }
-        entries.insert(contentsOf: tracks.map { makeEntry($0, queued: true) }, at: position)
+        entries.insert(contentsOf: tracks.map { makeEntry($0, queued: true) }, at: queuedRange.lowerBound)
+    }
+
+    /// Appends `tracks` to the end of the queue. With nothing playing, they become the list.
+    public mutating func addToQueue(_ tracks: [Track]) {
+        guard !tracks.isEmpty else { return }
+        guard index != nil else { replace(with: tracks, startAt: 0); return }
+        entries.append(contentsOf: tracks.map { makeEntry($0, queued: false) })
+        // The list now holds more than what it was started from.
+        source = nil
     }
 
     private mutating func makeEntry(_ track: Track, queued: Bool) -> Entry {

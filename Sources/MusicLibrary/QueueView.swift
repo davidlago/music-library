@@ -1,8 +1,8 @@
 import MusicLibraryCore
 import SwiftUI
 
-/// The queue in the window's inspector: the current song, songs queued with Play Next or Add to Queue, then
-/// the rest of the list playback started from. Double-click plays a song, drag reorders, Delete removes.
+/// The queue in the window's inspector: the current song, songs queued with Play Next, then the rest of
+/// the list (what playback started from, plus anything added with Add to Queue). Double-click plays a song, drag reorders, Delete removes.
 struct QueueView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.theme) private var theme
