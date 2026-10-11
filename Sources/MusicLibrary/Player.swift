@@ -23,6 +23,8 @@ final class Player {
     @ObservationIgnored var onTrackStart: (@MainActor (Track) -> Void)?
     /// Called on every playback position update.
     @ObservationIgnored var onProgress: (@MainActor (Track, Double, Bool) -> Void)?
+    /// Called before playback starts or resumes (stops a catalog preview).
+    @ObservationIgnored var onWillPlay: (@MainActor () -> Void)?
     /// Called when playback stops for good: the queue ran out or the player was stopped.
     @ObservationIgnored var onPlaybackEnded: (@MainActor () -> Void)?
     /// The queue ran out; pressing play again starts the last track over as a new play.
@@ -136,7 +138,7 @@ final class Player {
         finishedQueue = false
         avPlayer.replaceCurrentItem(with: item)
         avPlayer.volume = volume
-        if isPlaying { avPlayer.play() }
+        if isPlaying { onWillPlay?(); avPlayer.play() }
         updateNowPlaying()
         if let track = currentTrack { onTrackStart?(track) }
     }
@@ -166,7 +168,7 @@ final class Player {
             loadCurrent()
             return
         }
-        if isPlaying { avPlayer.pause() } else { avPlayer.play() }
+        if isPlaying { avPlayer.pause() } else { onWillPlay?(); avPlayer.play() }
         isPlaying.toggle()
         updateNowPlaying()
         if isPlaying && finishedQueue {

@@ -64,6 +64,8 @@
   with the same filters as your library, plus catalog ones: `genre:jazz decade:60s -is:owned is:available`.
 - **Real album details.** Each CD is matched on MusicBrainz by its barcode for the cover, track list, year, label, genres,
   rating and description, and marked when it's already in your library, even when the catalog spells it differently.
+- **Hear it first.** CDs you don't have play 30-second previews of their songs from Apple Music, with no account or
+  sign-in: one song at a time from the track list, or all of them in a row.
 - **Your account.** Sign in to see your checkouts (and which you haven't ripped yet) and to add CDs to one of your library
   lists, so you know what to look for on your next visit.
 
@@ -190,7 +192,8 @@ the new Mac choose it in **Settings ▸ General**.
 The library, your listening history and your settings stay on your Mac. The app talks to these services, only to look
 things up: MusicBrainz and the Cover Art Archive (matching, covers, artist and album info), Wikipedia, Wikidata and
 Wikimedia Commons (descriptions and photos), AcoustID (only if you add a key), Last.fm (only if you connect it), and your
-library's catalog website (only once you open Library CDs; your card number and PIN are sent only to that site). API keys,
+library's catalog website (only once you open Library CDs; your card number and PIN are sent only to that site), and
+Apple's iTunes Search API (only when you open a library CD you don't have, for its song previews). API keys,
 secrets and your PIN are kept in your keychain. Downloading artist and album info can be turned off in
 **Settings ▸ General**, and looking up library CDs in **Settings ▸ Library**.
 
