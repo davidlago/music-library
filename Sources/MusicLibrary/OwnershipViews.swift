@@ -81,7 +81,7 @@ struct AlbumOwnershipSection: View {
         let purchase = model.purchase(for: album)
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader(title: "Your Copy")
-            Toggle("I own this album", isOn: Binding(get: { purchase != nil }, set: setOwned))
+            Toggle("I own this album", isOn: Binding(get: { purchase != nil }, set: { setOwned($0) }))
                 .toggleStyle(.switch)
             if let purchase {
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
