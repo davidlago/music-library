@@ -161,13 +161,13 @@ extension MusicBrainzParser {
             throw NetworkError.badResponse("MusicBrainz release list is not a JSON object")
         }
         return (o["releases"] as? [[String: Any]] ?? []).compactMap { r in
-            guard let id = r["id"] as? String, let title = r["title"] as? String else { return nil }
+            guard let id = MBID.validated(r["id"] as? String), let title = r["title"] as? String else { return nil }
             let media = r["media"] as? [[String: Any]] ?? []
             let label = (r["label-info"] as? [[String: Any]])?.first
             func str(_ v: Any?) -> String? { (v as? String).flatMap { $0.isEmpty ? nil : $0 } }
             return MBReleaseSummary(
                 id: id, title: title, artist: creditString(r["artist-credit"]), date: str(r["date"]),
-                barcode: str(r["barcode"]), releaseGroupId: (r["release-group"] as? [String: Any])?["id"] as? String,
+                barcode: str(r["barcode"]), releaseGroupId: MBID.validated((r["release-group"] as? [String: Any])?["id"] as? String),
                 formats: media.compactMap { $0["format"] as? String },
                 trackCount: r["track-count"] as? Int ?? media.reduce(0) { $0 + ($1["track-count"] as? Int ?? 0) },
                 label: str((label?["label"] as? [String: Any])?["name"]), catalogNumber: str(label?["catalog-number"]),
@@ -200,8 +200,9 @@ extension MusicBrainzClient {
 
     /// The releases of a release group (with media and labels).
     public func browseReleases(releaseGroupId: String) async throws -> [MBReleaseSummary] {
+        guard let mbid = MBID.validated(releaseGroupId) else { throw NetworkError.badResponse("not a MusicBrainz release group ID") }
         var c = URLComponents(string: "\(Self.baseURL)/release")!
-        c.percentEncodedQuery = "release-group=\(releaseGroupId)&inc=media+labels+artist-credits&limit=50&fmt=json"
+        c.percentEncodedQuery = "release-group=\(mbid)&inc=media+labels+artist-credits&limit=50&fmt=json"
         return try MusicBrainzParser.parseReleaseList(try await fetchData(c.url!))
     }
 }
