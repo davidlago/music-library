@@ -43,7 +43,9 @@ xcodebuild -project iOS/MusicLibraryMobile.xcodeproj -scheme MusicLibraryMobile 
     -destination 'generic/platform=iOS' -archivePath "$ARCHIVE" -allowProvisioningUpdates ${AUTH[@]+"${AUTH[@]}"} \
     "${SETTINGS[@]}" archive -quiet
 
-OPTIONS="$(mktemp -d)/ExportOptions.plist"
+OPTIONS_DIR="$(mktemp -d)"
+trap 'rm -rf "$OPTIONS_DIR"' EXIT
+OPTIONS="$OPTIONS_DIR/ExportOptions.plist"
 cat > "$OPTIONS" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
