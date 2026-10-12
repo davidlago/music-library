@@ -91,8 +91,9 @@
   to its own folder.
 - **An iPhone app.** Browse your whole library on your iPhone (album and artist pages, Music DNA and Insights, as on the
   Mac), download the music you want over Wi-Fi from the phone itself, and play it offline, through a USB DAC at each
-  song's own sample rate, with the same search, playlists, Liked Songs and Last.fm scrobbling. See
-  [iPhone app](#iphone-app).
+  song's own sample rate, with the same search, playlists, Liked Songs and Last.fm scrobbling. Home and lock screen
+  widgets show your listening, recent purchases and what's playing (with controls), and an Apple Watch app is a remote
+  for the phone. See [iPhone app](#iphone-app).
 
 ## Tour
 
@@ -169,6 +170,17 @@ the Mac over Wi-Fi, or **Remove from iPhone** to free the space.
 
 ![The iPhone app: an album's listening stats and track list with the song playing, Music DNA centered on Diana Krall, and Insights with the timeline by decade and top genres](docs/screenshots/iphone-dna-insights.png)
 
+### Widgets and Apple Watch
+
+Home screen widgets show what's playing (with play/pause, skip and like buttons that work without opening the app), how
+much you've listened lately with your streak and top albums, the albums you bought and what you've spent this year, and
+the library at a glance. The Apple Watch app is a remote for the iPhone's player with your listening and purchases, and
+its complications show your listening time and the song playing.
+
+![iPhone widgets: Now Playing with controls and Listening with top albums; Library and Recent Purchases; and the small Library, Listening, latest purchase and Now Playing widgets](docs/screenshots/iphone-widgets.png)
+
+![The Apple Watch app: a watch face with the Listening and Now Playing complications, Now Playing with controls, Listening for the past 7 days and recent purchases](docs/screenshots/watch.png)
+
 ### Themes
 
 | Catppuccin Mocha | Rosé Pine Dawn |
@@ -217,10 +229,12 @@ works).
 
    ```
    DEVELOPMENT_TEAM = ABCDE12345
-   PRODUCT_BUNDLE_IDENTIFIER = com.yourname.MusicLibraryMobile
+   APP_BUNDLE_ID = com.yourname.MusicLibraryMobile
    ```
 
    A bundle identifier can belong to only one developer, so if Xcode says it isn't available, choose your own as above.
+   The widgets, the Apple Watch app and the app group they share with the app are named after it, and Xcode registers
+   them for your team.
 4. Pick your iPhone as the run destination and click **Run** (⌘R).
 5. The first time, iOS won't open an app from an unknown developer: on the phone, open
    **Settings ▸ General ▸ VPN & Device Management**, tap your Apple ID under Developer App and tap **Trust**.
@@ -264,6 +278,30 @@ then send only what changed.
   made offline are sent when it's back online; the Mac doesn't scrobble them again.
 - The play queue and position are kept when the app is closed.
 
+**Widgets**
+
+Long-press the home screen, tap **Edit ▸ Add Widget** and search for Music Library. The widgets show what the app last
+saw, so open the app once after installing (and after a sync) to fill them in:
+
+- **Listening**: time listened in the past 7 or 30 days (long-press ▸ **Edit Widget** to choose), a bar per day, your
+  streak, and your top artist, song and albums. Also on the lock screen.
+- **Now Playing**: the song with play/pause (and previous, next and like on the medium size), which work without opening
+  the app; with nothing queued, **Shuffle** plays what's on the phone. Also on the lock screen.
+- **Recent Purchases**: the albums you bought lately with their price and date, and what you've spent this year.
+- **Rediscover**: a song you played a lot and haven't heard in three months, a different one every couple of hours, with
+  **Play** for its album.
+- **Library**: albums, songs and hours in the library, how much of it is on the phone, and what was added last.
+
+Tapping a widget opens the app on its album, Now Playing or Insights.
+
+**Apple Watch**
+
+The watch app (watchOS 26 or later) installs with the iPhone app (or from the Watch app on the phone, under **Available Apps**). It's a remote
+for the iPhone's player (play/pause, previous, next, like, and starting Liked Songs, a shuffle, or an album from your
+most played, Rediscover, recent purchases and recently added) and shows your listening and purchases. Its complications
+show listening time, the song playing and this year's purchases. It shows what the phone last sent, so the phone app
+must have run since; commands need the phone nearby.
+
 **Every 7 days (free Apple ID)**
 
 Apps installed with a free Apple ID stop opening after 7 days. Connect the phone and click **Run** in Xcode again: the new
@@ -301,7 +339,9 @@ you're searching, not your ZIP code). API keys,
 secrets and your PIN are kept in your keychain. Downloading artist and album info can be turned off in
 **Settings ▸ General**, and looking up library CDs in **Settings ▸ Library**.
 
-The iPhone app keeps its music and the copied database on the phone, out of iCloud backups. It talks to Last.fm, if you
+The iPhone app keeps its music and the copied database on the phone, out of iCloud backups. Its widgets and the watch app
+get a small summary (stats, recent purchases, the song playing and a few covers) kept on the phone and sent to your
+paired watch. It talks to Last.fm, if you
 connect it, to Ticketmaster and JamBase for concerts on artist pages (only if the Mac has keys for them), and to the Mac
 app it's paired with, over your local network: syncs are encrypted with a key the two exchange when pairing. While the
 Mac app runs it listens on the local network for its paired phones (macOS may ask to allow incoming connections).
@@ -322,7 +362,8 @@ swift test                      # runs the test suite (needs ffmpeg)
 (a signing certificate; one with a Team ID keeps keychain access across rebuilds). With only the Command Line Tools
 installed, see [AGENTS.md](AGENTS.md) for an SDK note.
 
-The iPhone app is `iOS/MusicLibraryMobile.xcodeproj` (needs Xcode); it shares `MusicLibraryCore` with the Mac app.
+The iPhone app is `iOS/MusicLibraryMobile.xcodeproj` (needs Xcode), with its widgets and the Apple Watch app; it shares
+`MusicLibraryCore` with the Mac app.
 See [iPhone app](#iphone-app) for installing it on a phone.
 
 Releases are built by GitHub Actions: pushing a tag like `v1.2.3` runs the tests, builds a universal app and publishes it on the

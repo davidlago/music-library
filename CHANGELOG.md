@@ -7,6 +7,18 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- **iPhone widgets.** Listening (time listened in the past 7 or 30 days, a bar per day, your streak and top artists,
+  songs and albums), Now Playing (with play/pause, previous, next and like buttons that work without opening the app),
+  Recent Purchases (what you bought lately and spent this year), Rediscover (favorites you haven't played in months, with
+  Play) and Library (its size, how much is on the phone, what was added last). Listening and Now Playing are on the lock
+  screen too. Tapping one opens its album, Now Playing or Insights.
+- **An Apple Watch app.** A remote for the iPhone's player (play/pause, skip, like, and starting Liked Songs, a shuffle or
+  an album), your listening and purchases, and complications for listening time, the song playing and this year's
+  purchases. It installs with the iPhone app and needs watchOS 26 or later.
+- The iPhone app's icon no longer has a white frame around it.
+- To use your own bundle identifier for the iPhone app, set `APP_BUNDLE_ID` (not `PRODUCT_BUNDLE_IDENTIFIER`) in
+  `iOS/Local.xcconfig`; the widgets, watch app and app group are named after it.
+
 ## 1.11.0
 
 - **Your whole library on the iPhone.** Every sync now sends the details of the entire library (every album and artist
