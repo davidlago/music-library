@@ -174,14 +174,14 @@ In App Store Connect:
 
 1. Tag the release as usual: CI uploads the build to TestFlight as version X.Y.Z (see above).
 2. In App Store Connect, add the version under the iOS app (**+** next to iOS App), fill in **What's New** from the
-   changelog, and on the first version also the description, keywords, URLs and screenshots (`docs/app-store/iphone`
-   for the 6.9-inch display, `docs/app-store/watch` for Apple Watch).
+   changelog, and on the first version also the description, keywords, URLs and screenshots (in **Media Manager**:
+   `docs/app-store/iphone-6.3` for the required 6.1/6.3-inch display, `docs/app-store/watch` for Apple Watch).
 3. Select the build, fill in **App Review Information** (no sign-in, the notes from docs/app-store, the demo video as
    an attachment on the first submission), and choose when to release it.
 4. **Add for Review**, then **Submit for Review**. Review usually takes a day or two; App Store Connect emails the
    outcome.
 
-New screenshots: open the sample library in the iPhone 18 Pro Max simulator (status bar set with
+New screenshots: open the sample library in the iPhone 17 simulator (6.3-inch; status bar set with
 `xcrun simctl status_bar booted override --time 9:41`) and take them with `xcrun simctl io booted screenshot`;
 `musiclibrary://album?key=<artist>%01<album>`, `musiclibrary://now-playing` and `musiclibrary://insights?pane=listening`
 open those screens directly. The watch's come from the Apple Watch simulator paired with it.
