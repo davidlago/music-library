@@ -1,0 +1,59 @@
+name: Website
+
+# Builds site/ with scripts/build-site.sh and publishes it on GitHub Pages
+# (https://davidlago.github.io/music-library/). Pull requests only build it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - site/**
+      - docs/screenshots/**
+      - Resources/AppIcon-1024.png
+      - scripts/build-site.sh
+      - .github/workflows/pages.yml
+  pull_request:
+    paths:
+      - site/**
+      - docs/screenshots/**
+      - Resources/AppIcon-1024.png
+      - scripts/build-site.sh
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install cwebp
+        run: sudo apt-get update && sudo apt-get install -y webp
+
+      - name: Build
+        run: scripts/build-site.sh
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/site
+
+  deploy:
+    name: Publish on GitHub Pages
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
