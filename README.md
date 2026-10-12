@@ -189,30 +189,22 @@ its complications show your listening time and the song playing.
 
 ## Install
 
-1. Download `MusicLibrary-<version>-macOS.zip` from the [latest release](https://github.com/davidlago/music-library/releases/latest),
-   unzip it and drag **MusicLibrary.app** to your Applications folder. It runs natively on Apple Silicon and Intel Macs (macOS 14 or later).
-2. **First launch:** the app isn't notarized by Apple, so macOS will refuse to open it the first time. Open
-   **System Settings ▸ Privacy & Security**, scroll down and click **Open Anyway**. Alternatively, run:
+Download `MusicLibrary-<version>-macOS.zip` from the [latest release](https://github.com/davidlago/music-library/releases/latest),
+unzip it and drag **MusicLibrary.app** to your Applications folder. It runs natively on Apple Silicon and Intel Macs
+(macOS 14 or later). From 1.13.0 the app is signed and notarized by Apple, so it opens like any other app, and it
+includes the ffmpeg, ffprobe and fpcalc it uses to read and write tags, rip CDs and fingerprint songs: there's nothing
+else to install. (Earlier releases needed **Open Anyway** in **System Settings ▸ Privacy & Security** and
+`brew install ffmpeg`; you can uninstall Homebrew's ffmpeg once you've updated, unless something else uses it.)
 
-   ```bash
-   xattr -dr com.apple.quarantine /Applications/MusicLibrary.app
-   ```
-
-3. **Install ffmpeg**, which the app uses to read and write tags, convert and rip:
-
-   ```bash
-   brew install ffmpeg
-   ```
-
-   Optional: `brew install chromaprint` for AcoustID fingerprint matching (also needs a free [AcoustID API key](https://acoustid.org/new-application)).
-
-When a new version first reads your saved keys and passwords, macOS asks once to allow access to the keychain; choose
+The first time a new version reads your saved keys and passwords, macOS may ask to allow access to the keychain; choose
 **Always Allow**.
 
 ## iPhone app
 
-The iPhone app plays a copy of part of your library, offline. It's an early companion: there's no App Store version yet,
-so you build it with Xcode and install it on your own phone, which takes a few one-time steps.
+The iPhone app plays a copy of part of your library, offline. It's an early companion and isn't on the App Store yet.
+It's tested through TestFlight: if you've been invited, install [TestFlight](https://apps.apple.com/app/testflight/id899247664)
+on the iPhone and open the invitation. Otherwise, build it with Xcode and install it on your own phone, which takes a few
+one-time steps.
 
 **What you need:** a Mac with Xcode 27 or later, an iPhone on iOS 27 or later with a USB cable, and an Apple ID (a free one
 works).
@@ -313,6 +305,8 @@ home screen, which deletes its music too. A paid Apple Developer Program members
 - Your library lives in `~/Music/MusicLibrary` by default; choose another folder in **Settings ▸ General**.
 - Import with **File ▸ Import…** (⌘O), by dropping files or folders on the window, or by inserting a CD.
 - Add your email under **Settings ▸ General ▸ MusicBrainz**; MusicBrainz asks apps to identify who's making requests.
+- To match songs by their audio fingerprint, add a free [AcoustID API key](https://acoustid.org/new-application) in
+  **Settings ▸ General ▸ AcoustID**.
 - To scrobble, create a free [Last.fm API account](https://www.last.fm/api/account/create), enter the key and shared secret in
   **Settings ▸ Last.fm** and click **Connect**.
 - For concerts near you, open **Settings ▸ Concerts**, enter your ZIP code and add a free
@@ -348,7 +342,8 @@ Mac app runs it listens on the local network for its paired phones (macOS may as
 
 ## Building from source
 
-You need macOS 14+, Swift 6 (Xcode 16 or later, or the Command Line Tools) and ffmpeg.
+You need macOS 14+, Swift 6 (Xcode 16 or later, or the Command Line Tools), ffmpeg (`brew install ffmpeg`, for the
+tests and `swift run`) and cmake (`brew install cmake`, to build the copy of ffmpeg that goes inside the app).
 
 ```bash
 git clone https://github.com/davidlago/music-library.git
@@ -358,7 +353,9 @@ open build/MusicLibrary.app
 swift test                      # runs the test suite (needs ffmpeg)
 ```
 
-`scripts/build-app.sh` accepts `VERSION=1.2.3`, `UNIVERSAL=1` (Apple Silicon + Intel, needs Xcode) and `SIGN_IDENTITY=…`
+`scripts/build-app.sh` builds FFmpeg and Chromaprint from source the first time (`scripts/build-tools.sh`, about a
+minute) and puts ffmpeg, ffprobe and fpcalc inside the app; `BUNDLE_TOOLS=0` leaves them out, and the app then uses
+Homebrew's. It also accepts `VERSION=1.2.3`, `UNIVERSAL=1` (Apple Silicon + Intel, needs Xcode) and `SIGN_IDENTITY=…`
 (a signing certificate; one with a Team ID keeps keychain access across rebuilds). With only the Command Line Tools
 installed, see [AGENTS.md](AGENTS.md) for an SDK note.
 
@@ -366,8 +363,9 @@ The iPhone app is `iOS/MusicLibraryMobile.xcodeproj` (needs Xcode), with its wid
 `MusicLibraryCore` with the Mac app.
 See [iPhone app](#iphone-app) for installing it on a phone.
 
-Releases are built by GitHub Actions: pushing a tag like `v1.2.3` runs the tests, builds a universal app and publishes it on the
-Releases page.
+Releases are built by GitHub Actions: pushing a tag like `v1.2.3` runs the tests, builds a universal app, signs it with a
+Developer ID certificate, has Apple notarize it and publishes it on the Releases page. `scripts/testflight.sh` uploads
+the iPhone app to TestFlight. [docs/distribution.md](docs/distribution.md) has the one-time setup for both.
 
 ## Acknowledgements
 
@@ -375,7 +373,9 @@ Metadata from [MusicBrainz](https://musicbrainz.org) and the [Cover Art Archive]
 from [Wikipedia](https://www.wikipedia.org), [Wikidata](https://www.wikidata.org) and [Wikimedia Commons](https://commons.wikimedia.org)
 (each photo links to its source and license in the app); fingerprints from [AcoustID](https://acoustid.org); scrobbling via
 [Last.fm](https://www.last.fm); concert listings from [Ticketmaster](https://www.ticketmaster.com) and
-[JamBase](https://www.jambase.com); audio work by [FFmpeg](https://ffmpeg.org); library catalogs by
+[JamBase](https://www.jambase.com); audio work by [FFmpeg](https://ffmpeg.org) and fingerprinting by [Chromaprint](https://acoustid.org/chromaprint), both
+included in the app under the LGPL (their licenses are in `MusicLibrary.app/Contents/Resources/Licenses`); library
+catalogs by
 [Aspen Discovery](https://aspendiscovery.org).
 
 ## License

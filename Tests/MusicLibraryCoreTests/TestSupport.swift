@@ -2,7 +2,9 @@ import Foundation
 @testable import MusicLibraryCore
 
 enum TestSupport {
-    static let tools = ToolLocator()
+    /// Makes test audio and images with the installed ffmpeg (lavfi, mp3/aac encoders), which the app's trimmed
+    /// copy in `MUSICLIB_TOOLS_DIR` doesn't have; the code under test finds its tools as the app does.
+    static let tools = ToolLocator(searchPaths: ToolLocator.installedSearchPaths)
 
     static func tempDir() throws -> URL {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mltest-\(UUID().uuidString)", isDirectory: true)
