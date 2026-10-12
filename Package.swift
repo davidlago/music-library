@@ -22,6 +22,8 @@ let package = Package(
         .target(name: "MusicLibraryGlance"),
         .target(name: "MusicLibraryCore", dependencies: ["MusicLibraryGlance"]),
         .executableTarget(name: "MusicLibrary", dependencies: ["MusicLibraryCore"]),
+        // Makes the iPhone app's sample library (scripts/make-sample-library.sh).
+        .executableTarget(name: "SampleLibraryMaker", dependencies: ["MusicLibraryCore"]),
         .testTarget(
             name: "MusicLibraryCoreTests",
             dependencies: ["MusicLibraryCore", "MusicLibraryGlance"],

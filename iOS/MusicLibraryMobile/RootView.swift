@@ -86,6 +86,10 @@ struct LibraryStatusView: View {
                 """)
             } actions: {
                 Button("Check Again") { model.reload() }
+                if PhoneModel.sampleRoot != nil {
+                    Button("Explore a Sample Library") { model.showSample() }
+                        .buttonStyle(.borderedProminent)
+                }
             }
         case .failed(let message):
             ContentUnavailableView {

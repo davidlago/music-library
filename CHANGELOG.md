@@ -7,6 +7,14 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- **Try the iPhone app without a Mac.** **Explore a Sample Library** on the empty Library tab opens a sample library
+  built into the app: fictional artists and albums, with songs synthesized for it and covers drawn for it, listening
+  history, likes and owned albums, so every page, Insights, Music DNA, the widgets and the Apple Watch app can be tried.
+  Nothing done in it goes to the Mac or Last.fm, and your own library replaces it after your first sync (or hide it from
+  the Library tab or Settings).
+- The website has a [privacy policy](https://davidlago.github.io/music-library/privacy.html) and a
+  [support page](https://davidlago.github.io/music-library/support.html).
+
 ## 1.15.0
 
 - **Owned albums stand out.** Albums you've marked as owned show a small disc badge in the corner of their cover in

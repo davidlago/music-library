@@ -8,6 +8,12 @@ struct SyncTab: View {
         let sync = model.sync
         NavigationStack {
             List {
+                if model.isSample {
+                    Section {
+                        Label("You're exploring the sample library. After your first sync, your own library replaces it.", systemImage: "sparkles")
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 if case .pairing(let code) = sync.status {
                     pairing(code)
                 } else if !sync.isPaired {

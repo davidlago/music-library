@@ -45,16 +45,33 @@ public struct LibrarySnapshot: Sendable {
     private let trackByID: [Int64: Track]
 
     /// Opens `<root>/library.sqlite`. `isPresent` defaults to checking the track's file, which must resolve
-    /// inside `root` (`Track.resolvedFileURL`).
-    public init(root: URL, isPresent: ((Track) -> Bool)? = nil) throws {
+    /// inside `root` (`Track.resolvedFileURL`). `datesRelativeToNow` moves the history (plays, likes, purchases, when
+    /// songs were added) forward by whole days so the last play was within the last day: for the sample library, which is
+    /// made once and opened any time later.
+    public init(root: URL, isPresent: ((Track) -> Bool)? = nil, datesRelativeToNow: Bool = false, now: Date = Date()) throws {
         let db = try Database(snapshotAt: LibraryLocation.databaseURL(root: root).path)
         let fm = FileManager.default
         let present = isPresent ?? { t in t.resolvedFileURL(root: root).map { fm.fileExists(atPath: $0.path) } ?? false }
-        let all = try db.fetchAllTracks()
-        let byID = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-
+        var all = try db.fetchAllTracks()
         // Snapshots from older versions may lack the newer tables: those are just empty.
-        let likedDates = ((try? db.likedTrackDates()) ?? [:]).filter { byID[$0.key] != nil }
+        var plays = (try? db.plays()) ?? []
+        var playTotals = (try? db.playTotals()) ?? [:]
+        var likedDates = (try? db.likedTrackDates()) ?? [:]
+        var purchases = (try? db.albumPurchases()) ?? [:]
+        if datesRelativeToNow {
+            let shift = Self.dayShift(latest: plays.last?.startedAt ?? all.map(\.addedAt).max(), now: now)
+            for i in all.indices { all[i].addedAt += shift }
+            for i in plays.indices { plays[i].startedAt += shift }
+            playTotals = playTotals.mapValues { var t = $0; t.lastPlayed = t.lastPlayed.map { $0 + shift }; return t }
+            likedDates = likedDates.mapValues { $0 + shift }
+            purchases = purchases.mapValues { p in
+                var p = p
+                p.purchasedOn = p.purchasedOn.map { PurchaseDay($0.date().addingTimeInterval(shift)) }
+                return p
+            }
+        }
+        let byID = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        likedDates = likedDates.filter { byID[$0.key] != nil }
         let playlists = ((try? db.playlists()) ?? []).compactMap { p -> PlaylistItem? in
             let ids = (try? db.playlistTrackIds(p.id)) ?? []
             let items = ids.compactMap { byID[$0] }
@@ -89,9 +106,9 @@ public struct LibrarySnapshot: Sendable {
         self.smartPlaylists = (try? db.smartPlaylists()) ?? []
         self.likedDates = likedDates
         self.libraryID = db.libraryID()
-        self.plays = (try? db.plays()) ?? []
-        self.playTotals = (try? db.playTotals()) ?? [:]
-        self.purchases = (try? db.albumPurchases()) ?? [:]
+        self.plays = plays
+        self.playTotals = playTotals
+        self.purchases = purchases
         self.artistInfos = infos.mapValues(\.info)
         self.albumInfos = (try? db.albumInfos()) ?? [:]
         self.artistImageFiles = imageFiles
@@ -102,6 +119,12 @@ public struct LibrarySnapshot: Sendable {
     }
 
     public func track(id: Int64) -> Track? { trackByID[id] }
+
+    /// Whole days from `latest` to `now` (none when `latest` is later or missing).
+    static func dayShift(latest: Date?, now: Date) -> TimeInterval {
+        guard let latest, latest < now else { return 0 }
+        return (now.timeIntervalSince(latest) / 86_400).rounded(.down) * 86_400
+    }
 
     public func isPresent(_ track: Track) -> Bool { presentIDs.contains(track.id) }
 
