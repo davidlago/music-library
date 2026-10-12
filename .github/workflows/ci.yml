@@ -16,6 +16,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # The release Xcode that builds the iPhone app (scripts/select-xcode.sh). App Store Connect refuses builds made with a
+  # beta Xcode, so it's pinned: when Apple ships a new release Xcode and the xcode-27 image has it, update this.
+  RELEASE_XCODE: "27.0"
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
@@ -124,13 +129,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Select Xcode 27
-        run: |
-          xcode="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | grep -iv beta | sort -V | tail -1 || true)"
-          [ -n "$xcode" ] || xcode="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1 || true)"
-          [ -n "$xcode" ] || { echo "No Xcode 27 on this runner:"; ls -d /Applications/Xcode*.app; exit 1; }
-          sudo xcode-select -s "$xcode"
-          xcodebuild -version
+      - name: Select the release Xcode
+        run: scripts/select-xcode.sh
 
       - name: Build MusicLibraryCore for iOS
         run: xcodebuild -scheme MusicLibraryCore -destination 'generic/platform=iOS Simulator' build
@@ -147,13 +147,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Select Xcode 27
-        run: |
-          xcode="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | grep -iv beta | sort -V | tail -1 || true)"
-          [ -n "$xcode" ] || xcode="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1 || true)"
-          [ -n "$xcode" ] || { echo "No Xcode 27 on this runner:"; ls -d /Applications/Xcode*.app; exit 1; }
-          sudo xcode-select -s "$xcode"
-          xcodebuild -version
+      - name: Select the release Xcode
+        run: scripts/select-xcode.sh
 
       # An App Manager API key can't use cloud-managed signing, so the Apple Distribution certificate comes from a
       # secret; with the key, testflight.sh makes App Store profiles for it (scripts/provisioning-profiles.swift),
