@@ -102,6 +102,8 @@ enum SyncText {
         var parts: [String] = []
         parts.append(s.copied == 0 ? "Nothing new to copy" : "Copied \(s.copied) \(s.copied == 1 ? "file" : "files") (\(ByteCountFormatter.string(fromByteCount: s.bytes, countStyle: .file)))")
         if s.deleted > 0 { parts.append("removed \(s.deleted)") }
+        if s.plays > 0 { parts.append("sent \(s.plays) \(s.plays == 1 ? "play" : "plays")") }
+        if s.likes > 0 { parts.append("sent \(s.likes) \(s.likes == 1 ? "like" : "likes")") }
         if s.databaseUpdated { parts.append("library updated") }
         if s.missing > 0 { parts.append("\(s.missing) missing on the Mac") }
         return parts.joined(separator: ", ") + "."

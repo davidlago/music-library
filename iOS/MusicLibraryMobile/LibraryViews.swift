@@ -40,7 +40,7 @@ private struct LibraryHome: View {
                 NavigationLink(value: LibraryRoute.artists) { Label("Artists", systemImage: "music.mic") }
                 NavigationLink(value: LibraryRoute.albums) { Label("Albums", systemImage: "square.stack") }
                 NavigationLink(value: LibraryRoute.songs) { Label("Songs", systemImage: "music.note") }
-                if !library.liked.isEmpty {
+                if !model.likedDates.isEmpty {
                     NavigationLink(value: LibraryRoute.liked) { Label("Liked Songs", systemImage: "heart") }
                 }
             }
@@ -98,7 +98,7 @@ private struct LibraryRoutePage: View {
             case .songs:
                 TrackListPage(title: "Songs", tracks: library.tracks)
             case .liked:
-                TrackListPage(title: "Liked Songs", tracks: library.liked)
+                TrackListPage(title: "Liked Songs", tracks: model.likedTracks)
             case .playlist(let id):
                 if let item = library.playlists.first(where: { $0.id == id }) {
                     TrackListPage(title: item.playlist.name, tracks: item.tracks)
@@ -186,12 +186,13 @@ struct TrackRows: View {
         ForEach(Array(tracks.enumerated()), id: \.element.id) { i, track in
             Button { player.play(queue: tracks, startAt: i, source: source) } label: {
                 TrackRow(track: track, numbered: numbered, library: model.library,
-                         isCurrent: player.currentTrack?.id == track.id)
+                         isCurrent: player.currentTrack?.id == track.id, isLiked: model.isLiked(track))
             }
             .buttonStyle(.plain)
             .contextMenu {
                 Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { player.playNext([track]) }
                 Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { player.addToQueue([track]) }
+                LikeMenuButton(track: track)
             }
         }
     }
@@ -202,6 +203,7 @@ struct TrackRow: View {
     var numbered = false
     let library: LibrarySnapshot?
     var isCurrent = false
+    var isLiked = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -227,12 +229,23 @@ struct TrackRow: View {
                 }
             }
             Spacer(minLength: 8)
-            if library?.likedIDs.contains(track.id) == true {
+            if isLiked {
                 Image(systemName: "heart.fill").font(.caption).foregroundStyle(.pink).accessibilityLabel("Liked")
             }
             Text(Format.time(track.duration)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
         }
         .contentShape(Rectangle())
+    }
+}
+
+/// Like or Unlike for a song's menu; the change shows at once and goes to the Mac at the next sync.
+struct LikeMenuButton: View {
+    @Environment(PhoneModel.self) private var model
+    let track: Track
+
+    var body: some View {
+        let liked = model.isLiked(track)
+        Button(liked ? "Unlike" : "Like", systemImage: liked ? "heart.slash" : "heart") { model.toggleLike(track) }
     }
 }
 

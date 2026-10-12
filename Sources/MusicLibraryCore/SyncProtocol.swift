@@ -4,11 +4,13 @@ import Foundation
 /// Sync screen is open; the Mac connects (TLS with a pre-shared key, see `SyncPairing`) and exchanges `SyncMessage`s
 /// in length-prefixed frames, with file contents sent as raw chunk frames after a `.file` message.
 ///
-/// A session: both send `.hello`; when pairing, the Mac sends `.pair` and the phone answers `.paired`; the phone
-/// sends its `.manifest`; the Mac sends `.plan`, `.delete`, then each file (the database last) and `.done`; the phone
-/// answers `.done` once everything is written.
+/// A session: both send `.hello`; when pairing, the Mac sends `.pair` and the phone answers `.paired` (and that's
+/// all); the phone sends its `.manifest` (with its plays and likes since the last sync); the Mac applies those, may
+/// send `.lastFM`, then `.plan`, `.delete`, each file (the database last) and `.done`; the phone answers `.done` once
+/// everything is written.
 public enum SyncProtocol {
-    public static let version = 1
+    /// 2: plays and likes from the phone, the library ID, Last.fm handoff.
+    public static let version = 2
     public static let serviceType = "_musiclib-sync._tcp"
     /// File data per chunk frame.
     public static let chunkSize = 1 << 20
@@ -106,6 +108,8 @@ public enum SyncMessage: Codable, Equatable, Sendable {
     case hello(SyncHello)
     /// Mac → phone while pairing: the long-term key for later sessions.
     case pair(SyncGrant)
+    /// Mac → phone, when the phone isn't connected to Last.fm: the Mac's account.
+    case lastFM(SyncLastFM)
     /// Phone → Mac: the key is stored.
     case paired
     case manifest(SyncManifest)
@@ -126,11 +130,17 @@ public struct SyncHello: Codable, Equatable, Sendable {
     public var schemaVersion: Int
     /// Free space on the phone, in bytes.
     public var freeSpace: Int64?
+    /// The Mac's library (`Database.libraryID`).
+    public var libraryID: String?
+    /// The phone is connected to Last.fm (when false, the Mac may send its account).
+    public var lastFMConnected: Bool?
 
-    public init(deviceID: String, deviceName: String, appVersion: String, freeSpace: Int64? = nil) {
+    public init(deviceID: String, deviceName: String, appVersion: String, freeSpace: Int64? = nil, libraryID: String? = nil,
+                lastFMConnected: Bool? = nil) {
         protocolVersion = SyncProtocol.version
         schemaVersion = Database.schemaVersion
         self.deviceID = deviceID; self.deviceName = deviceName; self.appVersion = appVersion; self.freeSpace = freeSpace
+        self.libraryID = libraryID; self.lastFMConnected = lastFMConnected
     }
 }
 
@@ -155,7 +165,13 @@ public struct SyncFileEntry: Codable, Hashable, Sendable {
 
 public struct SyncManifest: Codable, Equatable, Sendable {
     public var files: [SyncFileEntry]
-    public init(files: [SyncFileEntry]) { self.files = files }
+    /// Plays and likes on the phone since the last sync.
+    public var events: [SyncEvent]
+    /// The library the phone's copy came from (and its events refer to); nil before the first sync.
+    public var libraryID: String?
+    public init(files: [SyncFileEntry], events: [SyncEvent] = [], libraryID: String? = nil) {
+        self.files = files; self.events = events; self.libraryID = libraryID
+    }
 }
 
 public struct SyncPlanSummary: Codable, Equatable, Sendable {
@@ -178,5 +194,9 @@ public struct SyncSummary: Codable, Hashable, Sendable {
     public var databaseUpdated = false
     /// Songs in the selection whose files are missing from the Mac's library.
     public var missing = 0
+    /// The phone's plays and like changes added to the Mac's library, and events dropped (songs changed or gone).
+    public var plays = 0
+    public var likes = 0
+    public var eventsDropped = 0
     public init() {}
 }

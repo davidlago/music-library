@@ -150,6 +150,8 @@ struct IPhoneSyncView: View {
     private func summaryText(_ s: SyncSummary) -> String {
         var parts = [s.copied == 0 ? "nothing new to copy" : "copied \(s.copied) \(s.copied == 1 ? "file" : "files")"]
         if s.deleted > 0 { parts.append("removed \(s.deleted)") }
+        if s.plays > 0 { parts.append("\(s.plays) \(s.plays == 1 ? "play" : "plays") added") }
+        if s.likes > 0 { parts.append("\(s.likes) \(s.likes == 1 ? "like" : "likes") updated") }
         if s.missing > 0 { parts.append("\(s.missing) missing here") }
         return parts.joined(separator: ", ")
     }

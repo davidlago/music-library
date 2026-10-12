@@ -25,6 +25,10 @@ public struct LibrarySnapshot: Sendable {
     /// Present liked tracks, most recently liked first.
     public let liked: [Track]
     public let likedIDs: Set<Int64>
+    /// When each present liked track was liked.
+    public let likedDates: [Int64: Date]
+    /// The library this is a copy of (`Database.libraryID`).
+    public let libraryID: String?
     private let albumTracks: [String: [Track]]
     private let trackByID: [Int64: Track]
 
@@ -70,6 +74,8 @@ public struct LibrarySnapshot: Sendable {
         self.smartPlaylists = (try? db.smartPlaylists()) ?? []
         self.liked = liked
         self.likedIDs = Set(liked.map(\.id))
+        self.likedDates = likedDates.filter { byID[$0.key] != nil }
+        self.libraryID = db.libraryID()
         self.albumTracks = albumTracks
         self.trackByID = byID
     }

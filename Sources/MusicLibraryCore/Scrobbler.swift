@@ -157,6 +157,14 @@ public final class Scrobbler {
         flush()
     }
 
+    /// Uses an account connected elsewhere (the Mac app hands its own to the iPhone app when syncing).
+    public func adopt(apiKey: String, sharedSecret: String, session: LastFMSession) {
+        cancelAuthorization()
+        self.apiKey = apiKey
+        self.sharedSecret = sharedSecret
+        didConnect(session)
+    }
+
     public func disconnect() {
         cancelAuthorization()
         session = nil

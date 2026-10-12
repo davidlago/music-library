@@ -39,6 +39,8 @@ final class SyncStore {
     /// The first sync to a phone found files to remove and is waiting for the user to agree.
     private(set) var pendingDeletes: Int?
 
+    /// Called after a sync that added the phone's plays or likes to the library.
+    @ObservationIgnored var onHistoryChanged: () -> Void = {}
     @ObservationIgnored private var browser: SyncBrowser?
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var deleteApproval: CheckedContinuation<Bool, Never>?
@@ -126,7 +128,8 @@ final class SyncStore {
 
     // MARK: Syncing
 
-    func sync(_ phone: PairedPhone, tracks: [Track], libraryRoot: URL, database: Database) {
+    /// Syncs `tracks` to `phone`, bringing back its plays and likes; `lastFM` goes to a phone that isn't connected.
+    func sync(_ phone: PairedPhone, tracks: [Track], libraryRoot: URL, database: Database, lastFM: SyncLastFM?) {
         guard !isBusy, let peer = peer(for: phone) else { return }
         guard let key = keychain.string(for: Keys.key(phone.id)).flatMap({ Data(base64Encoded: $0) }) else {
             lastError = SyncError.notPaired.localizedDescription
@@ -142,13 +145,14 @@ final class SyncStore {
             do {
                 let summary = try await SyncMacSession.sync(
                     endpoint: peer.endpoint, key: key, identity: identity, tracks: tracks, libraryRoot: libraryRoot,
-                    database: database, scratch: scratch,
+                    database: database, scratch: scratch, lastFM: lastFM,
                     approveDeletes: { count in firstSync ? await self.askToDelete(count) : true },
                     progress: { progress in await self.report(phone.id, progress) })
                 if let i = phones.firstIndex(where: { $0.id == phone.id }) {
                     phones[i].lastSync = Date()
                     phones[i].lastSummary = summary
                 }
+                if summary.plays > 0 || summary.likes > 0 { onHistoryChanged() }
             } catch is CancellationError {
                 lastError = "Sync cancelled. Everything copied so far is on the iPhone."
             } catch {
