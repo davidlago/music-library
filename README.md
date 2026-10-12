@@ -17,6 +17,9 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
 </p>
 
+<p align="center"><a href="https://davidlago.github.io/music-library/"><strong>Website</strong></a> ·
+  <a href="https://github.com/davidlago/music-library/releases/latest"><strong>Download</strong></a></p>
+
 ![An album page: the cover, a blurred-cover backdrop, rating, genres, listening stats and the full track list](docs/screenshots/album.png)
 
 ## Highlights
