@@ -359,6 +359,20 @@ struct InitialsBadge: View {
     }
 }
 
+/// A count in a tinted capsule, at the end of a Library row.
+struct CountPill: View {
+    let count: Int
+    var tint: Color = .accentColor
+
+    var body: some View {
+        Text(count.formatted())
+            .font(.caption.weight(.semibold)).monospacedDigit()
+            .foregroundStyle(tint)
+            .padding(.horizontal, 8).padding(.vertical, 2)
+            .background(Capsule().fill(tint.opacity(0.15)))
+    }
+}
+
 // MARK: Availability
 
 /// A small mark for an album or song that isn't (all) on the phone, or is on its way.

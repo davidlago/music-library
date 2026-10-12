@@ -38,6 +38,8 @@ struct CoverThumb: View {
     var size: CGFloat = 140
     /// Pass `AppModel.coverRevision` so a replaced cover.jpg is loaded again.
     var revision = 0
+    /// Draws the Owned badge in the corner (`model.purchase(for:) != nil`).
+    var owned = false
     @State private var image: NSImage?
 
     var body: some View {
@@ -48,6 +50,7 @@ struct CoverThumb: View {
                 Rectangle().fill(.quaternary)
                 Image(systemName: "music.note").font(.system(size: size / 3)).foregroundStyle(.subtext)
             }
+            if owned { OwnedBadge(size: size) }
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -56,6 +59,26 @@ struct CoverThumb: View {
             let data = await Task.detached { try? Data(contentsOf: url) }.value
             image = data.flatMap { NSImage(data: $0) }
         }
+    }
+}
+
+/// A small disc in the top-right corner of an owned album's cover.
+struct OwnedBadge: View {
+    let size: CGFloat
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let diameter = max(14, size * 0.13)
+        Image(systemName: "opticaldisc.fill")
+            .font(.system(size: diameter * 0.55, weight: .bold))
+            .foregroundStyle(theme.palette.map { Color($0.mantle) } ?? .white)
+            .frame(width: diameter, height: diameter)
+            .background(Circle().fill(theme.accent))
+            .shadow(color: .black.opacity(0.3), radius: 1.5, y: 0.5)
+            .padding(max(4, size * 0.04))
+            .frame(width: size, height: size, alignment: .topTrailing)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
 

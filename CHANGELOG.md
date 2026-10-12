@@ -7,6 +7,14 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.15.0
+
+- **Owned albums stand out.** Albums you've marked as owned show a small disc badge in the corner of their cover in
+  the album grids: Albums, artist pages and search results on the Mac, and Albums and artist pages on the iPhone.
+- **Counts at a glance.** The Mac sidebar shows how many songs, albums and artists the library has. The iPhone's
+  Library tab shows counts for Artists, Albums, Songs and Liked Songs, counting only what's on the iPhone when
+  **On This iPhone** is chosen.
+
 ## 1.14.0
 
 This release changes how releases are made; the Mac and iPhone apps work as in 1.13.0.
