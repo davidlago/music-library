@@ -89,8 +89,9 @@
   there are never overwritten, and playlists get `.m3u` files. Turn on the database option to also back up
   `library.sqlite` and the artist photos to the drive, for a full library backup. A single playlist can still be exported
   to its own folder.
-- **An iPhone app.** Sync part of the library to your iPhone over Wi-Fi and play it offline, through a USB DAC at each
-  song's own sample rate, with the same search, playlists, Liked Songs, covers and Last.fm scrobbling. See
+- **An iPhone app.** Browse your whole library on your iPhone (album and artist pages, Music DNA and Insights, as on the
+  Mac), download the music you want over Wi-Fi from the phone itself, and play it offline, through a USB DAC at each
+  song's own sample rate, with the same search, playlists, Liked Songs and Last.fm scrobbling. See
   [iPhone app](#iphone-app).
 
 ## Tour
@@ -158,9 +159,11 @@ The search takes the same filters as your music, with a few catalog meanings and
 
 ### On the iPhone
 
-Albums, artists, songs, playlists and search, a Now Playing screen that shows the file's format and the rate your DAC is
-running at, and gapless playback between songs at the same rate. Choose what goes on the phone with **Add to iPhone** on
-the Mac and sync it over Wi-Fi from the Mac's **iPhone** page.
+Your whole library, with the Mac's album pages (description, rating, the full track list, release details, credits,
+your copy), artist pages (bio, links, concerts near you, albums, most played), Music DNA and Insights, plus search,
+playlists and a Now Playing screen that shows the file's format and the rate your DAC is running at, with gapless playback
+between songs at the same rate. Music that isn't on the phone is dimmed: tap **Download** and the phone fetches it from
+the Mac over Wi-Fi, or **Remove from iPhone** to free the space.
 
 ![The iPhone app: the albums grid, an album page and Now Playing showing FLAC 24/48 going out at 48 kHz](docs/screenshots/iphone.png)
 
@@ -225,14 +228,19 @@ works).
 1. Pair once: on the iPhone, open the **Sync** tab and tap **Pair with a Mac**. In the Mac app, choose **iPhone** in the
    sidebar, type the code the iPhone shows next to its name and click **Pair**. Both need to be on the same Wi-Fi network
    (allow local network access when each asks).
-2. Choose what goes on the phone: **Add to iPhone** in the menu of any album, artist, playlist or song, or Liked Songs.
-   The iPhone list is separate from the Export List.
-3. With the iPhone's Sync tab open, click **Sync Now** on the Mac. The phone ends up with exactly the list: new and
-   changed files are copied, songs you took off the list are removed (the first sync asks before removing anything), and
-   the library, playlists and Liked Songs are updated. Keep the Sync tab on screen until it's done.
-4. Each sync also brings back what you did on the phone: songs you liked or unliked there (with the heart in Now Playing
-   or a song's menu) and what you listened to, so the Mac's Liked Songs, play counts and Insights include the phone. If
-   the Mac is connected to Last.fm and the phone isn't, the sync connects the phone with the Mac's account.
+2. Every sync sends the whole library's details to the phone (every album and artist, their covers and photos, the info
+   the Mac looked up, your listening history and what you own), so you can browse all of it there. Only the music you
+   choose is copied.
+3. Choose that music on the phone: open any album, artist or playlist and tap **Download**, or **Remove from iPhone**
+   (also in long-press menus, and per song). With Music Library open on the Mac and both on the same Wi-Fi, the phone
+   syncs right away; otherwise what you asked for waits (in the Sync tab) until the Mac is around. Removing deletes the
+   songs from the phone at once and tells the Mac to stop syncing them. Or choose it on the Mac with **Add to iPhone** in
+   any album, artist, playlist or song menu; the Mac's **iPhone** page shows the list, including what was taken off the
+   phone, and **Sync Now** there works while the iPhone's Sync tab is open.
+4. Each sync also brings back what you did on the phone: songs you liked or unliked there, albums you marked as owned
+   (with when you bought them and what you paid) and what you listened to, so the Mac's Liked Songs, Insights and album
+   pages include the phone. If the Mac is connected to Last.fm and the phone isn't, the sync connects the phone with the
+   Mac's account; the Mac's concert settings come along too, for concerts on artist pages.
 
 For a big first load, copying through Finder is faster than Wi-Fi: export the list to a folder with the database option
 on, select the iPhone in Finder's sidebar, open the **Files** tab and drag the folder onto **Music Library**. Later syncs
@@ -285,9 +293,10 @@ you're searching, not your ZIP code). API keys,
 secrets and your PIN are kept in your keychain. Downloading artist and album info can be turned off in
 **Settings ▸ General**, and looking up library CDs in **Settings ▸ Library**.
 
-The iPhone app keeps its music and the copied database on the phone, out of iCloud backups. It talks only to Last.fm, if
-you connect it, and to the Mac app it's paired with, over your local network: syncs are encrypted with a key the two
-exchange when pairing.
+The iPhone app keeps its music and the copied database on the phone, out of iCloud backups. It talks to Last.fm, if you
+connect it, to Ticketmaster and JamBase for concerts on artist pages (only if the Mac has keys for them), and to the Mac
+app it's paired with, over your local network: syncs are encrypted with a key the two exchange when pairing. While the
+Mac app runs it listens on the local network for its paired phones (macOS may ask to allow incoming connections).
 
 ## Building from source
 

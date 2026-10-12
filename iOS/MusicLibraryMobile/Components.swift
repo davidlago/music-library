@@ -396,7 +396,8 @@ struct AvailabilityBar: View {
         let pending = model.isDownloadPending(tracks)
         let sync = model.sync
         HStack(spacing: 12) {
-            Image(systemName: icon(availability, pending)).font(.title3).foregroundStyle(pending ? Color.accentColor : .secondary)
+            Image(systemName: icon(availability, pending)).font(.title3)
+                .foregroundStyle(pending ? Color.accentColor : (availability == .onPhone ? Color.green : Color.secondary))
                 .frame(width: 28)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title(availability, pending)).font(.subheadline.weight(.semibold))

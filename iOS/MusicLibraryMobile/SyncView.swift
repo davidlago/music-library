@@ -12,7 +12,7 @@ struct SyncTab: View {
                     pairing(code)
                 } else if !sync.isPaired {
                     Section {
-                        Text("Sync music from Music Library on your Mac over Wi-Fi: the Mac sends the albums, artists and playlists you choose, removes what you take off the list, and keeps the library on this iPhone up to date.")
+                        Text("Sync music from Music Library on your Mac over Wi-Fi: your whole library shows up here to browse, and the Mac sends the albums, artists and playlists you choose, here or on the Mac.")
                             .foregroundStyle(.secondary)
                         Button("Pair with a Mac", systemImage: "link") { sync.startPairing() }
                     } footer: {
@@ -24,6 +24,24 @@ struct SyncTab: View {
                 if let error = sync.lastError {
                     Section {
                         Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                    }
+                }
+                if !model.requests.isEmpty {
+                    Section {
+                        ForEach(model.requests.reversed()) { r in
+                            Label {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(title(r.item))
+                                    Text(r.include ? "Download" : "Removed; the Mac stops syncing it").font(.caption).foregroundStyle(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: r.include ? "arrow.down.circle" : "minus.circle")
+                            }
+                        }
+                    } header: {
+                        Text("Waiting for the Mac")
+                    } footer: {
+                        Text("These go to \(sync.macName ?? "the Mac") at the next sync.")
                     }
                 }
                 if let date = sync.lastSync, let summary = sync.lastSummary {
@@ -72,6 +90,14 @@ struct SyncTab: View {
     private func paired(_ sync: PhoneSync) -> some View {
         Section {
             Label("Paired with \(sync.macName ?? "your Mac")", systemImage: "laptopcomputer.and.iphone")
+            if case .syncing = sync.status {} else {
+                if sync.macPeer != nil {
+                    Button("Sync Now", systemImage: "arrow.triangle.2.circlepath") { sync.syncNow() }
+                } else {
+                    Label("Looking for \(sync.macName ?? "the Mac"). Open Music Library on it, on the same Wi-Fi.", systemImage: "wifi")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            }
             switch sync.status {
             case .syncing(let progress):
                 VStack(alignment: .leading, spacing: 6) {
@@ -86,13 +112,13 @@ struct SyncTab: View {
             case .waiting:
                 HStack(spacing: 10) {
                     ProgressView()
-                    Text("Ready. Start the sync on the Mac.")
+                    Text("The Mac can also start the sync while this tab is open.").foregroundStyle(.secondary)
                 }
             default:
-                Text("Open this tab to sync.").foregroundStyle(.secondary)
+                EmptyView()
             }
         } footer: {
-            Text("Keep this screen open while syncing: iOS pauses the app in the background.")
+            Text("Keep the app open while syncing: iOS pauses it in the background. Download or remove music from album, artist and playlist pages; the iPhone syncs with the Mac as soon as it's around.")
         }
     }
 }
@@ -105,6 +131,7 @@ enum SyncText {
         if s.plays > 0 { parts.append("sent \(s.plays) \(s.plays == 1 ? "play" : "plays")") }
         if s.likes > 0 { parts.append("sent \(s.likes) \(s.likes == 1 ? "like" : "likes")") }
         if s.databaseUpdated { parts.append("library updated") }
+        if let n = s.purchases, n > 0 { parts.append("sent \(n) ownership \(n == 1 ? "change" : "changes")") }
         if s.missing > 0 { parts.append("\(s.missing) missing on the Mac") }
         return parts.joined(separator: ", ") + "."
     }
@@ -112,5 +139,21 @@ enum SyncText {
     static func progress(_ p: SyncProgress) -> String {
         let bytes = "\(ByteCountFormatter.string(fromByteCount: p.bytes, countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: p.totalBytes, countStyle: .file))"
         return p.totalFiles == 0 ? "Comparing with the Mac…" : "\(p.files) of \(p.totalFiles) files · \(bytes)"
+    }
+}
+
+extension SyncTab {
+    /// "Album · Artist", a playlist's name…
+    func title(_ item: ExportItem) -> String {
+        let library = model.library
+        switch item {
+        case .library: return "Entire library"
+        case .album(let album, let artist): return "\(album.isEmpty ? "Unknown Album" : album) · \(artist)"
+        case .artist(let name): return name.isEmpty ? "Unknown Artist" : name
+        case .track(let id): return library?.track(id: id).map { "\($0.title) · \($0.artist)" } ?? "A song"
+        case .playlist(let id): return library?.playlists.first { $0.id == id }?.playlist.name ?? "A playlist"
+        case .smartPlaylist(let id): return library?.smartPlaylists.first { $0.id == id }?.name ?? "A smart playlist"
+        case .likedSongs: return "Liked Songs"
+        }
     }
 }
