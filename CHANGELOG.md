@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.13.0
+
 - **The Mac app is notarized and needs nothing else.** Releases are signed with a Developer ID certificate and notarized
   by Apple, so the app opens like any other: no more **Open Anyway** in Privacy & Security. It includes its own ffmpeg,
   ffprobe and fpcalc, so Homebrew's ffmpeg and chromaprint aren't needed anymore, and AcoustID fingerprinting works with
