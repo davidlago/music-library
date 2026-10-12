@@ -16,7 +16,7 @@ public enum ToolError: Error, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .notFound(let name):
-            return "\(name) was not found. Install it with Homebrew (brew install ffmpeg / brew install chromaprint)."
+            return "\(name) was not found. The app includes it; when running from source, install it with Homebrew (brew install ffmpeg / brew install chromaprint)."
         case .failed(let tool, let status, let stderr):
             let tail = stderr.split(separator: "\n").suffix(4).joined(separator: "\n")
             return "\(tool) exited with status \(status): \(tail)"
@@ -111,15 +111,24 @@ public enum ProcessRunner {
 public struct ToolLocator: Sendable {
     public static let defaultSearchPaths = ["/opt/homebrew/bin", "/usr/local/bin"]
 
+    /// The ffmpeg, ffprobe and fpcalc built into the app (`scripts/build-tools.sh`), found before installed ones.
+    public static var bundledToolsPath: String { Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers").path }
+
+    /// Installed tools only (Homebrew, then `PATH`), ignoring the app's own copies.
+    public static var installedSearchPaths: [String] {
+        defaultSearchPaths + (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map(String.init)
+    }
+
     public let searchPaths: [String]
 
+    /// With no `searchPaths`: the app's own tools, then installed ones. `MUSICLIB_TOOLS_DIR` goes first when set, so
+    /// the tests can run against the tools built for the app.
     public init(searchPaths: [String]? = nil) {
         if let searchPaths {
             self.searchPaths = searchPaths
         } else {
-            let envPath = (ProcessInfo.processInfo.environment["PATH"] ?? "")
-                .split(separator: ":").map(String.init)
-            self.searchPaths = Self.defaultSearchPaths + envPath
+            let override = ProcessInfo.processInfo.environment["MUSICLIB_TOOLS_DIR"].map { [$0] } ?? []
+            self.searchPaths = override + [Self.bundledToolsPath] + Self.installedSearchPaths
         }
     }
 

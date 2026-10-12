@@ -87,7 +87,8 @@ struct GeneralSettings: View {
     private func toolRow(_ name: String, url: URL?, hint: String) -> some View {
         LabeledContent(name) {
             if let url {
-                Label(url.path, systemImage: "checkmark.circle.fill").foregroundStyle(.green).font(.caption)
+                let included = url.deletingLastPathComponent().path == ToolLocator.bundledToolsPath
+                Label(included ? "Included with the app" : url.path, systemImage: "checkmark.circle.fill").foregroundStyle(.green).font(.caption)
             } else {
                 Label("Not found — \(hint)", systemImage: "xmark.circle.fill").foregroundStyle(.red).font(.caption)
             }

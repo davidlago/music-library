@@ -203,7 +203,7 @@ struct SyncFixture {
     let phone = SyncIdentity(deviceID: "phone-id", deviceName: "iPhone", appVersion: "test")
 
     /// Starts a phone listener with `key` and returns its port and the result of the first session.
-    func listen(key: Data, root: URL, pairing: Bool, grants: GrantBox = GrantBox()) async throws -> (NWEndpoint.Port, Task<(SyncHello, SyncSummary), Error>) {
+    func listen(key: Data, root: URL, pairing: Bool, grants: GrantBox = GrantBox(), freeSpace: Int64? = nil) async throws -> (NWEndpoint.Port, Task<(SyncHello, SyncSummary), Error>) {
         let sessions = AsyncStream<NWConnection>.makeStream()
         let identity = phone
         let advertiser = try SyncAdvertiser(deviceID: phone.deviceID, name: "test", key: key, pairing: pairing, advertise: false,
@@ -213,7 +213,7 @@ struct SyncFixture {
         let task = Task { () async throws -> (SyncHello, SyncSummary) in
             defer { advertiser.stop() }
             for await connection in sessions.stream {
-                let result = try await SyncPhoneSession.run(SyncConnection(connection), identity: identity, root: root, freeSpace: nil,
+                let result = try await SyncPhoneSession.run(SyncConnection(connection), identity: identity, root: root, freeSpace: freeSpace,
                                                             pairing: pairing, storeGrant: { await grants.store($0) })
                 return (result.mac, result.summary)
             }
@@ -289,6 +289,19 @@ struct SyncFixture {
         _ = try await session.value
         #expect(third.deleted == 0)
         #expect(FileManager.default.fileExists(atPath: phoneRoot.appendingPathComponent(f.tracks[1].path).path))
+    }
+
+    @Test func thePhoneRefusesASyncThatDoesNotFit() async throws {
+        let f = try SyncFixture()
+        let key = SyncPairing.newKey()
+        let phoneRoot = try TestSupport.tempDir().appendingPathComponent("phone")
+        let (port, session) = try await listen(key: key, root: phoneRoot, pairing: false, freeSpace: 100)
+        await #expect(throws: (any Error).self) {
+            _ = try await SyncMacSession.sync(endpoint: endpoint(port), key: key, identity: mac, tracks: f.tracks,
+                                              libraryRoot: f.root, database: f.db, scratch: try TestSupport.tempDir())
+        }
+        await #expect(throws: SyncSessionError.self) { _ = try await session.value }
+        #expect(!FileManager.default.fileExists(atPath: phoneRoot.appendingPathComponent("Music").path))
     }
 
     @Test func anOtherKeyIsRefused() async throws {

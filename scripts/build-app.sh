@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Builds build/MusicLibrary.app (ad-hoc signed).
+# Builds build/MusicLibrary.app (ad-hoc signed unless SIGN_IDENTITY is set).
 #
 #   VERSION=1.2.0   version shown in Finder and About (default: 0.0.0-dev)
 #   BUILD=42        build number (default: 1)
 #   UNIVERSAL=1     build for both Apple Silicon and Intel (needs Xcode, not just the Command Line Tools)
-#   SIGN_IDENTITY="Apple Development: …"
-#                   sign with this certificate instead of ad hoc. Keychain access is tied to an ad-hoc build's exact
-#                   code hash, so macOS asks once after every rebuild; a certificate with a Team ID (like a free Apple
-#                   Development one from Xcode) keeps access across builds.
+#   SIGN_IDENTITY="Developer ID Application: …"
+#                   sign with this certificate instead of ad hoc, with the hardened runtime (and a secure timestamp for a
+#                   Developer ID one, which notarization needs: scripts/notarize.sh). Keychain access is tied to an
+#                   ad-hoc build's exact code hash, so macOS asks once after every rebuild; a certificate with a Team ID
+#                   (Developer ID, or an Apple Development one from Xcode) keeps access across builds.
+#   BUNDLE_TOOLS=0  leave out ffmpeg, ffprobe and fpcalc (default: build them with scripts/build-tools.sh and put them
+#                   in Contents/Helpers, so the app needs nothing from Homebrew)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -24,6 +27,7 @@ fi
 
 ARCH_FLAGS=()
 if [[ "${UNIVERSAL:-0}" == "1" ]]; then ARCH_FLAGS=(--arch arm64 --arch x86_64); fi
+export UNIVERSAL
 
 swift build -c release ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"}
 BIN_DIR="$(swift build -c release ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-bin-path)"
@@ -34,11 +38,18 @@ if [[ ! -f "$ICON" ]]; then
     exit 1
 fi
 
+if [[ "${BUNDLE_TOOLS:-1}" == "1" ]]; then scripts/build-tools.sh; fi
+
 APP="build/MusicLibrary.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/MusicLibrary" "$APP/Contents/MacOS/MusicLibrary"
 cp "$ICON" "$APP/Contents/Resources/AppIcon.icns"
+if [[ "${BUNDLE_TOOLS:-1}" == "1" ]]; then
+    mkdir -p "$APP/Contents/Helpers"
+    cp build/tools/ffmpeg build/tools/ffprobe build/tools/fpcalc "$APP/Contents/Helpers/"
+    cp -R build/tools/Licenses "$APP/Contents/Resources/Licenses"
+fi
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -65,5 +76,16 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-codesign --force --sign "${SIGN_IDENTITY:--}" "$APP"
-echo "Built $APP ($VERSION, $(lipo -archs "$APP/Contents/MacOS/MusicLibrary"))"
+IDENTITY="${SIGN_IDENTITY:--}"
+SIGN_FLAGS=(--force --sign "$IDENTITY")
+if [[ "$IDENTITY" != "-" ]]; then SIGN_FLAGS+=(--options runtime); fi
+if [[ "$IDENTITY" == "Developer ID Application"* ]]; then SIGN_FLAGS+=(--timestamp); fi
+# Helpers first, then the app around them (no --deep).
+if [[ -d "$APP/Contents/Helpers" ]]; then
+    for tool in "$APP"/Contents/Helpers/*; do
+        codesign "${SIGN_FLAGS[@]}" --identifier "local.musiclibrary.$(basename "$tool")" "$tool"
+    done
+fi
+codesign "${SIGN_FLAGS[@]}" "$APP"
+codesign --verify --strict --deep "$APP"
+echo "Built $APP ($VERSION, $(lipo -archs "$APP/Contents/MacOS/MusicLibrary"), signed: $IDENTITY)"

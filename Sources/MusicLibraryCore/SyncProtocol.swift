@@ -137,7 +137,8 @@ public struct SyncHello: Codable, Equatable, Sendable {
     public var appVersion: String
     /// The newest library database schema the sender's app reads.
     public var schemaVersion: Int
-    /// Free space on the phone, in bytes.
+    /// Free space on the phone, in bytes. Sent only by older iPhone apps: newer ones check `SyncPlanSummary.needed`
+    /// themselves.
     public var freeSpace: Int64?
     /// The Mac's library (`Database.libraryID`).
     public var libraryID: String?
@@ -189,7 +190,13 @@ public struct SyncPlanSummary: Codable, Equatable, Sendable {
     public var files: Int
     public var bytes: Int64
     public var deletes: Int
-    public init(files: Int, bytes: Int64, deletes: Int) { self.files = files; self.bytes = bytes; self.deletes = deletes }
+    /// How much more space the phone's copy takes after this sync (what's sent minus what's deleted or replaced). The
+    /// phone checks it against its free space itself: App Store rules keep the free space on the device. Optional:
+    /// older Macs don't send it.
+    public var needed: Int64?
+    public init(files: Int, bytes: Int64, deletes: Int, needed: Int64? = nil) {
+        self.files = files; self.bytes = bytes; self.deletes = deletes; self.needed = needed
+    }
 }
 
 public struct SyncFileHeader: Codable, Equatable, Sendable {

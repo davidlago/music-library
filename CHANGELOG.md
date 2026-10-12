@@ -7,6 +7,17 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- **The Mac app is notarized and needs nothing else.** Releases are signed with a Developer ID certificate and notarized
+  by Apple, so the app opens like any other: no more **Open Anyway** in Privacy & Security. It includes its own ffmpeg,
+  ffprobe and fpcalc, so Homebrew's ffmpeg and chromaprint aren't needed anymore, and AcoustID fingerprinting works with
+  just an API key. **Settings ▸ General ▸ Tools** shows "Included with the app". After updating, macOS asks once more to
+  allow keychain access; choose **Always Allow**.
+- **The iPhone app is on TestFlight** for invited testers; see the
+  [iPhone app](https://github.com/davidlago/music-library#iphone-app) section of the README. Building it with Xcode still
+  works.
+- When a sync doesn't fit on the iPhone, the iPhone now stops it, before deleting or copying anything, and says how much
+  space it needs; it no longer tells the Mac how much space it has free.
+
 ## 1.12.0
 
 This release is for the iPhone app; the Mac app is unchanged, and syncing works as in 1.11.0. Rebuild the iPhone app from

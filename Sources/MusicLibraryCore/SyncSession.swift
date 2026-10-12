@@ -10,8 +10,8 @@ public struct SyncIdentity: Sendable {
         self.deviceID = deviceID; self.deviceName = deviceName; self.appVersion = appVersion
     }
 
-    func hello(freeSpace: Int64? = nil, libraryID: String? = nil, lastFMConnected: Bool? = nil) -> SyncHello {
-        SyncHello(deviceID: deviceID, deviceName: deviceName, appVersion: appVersion, freeSpace: freeSpace,
+    func hello(libraryID: String? = nil, lastFMConnected: Bool? = nil) -> SyncHello {
+        SyncHello(deviceID: deviceID, deviceName: deviceName, appVersion: appVersion,
                   libraryID: libraryID, lastFMConnected: lastFMConnected)
     }
 }
@@ -30,15 +30,14 @@ public struct SyncProgress: Equatable, Sendable {
 
 public enum SyncSessionError: Error, LocalizedError, Equatable {
     case phoneAppTooOld
-    case notEnoughSpace(needed: Int64, available: Int64)
+    case notEnoughSpace(needed: Int64)
 
     public var errorDescription: String? {
         switch self {
         case .phoneAppTooOld:
             return "The iPhone app is older than this Mac app and can't read its library. Update the iPhone app, then sync again."
-        case .notEnoughSpace(let needed, let available):
-            let f = ByteCountFormatter()
-            return "Not enough space on the iPhone: \(f.string(fromByteCount: needed)) needed, \(f.string(fromByteCount: available)) available."
+        case .notEnoughSpace(let needed):
+            return "Not enough space on the iPhone: this sync needs \(ByteCountFormatter().string(fromByteCount: needed)) more. Free up space on the iPhone or choose less music."
         }
     }
 }
@@ -52,7 +51,8 @@ public enum SyncPhoneSession {
     /// syncs in a new session, with that key). Otherwise `events` (recorded against `libraryID`) and `requests` go to
     /// the Mac with the file list; once the session returns, the Mac has handled them all. `adoptLastFM` gets the
     /// Mac's Last.fm account when `lastFMConnected` is false and the Mac has one; `storeConcerts` its concert
-    /// settings. Returns the Mac's hello and what was applied.
+    /// settings. `freeSpace` is checked here against what the Mac's plan needs and never sent. Returns the Mac's hello
+    /// and what was applied.
     public static func run(_ connection: SyncConnection, identity: SyncIdentity, root: URL, freeSpace: Int64?, pairing: Bool,
                            events: [SyncEvent] = [], requests: [SyncRequest] = [], libraryID: String? = nil, lastFMConnected: Bool = true,
                            storeGrant: @Sendable (SyncGrant) async throws -> Void,
@@ -64,7 +64,7 @@ public enum SyncPhoneSession {
             try await connection.open()
             guard case .hello(let mac) = try await connection.receiveMessage() else { throw SyncError.unexpected("no hello from the Mac") }
             guard mac.protocolVersion == SyncProtocol.version else { throw SyncError.versionMismatch(mac.protocolVersion) }
-            try await connection.send(.hello(identity.hello(freeSpace: freeSpace, lastFMConnected: lastFMConnected)))
+            try await connection.send(.hello(identity.hello(lastFMConnected: lastFMConnected)))
             if pairing {
                 guard case .pair(let grant) = try await connection.receiveMessage(), grant.keyData != nil else {
                     throw SyncError.unexpected("no key from the Mac")
@@ -82,6 +82,7 @@ public enum SyncPhoneSession {
             while true {
                 switch try await connection.receiveMessage() {
                 case .plan(let plan):
+                    if let needed = plan.needed, let freeSpace, needed > freeSpace { throw SyncSessionError.notEnoughSpace(needed: needed) }
                     state.totalFiles = plan.files
                     state.totalBytes = plan.bytes
                     await progress(state)
@@ -197,10 +198,11 @@ public enum SyncMacSession {
             if !plan.deletes.isEmpty, await !approveDeletes(plan.deletes.count) { plan.deletes = [] }
             let onPhone = Dictionary(manifest.files.map { ($0.path, $0.size) }, uniquingKeysWith: { a, _ in a })
             let freed = plan.deletes.reduce(Int64(0)) { $0 + (onPhone[$1] ?? 0) } + plan.sends.reduce(Int64(0)) { $0 + (onPhone[$1.path] ?? 0) }
-            if let available = phone.freeSpace, plan.bytes - freed > available {
-                throw SyncSessionError.notEnoughSpace(needed: plan.bytes - freed, available: available)
-            }
-            try await connection.send(.plan(plan.summary))
+            let needed = plan.bytes - freed
+            if let available = phone.freeSpace, needed > available { throw SyncSessionError.notEnoughSpace(needed: needed) }
+            var summary = plan.summary
+            summary.needed = needed
+            try await connection.send(.plan(summary))
             try await connection.send(.delete(plan.deletes))
 
             var state = SyncProgress()

@@ -12,4 +12,5 @@ APP_BUNDLE_ID = io.github.davidlago.MusicLibraryMobile
 // The iPhone app and its widgets share this container (the watch app and its complications have their own).
 APP_GROUP_IDENTIFIER = group.$(APP_BUNDLE_ID)
 
+#include "Version.xcconfig"
 #include? "Local.xcconfig"
