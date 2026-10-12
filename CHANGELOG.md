@@ -7,6 +7,11 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.12.0
+
+This release is for the iPhone app; the Mac app is unchanged, and syncing works as in 1.11.0. Rebuild the iPhone app from
+Xcode to get it (see the [iPhone app](https://github.com/davidlago/music-library#iphone-app) section of the README).
+
 - **iPhone widgets.** Listening (time listened in the past 7 or 30 days, a bar per day, your streak and top artists,
   songs and albums), Now Playing (with play/pause, previous, next and like buttons that work without opening the app),
   Recent Purchases (what you bought lately and spent this year), Rediscover (favorites you haven't played in months, with
@@ -15,6 +20,7 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 - **An Apple Watch app.** A remote for the iPhone's player (play/pause, skip, like, and starting Liked Songs, a shuffle or
   an album), your listening and purchases, and complications for listening time, the song playing and this year's
   purchases. It installs with the iPhone app and needs watchOS 26 or later.
+  [Screenshots](https://github.com/davidlago/music-library#widgets-and-apple-watch).
 - The iPhone app's icon no longer has a white frame around it.
 - To use your own bundle identifier for the iPhone app, set `APP_BUNDLE_ID` (not `PRODUCT_BUNDLE_IDENTIFIER`) in
   `iOS/Local.xcconfig`; the widgets, watch app and app group are named after it.
