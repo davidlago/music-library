@@ -22,7 +22,7 @@ else
     exit 1
 fi
 
-if ! codesign -dv "$APP" 2>&1 | grep -q "^Authority=Developer ID Application"; then
+if [[ "$(codesign -dv --verbose=2 "$APP" 2>&1)" != *$'\nAuthority=Developer ID Application'* ]]; then
     echo "error: $APP isn't signed with a Developer ID Application certificate (SIGN_IDENTITY)" >&2
     exit 1
 fi
