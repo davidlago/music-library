@@ -70,6 +70,27 @@ jobs:
             ${{ steps.package.outputs.name }}.sha256
           if-no-files-found: error
 
+  ios:
+    name: Build for iOS
+    # The iPhone app targets iOS 27 and uses its APIs, so it needs Xcode 27 (GitHub's `xcode-27` image, in preview).
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode 27
+        run: |
+          xcode="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | grep -iv beta | sort -V | tail -1 || true)"
+          [ -n "$xcode" ] || xcode="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1 || true)"
+          [ -n "$xcode" ] || { echo "No Xcode 27 on this runner:"; ls -d /Applications/Xcode*.app; exit 1; }
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+
+      - name: Build MusicLibraryCore for iOS
+        run: xcodebuild -scheme MusicLibraryCore -destination 'generic/platform=iOS Simulator' build
+
+      - name: Build the iPhone app
+        run: xcodebuild -project iOS/MusicLibraryMobile.xcodeproj -scheme MusicLibraryMobile -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+
   release:
     name: Publish release
     needs: build

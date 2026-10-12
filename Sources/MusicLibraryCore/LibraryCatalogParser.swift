@@ -1,3 +1,5 @@
+// XMLDocument (used to parse tidied HTML) is macOS only, and so is the library catalog.
+#if os(macOS)
 import Foundation
 
 /// Reads the catalog's HTML pages and AJAX replies. Foundation's HTML reader (libxml2 via tidy) nests Aspen's
@@ -452,3 +454,4 @@ struct HTMLNode {
         s.replacingOccurrences(of: "\u{a0}", with: " ").split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 }
+#endif

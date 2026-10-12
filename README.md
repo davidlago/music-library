@@ -13,6 +13,7 @@
   <a href="https://github.com/davidlago/music-library/releases/latest"><img src="https://img.shields.io/github/v/release/davidlago/music-library?label=download" alt="Latest release"></a>
   <a href="https://github.com/davidlago/music-library/actions/workflows/ci.yml"><img src="https://github.com/davidlago/music-library/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-blue" alt="macOS 14+">
+  <img src="https://img.shields.io/badge/iPhone%20app-iOS%2027%2B-blue" alt="iPhone app: iOS 27+">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
 </p>
 
@@ -88,6 +89,8 @@
   there are never overwritten, and playlists get `.m3u` files. Turn on the database option to also back up
   `library.sqlite` and the artist photos to the drive, for a full library backup. A single playlist can still be exported
   to its own folder.
+- **An iPhone app.** Copy part of the library to your iPhone and play it offline, through a USB DAC at each song's own
+  sample rate, with the same search, playlists, Liked Songs, covers and Last.fm scrobbling. See [iPhone app](#iphone-app).
 
 ## Tour
 
@@ -152,6 +155,13 @@ The search takes the same filters as your music, with a few catalog meanings and
 | `is:onlist` | On the library list you chose in Settings |
 | `library:acton`, `rating:>=4` | Owned by a library; MusicBrainz community rating |
 
+### On the iPhone
+
+Albums, artists, songs, playlists and search, a Now Playing screen that shows the file's format and the rate your DAC is
+running at, and gapless playback between songs at the same rate.
+
+![The iPhone app: the albums grid, an album page and Now Playing showing FLAC 24/48 going out at 48 kHz](docs/screenshots/iphone.png)
+
 ### Themes
 
 | Catppuccin Mocha | Rosé Pine Dawn |
@@ -179,6 +189,57 @@ The search takes the same filters as your music, with a few catalog meanings and
 
 When a new version first reads your saved keys and passwords, macOS asks once to allow access to the keychain; choose
 **Always Allow**.
+
+## iPhone app
+
+The iPhone app plays a copy of part of your library, offline. It's an early companion: there's no App Store version yet,
+so you build it with Xcode and install it on your own phone, which takes a few one-time steps.
+
+**What you need:** a Mac with Xcode 27 or later, an iPhone on iOS 27 or later with a USB cable, and an Apple ID (a free one
+works).
+
+**Install it**
+
+1. On the iPhone, turn on **Settings ▸ Privacy & Security ▸ Developer Mode** (the phone restarts), then connect it to the
+   Mac and tap **Trust**.
+2. Get the source (see [Building from source](#building-from-source)) and open `iOS/MusicLibraryMobile.xcodeproj` in Xcode.
+   Sign in with your Apple ID in **Xcode ▸ Settings ▸ Accounts** if you haven't.
+3. Set your team: select the **MusicLibraryMobile** target, open **Signing & Capabilities** and pick your team (with a free
+   Apple ID, "Your Name (Personal Team)"). To keep the project file unchanged, put it in `iOS/Local.xcconfig` instead,
+   which isn't committed:
+
+   ```
+   DEVELOPMENT_TEAM = ABCDE12345
+   PRODUCT_BUNDLE_IDENTIFIER = com.yourname.MusicLibraryMobile
+   ```
+
+   A bundle identifier can belong to only one developer, so if Xcode says it isn't available, choose your own as above.
+4. Pick your iPhone as the run destination and click **Run** (⌘R).
+5. The first time, iOS won't open an app from an unknown developer: on the phone, open
+   **Settings ▸ General ▸ VPN & Device Management**, tap your Apple ID under Developer App and tap **Trust**.
+
+**Add music**
+
+1. In the Mac app, add albums, artists, playlists or songs to the Export List, turn on the database option, and export to
+   a folder (for example one named `Music Library`).
+2. Connect the iPhone, select it in Finder's sidebar, open the **Files** tab and drag the exported folder onto
+   **Music Library**.
+3. Open the app. It shows only the songs that are on the phone; export more and drag the folder in again to add albums.
+
+**Use it**
+
+- With a USB DAC connected, each song plays at its own sample rate (16/44.1, 24/96, 24/192…); Now Playing shows where it's
+  going and at what rate. For bit-perfect output keep the iPhone's volume at maximum and use the DAC's or amplifier's.
+  Unplugging the DAC pauses instead of switching to the speaker.
+- Settings (the gear on the Library tab) has the sample-rate switch and Last.fm: enter the same API key and shared secret
+  as on the Mac and tap **Connect…**. Scrobbles made offline are sent when the phone is back online.
+- The play queue and position are kept when the app is closed.
+
+**Every 7 days (free Apple ID)**
+
+Apps installed with a free Apple ID stop opening after 7 days. Connect the phone and click **Run** in Xcode again: the new
+build installs over the old one and keeps your music, database, Last.fm account and queue. Don't delete the app from the
+home screen, which deletes its music too. A paid Apple Developer Program membership makes installs last a year.
 
 ## Getting started
 
@@ -211,6 +272,9 @@ you're searching, not your ZIP code). API keys,
 secrets and your PIN are kept in your keychain. Downloading artist and album info can be turned off in
 **Settings ▸ General**, and looking up library CDs in **Settings ▸ Library**.
 
+The iPhone app keeps its music and the copied database on the phone, out of iCloud backups. It talks only to Last.fm, if
+you connect it.
+
 ## Building from source
 
 You need macOS 14+, Swift 6 (Xcode 16 or later, or the Command Line Tools) and ffmpeg.
@@ -226,6 +290,9 @@ swift test                      # runs the test suite (needs ffmpeg)
 `scripts/build-app.sh` accepts `VERSION=1.2.3`, `UNIVERSAL=1` (Apple Silicon + Intel, needs Xcode) and `SIGN_IDENTITY=…`
 (a signing certificate; one with a Team ID keeps keychain access across rebuilds). With only the Command Line Tools
 installed, see [AGENTS.md](AGENTS.md) for an SDK note.
+
+The iPhone app is `iOS/MusicLibraryMobile.xcodeproj` (needs Xcode); it shares `MusicLibraryCore` with the Mac app.
+See [iPhone app](#iphone-app) for installing it on a phone.
 
 Releases are built by GitHub Actions: pushing a tag like `v1.2.3` runs the tests, builds a universal app and publishes it on the
 Releases page.

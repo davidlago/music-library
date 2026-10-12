@@ -4,11 +4,13 @@ import SQLite3
 public enum DatabaseError: Error, LocalizedError {
     case open(String)
     case sql(message: String, statement: String)
+    case newerSchema(Int)
 
     public var errorDescription: String? {
         switch self {
         case .open(let m): return "Could not open library database: \(m)"
         case .sql(let m, let s): return "Database error: \(m) (\(s))"
+        case .newerSchema: return "This library was made by a newer version of Music Library. Update the app to open it."
         }
     }
 }
@@ -51,6 +53,19 @@ public final class Database: @unchecked Sendable {
         try exec("PRAGMA foreign_keys=ON")
         if path != ":memory:" { try exec("PRAGMA journal_mode=WAL") }
         try migrate()
+    }
+
+    /// Opens a library snapshot (the `library.sqlite` an export or a sync writes) without changing it: no
+    /// migrations, nothing written. A snapshot from an older version may lack the newer tables, so reads of
+    /// those throw; one from a newer version is refused, since its schema is unknown here.
+    public init(snapshotAt path: String) throws {
+        if sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil) != SQLITE_OK {
+            let msg = db.map { String(cString: sqlite3_errmsg($0)) } ?? "unknown error"
+            sqlite3_close(db)
+            throw DatabaseError.open(msg)
+        }
+        let version = try query("PRAGMA user_version") { $0.int(0) ?? 0 }.first ?? 0
+        guard version <= Self.schemaVersion else { throw DatabaseError.newerSchema(version) }
     }
 
     deinit { sqlite3_close(db) }

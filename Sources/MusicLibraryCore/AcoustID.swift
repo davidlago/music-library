@@ -48,6 +48,7 @@ public enum AcoustIDParser {
     }
 }
 
+#if os(macOS)
 public struct AcoustIDClient: Sendable {
     public let apiKey: String
     public let fpcalc: URL
@@ -87,3 +88,4 @@ public struct AcoustIDClient: Sendable {
         return try AcoustIDParser.parse(data)
     }
 }
+#endif

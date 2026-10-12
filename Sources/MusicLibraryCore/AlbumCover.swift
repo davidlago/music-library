@@ -1,5 +1,6 @@
 import Foundation
 
+#if os(macOS)
 extension TagWriter {
     static func embedCoverArguments(file: URL, coverPath: String, output: URL, ext: String) -> [String] {
         var args = ["-nostdin", "-v", "error", "-y", "-i", file.path, "-i", coverPath,
@@ -85,3 +86,4 @@ public struct AlbumCoverWriter: Sendable {
         return result
     }
 }
+#endif

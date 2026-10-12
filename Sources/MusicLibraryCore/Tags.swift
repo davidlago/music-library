@@ -9,6 +9,7 @@ public struct TagInfo: Sendable {
     fileprivate var coverStreamIndex: Int?
 }
 
+#if os(macOS)
 public struct TagReader: Sendable {
     public let tools: ToolLocator
     public init(tools: ToolLocator = ToolLocator()) { self.tools = tools }
@@ -279,3 +280,4 @@ public enum ImageTools {
         return try Data(contentsOf: output)
     }
 }
+#endif

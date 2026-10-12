@@ -1,3 +1,5 @@
+// iOS apps can't launch processes, so ffmpeg, ffprobe and fpcalc are macOS only.
+#if os(macOS)
 import Foundation
 
 public struct ProcessResult: Sendable {
@@ -140,3 +142,4 @@ public struct ToolLocator: Sendable {
         return url
     }
 }
+#endif
