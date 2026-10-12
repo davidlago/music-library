@@ -50,23 +50,24 @@ Pushing a `vX.Y.Z` tag signs and notarizes the release build in CI. It needs the
 
 | Secret | Value |
 |---|---|
-| `DEVELOPER_ID_CERTIFICATE_P12` | the certificate and its private key, exported as .p12 and base64-encoded |
-| `DEVELOPER_ID_CERTIFICATE_PASSWORD` | the password you gave the .p12 |
-| `NOTARY_API_KEY` | the contents of the `.p8` file |
+| `DEVELOPER_ID_CERTIFICATE_P12` | the certificate and its private key, as a base64-encoded .p12 |
+| `DEVELOPER_ID_CERTIFICATE_PASSWORD` | the .p12's password |
+| `NOTARY_API_KEY` | the contents of the `.p8` file (also used for TestFlight uploads) |
 | `NOTARY_API_KEY_ID` | the key's Key ID |
 | `NOTARY_API_ISSUER_ID` | the Issuer ID |
 
-To export the certificate, open **Keychain Access**, find **Developer ID Application: …** under **My Certificates**,
-right-click it, choose **Export…**, save it as a .p12 and set a password. Then:
+`scripts/set-signing-secret.sh` sets the certificate's two: it exports only that identity from your login keychain
+(macOS asks for your login password), protects it with a random password, checks that it imports the way CI imports
+it, and stores both secrets with `gh`. Then the API key's three:
 
 ```bash
-base64 -i DeveloperID.p12 | gh secret set DEVELOPER_ID_CERTIFICATE_P12
-gh secret set DEVELOPER_ID_CERTIFICATE_PASSWORD
+scripts/set-signing-secret.sh "Developer ID Application" DEVELOPER_ID_CERTIFICATE
 gh secret set NOTARY_API_KEY < ~/path/to/AuthKey_XXXXXXXXXX.p8
 gh secret set NOTARY_API_KEY_ID --body XXXXXXXXXX
 gh secret set NOTARY_API_ISSUER_ID --body xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-rm DeveloperID.p12
 ```
+
+A Developer ID certificate lasts five years; after renewing it, run the script again.
 
 A tagged build fails rather than publishing an unsigned release when a secret is missing. Pull requests and pushes to
 `main` still build an ad-hoc-signed app (with the tools).
@@ -123,8 +124,30 @@ code uses.
   explain that the app gets its music from the Mac app (with a link to the Releases page) and how to sync, since a
   reviewer opening it without a Mac sees an empty library.
 
-TestFlight builds expire after 90 days; upload a new one before then. When the Mac app's version changes, update
-`MARKETING_VERSION` in `iOS/Version.xcconfig` too.
+TestFlight builds expire after 90 days; upload a new one before then. Internal groups get every new build when their
+**Automatic Distribution** setting is on; testers' TestFlight app then notifies them, or installs it by itself when they
+turn on automatic updates in TestFlight.
+
+### 5. Upload every release from CI
+
+Each `vX.Y.Z` tag also uploads the iPhone app as version X.Y.Z (the `testflight` job, after the build and tests pass;
+`MARKETING_VERSION` in `iOS/Version.xcconfig` only matters for local builds). It uses the notarization API key, which
+uploads. An App Manager key can't use Apple's cloud-managed distribution certificates, so CI signs manually with an
+Apple Distribution certificate of its own, from two more secrets, and an App Store profile per bundle ID named
+"<bundle ID> App Store (CI)", which `scripts/provisioning-profiles.swift` creates (or replaces, once expired or made for
+another certificate) with the API key:
+
+1. Create it in Xcode: **Settings ▸ Accounts**, your team, **Manage Certificates…**, **+** ▸ **Apple Distribution**.
+2. Store it:
+
+   ```bash
+   scripts/set-signing-secret.sh "Apple Distribution" APPLE_DISTRIBUTION_CERTIFICATE
+   ```
+
+The certificate lasts a year: when Apple emails that it's expiring, create a new one and run the script again.
+
+To check it without a release, run the CI workflow by hand (**Actions ▸ CI ▸ Run workflow**, or
+`gh workflow run ci.yml -f testflight=export`): `export` signs an .ipa without uploading, `upload` uploads it.
 
 ### Later: the App Store
 

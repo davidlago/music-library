@@ -27,14 +27,15 @@ if [[ "$(codesign -dv --verbose=2 "$APP" 2>&1)" != *$'\nAuthority=Developer ID A
     exit 1
 fi
 
-ZIP="$(mktemp -d)/MusicLibrary.zip"
+ZIP_DIR="$(mktemp -d)"
+trap 'rm -rf "$ZIP_DIR"' EXIT
+ZIP="$ZIP_DIR/MusicLibrary.zip"
 ditto -c -k --keepParent "$APP" "$ZIP"
 
 echo "Submitting to Apple's notary service (usually a few minutes)…"
 OUT="$(xcrun notarytool submit "$ZIP" "${AUTH[@]}" --wait --output-format json)" || true
 ID="$(printf '%s' "$OUT" | plutil -extract id raw - 2>/dev/null || true)"
 STATUS="$(printf '%s' "$OUT" | plutil -extract status raw - 2>/dev/null || true)"
-rm -f "$ZIP"
 if [[ "$STATUS" != "Accepted" ]]; then
     echo "error: notarization ${STATUS:-failed}: $OUT" >&2
     if [[ -n "$ID" ]]; then xcrun notarytool log "$ID" "${AUTH[@]}" >&2 || true; fi

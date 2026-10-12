@@ -7,6 +7,12 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.14.0
+
+This release changes how releases are made; the Mac and iPhone apps work as in 1.13.0.
+
+- Every release now also goes to TestFlight automatically, as the same version as the Mac app.
+
 ## 1.13.0
 
 - **The Mac app is notarized and needs nothing else.** Releases are signed with a Developer ID certificate and notarized
