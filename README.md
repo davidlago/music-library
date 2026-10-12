@@ -165,7 +165,9 @@ playlists and a Now Playing screen that shows the file's format and the rate you
 between songs at the same rate. Music that isn't on the phone is dimmed: tap **Download** and the phone fetches it from
 the Mac over Wi-Fi, or **Remove from iPhone** to free the space.
 
-![The iPhone app: the albums grid, an album page and Now Playing showing FLAC 24/48 going out at 48 kHz](docs/screenshots/iphone.png)
+![The iPhone app: the whole library's albums with the ones not on the phone dimmed, an album that isn't on the phone with its Download button, and an artist page](docs/screenshots/iphone.png)
+
+![The iPhone app: an album's listening stats and track list with the song playing, Music DNA centered on Diana Krall, and Insights with the timeline by decade and top genres](docs/screenshots/iphone-dna-insights.png)
 
 ### Themes
 
@@ -248,6 +250,12 @@ then send only what changed.
 
 **Use it**
 
+- **Library** lists everything; switch it to **On This iPhone** to see only what you can play right now. Albums, artists
+  and songs that aren't on the phone are dimmed: tap one to download it, or long-press anything for **Download to
+  iPhone** or **Remove from iPhone**. What's waiting for the Mac is listed in the Sync tab.
+- Album and artist pages, **Music DNA** (from Library, an artist page or any credited name) and the **Insights** tab work
+  without the music being on the phone, from what the Mac last synced. Liking songs and editing **Your Copy** on an album
+  page go back to the Mac at the next sync.
 - With a USB DAC connected, each song plays at its own sample rate (16/44.1, 24/96, 24/192…); Now Playing shows where it's
   going and at what rate. For bit-perfect output keep the iPhone's volume at maximum and use the DAC's or amplifier's.
   Unplugging the DAC pauses instead of switching to the speaker.
