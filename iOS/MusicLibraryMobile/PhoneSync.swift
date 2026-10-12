@@ -38,6 +38,13 @@ final class PhoneSync {
 
     /// Called after a sync changed the library.
     @ObservationIgnored var onLibraryChanged: () -> Void = {}
+    /// The plays and likes to send, and the library they were recorded against.
+    @ObservationIgnored var pendingEvents: () -> ([SyncEvent], String?) = { ([], nil) }
+    /// Called with the events a finished sync handled (the Mac applied, already had, or dropped them).
+    @ObservationIgnored var onEventsDelivered: (Set<String>) -> Void = { _ in }
+    @ObservationIgnored var isLastFMConnected: () -> Bool = { true }
+    /// Gets the Mac's Last.fm account when this phone isn't connected.
+    @ObservationIgnored var adoptLastFM: (SyncLastFM) -> Void = { _ in }
     @ObservationIgnored private var advertiser: SyncAdvertiser?
     @ObservationIgnored private var visible = false
     @ObservationIgnored private var busy = false
@@ -148,6 +155,8 @@ final class PhoneSync {
         let identity = identity, root = root
         let free = (try? URL.documentsDirectory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
             .volumeAvailableCapacityForImportantUsage
+        let (events, libraryID) = pairing ? ([], nil) : pendingEvents()
+        let lastFMConnected = isLastFMConnected()
         Task {
             defer {
                 busy = false
@@ -157,12 +166,15 @@ final class PhoneSync {
             do {
                 let result = try await SyncPhoneSession.run(
                     SyncConnection(connection), identity: identity, root: root, freeSpace: free, pairing: pairing,
+                    events: events, libraryID: libraryID, lastFMConnected: lastFMConnected,
                     storeGrant: { grant in try await self.store(grant) },
+                    adoptLastFM: { account in await self.adopt(account) },
                     progress: { progress in await self.report(progress) })
                 if pairing {
                     // Later syncs use the key the Mac just handed over.
                     if visible, let key { listen(key: key, pairing: nil) } else { stopListening(); status = .off }
                 } else {
+                    onEventsDelivered(Set(events.map(\.id)))
                     finished(result.summary)
                 }
             } catch {
@@ -186,6 +198,10 @@ final class PhoneSync {
         defaults.set(grant.macID, forKey: Keys.macID)
         defaults.set(grant.macName, forKey: Keys.macName)
         macName = grant.macName
+    }
+
+    private func adopt(_ account: SyncLastFM) {
+        adoptLastFM(account)
     }
 
     private func report(_ progress: SyncProgress) {

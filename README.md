@@ -230,6 +230,9 @@ works).
 3. With the iPhone's Sync tab open, click **Sync Now** on the Mac. The phone ends up with exactly the list: new and
    changed files are copied, songs you took off the list are removed (the first sync asks before removing anything), and
    the library, playlists and Liked Songs are updated. Keep the Sync tab on screen until it's done.
+4. Each sync also brings back what you did on the phone: songs you liked or unliked there (with the heart in Now Playing
+   or a song's menu) and what you listened to, so the Mac's Liked Songs, play counts and Insights include the phone. If
+   the Mac is connected to Last.fm and the phone isn't, the sync connects the phone with the Mac's account.
 
 For a big first load, copying through Finder is faster than Wi-Fi: export the list to a folder with the database option
 on, select the iPhone in Finder's sidebar, open the **Files** tab and drag the folder onto **Music Library**. Later syncs
@@ -240,8 +243,9 @@ then send only what changed.
 - With a USB DAC connected, each song plays at its own sample rate (16/44.1, 24/96, 24/192…); Now Playing shows where it's
   going and at what rate. For bit-perfect output keep the iPhone's volume at maximum and use the DAC's or amplifier's.
   Unplugging the DAC pauses instead of switching to the speaker.
-- Settings (the gear on the Library tab) has the sample-rate switch and Last.fm: enter the same API key and shared secret
-  as on the Mac and tap **Connect…**. Scrobbles made offline are sent when the phone is back online.
+- Settings (the gear on the Library tab) has the sample-rate switch and Last.fm (connected from the Mac at the first sync,
+  or enter the API key and shared secret and tap **Connect…**). The phone scrobbles what it plays itself, and scrobbles
+  made offline are sent when it's back online; the Mac doesn't scrobble them again.
 - The play queue and position are kept when the app is closed.
 
 **Every 7 days (free Apple ID)**

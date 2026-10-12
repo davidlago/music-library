@@ -50,6 +50,8 @@ final class PhonePlayer {
     @ObservationIgnored var onTrackStart: ((Track) -> Void)?
     /// Called on every position update.
     @ObservationIgnored var onProgress: ((Track, Double, Bool) -> Void)?
+    /// Called when playback stops for good: the queue ran out.
+    @ObservationIgnored var onPlaybackEnded: (() -> Void)?
 
     @ObservationIgnored private let avPlayer = AVQueuePlayer()
     /// The item playing the queue's current song, and the next song's item when it's preloaded.
@@ -294,6 +296,7 @@ final class PhonePlayer {
             currentTime = 0
             finishedQueue = true
             updateNowPlaying()
+            onPlaybackEnded?()
         }
     }
 

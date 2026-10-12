@@ -184,7 +184,7 @@ Themes use `Themes.swift` palettes with an iOS port of `.themedRoot` and the sam
    - At this point you already have a working offline player on the phone.
 3. **Playback done right, and Last.fm** (done; the DAC itself still to be checked on the phone): sample-rate switching (spike first), the output display, gapless at the same rate, lock screen controls, the queue sheet, saving and restoring player state, and Last.fm scrobbling with the account entered on the phone.
 4. **Wi-Fi sync, Mac to phone** (done, except sending the Mac's Last.fm account, which moves to a later phase; tested with the iPhone simulator and between the Mac app and a real iPhone): pairing (including sending the Mac's Last.fm account), the protocol, the planner, mirror deletes and the Mac sync page. Seeding a big library by dragging in Finder (phase 2) and then syncing changes over Wi-Fi is the recommended path. A first sync over Wi-Fi runs at roughly 20 to 40 MB/s, so it can take hours for hundreds of GB. The phone keeps the screen awake while syncing.
-5. **Two-way sync:** plays and likes back to the Mac, `plays.event_id` and the library id.
+5. **Two-way sync** (done; tested with the iPhone simulator): plays and likes back to the Mac, the library id, and handing the Mac's Last.fm account to the phone. Applied events are recorded in a `sync_events` table (rather than a `plays.event_id` column), which covers likes too.
 6. **Later:**
    - artist and album pages with full info
    - Music DNA and Insights on the phone

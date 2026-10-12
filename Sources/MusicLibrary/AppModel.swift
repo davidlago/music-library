@@ -236,6 +236,11 @@ final class AppModel {
         player.onPlaybackEnded = { [unowned self] in self.finishPlay() }
         player.onWillPlay = { [unowned self] in self.previews.stop() }
         previews.onWillPlay = { [unowned self] in if self.player.isPlaying { self.player.togglePlayPause() } }
+        // Plays and likes from the iPhone are in the database now: likes, play counts and Insights follow.
+        iPhone.onHistoryChanged = { [unowned self] in
+            self.reloadLibrary()
+            self.historyVersion += 1
+        }
         artistInfo.onAutoSyncEnabled = { [unowned self] in self.syncArtistInfo() }
         catalog.makeEnricher = { [unowned self] client in
             CatalogEnricher(catalog: { path in try await client.get(path, priority: .background) }, musicBrainz: self.musicBrainz, info: self.artistFetcher)
@@ -974,7 +979,11 @@ final class AppModel {
 
     func syncIPhone(_ phone: SyncStore.PairedPhone) {
         guard let database else { return }
-        iPhone.sync(phone, tracks: iPhoneTracks, libraryRoot: libraryRoot, database: database)
+        var lastFM: SyncLastFM?
+        if case .connected = scrobbler.status, let session = scrobbler.session {
+            lastFM = SyncLastFM(apiKey: scrobbler.apiKey, sharedSecret: scrobbler.sharedSecret, sessionKey: session.key, username: session.username)
+        }
+        iPhone.sync(phone, tracks: iPhoneTracks, libraryRoot: libraryRoot, database: database, lastFM: lastFM)
     }
 
     /// Every track in the export list once, in list order.

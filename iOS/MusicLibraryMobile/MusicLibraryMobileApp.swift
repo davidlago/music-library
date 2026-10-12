@@ -18,6 +18,7 @@ struct MusicLibraryMobileApp: App {
                         model.scrobbler.flush()
                     case .background:
                         model.savePlayerState()
+                        model.noteInterruptedPlay()
                     default:
                         break
                     }

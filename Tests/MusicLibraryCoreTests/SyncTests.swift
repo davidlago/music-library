@@ -303,3 +303,120 @@ struct SyncFixture {
         #expect(!FileManager.default.fileExists(atPath: phoneRoot.appendingPathComponent("Music").path))
     }
 }
+
+@Suite struct SyncEventTests {
+    @Test func libraryIDIsMadeOnceAndTravelsWithCopies() throws {
+        let f = try SyncFixture()
+        let id = try #require(f.db.libraryID())
+        #expect(try Database(path: f.root.appendingPathComponent("library.sqlite").path).libraryID() == id)
+        let copy = try TestSupport.tempDir().appendingPathComponent("copy.sqlite")
+        try f.db.writeSyncSnapshot(to: copy, scratch: try TestSupport.tempDir())
+        #expect(try Database(snapshotAt: copy.path).libraryID() == id)
+        #expect(try SyncFixture().db.libraryID() != id)
+    }
+
+    @Test func eventsApplyOnceAndOnlyToMatchingSongs() throws {
+        let f = try SyncFixture()
+        let library = f.db.libraryID()
+        let t = f.tracks[0]
+        var changed = f.tracks[1]
+        changed.sha256 = "re-imported"
+        let events = [
+            SyncEvent(track: t, at: Date(timeIntervalSince1970: 1000), kind: .play(listened: 120, counted: true)),
+            SyncEvent(track: t, at: Date(timeIntervalSince1970: 2000), kind: .play(listened: 10, counted: false)),
+            SyncEvent(track: changed, at: Date(timeIntervalSince1970: 3000), kind: .play(listened: 99, counted: true)),
+            SyncEvent(track: t, at: Date(timeIntervalSince1970: 4000), kind: .like(true)),
+        ]
+        let first = try f.db.applySyncEvents(events, libraryID: library)
+        #expect(first == { var r = SyncEventResult(); r.plays = 2; r.likes = 1; r.dropped = 1; return r }())
+        #expect(try f.db.plays().map(\.listened).sorted() == [10, 120])
+        #expect(try f.db.likedTrackDates()[t.id] == Date(timeIntervalSince1970: 4000))
+        // A repeated sync sends the same events again: nothing changes.
+        #expect(try f.db.applySyncEvents(events, libraryID: library) == SyncEventResult())
+        #expect(try f.db.plays().count == 2)
+
+        // Another library's events are dropped.
+        let other = [SyncEvent(track: t, at: Date(), kind: .play(listened: 60, counted: true))]
+        #expect(try f.db.applySyncEvents(other, libraryID: "someone-else").dropped == 1)
+        #expect(try f.db.plays().count == 2)
+        // A copy from before library IDs: the song check alone decides.
+        #expect(try f.db.applySyncEvents([SyncEvent(track: t, at: Date(), kind: .play(listened: 30, counted: false))], libraryID: nil).plays == 1)
+    }
+
+    @Test func theLatestLikeChangeWins() throws {
+        let f = try SyncFixture()
+        let library = f.db.libraryID()
+        let (a, b) = (f.tracks[0], f.tracks[1])
+        try f.db.setLiked([a.id], true, at: Date(timeIntervalSince1970: 100))
+        try f.db.setLiked([b.id], true, at: Date(timeIntervalSince1970: 500))
+        // The phone unliked both at 300: a was liked on the Mac before that (removed), b after (kept).
+        let result = try f.db.applySyncEvents([SyncEvent(track: a, at: Date(timeIntervalSince1970: 300), kind: .like(false)),
+                                               SyncEvent(track: b, at: Date(timeIntervalSince1970: 300), kind: .like(false))], libraryID: library)
+        #expect(result.likes == 1)
+        #expect(try f.db.likedTrackDates().keys.sorted() == [b.id])
+        // Liking a song that's already liked keeps the Mac's date.
+        _ = try f.db.applySyncEvents([SyncEvent(track: b, at: Date(timeIntervalSince1970: 900), kind: .like(true))], libraryID: library)
+        #expect(try f.db.likedTrackDates()[b.id] == Date(timeIntervalSince1970: 500))
+    }
+
+    @Test func outboxPersistsAndOverlaysLikes() throws {
+        let f = try SyncFixture()
+        let url = try TestSupport.tempDir().appendingPathComponent("outbox.json")
+        let box = SyncOutbox(url: url)
+        let like = SyncEvent(track: f.tracks[0], at: Date(timeIntervalSince1970: 10), kind: .like(true))
+        let unlike = SyncEvent(track: f.tracks[1], at: Date(timeIntervalSince1970: 20), kind: .like(false))
+        box.append(like)
+        box.append(unlike)
+        box.append(SyncEvent(track: f.tracks[2], at: Date(), kind: .play(listened: 5, counted: false)))
+        #expect(SyncOutbox(url: url).events.count == 3)
+        let liked = SyncOutbox.liked(base: [f.tracks[1].id: Date(timeIntervalSince1970: 1)], events: box.events)
+        #expect(liked == [f.tracks[0].id: Date(timeIntervalSince1970: 10)])
+        box.remove([like.id, unlike.id])
+        #expect(SyncOutbox(url: url).events.map(\.kind) == [.play(listened: 5, counted: false)])
+    }
+}
+
+extension SyncSessionTests {
+    actor AccountBox {
+        var account: SyncLastFM?
+        func set(_ a: SyncLastFM) { account = a }
+    }
+
+    @Test func phoneEventsAndLastFMTravelWithASync() async throws {
+        let f = try SyncFixture()
+        let key = SyncPairing.newKey()
+        let phoneRoot = try TestSupport.tempDir().appendingPathComponent("Music Library")
+        let scratch = try TestSupport.tempDir()
+        let events = [SyncEvent(track: f.tracks[0], at: Date(timeIntervalSince1970: 1000), kind: .play(listened: 200, counted: true)),
+                      SyncEvent(track: f.tracks[1], at: Date(timeIntervalSince1970: 2000), kind: .like(true))]
+        let account = SyncLastFM(apiKey: "k", sharedSecret: "s", sessionKey: "sk", username: "dave")
+        let received = AccountBox()
+
+        let sessions = AsyncStream<NWConnection>.makeStream()
+        let advertiser = try SyncAdvertiser(deviceID: "phone-id", name: "test", key: key, pairing: false, advertise: false,
+                                            onConnection: { sessions.continuation.yield($0) })
+        advertiser.start()
+        for _ in 0..<100 where advertiser.port == nil || advertiser.port == .any { try await Task.sleep(for: .milliseconds(20)) }
+        let identity = phone, library = f.db.libraryID()
+        let session = Task { () async throws -> SyncSummary in
+            defer { advertiser.stop() }
+            for await connection in sessions.stream {
+                return try await SyncPhoneSession.run(SyncConnection(connection), identity: identity, root: phoneRoot, freeSpace: nil,
+                                                      pairing: false, events: events, libraryID: library, lastFMConnected: false,
+                                                      storeGrant: { _ in }, adoptLastFM: { await received.set($0) }).summary
+            }
+            throw SyncError.connection("no session")
+        }
+        let summary = try await SyncMacSession.sync(endpoint: endpoint(advertiser.port!), key: key, identity: mac, tracks: f.tracks,
+                                                    libraryRoot: f.root, database: f.db, scratch: scratch, lastFM: account)
+        #expect(try await session.value == summary)
+        #expect(summary.plays == 1)
+        #expect(summary.likes == 1)
+        #expect(await received.account == account)
+        // The snapshot the phone got back already has them.
+        let copy = try LibrarySnapshot(root: phoneRoot)
+        #expect(copy.likedIDs == [f.tracks[1].id])
+        #expect(copy.libraryID == f.db.libraryID())
+        #expect(try Database(snapshotAt: LibraryLocation.databaseURL(root: phoneRoot).path).plays().count == 1)
+    }
+}

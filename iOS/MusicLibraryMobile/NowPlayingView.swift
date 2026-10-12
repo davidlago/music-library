@@ -64,6 +64,7 @@ private struct OutputLine: View {
 
 struct NowPlayingView: View {
     @Environment(PhonePlayer.self) private var player
+    @Environment(PhoneModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     /// While the scrubber is dragged, the position it shows (the player seeks when it's let go).
     @State private var scrubbing: Double?
@@ -139,7 +140,13 @@ struct NowPlayingView: View {
             .foregroundStyle(.secondary)
         }
 
-        HStack(spacing: 48) {
+        HStack(spacing: 40) {
+            let liked = model.isLiked(track)
+            Button { model.toggleLike(track) } label: {
+                Image(systemName: liked ? "heart.fill" : "heart").foregroundStyle(liked ? Color.pink : Color.primary)
+            }
+            .font(.title2)
+            .accessibilityLabel(liked ? "Unlike" : "Like")
             Button { player.previous() } label: { Image(systemName: "backward.fill") }
                 .accessibilityLabel("Previous")
             Button { player.togglePlayPause() } label: {
@@ -148,6 +155,8 @@ struct NowPlayingView: View {
             .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
             Button { player.next() } label: { Image(systemName: "forward.fill") }
                 .accessibilityLabel("Next")
+            // Balances the heart, so play/pause stays centered.
+            Image(systemName: "heart").font(.title2).hidden()
         }
         .font(.title)
         .buttonStyle(.plain)

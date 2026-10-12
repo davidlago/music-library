@@ -7,6 +7,15 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.10.0
+
+- **What you do on the iPhone comes back to the Mac.** Like and unlike songs on the phone (in Now Playing or a song's
+  menu); each sync brings those changes and the phone's listening history back to the Mac, so Liked Songs, play counts and
+  Insights cover both. The phone scrobbles its own plays, so nothing is scrobbled twice. Update both apps together: this
+  sync works only between this version of each.
+- **Last.fm on the iPhone without typing keys.** If the Mac is connected to Last.fm and the phone isn't, the next sync
+  connects the phone with the Mac's account.
+
 ## 1.9.0
 
 - **Sync to the iPhone over Wi-Fi.** Pair the iPhone app with the Mac once (a code the phone shows, typed on the Mac),

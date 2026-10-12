@@ -42,7 +42,7 @@ public final class Database: @unchecked Sendable {
     private var db: OpaquePointer?
     private let lock = NSRecursiveLock()
     private var transactionDepth = 0
-    static let schemaVersion = 13
+    static let schemaVersion = 14
 
     public init(path: String) throws {
         if sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nil) != SQLITE_OK {
@@ -235,7 +235,23 @@ public final class Database: @unchecked Sendable {
                 key TEXT PRIMARY KEY, file TEXT NOT NULL, credit TEXT, credit_url TEXT, updated_at REAL NOT NULL)
             """)
         }
+        if version < 14 {
+            try transaction {
+                // A library's identity, so a phone paired with one library never sends its history to another.
+                try exec("CREATE TABLE IF NOT EXISTS library_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+                try exec("INSERT OR IGNORE INTO library_meta(key,value) VALUES('library_id',?)", [.text(UUID().uuidString)])
+                // Events from the phone already applied (plays and likes), so a repeated sync doesn't apply them twice.
+                try exec("CREATE TABLE IF NOT EXISTS sync_events(id TEXT PRIMARY KEY, applied_at REAL NOT NULL)")
+            }
+        }
         try exec("PRAGMA user_version=\(Self.schemaVersion)")
+    }
+
+    /// This library's identity (made once, kept in exports, backups and synced copies). Nil in a snapshot from a
+    /// version before it existed.
+    public func libraryID() -> String? {
+        let rows = (try? query("SELECT value FROM library_meta WHERE key='library_id'") { $0.string(0) }) ?? []
+        return rows.first ?? nil
     }
 
     // MARK: Tracks
