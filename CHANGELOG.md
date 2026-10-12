@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.16.0
+
 - **Try the iPhone app without a Mac.** **Explore a Sample Library** on the empty Library tab opens a sample library
   built into the app: fictional artists and albums, with songs synthesized for it and covers drawn for it, listening
   history, likes and owned albums, so every page, Insights, Music DNA, the widgets and the Apple Watch app can be tried.
