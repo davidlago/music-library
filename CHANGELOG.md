@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.9.0
+
 - **Sync to the iPhone over Wi-Fi.** Pair the iPhone app with the Mac once (a code the phone shows, typed on the Mac),
   then choose what goes on the phone with **Add to iPhone** in any album, artist, playlist or song menu. **Sync Now** on
   the Mac's new **iPhone** page copies new and changed files, removes what you took off the list (the first sync asks
