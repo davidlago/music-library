@@ -3,18 +3,6 @@ import MusicLibraryCore
 import SwiftUI
 
 /// Something picked for export. Resolved to tracks when exporting, so playlists export their current contents.
-enum ExportItem: Codable, Hashable, Identifiable {
-    case library
-    case album(album: String, artist: String)
-    case artist(String)
-    case track(Int64)
-    case playlist(Int64)
-    case smartPlaylist(Int64)
-    case likedSongs
-
-    var id: Self { self }
-}
-
 /// The Export List page. With a destination chosen it splits in two: what's being added on the left, what the
 /// destination already holds on the right, with what the export will actually copy highlighted on both sides.
 struct ExportListView: View {

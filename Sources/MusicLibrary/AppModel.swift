@@ -239,8 +239,12 @@ final class AppModel {
         // Plays and likes from the iPhone are in the database now: likes, play counts and Insights follow.
         iPhone.onHistoryChanged = { [unowned self] in
             self.reloadLibrary()
+            self.purchases = (try? self.database?.albumPurchases()) ?? self.purchases
+            self.purchasesVersion += 1
             self.historyVersion += 1
         }
+        iPhone.context = { [unowned self] in self.syncContext }
+        iPhone.startListening()
         artistInfo.onAutoSyncEnabled = { [unowned self] in self.syncArtistInfo() }
         catalog.makeEnricher = { [unowned self] client in
             CatalogEnricher(catalog: { path in try await client.get(path, priority: .background) }, musicBrainz: self.musicBrainz, info: self.artistFetcher)
@@ -971,19 +975,25 @@ final class AppModel {
         }
     }
 
-    /// Every track on the iPhone list once, in list order.
-    var iPhoneTracks: [Track] {
-        var seen = Set<Int64>()
-        return iPhone.list.flatMap(tracks(for:)).filter { seen.insert($0.id).inserted }
-    }
+    /// Every track the iPhone selection puts on the phone, once, in list order.
+    var iPhoneTracks: [Track] { iPhone.selection.resolve(tracks(for:)) }
 
-    func syncIPhone(_ phone: SyncStore.PairedPhone) {
-        guard let database else { return }
+    func syncIPhone(_ phone: SyncStore.PairedPhone) { iPhone.sync(phone) }
+
+    /// What a sync with the iPhone needs: the library, and the Last.fm account and concert settings to hand over.
+    private var syncContext: SyncContext? {
+        guard let database else { return nil }
         var lastFM: SyncLastFM?
         if case .connected = scrobbler.status, let session = scrobbler.session {
             lastFM = SyncLastFM(apiKey: scrobbler.apiKey, sharedSecret: scrobbler.sharedSecret, sessionKey: session.key, username: session.username)
         }
-        iPhone.sync(phone, tracks: iPhoneTracks, libraryRoot: libraryRoot, database: database, lastFM: lastFM)
+        var concertSettings: SyncConcertSettings?
+        if concerts.isConfigured, let home = concerts.home {
+            concertSettings = SyncConcertSettings(home: home, radius: concerts.radius, unit: concerts.unit,
+                                                  ticketmasterKey: concerts.ticketmasterKey, jambaseKey: concerts.jambaseKey)
+        }
+        return SyncContext(libraryRoot: libraryRoot, database: database, lastFM: lastFM, concerts: concertSettings,
+                           library: tracks, tracks: { [unowned self] in self.tracks(for: $0) })
     }
 
     /// Every track in the export list once, in list order.

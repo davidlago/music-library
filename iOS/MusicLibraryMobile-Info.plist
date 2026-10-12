@@ -5,6 +5,7 @@
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_musiclib-sync._tcp</string>
+		<string>_musiclib-mac._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Music Library receives music from the Mac app over your local network.</string>

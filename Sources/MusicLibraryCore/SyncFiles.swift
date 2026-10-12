@@ -5,9 +5,11 @@ import Foundation
 
 /// What a sync sends to the phone and removes from it, from the selection's tracks and the phone's manifest.
 /// The phone mirrors the selection: files it has under the managed folders that aren't wanted are deleted, and a
-/// wanted file whose size differs (retagged, a new cover) is sent again.
+/// wanted file whose size differs (retagged, a new cover) is sent again. Every album's cover and every artist photo
+/// go too, so the whole library can be browsed on the phone.
 public struct SyncPlan: Equatable, Sendable {
-    /// Paths relative to the library root, in send order: tracks (with their album covers), then artist photos.
+    /// Paths relative to the library root, in send order: tracks (with their album covers), the other albums'
+    /// covers, then artist photos.
     public var sends: [SyncFileEntry] = []
     public var deletes: [String] = []
     /// Selected tracks whose files are missing from the Mac's library; they're skipped.
@@ -16,7 +18,8 @@ public struct SyncPlan: Equatable, Sendable {
     public var bytes: Int64 { sends.reduce(0) { $0 + $1.size } }
     public var summary: SyncPlanSummary { SyncPlanSummary(files: sends.count, bytes: bytes, deletes: deletes.count) }
 
-    public init(tracks: [Track], libraryRoot: URL, phone: [SyncFileEntry]) {
+    /// `library` is every track in the library, for the covers.
+    public init(tracks: [Track], library: [Track] = [], libraryRoot: URL, phone: [SyncFileEntry]) {
         var onPhone: [String: Int64] = [:]
         // The manifest comes from the phone: entries that aren't plain paths inside the managed folders are ignored.
         for entry in phone where SyncPlan.isManaged(entry.path) { onPhone[entry.path] = entry.size }
@@ -31,18 +34,21 @@ public struct SyncPlan: Equatable, Sendable {
         }
 
         var seenDirs = Set<String>()
+        func wantCover(of t: Track) {
+            let dir = (t.path as NSString).deletingLastPathComponent
+            guard seenDirs.insert(dir).inserted else { return }
+            let cover = (dir as NSString).appendingPathComponent("cover.jpg")
+            if SyncPlan.isManaged(cover), let size = sourceSize(cover) { want(cover, size: size) }
+        }
         for t in tracks where !wanted.contains(t.path) {
             guard SyncPlan.isManaged(t.path), let size = sourceSize(t.path) else {
                 missing += 1
                 continue
             }
             want(t.path, size: size)
-            let dir = (t.path as NSString).deletingLastPathComponent
-            if seenDirs.insert(dir).inserted {
-                let cover = (dir as NSString).appendingPathComponent("cover.jpg")
-                if let size = sourceSize(cover) { want(cover, size: size) }
-            }
+            wantCover(of: t)
         }
+        for t in library { wantCover(of: t) }
         let images = LibraryExporter.artistImageFolder
         let names = (try? FileManager.default.contentsOfDirectory(atPath: libraryRoot.appendingPathComponent(images).path)) ?? []
         for name in names.sorted() where !name.hasPrefix(".") {

@@ -179,31 +179,47 @@ final class Once: @unchecked Sendable {
 
 // MARK: Discovery
 
-/// A phone advertising sync on the local network.
+/// A device advertising sync on the local network: a phone (`SyncProtocol.serviceType`), or a Mac waiting for
+/// one paired phone (`SyncProtocol.macServiceType`, with `phoneID` set).
 public struct SyncPeer: Identifiable, Hashable, Sendable {
     public var id: String
     public var name: String
     /// The phone is showing a pairing code.
     public var isPairing: Bool
     public var endpoint: NWEndpoint
+    /// The phone a Mac's service is for.
+    public var phoneID: String?
 
-    static let idKey = "id", pairingKey = "pair"
+    static let idKey = "id", pairingKey = "pair", phoneKey = "phone"
 }
 
-/// The phone's side of discovery: advertises the service (with its device ID and whether it's pairing) and hands
-/// each incoming connection to `onConnection`.
+/// Listens for sync connections and advertises them: the phone's service (with its device ID and whether it's
+/// pairing), or the Mac's for one paired phone. Hands each incoming connection to `onConnection`.
 public final class SyncAdvertiser: @unchecked Sendable {
     private let listener: NWListener
     private let queue = DispatchQueue(label: "MusicLibrary.sync.listener")
 
-    /// `port` is for tests (a fixed local port without Bonjour); the app lets the system pick one.
-    public init(deviceID: String, name: String, key: Data, pairing: Bool, advertise: Bool = true, port: NWEndpoint.Port = .any,
-                onState: @escaping @Sendable (NWListener.State) -> Void = { _ in },
-                onConnection: @escaping @Sendable (NWConnection) -> Void) throws {
+    /// The phone. `port` is for tests (a fixed local port without Bonjour); the app lets the system pick one.
+    public convenience init(deviceID: String, name: String, key: Data, pairing: Bool, advertise: Bool = true, port: NWEndpoint.Port = .any,
+                            onState: @escaping @Sendable (NWListener.State) -> Void = { _ in },
+                            onConnection: @escaping @Sendable (NWConnection) -> Void) throws {
+        try self.init(type: SyncProtocol.serviceType, name: name, txt: [SyncPeer.idKey: deviceID, SyncPeer.pairingKey: pairing ? "1" : "0"],
+                      key: key, advertise: advertise, port: port, onState: onState, onConnection: onConnection)
+    }
+
+    /// The Mac, for the paired phone `phoneID` (whose key it listens with).
+    public convenience init(macID: String, phoneID: String, name: String, key: Data, advertise: Bool = true, port: NWEndpoint.Port = .any,
+                            onState: @escaping @Sendable (NWListener.State) -> Void = { _ in },
+                            onConnection: @escaping @Sendable (NWConnection) -> Void) throws {
+        try self.init(type: SyncProtocol.macServiceType, name: name, txt: [SyncPeer.idKey: macID, SyncPeer.phoneKey: phoneID],
+                      key: key, advertise: advertise, port: port, onState: onState, onConnection: onConnection)
+    }
+
+    private init(type: String, name: String, txt: [String: String], key: Data, advertise: Bool, port: NWEndpoint.Port,
+                 onState: @escaping @Sendable (NWListener.State) -> Void, onConnection: @escaping @Sendable (NWConnection) -> Void) throws {
         listener = try NWListener(using: SyncPairing.parameters(key: key), on: port)
         if advertise {
-            let txt = NWTXTRecord([SyncPeer.idKey: deviceID, SyncPeer.pairingKey: pairing ? "1" : "0"])
-            listener.service = NWListener.Service(name: name, type: SyncProtocol.serviceType, txtRecord: txt)
+            listener.service = NWListener.Service(name: name, type: type, txtRecord: NWTXTRecord(txt))
         }
         listener.stateUpdateHandler = onState
         listener.newConnectionHandler = onConnection
@@ -216,15 +232,16 @@ public final class SyncAdvertiser: @unchecked Sendable {
     public func stop() { listener.cancel() }
 }
 
-/// The Mac's side of discovery: phones advertising sync nearby.
+/// Discovery: phones advertising sync nearby (the Mac), or Macs waiting for a phone (the phone, with
+/// `type: SyncProtocol.macServiceType`).
 public final class SyncBrowser: @unchecked Sendable {
     private let browser: NWBrowser
     private let queue = DispatchQueue(label: "MusicLibrary.sync.browser")
 
-    public init(onChange: @escaping @Sendable ([SyncPeer]) -> Void) {
+    public init(type: String = SyncProtocol.serviceType, onChange: @escaping @Sendable ([SyncPeer]) -> Void) {
         let parameters = NWParameters()
         parameters.includePeerToPeer = true
-        browser = NWBrowser(for: .bonjourWithTXTRecord(type: SyncProtocol.serviceType, domain: nil), using: parameters)
+        browser = NWBrowser(for: .bonjourWithTXTRecord(type: type, domain: nil), using: parameters)
         browser.browseResultsChangedHandler = { results, _ in
             onChange(results.compactMap(SyncBrowser.peer).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending })
         }
@@ -233,7 +250,8 @@ public final class SyncBrowser: @unchecked Sendable {
     static func peer(_ result: NWBrowser.Result) -> SyncPeer? {
         guard case .service(let name, _, _, _) = result.endpoint, case .bonjour(let txt) = result.metadata,
               let id = txt[SyncPeer.idKey], !id.isEmpty else { return nil }
-        return SyncPeer(id: id, name: name, isPairing: txt[SyncPeer.pairingKey] == "1", endpoint: result.endpoint)
+        return SyncPeer(id: id, name: name, isPairing: txt[SyncPeer.pairingKey] == "1", endpoint: result.endpoint,
+                        phoneID: txt[SyncPeer.phoneKey])
     }
 
     public func start() { browser.start(queue: queue) }

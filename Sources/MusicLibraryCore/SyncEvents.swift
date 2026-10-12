@@ -1,12 +1,15 @@
 import Foundation
 
-/// Something done on the phone that belongs in the Mac's library: a listen, or liking or unliking a song.
+/// Something done on the phone that belongs in the Mac's library: a listen, liking or unliking a song, or saying
+/// whether you own its album (and when you bought it and what you paid).
 /// Recorded in the phone's outbox (`SyncOutbox`) and applied on the Mac at the next sync (`Database.applySyncEvents`).
 public struct SyncEvent: Codable, Hashable, Sendable, Identifiable {
     public enum Kind: Codable, Hashable, Sendable {
         /// A listen of `listened` seconds; `counted` when it met the scrobble rule.
         case play(listened: Double, counted: Bool)
         case like(Bool)
+        /// The album of `trackID` is owned (nil: not owned).
+        case purchase(AlbumPurchase?)
     }
 
     /// A UUID, so applying it twice (a sync that was cut off and repeated) has no effect.
@@ -27,6 +30,7 @@ public struct SyncEvent: Codable, Hashable, Sendable, Identifiable {
 public struct SyncEventResult: Equatable, Sendable {
     public var plays = 0
     public var likes = 0
+    public var purchases = 0
     /// Events for songs that changed or are gone on the Mac, or recorded against another library.
     public var dropped = 0
     public init() {}
@@ -77,6 +81,17 @@ public final class SyncOutbox: @unchecked Sendable {
         }
         return liked
     }
+
+    /// Owned albums after the outbox's ownership events, starting from the copy's. `albumKey` gives an event's
+    /// album (`SearchIndex.albumKey`) from its track.
+    public static func purchases(base: [String: AlbumPurchase], events: [SyncEvent], albumKey: (Int64) -> String?) -> [String: AlbumPurchase] {
+        var owned = base
+        for e in events.sorted(by: { $0.at < $1.at }) {
+            guard case .purchase(let p) = e.kind, let key = albumKey(e.trackID) else { continue }
+            owned[key] = p
+        }
+        return owned
+    }
 }
 
 /// The Mac's Last.fm account, handed to a phone that isn't connected.
@@ -124,6 +139,15 @@ extension Database {
                         try setLiked([track.id], false)
                         result.likes += 1
                     }
+                case .purchase(let purchase):
+                    // The newer of the phone's change and the Mac's last one wins.
+                    let key = SearchIndex.albumKey(album: track.album, artist: track.effectiveAlbumArtist)
+                    let updated = try query("SELECT updated_at FROM album_ownership WHERE key=?", [.text(key)]) { $0.double(0) }.first ?? nil
+                    if let updated, updated > e.at.timeIntervalSince1970 { continue }
+                    try saveAlbumPurchase(key: key, purchase.map {
+                        AlbumPurchase(album: track.album, artist: track.effectiveAlbumArtist, purchasedOn: $0.purchasedOn, price: $0.price)
+                    }, at: e.at)
+                    result.purchases += 1
                 }
             }
         }

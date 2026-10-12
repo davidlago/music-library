@@ -1,34 +1,46 @@
 import Foundation
 
-/// A library as the iPhone app shows it: a `library.sqlite` snapshot (written by an export or a sync, opened
-/// read-only) narrowed to the tracks whose files are present, since only part of the library is copied over.
+/// A library as the iPhone app shows it: a `library.sqlite` snapshot (written by a sync or an export, opened
+/// read-only) with everything in it (every album, artist, cover, the cached artist and album info, listening
+/// history and ownership), and which songs' files are on the phone. Only those can be played; the rest can be
+/// browsed and asked for (`SyncRequest`).
 public struct LibrarySnapshot: Sendable {
     public struct PlaylistItem: Identifiable, Hashable, Sendable {
         public var playlist: Playlist
-        /// Present tracks only, in playlist order.
+        /// Every track, in playlist order.
         public var tracks: [Track]
         public var id: Int64 { playlist.id }
     }
 
     public let root: URL
-    /// Present tracks, in the library's order.
+    /// Every track, in the library's order.
     public let tracks: [Track]
-    /// Every track in the snapshot, present or not.
-    public let snapshotTrackCount: Int
+    /// Tracks whose files are on the phone.
+    public let presentIDs: Set<Int64>
     public let index: SearchIndex
-    /// Albums and artists with at least one present track, in the Mac app's order.
+    /// Every album and artist, in the Mac app's order.
     public let albums: [AlbumSummary]
     public let artists: [ArtistSummary]
-    /// Playlists with at least one present track.
+    /// Playlists with at least one track.
     public let playlists: [PlaylistItem]
     public let smartPlaylists: [SmartPlaylist]
-    /// Present liked tracks, most recently liked first.
-    public let liked: [Track]
-    public let likedIDs: Set<Int64>
-    /// When each present liked track was liked.
+    /// When each liked track was liked.
     public let likedDates: [Int64: Date]
     /// The library this is a copy of (`Database.libraryID`).
     public let libraryID: String?
+    /// The listening history and its totals per track, as of the sync.
+    public let plays: [Play]
+    public let playTotals: [Int64: PlayTotal]
+    /// Albums owned, by `SearchIndex.albumKey`.
+    public let purchases: [String: AlbumPurchase]
+    /// Cached online info, by `LibrarySnapshot.artistKey` and `SearchIndex.albumKey`.
+    public let artistInfos: [String: ArtistInfo]
+    public let albumInfos: [String: AlbumInfo]
+    /// Photo files in `Artist Images`: the user's choice, else the downloaded one. Untrusted names are dropped.
+    public let artistImageFiles: [String: String]
+    public let artistPhotos: [String: ArtistPhotoChoice]
+    /// Who played, wrote and produced with whom (Music DNA).
+    public let collaborations: CollaborationGraph
     private let albumTracks: [String: [Track]]
     private let trackByID: [Int64: Track]
 
@@ -39,12 +51,10 @@ public struct LibrarySnapshot: Sendable {
         let fm = FileManager.default
         let present = isPresent ?? { t in t.resolvedFileURL(root: root).map { fm.fileExists(atPath: $0.path) } ?? false }
         let all = try db.fetchAllTracks()
-        let tracks = all.filter(present)
-        let byID = Dictionary(tracks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let byID = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
 
-        // Snapshots from older versions may lack the newer tables: those lists are just empty.
-        let likedDates = (try? db.likedTrackDates()) ?? [:]
-        let liked = likedDates.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.compactMap { byID[$0.key] }
+        // Snapshots from older versions may lack the newer tables: those are just empty.
+        let likedDates = ((try? db.likedTrackDates()) ?? [:]).filter { byID[$0.key] != nil }
         let playlists = ((try? db.playlists()) ?? []).compactMap { p -> PlaylistItem? in
             let ids = (try? db.playlistTrackIds(p.id)) ?? []
             let items = ids.compactMap { byID[$0] }
@@ -52,7 +62,7 @@ public struct LibrarySnapshot: Sendable {
         }
 
         var covers: [String: Bool] = [:]
-        let index = SearchIndex(tracks: tracks) { t in
+        let index = SearchIndex(tracks: all) { t in
             let dir = (t.path as NSString).deletingLastPathComponent
             if let known = covers[dir] { return known }
             let has = t.coverURL(root: root).map { fm.fileExists(atPath: $0.path) } ?? false
@@ -61,34 +71,65 @@ public struct LibrarySnapshot: Sendable {
         }
 
         var albumTracks: [String: [Track]] = [:]
-        for t in tracks { albumTracks[SearchIndex.albumKey(album: t.album, artist: t.effectiveAlbumArtist), default: []].append(t) }
+        for t in all { albumTracks[SearchIndex.albumKey(album: t.album, artist: t.effectiveAlbumArtist), default: []].append(t) }
         for (k, list) in albumTracks { albumTracks[k] = list.sorted(by: Self.albumOrder) }
 
+        let infos = (try? db.artistInfos()) ?? [:]
+        let photos = (try? db.artistPhotos()) ?? [:]
+        var imageFiles = infos.compactMapValues { $0.imageFile }.filter { ArtistPhotoChoice.isSafeFileName($0.value) }
+        for (key, choice) in photos { imageFiles[key] = choice.file }
+
         self.root = root
-        self.tracks = tracks
-        self.snapshotTrackCount = all.count
+        self.tracks = all
+        self.presentIDs = Set(all.filter(present).map(\.id))
         self.index = index
         self.albums = Self.albums(from: albumTracks)
         self.artists = Self.artists(from: albumTracks)
         self.playlists = playlists
         self.smartPlaylists = (try? db.smartPlaylists()) ?? []
-        self.liked = liked
-        self.likedIDs = Set(liked.map(\.id))
-        self.likedDates = likedDates.filter { byID[$0.key] != nil }
+        self.likedDates = likedDates
         self.libraryID = db.libraryID()
+        self.plays = (try? db.plays()) ?? []
+        self.playTotals = (try? db.playTotals()) ?? [:]
+        self.purchases = (try? db.albumPurchases()) ?? [:]
+        self.artistInfos = infos.mapValues(\.info)
+        self.albumInfos = (try? db.albumInfos()) ?? [:]
+        self.artistImageFiles = imageFiles
+        self.artistPhotos = photos
+        self.collaborations = CollaborationGraph(tracks: all)
         self.albumTracks = albumTracks
         self.trackByID = byID
     }
 
     public func track(id: Int64) -> Track? { trackByID[id] }
 
-    /// The album's present tracks by disc and track number.
+    public func isPresent(_ track: Track) -> Bool { presentIDs.contains(track.id) }
+
+    /// The ones whose files are on the phone, in the same order.
+    public func playable(_ tracks: [Track]) -> [Track] { tracks.filter { presentIDs.contains($0.id) } }
+
+    /// The tracks on the phone, in the library's order.
+    public var presentTracks: [Track] { playable(tracks) }
+
+    /// The album's tracks by disc and track number.
     public func tracks(album: AlbumSummary) -> [Track] {
         albumTracks[SearchIndex.albumKey(album: album.album, artist: album.artist)] ?? []
     }
 
+    public func album(forKey key: String) -> AlbumSummary? {
+        albums.first { SearchIndex.albumKey(album: $0.album, artist: $0.artist) == key }
+    }
+
+    public func album(of track: Track) -> AlbumSummary? {
+        album(forKey: SearchIndex.albumKey(album: track.album, artist: track.effectiveAlbumArtist))
+    }
+
     public func albums(artist: String) -> [AlbumSummary] {
         albums.filter { $0.artist.caseInsensitiveCompare(artist) == .orderedSame }
+    }
+
+    public func artist(named name: String) -> ArtistSummary? {
+        artists.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
     }
 
     public func tracks(artist: String) -> [Track] {
@@ -99,8 +140,45 @@ public struct LibrarySnapshot: Sendable {
         index.tracks(matching: SearchQuery.parse(p.query))
     }
 
+    /// An item's tracks, as the Mac resolves it for sync.
+    public func tracks(for item: ExportItem) -> [Track] {
+        switch item {
+        case .library: return tracks
+        case .album(let album, let artist): return albumTracks[SearchIndex.albumKey(album: album, artist: artist)] ?? []
+        case .artist(let name): return tracks(artist: name)
+        case .track(let id): return trackByID[id].map { [$0] } ?? []
+        case .playlist(let id): return playlists.first { $0.id == id }?.tracks ?? []
+        case .smartPlaylist(let id): return smartPlaylists.first { $0.id == id }.map(tracks(smartPlaylist:)) ?? []
+        case .likedSongs:
+            return likedDates.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.compactMap { trackByID[$0.key] }
+        }
+    }
+
     public func coverURL(album: AlbumSummary) -> URL? {
         LibraryPath.coverURL(forTrackAt: album.firstTrackPath, root: root)
+    }
+
+    // MARK: Artists
+
+    /// How artist info, photos and play totals are keyed (as the Mac's `ArtistInfoStore.key`).
+    public static func artistKey(_ name: String) -> String { name.lowercased() }
+
+    public func artistInfo(_ name: String) -> ArtistInfo? { artistInfos[Self.artistKey(name)] }
+
+    public func albumInfo(_ album: AlbumSummary) -> AlbumInfo? {
+        albumInfos[SearchIndex.albumKey(album: album.album, artist: album.artist)]
+    }
+
+    /// The artist's photo: the one chosen on the Mac, else the downloaded one.
+    public func artistImageURL(_ name: String) -> URL? {
+        guard let file = artistImageFiles[Self.artistKey(name)] else { return nil }
+        return root.appendingPathComponent(LibraryExporter.artistImageFolder, isDirectory: true).appendingPathComponent(file)
+    }
+
+    /// Who to credit for the photo shown ("Photo: …"); nil for the user's own images.
+    public func photoCredit(_ name: String) -> (label: String, url: URL?)? {
+        if let chosen = artistPhotos[Self.artistKey(name)] { return chosen.credit.map { ($0, chosen.creditURL) } }
+        return artistInfo(name)?.imageCreditURL.map { ("Wikimedia Commons", $0) }
     }
 
     /// Where the library is in the app's Documents folder: `Music Library` (where sync puts it), Documents

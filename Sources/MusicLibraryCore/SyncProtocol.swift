@@ -4,14 +4,21 @@ import Foundation
 /// Sync screen is open; the Mac connects (TLS with a pre-shared key, see `SyncPairing`) and exchanges `SyncMessage`s
 /// in length-prefixed frames, with file contents sent as raw chunk frames after a `.file` message.
 ///
+/// The phone can also start a sync (to download or remove what it asked for): the Mac advertises `macServiceType`
+/// for each paired phone while it runs, with that phone's key, and the phone connects to it. Who connected doesn't
+/// change the session.
+///
 /// A session: both send `.hello`; when pairing, the Mac sends `.pair` and the phone answers `.paired` (and that's
-/// all); the phone sends its `.manifest` (with its plays and likes since the last sync); the Mac applies those, may
-/// send `.lastFM`, then `.plan`, `.delete`, each file (the database last) and `.done`; the phone answers `.done` once
-/// everything is written.
+/// all); the phone sends its `.manifest` (with its plays, likes, ownership changes and download/remove requests since
+/// the last sync); the Mac applies those, may send `.lastFM` and `.concerts`, then `.plan`, `.delete`, each file (the
+/// database last) and `.done`; the phone answers `.done` once everything is written.
 public enum SyncProtocol {
-    /// 2: plays and likes from the phone, the library ID, Last.fm handoff.
-    public static let version = 2
+    /// 2: plays and likes from the phone, the library ID, Last.fm handoff. 3: the whole library's covers and
+    /// photos, requests and ownership from the phone, phone-started sessions, concert settings.
+    public static let version = 3
     public static let serviceType = "_musiclib-sync._tcp"
+    /// The Mac, waiting for one paired phone to start a sync.
+    public static let macServiceType = "_musiclib-mac._tcp"
     /// File data per chunk frame.
     public static let chunkSize = 1 << 20
     /// Frames larger than this are refused (a manifest of tens of thousands of files fits easily).
@@ -110,6 +117,8 @@ public enum SyncMessage: Codable, Equatable, Sendable {
     case pair(SyncGrant)
     /// Mac → phone, when the phone isn't connected to Last.fm: the Mac's account.
     case lastFM(SyncLastFM)
+    /// Mac → phone: where home is and the concert services' keys, for concerts on artist pages.
+    case concerts(SyncConcertSettings)
     /// Phone → Mac: the key is stored.
     case paired
     case manifest(SyncManifest)
@@ -165,12 +174,14 @@ public struct SyncFileEntry: Codable, Hashable, Sendable {
 
 public struct SyncManifest: Codable, Equatable, Sendable {
     public var files: [SyncFileEntry]
-    /// Plays and likes on the phone since the last sync.
+    /// Plays, likes and ownership changes on the phone since the last sync.
     public var events: [SyncEvent]
     /// The library the phone's copy came from (and its events refer to); nil before the first sync.
     public var libraryID: String?
-    public init(files: [SyncFileEntry], events: [SyncEvent] = [], libraryID: String? = nil) {
-        self.files = files; self.events = events; self.libraryID = libraryID
+    /// Downloads and removals asked for on the phone, oldest first.
+    public var requests: [SyncRequest]
+    public init(files: [SyncFileEntry], events: [SyncEvent] = [], libraryID: String? = nil, requests: [SyncRequest] = []) {
+        self.files = files; self.events = events; self.libraryID = libraryID; self.requests = requests
     }
 }
 
@@ -198,5 +209,19 @@ public struct SyncSummary: Codable, Hashable, Sendable {
     public var plays = 0
     public var likes = 0
     public var eventsDropped = 0
+    /// Ownership changes from the phone (optional: summaries saved by older versions don't have it).
+    public var purchases: Int?
     public init() {}
+}
+
+/// The Mac's concert settings, handed to the phone with each sync.
+public struct SyncConcertSettings: Codable, Equatable, Sendable {
+    public var home: HomeLocation
+    public var radius: Int
+    public var unit: DistanceUnit
+    public var ticketmasterKey: String
+    public var jambaseKey: String
+    public init(home: HomeLocation, radius: Int, unit: DistanceUnit, ticketmasterKey: String, jambaseKey: String) {
+        self.home = home; self.radius = radius; self.unit = unit; self.ticketmasterKey = ticketmasterKey; self.jambaseKey = jambaseKey
+    }
 }
