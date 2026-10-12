@@ -21,6 +21,7 @@ final class PhoneModel {
     let player = PhonePlayer()
     /// Shared with the Mac app: the same scrobble rules, queue (kept while offline) and account handling.
     let scrobbler = Scrobbler(openURL: { UIApplication.shared.open($0) })
+    let sync = PhoneSync()
 
     @ObservationIgnored private var loadedStamp: Stamp?
     @ObservationIgnored private var generation = 0
@@ -33,6 +34,7 @@ final class PhoneModel {
     }
 
     init() {
+        sync.onLibraryChanged = { [weak self] in self?.reload() }
         player.onTrackStart = { [weak self] track in
             self?.scrobbler.trackStarted(track)
             self?.savePlayerState()

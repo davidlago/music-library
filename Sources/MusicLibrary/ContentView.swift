@@ -140,6 +140,9 @@ struct SidebarView: View {
                 Label("Export List", systemImage: "externaldrive")
                     .sidebarBadge(model.exportList.count)
                     .tag(SidebarItem.exportList)
+                Label("iPhone", systemImage: "iphone")
+                    .sidebarBadge(model.iPhone.list.count)
+                    .tag(SidebarItem.iPhone)
             }
             Section {
                 Label(AppModel.likedSongsName, systemImage: "heart.fill")
@@ -241,6 +244,7 @@ struct DetailRouter: View {
         case .artists: ArtistsView()
         case .importQueue: ImportView()
         case .exportList: ExportListView()
+        case .iPhone: IPhoneSyncView()
         case .catalog: CatalogView()
         case .catalogCheckouts: CatalogCheckoutsView()
         case .catalogList: CatalogListView()

@@ -604,7 +604,7 @@ private extension String {
     var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }
 
-/// "Add to Export List" for a context menu, disabled once the item is already there.
+/// "Add to Export List" (and "Add to iPhone") for a context menu, each disabled once the item is already there.
 struct AddToExportListButton: View {
     @Environment(AppModel.self) private var model
     let items: [ExportItem]
@@ -616,5 +616,6 @@ struct AddToExportListButton: View {
     var body: some View {
         Button("Add to Export List", systemImage: "externaldrive.badge.plus") { model.addToExportList(items) }
             .disabled(items.allSatisfy(model.isInExportList))
+        AddToIPhoneButton(items: items)
     }
 }
