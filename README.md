@@ -364,8 +364,8 @@ The iPhone app is `iOS/MusicLibraryMobile.xcodeproj` (needs Xcode), with its wid
 See [iPhone app](#iphone-app) for installing it on a phone.
 
 Releases are built by GitHub Actions: pushing a tag like `v1.2.3` runs the tests, builds a universal app, signs it with a
-Developer ID certificate, has Apple notarize it and publishes it on the Releases page. `scripts/testflight.sh` uploads
-the iPhone app to TestFlight. [docs/distribution.md](docs/distribution.md) has the one-time setup for both.
+Developer ID certificate, has Apple notarize it and publishes it on the Releases page, and uploads the iPhone app to
+TestFlight (`scripts/testflight.sh` does that by hand). [docs/distribution.md](docs/distribution.md) has the one-time setup for both.
 
 ## Acknowledgements
 
