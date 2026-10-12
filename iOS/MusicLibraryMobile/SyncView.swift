@@ -46,7 +46,7 @@ struct SyncTab: View {
                 }
                 if let date = sync.lastSync, let summary = sync.lastSummary {
                     Section("Last sync") {
-                        LabeledContent("When") { Text(date, style: .relative) + Text(" ago") }
+                        LabeledContent("When") { Text(date.formatted(.relative(presentation: .named))) }
                         Text(SyncText.summary(summary)).foregroundStyle(.secondary)
                     }
                 }
