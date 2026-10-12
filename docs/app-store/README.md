@@ -4,8 +4,10 @@ What's entered in [App Store Connect](https://appstoreconnect.apple.com) for the
 Apple Watch app). Keep it in step with the app and the README; [docs/distribution.md](../distribution.md#the-app-store)
 says how a version is submitted.
 
-Screenshots: `iphone/` (6.9-inch, 1320 × 2868, from the iPhone 18 Pro Max simulator) and `watch/` (416 × 496, Apple
-Watch Series 12 46 mm), all taken from the sample library with the status bar set to 9:41. The review demo video is made
+Screenshots: `iphone-6.3/` (1206 × 2622, from the iPhone 17 simulator), the required "iPhone with Dynamic Island
+(medium display)" set that App Store Connect scales for every iPhone; `iphone/` (6.9-inch, 1320 × 2868, iPhone 18 Pro Max,
+optional "large display"); and `watch/` (416 × 496, Apple Watch Series 12 46 mm). All are taken from the sample library
+with the status bar set to 9:41. The review demo video is made
 the same way (`xcrun simctl io booted recordVideo`) and isn't committed.
 
 ## App information
