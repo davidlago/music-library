@@ -169,7 +169,8 @@ struct TopHitsStrip: View {
                 ForEach(albums.prefix(40)) { a in
                     NavigationLink(value: a) {
                         VStack(alignment: .leading, spacing: 4) {
-                            CoverThumb(url: model.coverURL(forAlbum: a), size: size, revision: model.coverRevision)
+                            CoverThumb(url: model.coverURL(forAlbum: a), size: size, revision: model.coverRevision,
+                                       owned: model.purchase(for: a) != nil)
                             Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.caption.weight(.medium)).lineLimit(1)
                             Text([a.artist, a.year.map(String.init)].compactMap { $0 }.joined(separator: " · "))
                                 .font(.caption2).foregroundStyle(.subtext).lineLimit(1)

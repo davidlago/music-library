@@ -6,6 +6,8 @@ import UIKit
 struct CoverImage: View {
     let url: URL?
     var size: CGFloat
+    /// Draws the Owned badge in the corner (`model.purchase(for:) != nil`).
+    var owned = false
     @Environment(\.displayScale) private var scale
     @State private var image: UIImage?
 
@@ -19,6 +21,7 @@ struct CoverImage: View {
                     .font(.system(size: size * 0.35))
                     .foregroundStyle(.secondary)
             }
+            if owned { OwnedBadge(size: size) }
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: size >= 120 ? 10 : 5))
@@ -28,6 +31,24 @@ struct CoverImage: View {
             guard let url else { return }
             image = await CoverLoader.image(at: url, maxPixel: size * scale)
         }
+    }
+}
+
+/// A small disc in the top-right corner of an owned album's cover.
+struct OwnedBadge: View {
+    let size: CGFloat
+
+    var body: some View {
+        let diameter = max(14, size * 0.13)
+        Image(systemName: "opticaldisc.fill")
+            .font(.system(size: diameter * 0.55, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: diameter, height: diameter)
+            .background(Circle().fill(Color.accentColor))
+            .shadow(color: .black.opacity(0.3), radius: 1.5, y: 0.5)
+            .padding(max(4, size * 0.04))
+            .frame(width: size, height: size, alignment: .topTrailing)
+            .allowsHitTesting(false)
     }
 }
 

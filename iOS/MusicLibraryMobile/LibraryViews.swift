@@ -62,6 +62,7 @@ private struct LibraryHome: View {
     let library: LibrarySnapshot
 
     var body: some View {
+        let counts = counts()
         List {
             Section {
                 Picker("Show", selection: $scope) { ForEach(LibraryScope.allCases) { Text($0.rawValue).tag($0) } }
@@ -70,11 +71,11 @@ private struct LibraryHome: View {
                     .listRowInsets(EdgeInsets())
             }
             Section {
-                NavigationLink(value: LibraryRoute.artists) { Label("Artists", systemImage: "music.mic") }
-                NavigationLink(value: LibraryRoute.albums) { Label("Albums", systemImage: "square.stack") }
-                NavigationLink(value: LibraryRoute.songs) { Label("Songs", systemImage: "music.note") }
+                NavigationLink(value: LibraryRoute.artists) { row("Artists", systemImage: "music.mic", count: counts.artists) }
+                NavigationLink(value: LibraryRoute.albums) { row("Albums", systemImage: "square.stack", count: counts.albums) }
+                NavigationLink(value: LibraryRoute.songs) { row("Songs", systemImage: "music.note", count: counts.songs) }
                 if !model.likedDates.isEmpty {
-                    NavigationLink(value: LibraryRoute.liked) { Label("Liked Songs", systemImage: "heart") }
+                    NavigationLink(value: LibraryRoute.liked) { row("Liked Songs", systemImage: "heart", count: counts.liked, tint: .pink) }
                 }
                 NavigationLink(value: DNARoute(name: nil)) { Label("Music DNA", systemImage: "point.3.connected.trianglepath.dotted") }
             }
@@ -103,6 +104,30 @@ private struct LibraryHome: View {
             }
         }
         .refreshable { model.reload() }
+    }
+
+    private func row(_ title: String, systemImage: String, count: Int, tint: Color = .accentColor) -> some View {
+        HStack {
+            Label(title, systemImage: systemImage)
+            Spacer()
+            CountPill(count: count, tint: tint)
+        }
+    }
+
+    private struct Counts {
+        var artists: Int, albums: Int, songs: Int, liked: Int
+    }
+
+    /// What each page lists in the current scope (`LibraryRoutePage.scoped`).
+    private func counts() -> Counts {
+        guard scope == .onPhone else {
+            return Counts(artists: library.artists.count, albums: library.albums.count,
+                          songs: library.tracks.count, liked: model.likedDates.count)
+        }
+        let albums = library.albums.filter { library.tracks(album: $0).contains(where: library.isPresent) }
+        let artists = Set(albums.map { $0.artist.lowercased() })
+        return Counts(artists: library.artists.count { artists.contains($0.name.lowercased()) }, albums: albums.count,
+                      songs: library.presentIDs.count, liked: model.likedDates.keys.count { library.presentIDs.contains($0) })
     }
 
     private var footer: String {
@@ -227,7 +252,7 @@ struct AlbumCell: View {
         let tracks = library.tracks(album: album)
         let availability = model.availability(tracks)
         VStack(alignment: .leading, spacing: 4) {
-            CoverImage(url: library.coverURL(album: album), size: size)
+            CoverImage(url: library.coverURL(album: album), size: size, owned: model.purchase(for: album) != nil)
                 .opacity(availability == .notOnPhone ? 0.55 : 1)
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(album.album.isEmpty ? "Unknown Album" : album.album).font(.subheadline).lineLimit(1)

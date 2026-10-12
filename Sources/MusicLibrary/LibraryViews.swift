@@ -143,7 +143,8 @@ struct AlbumsView: View {
                     ForEach(shown) { a in
                         NavigationLink(value: a) {
                             VStack(alignment: .leading, spacing: 4) {
-                                CoverThumb(url: model.coverURL(forAlbum: a), size: 150, revision: model.coverRevision)
+                                CoverThumb(url: model.coverURL(forAlbum: a), size: 150, revision: model.coverRevision,
+                                           owned: model.purchase(for: a) != nil)
                                 Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.headline).lineLimit(1)
                                 Text(a.artist.isEmpty ? "Unknown Artist" : a.artist).font(.subheadline).foregroundStyle(.subtext).lineLimit(1)
                                 if let detail = detail(a) {
