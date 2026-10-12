@@ -72,14 +72,16 @@ jobs:
 
   ios:
     name: Build for iOS
-    # The iOS deployment target (27) needs the iOS 27 SDK, which needs a newer runner than the macOS build.
-    runs-on: macos-26
+    # The iPhone app targets iOS 27 and uses its APIs, so it needs Xcode 27 (GitHub's `xcode-27` image, in preview).
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v7
 
-      - name: Select the newest stable Xcode
+      - name: Select Xcode 27
         run: |
-          xcode="$(ls -d /Applications/Xcode_*.app | grep -iv beta | sort -V | tail -1)"
+          xcode="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | grep -iv beta | sort -V | tail -1 || true)"
+          [ -n "$xcode" ] || xcode="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1 || true)"
+          [ -n "$xcode" ] || { echo "No Xcode 27 on this runner:"; ls -d /Applications/Xcode*.app; exit 1; }
           sudo xcode-select -s "$xcode"
           xcodebuild -version
 

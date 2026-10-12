@@ -46,7 +46,7 @@ SwiftUI's `@State`/`@Environment` macro plugin is not shipped with the CLT, so t
 - Build the iPhone app: `xcodebuild -project iOS/MusicLibraryMobile.xcodeproj -scheme MusicLibraryMobile -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build` (or open the project in Xcode and run it on a simulator or the phone)
 
 ## CI and releases
-- `.github/workflows/ci.yml` builds, runs the tests and builds a universal app on every push and pull request (macOS runner, newest stable Xcode, ffmpeg from Homebrew). A separate `ios` job builds `MusicLibraryCore` and the iPhone app for iOS on a newer runner.
+- `.github/workflows/ci.yml` builds, runs the tests and builds a universal app on every push and pull request (macOS runner, newest stable Xcode, ffmpeg from Homebrew). A separate `ios` job builds `MusicLibraryCore` and the iPhone app for iOS on GitHub's `xcode-27` image (Xcode 27, in preview; the macOS images stop at Xcode 26, without the iOS 27 SDK).
 - Pushing a tag `vX.Y.Z` also publishes a GitHub release with `MusicLibrary-X.Y.Z-macOS.zip` (ad-hoc signed, not notarized) and its SHA-256.
 - README screenshots live in `docs/screenshots/` (1600 px wide, taken from a real library window). `iphone.png` is three iOS Simulator screenshots (status bar set with `xcrun simctl status_bar … override --time 9:41`) side by side on a 1600×1000 canvas.
 
