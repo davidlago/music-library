@@ -452,15 +452,40 @@ public enum CatalogText {
     static func number(_ s: Substring) -> Int? { Int(s.replacingOccurrences(of: ",", with: "")) }
 
     /// A barcode as MusicBrainz stores it: GTIN-14 "00075678668432" and UPC-A "075678668432" are the same code.
+    /// Older catalog records often drop a UPC's leading zero and check digit ("7464395412" for "074643954129"):
+    /// those are completed first.
     public static func barcodeVariants(_ upc: String) -> [String] {
         let digits = upc.filter(\.isNumber)
         guard digits.count >= 8 else { return [] }
         let trimmed = String(digits.drop { $0 == "0" })
         var out: [String] = []
+        if let completed = completedUPC(digits) {
+            out += [completed, "0" + completed]
+        }
         for length in [12, 13] where trimmed.count <= length {
             out.append(String(repeating: "0", count: length - trimmed.count) + trimmed)
         }
         if trimmed.count > 13 { out.append(trimmed) }
         return out
+    }
+
+    /// A 10- or 11-digit code that isn't a valid UPC-A once padded, as the UPC-A with its check digit added.
+    static func completedUPC(_ digits: String) -> String? {
+        guard digits.count == 10 || digits.count == 11 else { return nil }
+        let padded = String(repeating: "0", count: 12 - digits.count) + digits
+        guard upcCheckDigit(padded.prefix(11)) != padded.last?.wholeNumberValue else { return nil }
+        let body = String(repeating: "0", count: 11 - digits.count) + digits
+        return upcCheckDigit(Substring(body)).map { body + String($0) }
+    }
+
+    /// Whether looking a code up may find more than it did before `completedUPC` (see `CatalogEnricher.version`).
+    public static func isTruncatedUPC(_ upc: String) -> Bool { completedUPC(upc.filter(\.isNumber)) != nil }
+
+    /// The UPC-A check digit for 11 digits.
+    static func upcCheckDigit(_ body: Substring) -> Int? {
+        let values = body.compactMap(\.wholeNumberValue)
+        guard values.count == 11 else { return nil }
+        let sum = values.enumerated().reduce(0) { $0 + ($1.offset.isMultiple(of: 2) ? 3 : 1) * $1.element }
+        return (10 - sum % 10) % 10
     }
 }
