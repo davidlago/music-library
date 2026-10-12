@@ -11,6 +11,10 @@ import UIKit
 /// starts as soon as the Mac is around). Also connects the player to Last.fm, keeps the play queue across launches,
 /// and records plays, likes and ownership changes for the Mac (`outbox`, sent at each sync). Keeps the widgets' and the
 /// watch's summary up to date (`glance`, `watch`) and runs their commands (`perform`).
+///
+/// Until there's a library of your own, it can show the sample library (`showSample`): fictional albums inside the
+/// app, opened read-only. What happens in it (likes, plays, ownership, the queue) is kept apart (`sampleOutbox`,
+/// its own player state), never sent to the Mac or Last.fm, and dropped once your own library arrives.
 @Observable
 final class PhoneModel {
     /// Whether an album, artist or list's songs are on the phone.
@@ -38,6 +42,8 @@ final class PhoneModel {
     let concerts = PhoneConcerts()
     /// Plays, likes and ownership changes since the last sync.
     @ObservationIgnored let outbox = SyncOutbox(url: URL.applicationSupportDirectory.appendingPathComponent("sync-outbox.json"))
+    /// The same, for the sample library; never sent anywhere.
+    @ObservationIgnored let sampleOutbox = SyncOutbox(url: URL.applicationSupportDirectory.appendingPathComponent("sample-outbox.json"))
     /// Downloads and removals not yet applied by the Mac.
     @ObservationIgnored let requestQueue = SyncRequestQueue(url: URL.applicationSupportDirectory.appendingPathComponent("sync-requests.json"))
     /// Liked songs and when: the copy's, with the likes and unlikes made on the phone since the last sync.
@@ -89,13 +95,29 @@ final class PhoneModel {
         return nil
     }
 
+    /// The library shown is the sample library.
+    private(set) var isSample = false
+
+    /// Where the changes made on the phone go: the Mac's outbox, or the sample library's.
+    private var activeOutbox: SyncOutbox { isSample ? sampleOutbox : outbox }
+
+    /// The sample library in the app bundle.
+    nonisolated static var sampleRoot: URL? { Bundle.main.url(forResource: "SampleLibrary", withExtension: "bundle") }
+
+    /// Shows the sample library while there's no library of your own (until `hideSample` or the first sync).
+    private var wantsSample: Bool {
+        get { UserDefaults.standard.bool(forKey: "showsSampleLibrary") }
+        set { UserDefaults.standard.set(newValue, forKey: "showsSampleLibrary") }
+    }
+
     init() {
         let glance = GlanceFeed()
         self.glance = glance
         watch = WatchLink(store: glance.store)
         sync.onLibraryChanged = { [weak self] in self?.reload() }
         sync.pendingEvents = { [weak self] in
-            guard let self else { return ([], [], nil) }
+            // The sample library's changes never go to the Mac; the Mac's wait until your own library is back.
+            guard let self, !isSample else { return ([], [], nil) }
             return (outbox.events, requestQueue.requests, library?.libraryID)
         }
         recoverInterruptedPlay()
@@ -115,12 +137,12 @@ final class PhoneModel {
                             session: LastFMSession(key: account.sessionKey, username: account.username))
         }
         player.onTrackStart = { [weak self] track in
-            self?.scrobbler.trackStarted(track)
+            if self?.isSample == false { self?.scrobbler.trackStarted(track) }
             self?.startPlay(track)
             self?.savePlayerState()
         }
         player.onProgress = { [weak self] track, position, playing in
-            self?.scrobbler.progress(track, position: position, playing: playing)
+            if self?.isSample == false { self?.scrobbler.progress(track, position: position, playing: playing) }
             self?.advancePlay(track, position: position, playing: playing)
         }
         player.onPlaybackEnded = { [weak self] in self?.finishPlay() }
@@ -154,7 +176,7 @@ final class PhoneModel {
     }
 
     func reloadIfChanged() {
-        let stamp = Stamp.current(in: URL.documentsDirectory)
+        let stamp = Stamp.current(in: URL.documentsDirectory) ?? (wantsSample ? Self.sampleRoot.map { Stamp(root: $0) } : nil)
         if case .loaded = state, stamp == loadedStamp { return }
         reload()
     }
@@ -163,11 +185,15 @@ final class PhoneModel {
         generation += 1
         let generation = generation
         let documents = URL.documentsDirectory
+        let sample = wantsSample
         if library == nil { state = .loading }
         loading = Task.detached(priority: .userInitiated) {
-            let (state, stamp) = Self.load(documents: documents)
+            let (state, stamp, isSample) = Self.load(documents: documents, sample: sample)
             await MainActor.run {
                 guard generation == self.generation else { return }
+                if isSample != self.isSample { self.switchLibraries(toSample: isSample) }
+                // Your own library is here (maybe it arrived while the app wasn't running): the sample is done.
+                if !isSample, stamp != nil { self.forgetSample() }
                 self.state = state
                 self.loadedStamp = stamp
                 if case .loaded(let library) = state {
@@ -180,6 +206,35 @@ final class PhoneModel {
         }
     }
 
+    // MARK: Sample library
+
+    func showSample() {
+        wantsSample = true
+        reload()
+    }
+
+    /// Hides the sample library and forgets what happened in it.
+    func hideSample() {
+        wantsSample = false
+        reload()
+    }
+
+    /// Between the sample library and your own, nothing carries over: the queue is emptied, and leaving the sample
+    /// drops its likes, plays and queue.
+    private func switchLibraries(toSample: Bool) {
+        finishPlay()
+        player.clear()
+        restoredPlayerState = false
+        isSample = toSample
+        if !toSample { forgetSample() }
+    }
+
+    private func forgetSample() {
+        wantsSample = false
+        sampleOutbox.remove(Set(sampleOutbox.events.map(\.id)))
+        try? FileManager.default.removeItem(at: Self.playerStateURL(sample: true))
+    }
+
     /// Loads the library if it isn't yet: a widget button or the watch can start the app in the background, where
     /// it never becomes active.
     private func ensureLoaded() async {
@@ -188,17 +243,24 @@ final class PhoneModel {
         await loading?.value
     }
 
-    nonisolated private static func load(documents: URL) -> (State, Stamp?) {
-        guard let stamp = Stamp.current(in: documents) else { return (.missing, nil) }
+    nonisolated private static func load(documents: URL, sample: Bool) -> (State, Stamp?, isSample: Bool) {
+        guard let stamp = Stamp.current(in: documents) else {
+            guard sample, let root = sampleRoot else { return (.missing, nil, false) }
+            do {
+                return (.loaded(try LibrarySnapshot(root: root, datesRelativeToNow: true)), Stamp(root: root), true)
+            } catch {
+                return (.failed(error.localizedDescription), nil, false)
+            }
+        }
         // Tens of GB of music shouldn't go into iCloud backups; the Mac has the library.
         var root = stamp.root
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
         try? root.setResourceValues(values)
         do {
-            return (.loaded(try LibrarySnapshot(root: stamp.root)), stamp)
+            return (.loaded(try LibrarySnapshot(root: stamp.root)), stamp, false)
         } catch {
-            return (.failed(error.localizedDescription), stamp)
+            return (.failed(error.localizedDescription), stamp, false)
         }
     }
 
@@ -206,7 +268,7 @@ final class PhoneModel {
 
     /// The copy's likes, ownership, history and requests with what happened on the phone since.
     private func refreshOverlays() {
-        let events = outbox.events
+        let events = activeOutbox.events
         likedDates = SyncOutbox.liked(base: library?.likedDates ?? [:], events: events)
         refreshPurchases(events)
         refreshPlays(events)
@@ -256,8 +318,8 @@ final class PhoneModel {
     }
 
     func toggleLike(_ track: Track) {
-        outbox.append(SyncEvent(track: track, at: Date(), kind: .like(!isLiked(track))))
-        likedDates = SyncOutbox.liked(base: library?.likedDates ?? [:], events: outbox.events)
+        activeOutbox.append(SyncEvent(track: track, at: Date(), kind: .like(!isLiked(track))))
+        likedDates = SyncOutbox.liked(base: library?.likedDates ?? [:], events: activeOutbox.events)
         glance.setNeedsUpdate()
     }
 
@@ -270,8 +332,8 @@ final class PhoneModel {
     /// Records that you own the album (with nil, that you don't); the change goes to the Mac at the next sync.
     func setPurchase(_ purchase: AlbumPurchase?, for album: AlbumSummary) {
         guard self.purchase(for: album) != purchase, let track = library?.tracks(album: album).first else { return }
-        outbox.append(SyncEvent(track: track, at: Date(), kind: .purchase(purchase)))
-        refreshPurchases(outbox.events)
+        activeOutbox.append(SyncEvent(track: track, at: Date(), kind: .purchase(purchase)))
+        refreshPurchases(activeOutbox.events)
     }
 
     // MARK: Availability, downloads and removals
@@ -295,6 +357,7 @@ final class PhoneModel {
 
     /// Asks the Mac for the item's songs; a sync starts as soon as the Mac is around.
     func download(_ item: ExportItem) {
+        guard !isSample else { return }
         requestQueue.add(SyncRequest(item: item, include: true))
         refreshRequests()
         sync.requestSync()
@@ -303,7 +366,7 @@ final class PhoneModel {
     /// Deletes the item's songs from the phone now (covers stay, so it can still be browsed) and asks the Mac to
     /// stop syncing them.
     func remove(_ item: ExportItem) {
-        guard let library else { return }
+        guard let library, !isSample else { return }
         let paths = library.tracks(for: item).filter(library.isPresent).map(\.path)
         if player.currentTrack.map({ t in paths.contains(t.path) }) == true { player.pause() }
         requestQueue.add(SyncRequest(item: item, include: false))
@@ -318,7 +381,7 @@ final class PhoneModel {
     }
 
     private func refreshRequests() {
-        requests = requestQueue.requests
+        requests = isSample ? [] : requestQueue.requests
         guard let library else { pendingDownloads = []; return }
         var pending = Set<Int64>()
         for r in requests {
@@ -403,8 +466,8 @@ final class PhoneModel {
         try? FileManager.default.removeItem(at: Self.interruptedPlayURL)
         guard let event = currentPlayEvent else { return }
         currentPlay = nil
-        outbox.append(event)
-        refreshPlays(outbox.events)
+        activeOutbox.append(event)
+        refreshPlays(activeOutbox.events)
     }
 
     private var currentPlayEvent: SyncEvent? {
@@ -417,7 +480,8 @@ final class PhoneModel {
     nonisolated static var interruptedPlayURL: URL { URL.applicationSupportDirectory.appendingPathComponent("interrupted-play.json") }
 
     func noteInterruptedPlay() {
-        guard let event = currentPlayEvent, let data = try? JSONEncoder().encode(event) else { return }
+        // It would be recovered into the Mac's outbox.
+        guard !isSample, let event = currentPlayEvent, let data = try? JSONEncoder().encode(event) else { return }
         try? data.write(to: Self.interruptedPlayURL, options: .atomic)
     }
 
@@ -430,7 +494,12 @@ final class PhoneModel {
     // MARK: Widgets and the watch
 
     private var glanceInputs: GlanceFeed.Inputs? {
-        guard let library else { return nil }
+        guard let library else {
+            // Hiding the sample library leaves nothing to show; the widgets shouldn't keep showing it.
+            guard case .missing = state else { return nil }
+            return GlanceFeed.Inputs(root: URL.documentsDirectory, tracks: [], present: [], plays: [], likedDates: [:],
+                                     purchases: [:], playTotals: [:], playing: nil)
+        }
         let playing = player.currentTrack.map { t in
             Glance.Playing(track: t, isPlaying: player.isPlaying, position: player.currentTime,
                            duration: player.duration > 0 ? player.duration : t.duration, next: player.nextTrack)
@@ -482,10 +551,13 @@ final class PhoneModel {
 
     /// The queue and position, saved at each song change and when the app goes to the background, and put back
     /// (paused) the first time the library loads.
-    nonisolated static var playerStateURL: URL { URL.applicationSupportDirectory.appendingPathComponent("player-state.json") }
+    nonisolated static func playerStateURL(sample: Bool) -> URL {
+        URL.applicationSupportDirectory.appendingPathComponent(sample ? "sample-player-state.json" : "player-state.json")
+    }
 
     func savePlayerState() {
-        let url = Self.playerStateURL
+        guard library != nil else { return }
+        let url = Self.playerStateURL(sample: isSample)
         guard let snapshot = player.snapshot else {
             try? FileManager.default.removeItem(at: url)
             return
@@ -499,7 +571,7 @@ final class PhoneModel {
     private func restorePlayerState(_ library: LibrarySnapshot) {
         guard !restoredPlayerState else { return }
         restoredPlayerState = true
-        guard let data = try? Data(contentsOf: Self.playerStateURL),
+        guard let data = try? Data(contentsOf: Self.playerStateURL(sample: isSample)),
               let snapshot = try? JSONDecoder().decode(PlayQueue.Snapshot.self, from: data) else { return }
         player.restore(snapshot) { id in library.track(id: id).flatMap { library.isPresent($0) ? $0 : nil } }
     }

@@ -149,8 +149,39 @@ The certificate lasts a year: when Apple emails that it's expiring, create a new
 To check it without a release, run the CI workflow by hand (**Actions ▸ CI ▸ Run workflow**, or
 `gh workflow run ci.yml -f testflight=export`): `export` signs an .ipa without uploading, `upload` uploads it.
 
-### Later: the App Store
+## The App Store
 
-Submitting to the App Store adds screenshots, a description, a privacy policy URL, the App Privacy questionnaire
-(listening history goes to Last.fm when connected; the area searched goes to Ticketmaster and JamBase) and App Review.
-The same caveat about the empty library applies: a sample library or a demo video in the review notes helps.
+The iPhone app is on the App Store as **Dave's Music Library**. The listing (name, description, keywords, URLs, the
+App Privacy and age rating answers and the review notes) is in [docs/app-store](app-store/README.md), with the
+screenshots.
+
+App Review can't pair with a Mac, so the app has a sample library: **Explore a Sample Library** on the empty Library tab
+opens fictional albums built into the app (`iOS/MusicLibraryMobile/SampleLibrary.bundle`, made by
+`scripts/make-sample-library.sh`). The review notes point the reviewer at it.
+
+### One-time setup
+
+In App Store Connect:
+
+1. **Business**: accept the Free Apps agreement (the Paid Apps one only if the app is ever sold) and declare the EU
+   trader status (not a trader).
+2. The app ▸ **App Information**: subtitle, category, content rights, age rating and the privacy policy URL, as listed
+   in [docs/app-store](app-store/README.md).
+3. **App Privacy**: the data types listed there, then **Publish**.
+4. **Pricing and Availability**: Free, all territories.
+
+### Each release
+
+1. Tag the release as usual: CI uploads the build to TestFlight as version X.Y.Z (see above).
+2. In App Store Connect, add the version under the iOS app (**+** next to iOS App), fill in **What's New** from the
+   changelog, and on the first version also the description, keywords, URLs and screenshots (`docs/app-store/iphone`
+   for the 6.9-inch display, `docs/app-store/watch` for Apple Watch).
+3. Select the build, fill in **App Review Information** (no sign-in, the notes from docs/app-store, the demo video as
+   an attachment on the first submission), and choose when to release it.
+4. **Add for Review**, then **Submit for Review**. Review usually takes a day or two; App Store Connect emails the
+   outcome.
+
+New screenshots: open the sample library in the iPhone 18 Pro Max simulator (status bar set with
+`xcrun simctl status_bar booted override --time 9:41`) and take them with `xcrun simctl io booted screenshot`;
+`musiclibrary://album?key=<artist>%01<album>`, `musiclibrary://now-playing` and `musiclibrary://insights?pane=listening`
+open those screens directly. The watch's come from the Apple Watch simulator paired with it.

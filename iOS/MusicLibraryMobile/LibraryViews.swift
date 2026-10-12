@@ -36,6 +36,26 @@ struct LibraryTab: View {
     }
 }
 
+/// Says the sample library is showing, and how to get your own.
+private struct SampleLibraryNote: View {
+    @Environment(PhoneModel.self) private var model
+
+    var body: some View {
+        Section {
+            Label {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Sample Library").font(.headline)
+                    Text("Fictional artists and albums, made up so you can try the app. Pair with Music Library on your Mac in the Sync tab to bring your own music: it replaces the sample after the first sync. What you do here isn't sent to your Mac or Last.fm.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+            } icon: {
+                Image(systemName: "sparkles").foregroundStyle(Color.accentColor)
+            }
+            Button("Hide Sample Library", systemImage: "eye.slash") { model.hideSample() }
+        }
+    }
+}
+
 /// Pushes the album a widget opened (`PhoneModel.pendingAlbumKey`) once the library is loaded.
 private struct PendingAlbumOpener: ViewModifier {
     @Environment(PhoneModel.self) private var model
@@ -64,6 +84,9 @@ private struct LibraryHome: View {
     var body: some View {
         let counts = counts()
         List {
+            if model.isSample {
+                SampleLibraryNote()
+            }
             Section {
                 Picker("Show", selection: $scope) { ForEach(LibraryScope.allCases) { Text($0.rawValue).tag($0) } }
                     .pickerStyle(.segmented)
@@ -283,7 +306,7 @@ struct AlbumMenu: View {
         if availability != .onPhone, !model.isDownloadPending(model.library?.tracks(album: album) ?? []) {
             Button("Download to iPhone", systemImage: "arrow.down.circle") { model.download(item) }.disabled(!model.sync.isPaired)
         }
-        if availability != .notOnPhone {
+        if availability != .notOnPhone, !model.isSample {
             Button("Remove from iPhone", systemImage: "trash", role: .destructive) { model.remove(item) }
         }
     }

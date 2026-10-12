@@ -182,6 +182,20 @@ final class PhonePlayer {
         updateNowPlaying()
     }
 
+    /// Stops and empties the queue: its library was replaced (the sample library by the user's own, or back).
+    func clear() {
+        loadGeneration += 1
+        stopItems()
+        queue.clear()
+        isPlaying = false
+        restoredPaused = false
+        finishedQueue = false
+        currentTime = 0
+        duration = 0
+        cover = nil
+        updateNowPlaying()
+    }
+
     func pause() {
         guard isPlaying else { return }
         avPlayer.pause()

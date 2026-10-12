@@ -406,10 +406,15 @@ struct AvailabilityBar: View {
     @State private var confirmRemove = false
 
     var body: some View {
+        // Everything in the sample library is on the iPhone, and stays.
+        if !model.isSample { bar }
+    }
+
+    private var bar: some View {
         let availability = model.availability(tracks)
         let pending = model.isDownloadPending(tracks)
         let sync = model.sync
-        HStack(spacing: 12) {
+        return HStack(spacing: 12) {
             Image(systemName: icon(availability, pending)).font(.title3)
                 .foregroundStyle(pending ? Color.accentColor : (availability == .onPhone ? Color.green : Color.secondary))
                 .frame(width: 28)
@@ -478,7 +483,8 @@ struct SongAvailabilityButtons: View {
     let track: Track
 
     var body: some View {
-        if model.isPresent(track) {
+        if model.isSample {
+        } else if model.isPresent(track) {
             Button("Remove from iPhone", systemImage: "trash", role: .destructive) { model.remove(.track(track.id)) }
         } else if !model.pendingDownloads.contains(track.id) {
             Button("Download to iPhone", systemImage: "arrow.down.circle") { model.download(.track(track.id)) }

@@ -204,7 +204,9 @@ The first time a new version reads your saved keys and passwords, macOS may ask 
 
 ## iPhone app
 
-The iPhone app plays a copy of part of your library, offline. It's an early companion and isn't on the App Store yet.
+The iPhone app plays a copy of part of your library, offline. It's an early companion and isn't on the App Store yet. To
+try it without the Mac app, tap **Explore a Sample Library** on its Library tab: fictional albums built into the app,
+replaced by your own library after your first sync.
 It's tested through TestFlight: if you've been invited, install [TestFlight](https://apps.apple.com/app/testflight/id899247664)
 on the iPhone and open the invitation. Otherwise, build it with Xcode and install it on your own phone, which takes a few
 one-time steps.

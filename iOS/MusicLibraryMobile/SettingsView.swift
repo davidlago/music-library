@@ -27,11 +27,23 @@ struct SettingsView: View {
                         Text(lastFMSummary)
                     }
                 }
-                if let library = model.library {
+                if model.isSample {
+                    Section {
+                        Button("Hide Sample Library") { model.hideSample() }
+                    } header: {
+                        Text("Library")
+                    } footer: {
+                        Text("The sample library's artists and albums are fictional. Your own library replaces it after your first sync.")
+                    }
+                } else if let library = model.library {
                     Section("Library") {
                         LabeledContent("Songs on this iPhone", value: "\(library.presentIDs.count) of \(library.tracks.count)")
                         LabeledContent("Folder", value: library.root.lastPathComponent)
                         Button("Reload Library") { model.reload() }
+                    }
+                } else if PhoneModel.sampleRoot != nil {
+                    Section("Library") {
+                        Button("Explore a Sample Library") { model.showSample() }
                     }
                 }
             }
