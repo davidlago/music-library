@@ -1,9 +1,15 @@
-// Signing for the iPhone app. Your Apple developer team goes in Local.xcconfig next to this file (not committed):
+// Signing for the iPhone app, its widgets and the Apple Watch app. Your Apple developer team goes in Local.xcconfig
+// next to this file (not committed):
 //
 //     DEVELOPMENT_TEAM = ABCDE12345
 //
-// With a free Apple ID (Personal Team), the bundle identifier must also be unique to you; override it there too:
+// With a free Apple ID (Personal Team), the bundle identifier must also be unique to you; override it there too. The
+// widgets, the watch app and the app group they share are named after it:
 //
-//     PRODUCT_BUNDLE_IDENTIFIER = io.github.yourname.MusicLibraryMobile
+//     APP_BUNDLE_ID = io.github.yourname.MusicLibraryMobile
+
+APP_BUNDLE_ID = io.github.davidlago.MusicLibraryMobile
+// The iPhone app and its widgets share this container (the watch app and its complications have their own).
+APP_GROUP_IDENTIFIER = group.$(APP_BUNDLE_ID)
 
 #include? "Local.xcconfig"

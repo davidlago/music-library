@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct MusicLibraryMobileApp: App {
-    @State private var model = PhoneModel()
+    @State private var model = PhoneModel.shared
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
