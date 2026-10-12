@@ -7,13 +7,16 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.11.0
+
 - **Your whole library on the iPhone.** Every sync now sends the details of the entire library (every album and artist
   with their covers and photos, descriptions, ratings, credits, listening history and ownership), not just the music on
   the phone, so you can browse all of it there; what isn't on the phone is dimmed.
 - **Download and remove music from the iPhone.** Tap **Download** on any album, artist or playlist (or a song) and the
   phone gets it from the Mac over Wi-Fi as soon as Music Library is open there; **Remove from iPhone** frees the space at
-  once. The Mac keeps listening for its paired phones while it runs, and its **iPhone** page shows what was taken off the
-  phone. Update both apps together: this sync works only between this version of each.
+  once. The Mac keeps listening for its paired phones while it runs (macOS may ask once to allow incoming connections),
+  and its **iPhone** page shows what was taken off the phone. The phone's Library tab shows **All Music** or only what's
+  **On This iPhone**. Update both apps together: this sync works only between this version of each.
 - **The Mac's album and artist pages on the iPhone.** Album pages have the description, rating, genres, your listening,
   the release's full track list, release details, credits (which open Music DNA), links and **Your Copy**, which you can
   edit on the phone. Artist pages have the photo, bio, links, concerts near you (with the Mac's concert settings), albums
