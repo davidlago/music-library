@@ -174,7 +174,7 @@ final class PhonePlayer {
         updateNowPlaying()
     }
 
-    private func pause() {
+    func pause() {
         guard isPlaying else { return }
         avPlayer.pause()
         isPlaying = false

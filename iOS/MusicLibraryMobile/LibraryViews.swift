@@ -7,12 +7,18 @@ enum LibraryRoute: Hashable {
     case smartPlaylist(Int64)
 }
 
+/// The Library tab lists the whole library or only what's on this iPhone.
+enum LibraryScope: String, CaseIterable, Identifiable {
+    case all = "All Music", onPhone = "On This iPhone"
+    var id: Self { self }
+}
+
 struct LibraryTab: View {
     @Environment(PhoneModel.self) private var model
     @State private var showSettings = false
 
     var body: some View {
-        NavigationStack {
+        LibraryStack {
             Group {
                 if let library = model.library, !library.tracks.isEmpty {
                     LibraryHome(library: library)
@@ -24,7 +30,6 @@ struct LibraryTab: View {
             .toolbar {
                 Button("Settings", systemImage: "gearshape") { showSettings = true }
             }
-            .libraryDestinations()
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
     }
@@ -32,10 +37,17 @@ struct LibraryTab: View {
 
 private struct LibraryHome: View {
     @Environment(PhoneModel.self) private var model
+    @AppStorage("libraryScope") private var scope = LibraryScope.all
     let library: LibrarySnapshot
 
     var body: some View {
         List {
+            Section {
+                Picker("Show", selection: $scope) { ForEach(LibraryScope.allCases) { Text($0.rawValue).tag($0) } }
+                    .pickerStyle(.segmented)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+            }
             Section {
                 NavigationLink(value: LibraryRoute.artists) { Label("Artists", systemImage: "music.mic") }
                 NavigationLink(value: LibraryRoute.albums) { Label("Albums", systemImage: "square.stack") }
@@ -43,12 +55,18 @@ private struct LibraryHome: View {
                 if !model.likedDates.isEmpty {
                     NavigationLink(value: LibraryRoute.liked) { Label("Liked Songs", systemImage: "heart") }
                 }
+                NavigationLink(value: DNARoute(name: nil)) { Label("Music DNA", systemImage: "point.3.connected.trianglepath.dotted") }
             }
-            if !library.playlists.isEmpty || !library.smartPlaylists.isEmpty {
+            let playlists = library.playlists.filter { scope == .all || model.availability($0.tracks) != .notOnPhone }
+            if !playlists.isEmpty || !library.smartPlaylists.isEmpty {
                 Section("Playlists") {
-                    ForEach(library.playlists) { item in
+                    ForEach(playlists) { item in
                         NavigationLink(value: LibraryRoute.playlist(item.id)) {
-                            Label(item.playlist.name, systemImage: "music.note.list")
+                            HStack {
+                                Label(item.playlist.name, systemImage: "music.note.list")
+                                Spacer()
+                                AvailabilityMark(availability: model.availability(item.tracks), pending: model.isDownloadPending(item.tracks))
+                            }
                         }
                     }
                     ForEach(library.smartPlaylists) { p in
@@ -60,10 +78,20 @@ private struct LibraryHome: View {
             }
             Section {
             } footer: {
-                Text("\(library.tracks.count) of \(library.snapshotTrackCount) songs on this iPhone")
+                Text(footer)
             }
         }
         .refreshable { model.reload() }
+    }
+
+    private var footer: String {
+        let present = library.presentIDs.count
+        var s = "\(present.formatted()) of \(songCount(library.tracks.count)) on this iPhone"
+        if !model.requests.isEmpty {
+            let n = model.pendingDownloads.count
+            if n > 0 { s += " · \(n.formatted()) waiting to download" }
+        }
+        return s
     }
 }
 
@@ -73,48 +101,82 @@ extension View {
         navigationDestination(for: LibraryRoute.self) { LibraryRoutePage(route: $0) }
             .navigationDestination(for: AlbumSummary.self) { AlbumPage(album: $0) }
             .navigationDestination(for: ArtistSummary.self) { ArtistPage(artist: $0) }
+            .navigationDestination(for: DNARoute.self) { MusicDNAPage(name: $0.name) }
+            .navigationDestination(for: QueryRoute.self) { QueryPage(route: $0) }
     }
 }
 
 private struct LibraryRoutePage: View {
     @Environment(PhoneModel.self) private var model
+    @AppStorage("libraryScope") private var scope = LibraryScope.all
     let route: LibraryRoute
 
     var body: some View {
         if let library = model.library {
             switch route {
             case .artists:
-                List(library.artists) { artist in
-                    NavigationLink(value: artist) {
-                        VStack(alignment: .leading) {
-                            Text(artist.name.isEmpty ? "Unknown Artist" : artist.name)
-                            Text("^[\(artist.albumCount) album](inflect: true)").font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .navigationTitle("Artists")
+                ArtistList(artists: scoped(library.artists) { library.tracks(artist: $0.name) })
+                    .navigationTitle("Artists")
             case .albums:
-                AlbumGrid(albums: library.albums, library: library).navigationTitle("Albums")
+                AlbumGrid(albums: scoped(library.albums) { library.tracks(album: $0) }, library: library)
+                    .navigationTitle("Albums")
             case .songs:
-                TrackListPage(title: "Songs", tracks: library.tracks)
+                TrackListPage(title: "Songs", tracks: scope == .onPhone ? library.presentTracks : library.tracks)
             case .liked:
-                TrackListPage(title: "Liked Songs", tracks: model.likedTracks)
+                TrackListPage(title: "Liked Songs", tracks: scopedTracks(model.likedTracks), item: .likedSongs)
             case .playlist(let id):
                 if let item = library.playlists.first(where: { $0.id == id }) {
-                    TrackListPage(title: item.playlist.name, tracks: item.tracks)
+                    TrackListPage(title: item.playlist.name, tracks: item.tracks, item: .playlist(id))
                 }
             case .smartPlaylist(let id):
                 if let p = library.smartPlaylists.first(where: { $0.id == id }) {
-                    TrackListPage(title: p.name, tracks: library.tracks(smartPlaylist: p))
+                    TrackListPage(title: p.name, tracks: scopedTracks(library.tracks(smartPlaylist: p)), item: .smartPlaylist(id))
                 }
             }
         } else {
             LibraryStatusView()
         }
     }
+
+    private func scoped<T>(_ items: [T], tracks: (T) -> [Track]) -> [T] {
+        scope == .all ? items : items.filter { model.availability(tracks($0)) != .notOnPhone }
+    }
+
+    private func scopedTracks(_ tracks: [Track]) -> [Track] { scope == .all ? tracks : model.playable(tracks) }
+}
+
+struct ArtistList: View {
+    @Environment(PhoneModel.self) private var model
+    let artists: [ArtistSummary]
+    @State private var filter = ""
+
+    var body: some View {
+        let shown = filter.isEmpty ? artists : artists.filter { $0.name.localizedStandardContains(filter) }
+        List(shown) { artist in
+            NavigationLink(value: artist) {
+                HStack(spacing: 12) {
+                    ArtistPhoto(name: artist.name, size: 44)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(artist.name.isEmpty ? "Unknown Artist" : artist.name).lineLimit(1)
+                        Text("\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") · \(songCount(artist.trackCount))")
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer(minLength: 6)
+                    if let library = model.library {
+                        let tracks = library.tracks(artist: artist.name)
+                        AvailabilityMark(availability: model.availability(tracks), pending: model.isDownloadPending(tracks))
+                    }
+                }
+            }
+        }
+        .listStyle(.plain)
+        .searchable(text: $filter, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Filter artists")
+        .overlay { if shown.isEmpty { ContentUnavailableView.search(text: filter) } }
+    }
 }
 
 struct AlbumGrid: View {
+    @Environment(PhoneModel.self) private var model
     let albums: [AlbumSummary]
     let library: LibrarySnapshot
 
@@ -122,15 +184,9 @@ struct AlbumGrid: View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 20) {
                 ForEach(albums) { album in
-                    NavigationLink(value: album) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            CoverImage(url: library.coverURL(album: album), size: 160)
-                            Text(album.album.isEmpty ? "Unknown Album" : album.album).font(.subheadline).lineLimit(1)
-                            Text(album.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                        .frame(width: 160, alignment: .leading)
-                    }
-                    .buttonStyle(.plain)
+                    NavigationLink(value: album) { AlbumCell(album: album, library: library) }
+                        .buttonStyle(.plain)
+                        .contextMenu { AlbumMenu(album: album) }
                 }
             }
             .padding()
@@ -138,13 +194,68 @@ struct AlbumGrid: View {
     }
 }
 
-/// Songs with Play and Shuffle at the top.
+/// A cover with the title and artist; dimmed when none of its songs are on the phone.
+struct AlbumCell: View {
+    @Environment(PhoneModel.self) private var model
+    let album: AlbumSummary
+    let library: LibrarySnapshot
+    var size: CGFloat = 160
+    var subtitle: String?
+
+    var body: some View {
+        let tracks = library.tracks(album: album)
+        let availability = model.availability(tracks)
+        VStack(alignment: .leading, spacing: 4) {
+            CoverImage(url: library.coverURL(album: album), size: size)
+                .opacity(availability == .notOnPhone ? 0.55 : 1)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(album.album.isEmpty ? "Unknown Album" : album.album).font(.subheadline).lineLimit(1)
+                Spacer(minLength: 0)
+                AvailabilityMark(availability: availability, pending: model.isDownloadPending(tracks))
+            }
+            Text(subtitle ?? album.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+        }
+        .frame(width: size, alignment: .leading)
+    }
+}
+
+/// Play, queue and download/remove for an album's long-press menu.
+struct AlbumMenu: View {
+    @Environment(PhoneModel.self) private var model
+    @Environment(PhonePlayer.self) private var player
+    let album: AlbumSummary
+
+    var body: some View {
+        let tracks = model.playable(model.library?.tracks(album: album) ?? [])
+        let item = ExportItem.album(album: album.album, artist: album.artist)
+        if !tracks.isEmpty {
+            Button("Play", systemImage: "play") { player.play(queue: tracks, source: album.album) }
+            Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { player.playNext(tracks) }
+            Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { player.addToQueue(tracks) }
+        }
+        let availability = model.availability(item)
+        if availability != .onPhone, !model.isDownloadPending(model.library?.tracks(album: album) ?? []) {
+            Button("Download to iPhone", systemImage: "arrow.down.circle") { model.download(item) }.disabled(!model.sync.isPaired)
+        }
+        if availability != .notOnPhone {
+            Button("Remove from iPhone", systemImage: "trash", role: .destructive) { model.remove(item) }
+        }
+    }
+}
+
+/// Songs with Play and Shuffle at the top (and, for lists, what's on the phone).
 struct TrackListPage: View {
     let title: String
     let tracks: [Track]
+    var item: ExportItem?
 
     var body: some View {
         List {
+            if let item, !tracks.isEmpty {
+                AvailabilityBar(item: item, tracks: tracks, noun: "list")
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+            }
             PlayButtons(tracks: tracks, source: title)
             TrackRows(tracks: tracks, source: title)
         }
@@ -155,46 +266,89 @@ struct TrackListPage: View {
 
 struct PlayButtons: View {
     @Environment(PhonePlayer.self) private var player
+    @Environment(PhoneModel.self) private var model
     let tracks: [Track]
     let source: String
 
     var body: some View {
+        let playable = model.playable(tracks)
         HStack(spacing: 12) {
-            Button { player.play(queue: tracks, source: source) } label: {
+            Button { player.play(queue: playable, source: source) } label: {
                 Label("Play", systemImage: "play.fill").frame(maxWidth: .infinity)
             }
-            Button { player.play(queue: tracks.shuffled(), source: source) } label: {
+            Button { player.play(queue: playable.shuffled(), source: source) } label: {
                 Label("Shuffle", systemImage: "shuffle").frame(maxWidth: .infinity)
             }
         }
         .buttonStyle(.bordered)
         .controlSize(.large)
-        .disabled(tracks.isEmpty)
+        .disabled(playable.isEmpty)
         .listRowSeparator(.hidden)
     }
 }
 
-/// Rows that play the list from the tapped song.
+/// Rows that play the list's songs on the phone from the tapped one. A song that isn't here offers to download it.
 struct TrackRows: View {
     @Environment(PhonePlayer.self) private var player
     @Environment(PhoneModel.self) private var model
     let tracks: [Track]
     let source: String
     var numbered = false
+    @State private var missing: Track?
 
     var body: some View {
-        ForEach(Array(tracks.enumerated()), id: \.element.id) { i, track in
-            Button { player.play(queue: tracks, startAt: i, source: source) } label: {
+        ForEach(tracks) { track in
+            let present = model.isPresent(track)
+            Button {
+                if present {
+                    let playable = model.playable(tracks)
+                    player.play(queue: playable, startAt: playable.firstIndex(of: track) ?? 0, source: source)
+                } else {
+                    missing = track
+                }
+            } label: {
                 TrackRow(track: track, numbered: numbered, library: model.library,
-                         isCurrent: player.currentTrack?.id == track.id, isLiked: model.isLiked(track))
+                         isCurrent: player.currentTrack?.id == track.id, isLiked: model.isLiked(track),
+                         isPresent: present, isPending: model.pendingDownloads.contains(track.id))
             }
             .buttonStyle(.plain)
-            .contextMenu {
-                Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { player.playNext([track]) }
-                Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { player.addToQueue([track]) }
-                LikeMenuButton(track: track)
-            }
+            .contextMenu { SongMenu(track: track) }
         }
+        .confirmationDialog("“\(missing?.title ?? "")” isn't on this iPhone", isPresented: Binding(get: { missing != nil }, set: { if !$0 { missing = nil } }),
+                            titleVisibility: .visible, presenting: missing) { track in
+            if model.sync.isPaired {
+                Button("Download Song") { model.download(.track(track.id)) }
+                if let album = model.library?.album(of: track) {
+                    Button("Download Album") { model.download(.album(album: album.album, artist: album.artist)) }
+                }
+            }
+        } message: { _ in
+            Text(model.sync.isPaired ? "Download it from your Mac to play it here." : "Pair with your Mac in the Sync tab to download music.")
+        }
+    }
+}
+
+/// A song's long-press menu.
+struct SongMenu: View {
+    @Environment(PhonePlayer.self) private var player
+    @Environment(PhoneModel.self) private var model
+    @Environment(\.openRoute) private var openRoute
+    let track: Track
+
+    var body: some View {
+        if model.isPresent(track) {
+            Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { player.playNext([track]) }
+            Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { player.addToQueue([track]) }
+        }
+        LikeMenuButton(track: track)
+        if let album = model.library?.album(of: track) {
+            Button("Go to Album", systemImage: "square.stack") { openRoute(album) }
+        }
+        if let artist = model.library?.artist(named: track.effectiveAlbumArtist) {
+            Button("Go to Artist", systemImage: "music.mic") { openRoute(artist) }
+        }
+        Button("Song Info", systemImage: "info.circle") { model.infoTrack = track }
+        SongAvailabilityButtons(track: track)
     }
 }
 
@@ -204,6 +358,8 @@ struct TrackRow: View {
     let library: LibrarySnapshot?
     var isCurrent = false
     var isLiked = false
+    var isPresent = true
+    var isPending = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -232,8 +388,12 @@ struct TrackRow: View {
             if isLiked {
                 Image(systemName: "heart.fill").font(.caption).foregroundStyle(.pink).accessibilityLabel("Liked")
             }
+            if !isPresent {
+                AvailabilityMark(availability: .notOnPhone, pending: isPending)
+            }
             Text(Format.time(track.duration)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
         }
+        .opacity(isPresent ? 1 : 0.5)
         .contentShape(Rectangle())
     }
 }
@@ -249,73 +409,10 @@ struct LikeMenuButton: View {
     }
 }
 
-struct AlbumPage: View {
-    @Environment(PhoneModel.self) private var model
-    let album: AlbumSummary
-
-    var body: some View {
-        if let library = model.library {
-            let tracks = library.tracks(album: album)
-            List {
-                VStack(spacing: 8) {
-                    CoverImage(url: library.coverURL(album: album), size: 260)
-                        .shadow(radius: 8, y: 4)
-                    Text(album.album.isEmpty ? "Unknown Album" : album.album)
-                        .font(.title2.bold()).multilineTextAlignment(.center)
-                    if let artist = library.artists.first(where: { $0.name == album.artist }) {
-                        NavigationLink(value: artist) { Text(album.artist).font(.title3) }
-                            .navigationLinkIndicatorVisibility(.hidden)
-                            .buttonStyle(.plain).foregroundStyle(Color.accentColor)
-                    }
-                    Text(Format.albumDetails(album: album, tracks: tracks))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .listRowSeparator(.hidden)
-                PlayButtons(tracks: tracks, source: album.album)
-                TrackRows(tracks: tracks, source: album.album, numbered: true)
-            }
-            .listStyle(.plain)
-            .navigationBarTitleDisplayMode(.inline)
-        } else {
-            LibraryStatusView()
-        }
-    }
-}
-
-struct ArtistPage: View {
-    @Environment(PhoneModel.self) private var model
-    let artist: ArtistSummary
-
-    var body: some View {
-        if let library = model.library {
-            ScrollView {
-                PlayButtons(tracks: library.tracks(artist: artist.name), source: artist.name)
-                    .padding(.horizontal)
-                AlbumGrid(albums: library.albums(artist: artist.name), library: library)
-            }
-            .navigationTitle(artist.name.isEmpty ? "Unknown Artist" : artist.name)
-        } else {
-            LibraryStatusView()
-        }
-    }
-}
-
 enum Format {
     static func time(_ seconds: Double) -> String {
         guard seconds.isFinite, seconds >= 0 else { return "0:00" }
         let s = Int(seconds.rounded())
         return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
-    }
-
-    /// "1997 · 12 songs, 53 min · FLAC 16/44.1"
-    static func albumDetails(album: AlbumSummary, tracks: [Track]) -> String {
-        let minutes = Int((tracks.reduce(0) { $0 + $1.duration } / 60).rounded())
-        var parts: [String] = []
-        if let year = album.year { parts.append(String(year)) }
-        parts.append("\(tracks.count) \(tracks.count == 1 ? "song" : "songs"), \(minutes) min")
-        let formats = Array(Set(tracks.compactMap { $0.audioFormat?.compact })).sorted()
-        if !formats.isEmpty { parts.append(formats.joined(separator: ", ")) }
-        return parts.joined(separator: " · ")
     }
 }

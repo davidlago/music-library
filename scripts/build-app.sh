@@ -58,7 +58,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSLocalNetworkUsageDescription</key><string>Music Library finds the iPhone app on your local network to sync music to it.</string>
-    <key>NSBonjourServices</key><array><string>_musiclib-sync._tcp</string></array>
+    <key>NSBonjourServices</key><array><string>_musiclib-sync._tcp</string><string>_musiclib-mac._tcp</string></array>
     <key>NSHumanReadableCopyright</key><string>© 2026 Dave Lago. MIT License.</string>
     <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict>

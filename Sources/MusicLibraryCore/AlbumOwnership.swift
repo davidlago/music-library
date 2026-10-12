@@ -63,6 +63,27 @@ public struct AlbumPurchase: Hashable, Sendable {
     }
 }
 
+/// For the phone's ownership edits sent with a sync: the date and price as the database stores them, and checked
+/// again when read (they come from another device).
+extension AlbumPurchase: Codable {
+    private enum CodingKeys: String, CodingKey { case album, artist, purchasedOn, price }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(album: try c.decode(String.self, forKey: .album), artist: try c.decode(String.self, forKey: .artist),
+                  purchasedOn: try c.decodeIfPresent(String.self, forKey: .purchasedOn).flatMap(PurchaseDay.init(string:)),
+                  price: Self.price(text: try c.decodeIfPresent(String.self, forKey: .price)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(album, forKey: .album)
+        try c.encode(artist, forKey: .artist)
+        try c.encodeIfPresent(purchasedOn?.string, forKey: .purchasedOn)
+        try c.encodeIfPresent(Self.priceText(price), forKey: .price)
+    }
+}
+
 extension Decimal {
     public var doubleValue: Double { NSDecimalNumber(decimal: self).doubleValue }
 }

@@ -1,10 +1,11 @@
 import MusicLibraryCore
 import SwiftUI
 
-/// The iPhone page: paired phones (and ones nearby asking to pair), the list the phone keeps, and syncing it.
+/// The iPhone page: paired phones (and ones nearby asking to pair), the list the phone keeps (with what's been
+/// taken off it, here or on the phone), and syncing it.
 struct IPhoneSyncView: View {
     @Environment(AppModel.self) private var model
-    @State private var selection = Set<ExportItem>()
+    @State private var selection = Set<SyncSelection.Rule>()
     @State private var codes: [String: String] = [:]
     @State private var totalBytes: Int64?
 
@@ -14,16 +15,30 @@ struct IPhoneSyncView: View {
         VStack(spacing: 0) {
             phones(store, songs: tracks.count)
             Divider()
-            if store.list.isEmpty {
+            if store.selection.isEmpty {
                 ContentUnavailableView("Nothing to Sync Yet", systemImage: "iphone",
-                                       description: Text("Add albums, artists, playlists or songs with Add to iPhone in their menus. The iPhone keeps exactly this list."))
+                                       description: Text("Add albums, artists, playlists or songs with Add to iPhone in their menus, or tap Download on the iPhone. The iPhone keeps exactly this list."))
                     .frame(maxHeight: .infinity)
             } else {
                 List(selection: $selection) {
-                    ForEach(store.list) { ExportItemRow(item: $0).tag($0) }
+                    ForEach(store.selection.rules) { rule in
+                        HStack {
+                            ExportItemRow(item: rule.item)
+                            if !rule.include {
+                                Spacer()
+                                Label("Kept off the iPhone", systemImage: "minus.circle").font(.caption).foregroundStyle(.subtext)
+                            }
+                        }
+                        .opacity(rule.include ? 1 : 0.75)
+                        .tag(rule)
+                    }
                 }
-                .contextMenu(forSelectionType: ExportItem.self) { items in
-                    Button("Remove from iPhone List", systemImage: "minus.circle") { store.remove(items) }
+                .contextMenu(forSelectionType: SyncSelection.Rule.self) { rules in
+                    if rules.allSatisfy({ !$0.include }) {
+                        Button("Put Back on iPhone", systemImage: "plus.circle") { store.remove(rules) }
+                    } else {
+                        Button("Remove from iPhone List", systemImage: "minus.circle") { store.remove(rules) }
+                    }
                 }
                 .onDeleteCommand { store.remove(selection) }
                 .themedScrollBackground()
@@ -32,7 +47,7 @@ struct IPhoneSyncView: View {
             HStack {
                 Text(footer(songs: tracks.count)).foregroundStyle(.subtext)
                 Spacer()
-                Text("The iPhone keeps exactly this list: what you remove here is removed from it at the next sync.")
+                Text("The iPhone keeps exactly this list: what you remove here is removed from it at the next sync. Downloads and removals made on the iPhone show up here too.")
                     .font(.caption).foregroundStyle(.subtext)
             }
             .padding(.horizontal, 14).padding(.vertical, 8)
@@ -90,7 +105,7 @@ struct IPhoneSyncView: View {
                     Label("Ready to sync", systemImage: "circle.fill").font(.caption).foregroundStyle(.green)
                         .labelStyle(.titleAndIcon).imageScale(.small)
                 } else {
-                    Text("Not found. Open the Sync tab in Music Library on the iPhone.").font(.caption).foregroundStyle(.subtext)
+                    Text("Sync from the iPhone, or open its Sync tab to sync from here.").font(.caption).foregroundStyle(.subtext)
                 }
                 if let date = phone.lastSync {
                     (Text("Last synced ") + Text(date, style: .relative) + Text(" ago" + (phone.lastSummary.map { ": " + summaryText($0) } ?? "")))
@@ -152,6 +167,7 @@ struct IPhoneSyncView: View {
         if s.deleted > 0 { parts.append("removed \(s.deleted)") }
         if s.plays > 0 { parts.append("\(s.plays) \(s.plays == 1 ? "play" : "plays") added") }
         if s.likes > 0 { parts.append("\(s.likes) \(s.likes == 1 ? "like" : "likes") updated") }
+        if let n = s.purchases, n > 0 { parts.append("\(n) owned \(n == 1 ? "album" : "albums") updated") }
         if s.missing > 0 { parts.append("\(s.missing) missing here") }
         return parts.joined(separator: ", ")
     }

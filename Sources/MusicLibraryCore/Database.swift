@@ -559,14 +559,14 @@ public final class Database: @unchecked Sendable {
     // MARK: Album ownership
 
     /// Saves (or with nil, forgets) that you own the album with this key (`SearchIndex.albumKey`).
-    public func saveAlbumPurchase(key: String, _ purchase: AlbumPurchase?) throws {
+    public func saveAlbumPurchase(key: String, _ purchase: AlbumPurchase?, at date: Date = Date()) throws {
         guard let p = purchase else {
             try exec("DELETE FROM album_ownership WHERE key=?", [.text(key)])
             return
         }
         try exec("INSERT OR REPLACE INTO album_ownership(key,album,artist,purchased_on,price,updated_at) VALUES(?,?,?,?,?,?)",
                  [.text(key), .text(p.album), .text(p.artist), .text(p.purchasedOn?.string),
-                  .text(AlbumPurchase.priceText(p.price)), .double(Date().timeIntervalSince1970)])
+                  .text(AlbumPurchase.priceText(p.price)), .double(date.timeIntervalSince1970)])
     }
 
     /// Owned albums by key. Dates and prices that don't parse (the file may come from elsewhere) read as unknown.

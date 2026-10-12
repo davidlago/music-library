@@ -141,7 +141,7 @@ struct SidebarView: View {
                     .sidebarBadge(model.exportList.count)
                     .tag(SidebarItem.exportList)
                 Label("iPhone", systemImage: "iphone")
-                    .sidebarBadge(model.iPhone.list.count)
+                    .sidebarBadge(model.iPhone.selection.included.count)
                     .tag(SidebarItem.iPhone)
             }
             Section {

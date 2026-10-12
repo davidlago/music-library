@@ -1,10 +1,23 @@
 import Foundation
 import MusicLibraryCore
+import Network
 import Observation
 import SystemConfiguration
 
-/// Wi-Fi sync to the iPhone app: phones nearby, pairing, the list of what to keep on the phone (its own list, apart
-/// from the Export List, because the phone mirrors it), and running syncs.
+/// What a sync needs from the library, read when it starts.
+struct SyncContext {
+    var libraryRoot: URL
+    var database: Database
+    var lastFM: SyncLastFM?
+    var concerts: SyncConcertSettings?
+    /// Every track in the library.
+    var library: [Track]
+    var tracks: (ExportItem) -> [Track]
+}
+
+/// Wi-Fi sync to the iPhone app: phones nearby, pairing, what to keep on the phone (its own selection, apart from the
+/// Export List, because the phone mirrors it), and running syncs, started here or from the phone (the Mac listens
+/// for each paired phone while it runs).
 @MainActor @Observable
 final class SyncStore {
     struct PairedPhone: Codable, Hashable, Identifiable {
@@ -21,17 +34,22 @@ final class SyncStore {
     }
 
     private enum Keys {
+        /// Before the phone could ask for music: a plain list of items.
         static let list = "iPhoneSyncList"
+        static let selection = "iPhoneSyncSelection"
         static let phones = "iPhonePairedPhones"
         static let macID = "syncMacID"
         static func key(_ phoneID: String) -> String { "syncKey.\(phoneID)" }
     }
 
-    private(set) var list: [ExportItem] {
-        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(list), forKey: Keys.list) }
+    private(set) var selection: SyncSelection {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(selection), forKey: Keys.selection) }
     }
     private(set) var phones: [PairedPhone] {
-        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(phones), forKey: Keys.phones) }
+        didSet {
+            UserDefaults.standard.set(try? JSONEncoder().encode(phones), forKey: Keys.phones)
+            if Set(phones.map(\.id)) != Set(oldValue.map(\.id)) { updateListeners() }
+        }
     }
     private(set) var nearby: [SyncPeer] = []
     private(set) var activity: Activity = .idle
@@ -39,9 +57,14 @@ final class SyncStore {
     /// The first sync to a phone found files to remove and is waiting for the user to agree.
     private(set) var pendingDeletes: Int?
 
-    /// Called after a sync that added the phone's plays or likes to the library.
+    /// Called after a sync that added the phone's plays, likes or ownership changes to the library.
     @ObservationIgnored var onHistoryChanged: () -> Void = {}
+    /// The library as a sync needs it; nil while no library is open.
+    @ObservationIgnored var context: () -> SyncContext? = { nil }
     @ObservationIgnored private var browser: SyncBrowser?
+    /// One per paired phone, so it can start a sync.
+    @ObservationIgnored private var listeners: [String: SyncAdvertiser] = [:]
+    @ObservationIgnored private var listening = false
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var deleteApproval: CheckedContinuation<Bool, Never>?
     @ObservationIgnored private let keychain = KeychainStore.app
@@ -49,7 +72,8 @@ final class SyncStore {
 
     init() {
         let defaults = UserDefaults.standard
-        list = defaults.data(forKey: Keys.list).flatMap { try? JSONDecoder().decode([ExportItem].self, from: $0) } ?? []
+        selection = defaults.data(forKey: Keys.selection).flatMap { try? JSONDecoder().decode(SyncSelection.self, from: $0) }
+            ?? SyncSelection(items: defaults.data(forKey: Keys.list).flatMap { try? JSONDecoder().decode([ExportItem].self, from: $0) } ?? [])
         phones = defaults.data(forKey: Keys.phones).flatMap { try? JSONDecoder().decode([PairedPhone].self, from: $0) } ?? []
         let id = defaults.string(forKey: Keys.macID) ?? {
             let new = UUID().uuidString
@@ -86,16 +110,51 @@ final class SyncStore {
     /// Phones nearby showing a pairing code.
     var pairingPeers: [SyncPeer] { nearby.filter(\.isPairing) }
 
-    // MARK: List
+    // MARK: Selection
 
+    /// Puts the items on the phone at the next sync, even where a later rule kept them off.
     func add(_ items: [ExportItem]) {
-        let new = items.filter { !list.contains($0) }
-        if !new.isEmpty { list += new }
+        guard let context = context() else { return }
+        for item in items { selection.apply(item, include: true) { Set(context.tracks($0).map(\.id)) } }
     }
 
-    func remove(_ items: Set<ExportItem>) { list.removeAll { items.contains($0) } }
+    /// Deletes rules from the list (an exclusion deleted puts its songs back).
+    func remove(_ rules: Set<SyncSelection.Rule>) { selection.rules.removeAll { rules.contains($0) } }
 
-    func contains(_ item: ExportItem) -> Bool { list.contains(item) }
+    func contains(_ item: ExportItem) -> Bool {
+        guard let context = context() else { return false }
+        return selection.contains(item, tracks: context.tracks)
+    }
+
+    /// Everything the selection puts on the phone, each once.
+    func tracks(_ context: SyncContext) -> [Track] { selection.resolve(context.tracks) }
+
+    /// Applies what the phone asked for, in order; on a phone's first sync started from the phone, what's already on
+    /// it is added to the selection first (so nothing it has is removed without being asked).
+    private func applyRequests(_ manifest: SyncManifest, adopting: Bool) -> SyncTracks {
+        guard let context = context() else { return SyncTracks(tracks: []) }
+        let ids: (ExportItem) -> Set<Int64> = { Set(context.tracks($0).map(\.id)) }
+        if adopting {
+            let paths = Set(manifest.files.map(\.path))
+            let present = context.library.filter { paths.contains($0.path) }
+            var albums = Set<String>()
+            for t in present {
+                let album = ExportItem.album(album: t.album, artist: t.effectiveAlbumArtist)
+                let all = context.tracks(album)
+                if all.allSatisfy({ paths.contains($0.path) }) {
+                    if albums.insert(SearchIndex.albumKey(album: t.album, artist: t.effectiveAlbumArtist)).inserted {
+                        selection.apply(album, include: true, tracks: ids)
+                    }
+                } else {
+                    selection.apply(.track(t.id), include: true, tracks: ids)
+                }
+            }
+        }
+        for request in manifest.requests.sorted(by: { $0.at < $1.at }) {
+            selection.apply(request.item, include: request.include, tracks: ids)
+        }
+        return SyncTracks(tracks: tracks(context), library: context.library)
+    }
 
     // MARK: Pairing
 
@@ -126,13 +185,76 @@ final class SyncStore {
         phones.removeAll { $0.id == phone.id }
     }
 
+    // MARK: Listening for phones
+
+    /// Advertises this Mac to each paired phone, so the phone can start a sync (to download or remove music).
+    func startListening() {
+        listening = true
+        updateListeners()
+    }
+
+    private func updateListeners() {
+        guard listening else { return }
+        for (id, listener) in listeners where !phones.contains(where: { $0.id == id }) {
+            listener.stop()
+            listeners[id] = nil
+        }
+        for phone in phones where listeners[phone.id] == nil {
+            guard let key = key(for: phone) else { continue }
+            let phoneID = phone.id
+            do {
+                let listener = try SyncAdvertiser(
+                    macID: identity.deviceID, phoneID: phoneID, name: "\(identity.deviceName) (\(phoneID.prefix(4)))", key: key,
+                    onConnection: { [weak self] connection in Task { @MainActor in self?.accept(connection, phoneID: phoneID) } })
+                listener.start()
+                listeners[phoneID] = listener
+            } catch {
+                lastError = "Couldn't listen for \(phone.name): \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func key(for phone: PairedPhone) -> Data? {
+        keychain.string(for: Keys.key(phone.id)).flatMap { Data(base64Encoded: $0) }.flatMap { $0.count == 32 ? $0 : nil }
+    }
+
+    /// A paired phone connected to sync (only that phone has the key its listener uses).
+    private func accept(_ connection: NWConnection, phoneID: String) {
+        guard let phone = phones.first(where: { $0.id == phoneID }) else { connection.cancel(); return }
+        guard !isBusy else {
+            let busy = SyncConnection(connection)
+            Task {
+                try? await busy.open()
+                try? await busy.send(.failure("The Mac is busy with another sync. Try again in a moment."))
+                await busy.close()
+            }
+            return
+        }
+        run(phone, connection: SyncConnection(connection), fromPhone: true)
+    }
+
     // MARK: Syncing
 
-    /// Syncs `tracks` to `phone`, bringing back its plays and likes; `lastFM` goes to a phone that isn't connected.
-    func sync(_ phone: PairedPhone, tracks: [Track], libraryRoot: URL, database: Database, lastFM: SyncLastFM?) {
+    /// Syncs the selection to `phone` (which must have its Sync tab open), bringing back its plays, likes and
+    /// ownership changes and applying what it asked for; `lastFM` goes to a phone that isn't connected.
+    func sync(_ phone: PairedPhone) {
         guard !isBusy, let peer = peer(for: phone) else { return }
-        guard let key = keychain.string(for: Keys.key(phone.id)).flatMap({ Data(base64Encoded: $0) }) else {
+        guard let key = key(for: phone) else {
             lastError = SyncError.notPaired.localizedDescription
+            return
+        }
+        run(phone, connection: SyncConnection(endpoint: peer.endpoint, key: key), fromPhone: false)
+    }
+
+    /// A phone's first sync asks before removing anything from it when it's started here; one started from the
+    /// phone keeps what's there instead (it's added to the selection).
+    private func run(_ phone: PairedPhone, connection: SyncConnection, fromPhone: Bool) {
+        guard let context = context() else {
+            Task {
+                try? await connection.open()
+                try? await connection.send(.failure("No library is open on the Mac."))
+                await connection.close()
+            }
             return
         }
         lastError = nil
@@ -143,16 +265,18 @@ final class SyncStore {
         task = Task {
             defer { activity = .idle }
             do {
-                let summary = try await SyncMacSession.sync(
-                    endpoint: peer.endpoint, key: key, identity: identity, tracks: tracks, libraryRoot: libraryRoot,
-                    database: database, scratch: scratch, lastFM: lastFM,
-                    approveDeletes: { count in firstSync ? await self.askToDelete(count) : true },
+                let (_, summary) = try await SyncMacSession.sync(
+                    connection, identity: identity,
+                    selection: { manifest in await self.applyRequests(manifest, adopting: fromPhone && firstSync) },
+                    libraryRoot: context.libraryRoot, database: context.database, scratch: scratch,
+                    lastFM: context.lastFM, concerts: context.concerts,
+                    approveDeletes: { count in firstSync ? (fromPhone ? false : await self.askToDelete(count)) : true },
                     progress: { progress in await self.report(phone.id, progress) })
                 if let i = phones.firstIndex(where: { $0.id == phone.id }) {
                     phones[i].lastSync = Date()
                     phones[i].lastSummary = summary
                 }
-                if summary.plays > 0 || summary.likes > 0 { onHistoryChanged() }
+                if summary.plays > 0 || summary.likes > 0 || (summary.purchases ?? 0) > 0 { onHistoryChanged() }
             } catch is CancellationError {
                 lastError = "Sync cancelled. Everything copied so far is on the iPhone."
             } catch {

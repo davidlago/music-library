@@ -280,7 +280,7 @@ struct SyncFixture {
         #expect(second.deleted == 2)
         #expect(try Data(contentsOf: phoneRoot.appendingPathComponent(f.tracks[0].path)) == Data(repeating: 0xCD, count: 5000))
         #expect(!FileManager.default.fileExists(atPath: phoneRoot.appendingPathComponent("Music/Artist/Second (2000)").path))
-        #expect(try LibrarySnapshot(root: phoneRoot).tracks.count == 2)
+        #expect(try LibrarySnapshot(root: phoneRoot).presentTracks.count == 2)
 
         // Declining the deletions keeps what's on the phone.
         (port, session) = try await listen(key: key, root: phoneRoot, pairing: false)
@@ -415,7 +415,7 @@ extension SyncSessionTests {
         #expect(await received.account == account)
         // The snapshot the phone got back already has them.
         let copy = try LibrarySnapshot(root: phoneRoot)
-        #expect(copy.likedIDs == [f.tracks[1].id])
+        #expect(Set(copy.likedDates.keys) == [f.tracks[1].id])
         #expect(copy.libraryID == f.db.libraryID())
         #expect(try Database(snapshotAt: LibraryLocation.databaseURL(root: phoneRoot).path).plays().count == 1)
     }

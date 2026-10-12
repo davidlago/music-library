@@ -47,15 +47,17 @@ public enum SyncSessionError: Error, LocalizedError, Equatable {
 
 /// The phone's side of a session, from the Mac's `.hello` to the final `.done`.
 public enum SyncPhoneSession {
-    /// Runs one session on an incoming connection. When `pairing`, the Mac must send `.pair`; `storeGrant` keeps
-    /// the key it sends and the session ends there (the Mac syncs in a new session, with that key). Otherwise
-    /// `events` (recorded against `libraryID`) go to the Mac with the file list; once the session returns, the
-    /// Mac has handled them all. `adoptLastFM` gets the Mac's Last.fm account when `lastFMConnected` is false and
-    /// the Mac has one. Returns the Mac's hello and what was applied.
+    /// Runs one session on a connection from the Mac, or to it (`connection` is opened here either way). When
+    /// `pairing`, the Mac must send `.pair`; `storeGrant` keeps the key it sends and the session ends there (the Mac
+    /// syncs in a new session, with that key). Otherwise `events` (recorded against `libraryID`) and `requests` go to
+    /// the Mac with the file list; once the session returns, the Mac has handled them all. `adoptLastFM` gets the
+    /// Mac's Last.fm account when `lastFMConnected` is false and the Mac has one; `storeConcerts` its concert
+    /// settings. Returns the Mac's hello and what was applied.
     public static func run(_ connection: SyncConnection, identity: SyncIdentity, root: URL, freeSpace: Int64?, pairing: Bool,
-                           events: [SyncEvent] = [], libraryID: String? = nil, lastFMConnected: Bool = true,
+                           events: [SyncEvent] = [], requests: [SyncRequest] = [], libraryID: String? = nil, lastFMConnected: Bool = true,
                            storeGrant: @Sendable (SyncGrant) async throws -> Void,
                            adoptLastFM: @Sendable (SyncLastFM) async -> Void = { _ in },
+                           storeConcerts: @Sendable (SyncConcertSettings) async -> Void = { _ in },
                            progress: @Sendable (SyncProgress) async -> Void = { _ in }) async throws -> (mac: SyncHello, summary: SyncSummary) {
         var receiver: SyncReceiver?
         do {
@@ -74,7 +76,7 @@ public enum SyncPhoneSession {
             }
             let files = try SyncReceiver(root: root)
             receiver = files
-            try await connection.send(.manifest(SyncManifest(files: files.manifest(), events: events, libraryID: libraryID)))
+            try await connection.send(.manifest(SyncManifest(files: files.manifest(), events: events, libraryID: libraryID, requests: requests)))
 
             var state = SyncProgress()
             while true {
@@ -87,6 +89,8 @@ public enum SyncPhoneSession {
                     try files.delete(paths)
                 case .lastFM(let account):
                     await adoptLastFM(account)
+                case .concerts(let settings):
+                    await storeConcerts(settings)
                 case .file(let header):
                     let isDatabase = header.path == SyncReceiver.databaseName
                     state.current = header.path
@@ -110,6 +114,7 @@ public enum SyncPhoneSession {
                     summary.plays = sent.plays
                     summary.likes = sent.likes
                     summary.eventsDropped = sent.eventsDropped
+                    summary.purchases = sent.purchases
                     try await connection.send(.done(summary))
                     await connection.close()
                     return (mac, summary)
@@ -127,6 +132,13 @@ public enum SyncPhoneSession {
 }
 
 // MARK: Mac
+
+/// The songs a sync puts on the phone (`tracks`), and every track in the library (`library`, for the covers).
+public struct SyncTracks: Sendable {
+    public var tracks: [Track]
+    public var library: [Track]
+    public init(tracks: [Track], library: [Track] = []) { self.tracks = tracks; self.library = library }
+}
 
 /// The Mac's side: pairing with a phone, and syncing a selection to it.
 public enum SyncMacSession {
@@ -156,7 +168,19 @@ public enum SyncMacSession {
                             database: Database, scratch: URL, lastFM: SyncLastFM? = nil,
                             approveDeletes: @Sendable (Int) async -> Bool = { _ in true },
                             progress: @Sendable (SyncProgress) async -> Void = { _ in }) async throws -> SyncSummary {
-        let connection = SyncConnection(endpoint: endpoint, key: key)
+        try await sync(SyncConnection(endpoint: endpoint, key: key), identity: identity, selection: { _ in SyncTracks(tracks: tracks) },
+                       libraryRoot: libraryRoot, database: database, scratch: scratch, lastFM: lastFM,
+                       approveDeletes: approveDeletes, progress: progress).summary
+    }
+
+    /// A session on `connection`, made by the Mac or accepted from the phone. `selection` gets the phone's manifest
+    /// once its events are applied, applies its requests and returns what to sync. Returns the phone's hello and
+    /// what it applied.
+    public static func sync(_ connection: SyncConnection, identity: SyncIdentity,
+                            selection: @Sendable (SyncManifest) async -> SyncTracks, libraryRoot: URL,
+                            database: Database, scratch: URL, lastFM: SyncLastFM? = nil, concerts: SyncConcertSettings? = nil,
+                            approveDeletes: @Sendable (Int) async -> Bool = { _ in true },
+                            progress: @Sendable (SyncProgress) async -> Void = { _ in }) async throws -> (phone: SyncHello, summary: SyncSummary) {
         let snapshot = scratch.appendingPathComponent("sync-\(UUID().uuidString).sqlite")
         defer { try? FileManager.default.removeItem(at: snapshot) }
         do {
@@ -166,8 +190,10 @@ public enum SyncMacSession {
             guard case .manifest(let manifest) = try await connection.receiveMessage() else { throw SyncError.unexpected("no file list from the iPhone") }
             let applied = try database.applySyncEvents(manifest.events, libraryID: manifest.libraryID)
             if let lastFM, phone.lastFMConnected == false { try await connection.send(.lastFM(lastFM)) }
+            if let concerts { try await connection.send(.concerts(concerts)) }
 
-            var plan = SyncPlan(tracks: tracks, libraryRoot: libraryRoot, phone: manifest.files)
+            let selected = await selection(manifest)
+            var plan = SyncPlan(tracks: selected.tracks, library: selected.library, libraryRoot: libraryRoot, phone: manifest.files)
             if !plan.deletes.isEmpty, await !approveDeletes(plan.deletes.count) { plan.deletes = [] }
             let onPhone = Dictionary(manifest.files.map { ($0.path, $0.size) }, uniquingKeysWith: { a, _ in a })
             let freed = plan.deletes.reduce(Int64(0)) { $0 + (onPhone[$1] ?? 0) } + plan.sends.reduce(Int64(0)) { $0 + (onPhone[$1.path] ?? 0) }
@@ -203,10 +229,11 @@ public enum SyncMacSession {
             sent.plays = applied.plays
             sent.likes = applied.likes
             sent.eventsDropped = applied.dropped
+            sent.purchases = applied.purchases
             try await connection.send(.done(sent))
             guard case .done(let applied) = try await connection.receiveMessage() else { throw SyncError.unexpected("the iPhone didn't finish") }
             await connection.close()
-            return applied
+            return (phone, applied)
         } catch {
             try? await connection.send(.failure(error.localizedDescription))
             await connection.close()

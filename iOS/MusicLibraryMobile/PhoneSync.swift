@@ -6,7 +6,9 @@ import UIKit
 
 /// The phone's end of Wi-Fi sync. While the Sync tab is on screen (iOS suspends the app in the background), the
 /// phone advertises itself on the local network: with a pairing code until it's paired, then with the key the Mac
-/// handed over. The Mac starts each sync; files go into the library folder and the library reloads afterwards.
+/// handed over, so the Mac can start a sync. Once paired, while the app is open it also looks for the Mac (which
+/// listens for this phone while it runs) and starts a sync itself when music was asked for or removed, or when
+/// Sync Now is tapped. Files go into the library folder and the library reloads afterwards.
 @Observable
 final class PhoneSync {
     enum Status: Equatable {
@@ -35,18 +37,27 @@ final class PhoneSync {
     private(set) var lastSync: Date?
     private(set) var lastSummary: SyncSummary?
     private(set) var lastError: String?
+    /// The paired Mac, found on the network and ready for this phone to start a sync.
+    private(set) var macPeer: SyncPeer?
 
     /// Called after a sync changed the library.
     @ObservationIgnored var onLibraryChanged: () -> Void = {}
-    /// The plays and likes to send, and the library they were recorded against.
-    @ObservationIgnored var pendingEvents: () -> ([SyncEvent], String?) = { ([], nil) }
-    /// Called with the events a finished sync handled (the Mac applied, already had, or dropped them).
-    @ObservationIgnored var onEventsDelivered: (Set<String>) -> Void = { _ in }
+    /// The plays, likes and ownership changes to send, the downloads and removals asked for, and the library they
+    /// were recorded against.
+    @ObservationIgnored var pendingEvents: () -> ([SyncEvent], [SyncRequest], String?) = { ([], [], nil) }
+    /// Called with the events and requests a finished sync handled (the Mac applied, already had, or dropped them).
+    @ObservationIgnored var onEventsDelivered: (Set<String>, Set<String>) -> Void = { _, _ in }
+    /// Keeps the Mac's concert settings.
+    @ObservationIgnored var storeConcerts: (SyncConcertSettings) -> Void = { _ in }
     @ObservationIgnored var isLastFMConnected: () -> Bool = { true }
     /// Gets the Mac's Last.fm account when this phone isn't connected.
     @ObservationIgnored var adoptLastFM: (SyncLastFM) -> Void = { _ in }
     @ObservationIgnored private var advertiser: SyncAdvertiser?
+    @ObservationIgnored private var macBrowser: SyncBrowser?
     @ObservationIgnored private var visible = false
+    @ObservationIgnored private var active = false
+    /// A sync is wanted (music asked for or removed) and starts when the Mac is found.
+    @ObservationIgnored private var wantsSync = false
     @ObservationIgnored private var busy = false
     @ObservationIgnored private let keychain = KeychainStore.app
     @ObservationIgnored private let identity: SyncIdentity
@@ -99,6 +110,7 @@ final class PhoneSync {
 
     func unpair() {
         stopListening()
+        stopLookingForMac()
         keychain.remove(Keys.key)
         isPaired = false
         let defaults = UserDefaults.standard
@@ -142,10 +154,59 @@ final class PhoneSync {
         }
     }
 
+    // MARK: Finding the Mac
+
+    /// The app became active or went to the background: while it's active and paired, look for the Mac.
+    func setActive(_ active: Bool) {
+        self.active = active
+        if active, isPaired { lookForMac() } else if !busy { stopLookingForMac() }
+    }
+
+    private var macID: String? { UserDefaults.standard.string(forKey: Keys.macID) }
+
+    private func lookForMac() {
+        guard macBrowser == nil else { return }
+        let phoneID = identity.deviceID
+        let browser = SyncBrowser(type: SyncProtocol.macServiceType) { [weak self] peers in
+            Task { @MainActor in
+                guard let self else { return }
+                self.macPeer = peers.first { $0.phoneID == phoneID && $0.id == self.macID }
+                if self.macPeer != nil, self.wantsSync { self.syncNow() }
+            }
+        }
+        browser.start()
+        macBrowser = browser
+    }
+
+    private func stopLookingForMac() {
+        macBrowser?.stop()
+        macBrowser = nil
+        macPeer = nil
+    }
+
+    /// Something was asked for or removed: sync now if the Mac is around, else as soon as it is.
+    func requestSync() {
+        wantsSync = true
+        if macPeer != nil { syncNow() }
+    }
+
+    /// Connects to the Mac and syncs.
+    func syncNow() {
+        guard let peer = macPeer, let key, !busy else { return }
+        wantsSync = false
+        run(SyncConnection(endpoint: peer.endpoint, key: key), pairing: false)
+    }
+
+    func report(error: String) { lastError = error }
+
     // MARK: Sessions
 
     private func accept(_ connection: NWConnection, pairing: Bool) {
         guard !busy else { connection.cancel(); return }
+        run(SyncConnection(connection), pairing: pairing)
+    }
+
+    private func run(_ connection: SyncConnection, pairing: Bool) {
         busy = true
         lastError = nil
         if !pairing { status = .syncing(SyncProgress()) }
@@ -155,7 +216,7 @@ final class PhoneSync {
         let identity = identity, root = root
         let free = (try? URL.documentsDirectory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
             .volumeAvailableCapacityForImportantUsage
-        let (events, libraryID) = pairing ? ([], nil) : pendingEvents()
+        let (events, requests, libraryID) = pairing ? ([], [], nil) : pendingEvents()
         let lastFMConnected = isLastFMConnected()
         Task {
             defer {
@@ -165,21 +226,27 @@ final class PhoneSync {
             }
             do {
                 let result = try await SyncPhoneSession.run(
-                    SyncConnection(connection), identity: identity, root: root, freeSpace: free, pairing: pairing,
-                    events: events, libraryID: libraryID, lastFMConnected: lastFMConnected,
+                    connection, identity: identity, root: root, freeSpace: free, pairing: pairing,
+                    events: events, requests: requests, libraryID: libraryID, lastFMConnected: lastFMConnected,
                     storeGrant: { grant in try await self.store(grant) },
                     adoptLastFM: { account in await self.adopt(account) },
+                    storeConcerts: { settings in await self.keepConcerts(settings) },
                     progress: { progress in await self.report(progress) })
                 if pairing {
                     // Later syncs use the key the Mac just handed over.
                     if visible, let key { listen(key: key, pairing: nil) } else { stopListening(); status = .off }
+                    if active { lookForMac() }
                 } else {
-                    onEventsDelivered(Set(events.map(\.id)))
+                    onEventsDelivered(Set(events.map(\.id)), Set(requests.map(\.id)))
                     finished(result.summary)
+                    // Something more was asked for during the sync: another one, once this has wound down.
+                    if wantsSync { Task { @MainActor in self.requestSync() } }
                 }
             } catch {
                 lastError = error.localizedDescription
                 if !pairing {
+                    // Requests stay queued; the next sync sends them again.
+                    if !requests.isEmpty { wantsSync = true }
                     status = advertiser == nil ? .off : .waiting
                     // Whatever arrived before the failure is in place; show it.
                     onLibraryChanged()
@@ -202,6 +269,10 @@ final class PhoneSync {
 
     private func adopt(_ account: SyncLastFM) {
         adoptLastFM(account)
+    }
+
+    private func keepConcerts(_ settings: SyncConcertSettings) {
+        storeConcerts(settings)
     }
 
     private func report(_ progress: SyncProgress) {
