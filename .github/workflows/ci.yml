@@ -6,6 +6,12 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      testflight:
+        description: "iPhone app: sign it for TestFlight without uploading (export), or upload it (upload)"
+        type: choice
+        options: [none, export, upload]
+        default: none
 
 permissions:
   contents: read
@@ -68,19 +74,7 @@ jobs:
           CERTIFICATE_P12: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 }}
           CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
         run: |
-          [ -n "$CERTIFICATE_P12" ] || { echo "::error::The DEVELOPER_ID_CERTIFICATE_P12 secret is missing"; exit 1; }
-          keychain="$RUNNER_TEMP/signing.keychain-db"
-          password="$(uuidgen)"
-          security create-keychain -p "$password" "$keychain"
-          security set-keychain-settings -lut 21600 "$keychain"
-          security unlock-keychain -p "$password" "$keychain"
-          printf '%s' "$CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
-          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          rm "$RUNNER_TEMP/certificate.p12"
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" > /dev/null
-          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
-          identity="$(security find-identity -v -p codesigning "$keychain" | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)"
-          [ -n "$identity" ] || { echo "::error::The certificate has no Developer ID Application identity"; exit 1; }
+          identity="$(scripts/import-certificate.sh "Developer ID Application")"
           echo "SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
 
       - name: Build app (Apple Silicon + Intel)
@@ -143,6 +137,54 @@ jobs:
 
       - name: Build the iPhone app
         run: xcodebuild -project iOS/MusicLibraryMobile.xcodeproj -scheme MusicLibraryMobile -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+
+  testflight:
+    name: Upload the iPhone app to TestFlight
+    # Every release tag; by hand with the workflow's "testflight" input.
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.testflight != 'none')
+    needs: [build, ios]
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode 27
+        run: |
+          xcode="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | grep -iv beta | sort -V | tail -1 || true)"
+          [ -n "$xcode" ] || xcode="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1 || true)"
+          [ -n "$xcode" ] || { echo "No Xcode 27 on this runner:"; ls -d /Applications/Xcode*.app; exit 1; }
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+
+      # An App Manager API key can't use cloud-managed signing, so the Apple Distribution certificate comes from a
+      # secret; the key creates and updates the provisioning profiles and uploads.
+      - name: Import the Apple Distribution certificate
+        env:
+          CERTIFICATE_P12: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+        run: |
+          identity="$(scripts/import-certificate.sh "Apple Distribution")"
+          # The team is the identity's last part: "Apple Distribution: Name (TEAMID)".
+          team="$(sed -n 's/.*(\([A-Z0-9]\{10\}\))$/\1/p' <<< "$identity")"
+          [ -n "$team" ] || { echo "::error::No team ID in \"$identity\""; exit 1; }
+          echo "DEVELOPMENT_TEAM=$team" >> "$GITHUB_ENV"
+
+      - name: Archive and upload
+        env:
+          API_KEY: ${{ secrets.NOTARY_API_KEY }}
+          ASC_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          ASC_ISSUER: ${{ secrets.NOTARY_API_ISSUER_ID }}
+          UPLOAD: ${{ (startsWith(github.ref, 'refs/tags/v') || inputs.testflight == 'upload') && '1' || '0' }}
+        run: |
+          export ASC_KEY="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s\n' "$API_KEY" > "$ASC_KEY"
+          # Releases take their version from the tag; other runs use iOS/Version.xcconfig.
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then export VERSION="${GITHUB_REF_NAME#v}"; fi
+          DISTRIBUTION_CERTIFICATE=1 scripts/testflight.sh
+          rm -f "$ASC_KEY"
+
+      - name: Remove the signing keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
 
   release:
     name: Publish release
