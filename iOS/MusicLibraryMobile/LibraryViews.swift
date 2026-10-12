@@ -30,8 +30,29 @@ struct LibraryTab: View {
             .toolbar {
                 Button("Settings", systemImage: "gearshape") { showSettings = true }
             }
+            .modifier(PendingAlbumOpener())
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
+    }
+}
+
+/// Pushes the album a widget opened (`PhoneModel.pendingAlbumKey`) once the library is loaded.
+private struct PendingAlbumOpener: ViewModifier {
+    @Environment(PhoneModel.self) private var model
+    @Environment(\.openRoute) private var openRoute
+
+    private struct Pending: Equatable {
+        var key: String?
+        var libraryVersion: Int
+    }
+
+    func body(content: Content) -> some View {
+        content.task(id: Pending(key: model.pendingAlbumKey, libraryVersion: model.libraryVersion)) {
+            guard let key = model.pendingAlbumKey else { return }
+            if case .loading = model.state { return }
+            model.pendingAlbumKey = nil
+            if let album = model.library?.album(forKey: key) { openRoute(album) }
+        }
     }
 }
 

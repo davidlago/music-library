@@ -52,6 +52,8 @@ final class PhonePlayer {
     @ObservationIgnored var onProgress: ((Track, Double, Bool) -> Void)?
     /// Called when playback stops for good: the queue ran out.
     @ObservationIgnored var onPlaybackEnded: (() -> Void)?
+    /// Called when the song, play/pause or position (a seek) changes: what the lock screen shows.
+    @ObservationIgnored var onStateChange: (() -> Void)?
 
     @ObservationIgnored private let avPlayer = AVQueuePlayer()
     /// The item playing the queue's current song, and the next song's item when it's preloaded.
@@ -71,6 +73,12 @@ final class PhonePlayer {
     @ObservationIgnored private var requestedRate: Int?
 
     var currentTrack: Track? { queue.current }
+
+    /// The song after this one.
+    var nextTrack: Track? {
+        guard let index = queue.index, index + 1 < queue.entries.count else { return nil }
+        return queue.entries[index + 1].track
+    }
 
     init() {
         let defaults = UserDefaults.standard
@@ -102,7 +110,7 @@ final class PhonePlayer {
     private func enqueue(_ change: (inout PlayQueue) -> Void) {
         let idle = currentTrack == nil
         change(&queue)
-        if idle && currentTrack != nil { loadCurrent() } else { prepareNext() }
+        if idle && currentTrack != nil { loadCurrent() } else { prepareNext(); onStateChange?() }
     }
 
     func jump(to id: PlayQueue.Entry.ID) {
@@ -391,6 +399,7 @@ final class PhonePlayer {
     // MARK: Now playing
 
     private func updateNowPlaying() {
+        onStateChange?()
         guard let track = currentTrack else {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             return

@@ -8,18 +8,106 @@
 
 /* Begin PBXBuildFile section */
 		4D11A0000000000000000001 /* MusicLibraryCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A0000000000000000002 /* MusicLibraryCore */; };
+		4D11A0000000000000000027 /* MusicLibraryGlance in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A0000000000000000026 /* MusicLibraryGlance */; };
+		4D11A0000000000000000029 /* MusicLibraryGlance in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A0000000000000000028 /* MusicLibraryGlance */; };
+		4D11A000000000000000002B /* MusicLibraryGlance in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A000000000000000002A /* MusicLibraryGlance */; };
+		4D11A000000000000000002D /* MusicLibraryGlance in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A000000000000000002C /* MusicLibraryGlance */; };
+		4D11A0000000000000000049 /* MusicLibraryWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4D11A0000000000000000030 /* MusicLibraryWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		4D11A000000000000000004B /* MusicLibraryWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 4D11A0000000000000000031 /* MusicLibraryWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		4D11A000000000000000004D /* MusicLibraryWatchWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4D11A0000000000000000032 /* MusicLibraryWatchWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		4D11A000000000000000004E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4D11A000000000000000000E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4D11A0000000000000000033;
+			remoteInfo = MusicLibraryWidgets;
+		};
+		4D11A0000000000000000050 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4D11A000000000000000000E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4D11A000000000000000003A;
+			remoteInfo = MusicLibraryWatch;
+		};
+		4D11A0000000000000000052 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4D11A000000000000000000E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4D11A0000000000000000041;
+			remoteInfo = MusicLibraryWatchWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		4D11A0000000000000000048 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				4D11A0000000000000000049 /* MusicLibraryWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4D11A000000000000000004A /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				4D11A000000000000000004B /* MusicLibraryWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4D11A000000000000000004C /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				4D11A000000000000000004D /* MusicLibraryWatchWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		4D11A0000000000000000003 /* MusicLibraryMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusicLibraryMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4D11A0000000000000000004 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		4D11A0000000000000000005 /* MusicLibraryMobile-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "MusicLibraryMobile-Info.plist"; sourceTree = "<group>"; };
+		4D11A0000000000000000023 /* AppGroup.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AppGroup.entitlements; sourceTree = "<group>"; };
+		4D11A0000000000000000024 /* MusicLibraryWidgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "MusicLibraryWidgets-Info.plist"; sourceTree = "<group>"; };
+		4D11A0000000000000000025 /* MusicLibraryWatch-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "MusicLibraryWatch-Info.plist"; sourceTree = "<group>"; };
+		4D11A0000000000000000030 /* MusicLibraryWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicLibraryWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4D11A0000000000000000031 /* MusicLibraryWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusicLibraryWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4D11A0000000000000000032 /* MusicLibraryWatchWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicLibraryWatchWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4D11A0000000000000000006 /* MusicLibraryMobile */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = MusicLibraryMobile;
+			sourceTree = "<group>";
+		};
+		4D11A0000000000000000020 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		4D11A0000000000000000021 /* MusicLibraryWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MusicLibraryWidgets;
+			sourceTree = "<group>";
+		};
+		4D11A0000000000000000022 /* MusicLibraryWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MusicLibraryWatch;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -30,6 +118,31 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D11A0000000000000000001 /* MusicLibraryCore in Frameworks */,
+				4D11A0000000000000000027 /* MusicLibraryGlance in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4D11A0000000000000000038 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4D11A0000000000000000029 /* MusicLibraryGlance in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4D11A000000000000000003F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4D11A000000000000000002B /* MusicLibraryGlance in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4D11A0000000000000000046 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4D11A000000000000000002D /* MusicLibraryGlance in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -40,7 +153,13 @@
 			isa = PBXGroup;
 			children = (
 				4D11A0000000000000000006 /* MusicLibraryMobile */,
+				4D11A0000000000000000021 /* MusicLibraryWidgets */,
+				4D11A0000000000000000022 /* MusicLibraryWatch */,
+				4D11A0000000000000000020 /* Shared */,
 				4D11A0000000000000000005 /* MusicLibraryMobile-Info.plist */,
+				4D11A0000000000000000024 /* MusicLibraryWidgets-Info.plist */,
+				4D11A0000000000000000025 /* MusicLibraryWatch-Info.plist */,
+				4D11A0000000000000000023 /* AppGroup.entitlements */,
 				4D11A0000000000000000004 /* Signing.xcconfig */,
 				4D11A0000000000000000009 /* Products */,
 			);
@@ -50,6 +169,9 @@
 			isa = PBXGroup;
 			children = (
 				4D11A0000000000000000003 /* MusicLibraryMobile.app */,
+				4D11A0000000000000000030 /* MusicLibraryWidgets.appex */,
+				4D11A0000000000000000031 /* MusicLibraryWatch.app */,
+				4D11A0000000000000000032 /* MusicLibraryWatchWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -64,21 +186,99 @@
 				4D11A000000000000000000C /* Sources */,
 				4D11A0000000000000000007 /* Frameworks */,
 				4D11A000000000000000000D /* Resources */,
+				4D11A0000000000000000048 /* Embed Foundation Extensions */,
+				4D11A000000000000000004A /* Embed Watch Content */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4D11A000000000000000004F /* PBXTargetDependency */,
+				4D11A0000000000000000051 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4D11A0000000000000000006 /* MusicLibraryMobile */,
+				4D11A0000000000000000020 /* Shared */,
+			);
+			name = MusicLibraryMobile;
+			packageProductDependencies = (
+				4D11A0000000000000000002 /* MusicLibraryCore */,
+				4D11A0000000000000000026 /* MusicLibraryGlance */,
+			);
+			productName = MusicLibraryMobile;
+			productReference = 4D11A0000000000000000003 /* MusicLibraryMobile.app */;
+			productType = "com.apple.product-type.application";
+		};
+		4D11A000000000000000003A /* MusicLibraryWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4D11A000000000000000003B /* Build configuration list for PBXNativeTarget "MusicLibraryWatch" */;
+			buildPhases = (
+				4D11A000000000000000003E /* Sources */,
+				4D11A000000000000000003F /* Frameworks */,
+				4D11A0000000000000000040 /* Resources */,
+				4D11A000000000000000004C /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4D11A0000000000000000053 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4D11A0000000000000000022 /* MusicLibraryWatch */,
+			);
+			name = MusicLibraryWatch;
+			packageProductDependencies = (
+				4D11A000000000000000002A /* MusicLibraryGlance */,
+			);
+			productName = MusicLibraryWatch;
+			productReference = 4D11A0000000000000000031 /* MusicLibraryWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
+		4D11A0000000000000000041 /* MusicLibraryWatchWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4D11A0000000000000000042 /* Build configuration list for PBXNativeTarget "MusicLibraryWatchWidgets" */;
+			buildPhases = (
+				4D11A0000000000000000045 /* Sources */,
+				4D11A0000000000000000046 /* Frameworks */,
+				4D11A0000000000000000047 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				4D11A0000000000000000006 /* MusicLibraryMobile */,
+				4D11A0000000000000000021 /* MusicLibraryWidgets */,
 			);
-			name = MusicLibraryMobile;
+			name = MusicLibraryWatchWidgets;
 			packageProductDependencies = (
-				4D11A0000000000000000002 /* MusicLibraryCore */,
+				4D11A000000000000000002C /* MusicLibraryGlance */,
 			);
-			productName = MusicLibraryMobile;
-			productReference = 4D11A0000000000000000003 /* MusicLibraryMobile.app */;
-			productType = "com.apple.product-type.application";
+			productName = MusicLibraryWatchWidgets;
+			productReference = 4D11A0000000000000000032 /* MusicLibraryWatchWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		4D11A0000000000000000033 /* MusicLibraryWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4D11A0000000000000000034 /* Build configuration list for PBXNativeTarget "MusicLibraryWidgets" */;
+			buildPhases = (
+				4D11A0000000000000000037 /* Sources */,
+				4D11A0000000000000000038 /* Frameworks */,
+				4D11A0000000000000000039 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4D11A0000000000000000021 /* MusicLibraryWidgets */,
+				4D11A0000000000000000020 /* Shared */,
+			);
+			name = MusicLibraryWidgets;
+			packageProductDependencies = (
+				4D11A0000000000000000028 /* MusicLibraryGlance */,
+			);
+			productName = MusicLibraryWidgets;
+			productReference = 4D11A0000000000000000030 /* MusicLibraryWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -108,12 +308,36 @@
 			projectRoot = "";
 			targets = (
 				4D11A000000000000000000A /* MusicLibraryMobile */,
+				4D11A0000000000000000033 /* MusicLibraryWidgets */,
+				4D11A000000000000000003A /* MusicLibraryWatch */,
+				4D11A0000000000000000041 /* MusicLibraryWatchWidgets */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		4D11A000000000000000000D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4D11A0000000000000000039 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4D11A0000000000000000040 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4D11A0000000000000000047 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -130,7 +354,46 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4D11A0000000000000000037 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4D11A000000000000000003E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4D11A0000000000000000045 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4D11A000000000000000004F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4D11A0000000000000000033 /* MusicLibraryWidgets */;
+			targetProxy = 4D11A000000000000000004E /* PBXContainerItemProxy */;
+		};
+		4D11A0000000000000000051 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4D11A000000000000000003A /* MusicLibraryWatch */;
+			targetProxy = 4D11A0000000000000000050 /* PBXContainerItemProxy */;
+		};
+		4D11A0000000000000000053 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4D11A0000000000000000041 /* MusicLibraryWatchWidgets */;
+			targetProxy = 4D11A0000000000000000052 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		4D11A0000000000000000011 /* Debug */ = {
@@ -156,6 +419,7 @@
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Debug;
 		};
@@ -176,6 +440,7 @@
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Release;
 		};
@@ -184,6 +449,7 @@
 			baseConfigurationReference = 4D11A0000000000000000004 /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AppGroup.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
@@ -199,7 +465,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = io.github.davidlago.MusicLibraryMobile;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -216,6 +482,7 @@
 			baseConfigurationReference = 4D11A0000000000000000004 /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AppGroup.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
@@ -231,7 +498,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = io.github.davidlago.MusicLibraryMobile;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -240,6 +507,182 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		4D11A0000000000000000035 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4D11A0000000000000000004 /* Signing.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = AppGroup.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "MusicLibraryWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Music Library";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).Widgets";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) WIDGET_EXTENSION";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		4D11A0000000000000000036 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4D11A0000000000000000004 /* Signing.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = AppGroup.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "MusicLibraryWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Music Library";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).Widgets";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) WIDGET_EXTENSION";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		4D11A000000000000000003C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4D11A0000000000000000004 /* Signing.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AppGroup.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "MusicLibraryWatch-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Music Library";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "$(APP_BUNDLE_ID)";
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).watchkitapp";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Debug;
+		};
+		4D11A000000000000000003D /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4D11A0000000000000000004 /* Signing.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AppGroup.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "MusicLibraryWatch-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Music Library";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "$(APP_BUNDLE_ID)";
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).watchkitapp";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Release;
+		};
+		4D11A0000000000000000043 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4D11A0000000000000000004 /* Signing.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = AppGroup.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "MusicLibraryWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Music Library";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).watchkitapp.Widgets";
+				SDKROOT = watchos;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Debug;
+		};
+		4D11A0000000000000000044 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4D11A0000000000000000004 /* Signing.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = AppGroup.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "MusicLibraryWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Music Library";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).watchkitapp.Widgets";
+				SDKROOT = watchos;
+				TARGETED_DEVICE_FAMILY = 4;
 			};
 			name = Release;
 		};
@@ -264,6 +707,33 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		4D11A0000000000000000034 /* Build configuration list for PBXNativeTarget "MusicLibraryWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4D11A0000000000000000035 /* Debug */,
+				4D11A0000000000000000036 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4D11A000000000000000003B /* Build configuration list for PBXNativeTarget "MusicLibraryWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4D11A000000000000000003C /* Debug */,
+				4D11A000000000000000003D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4D11A0000000000000000042 /* Build configuration list for PBXNativeTarget "MusicLibraryWatchWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4D11A0000000000000000043 /* Debug */,
+				4D11A0000000000000000044 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -277,6 +747,22 @@
 		4D11A0000000000000000002 /* MusicLibraryCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MusicLibraryCore;
+		};
+		4D11A0000000000000000026 /* MusicLibraryGlance */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MusicLibraryGlance;
+		};
+		4D11A0000000000000000028 /* MusicLibraryGlance */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MusicLibraryGlance;
+		};
+		4D11A000000000000000002A /* MusicLibraryGlance */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MusicLibraryGlance;
+		};
+		4D11A000000000000000002C /* MusicLibraryGlance */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MusicLibraryGlance;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -1,5 +1,6 @@
 import Foundation
 import MusicLibraryCore
+import MusicLibraryGlance
 import Network
 import Observation
 import UIKit
@@ -8,7 +9,8 @@ import UIKit
 /// it changes (a sync, or an export dragged in through Finder's Files tab). The snapshot lists the whole library;
 /// only the songs whose files are here play, and the rest can be asked for (`requests`, sent at each sync, which
 /// starts as soon as the Mac is around). Also connects the player to Last.fm, keeps the play queue across launches,
-/// and records plays, likes and ownership changes for the Mac (`outbox`, sent at each sync).
+/// and records plays, likes and ownership changes for the Mac (`outbox`, sent at each sync). Keeps the widgets' and the
+/// watch's summary up to date (`glance`, `watch`) and runs their commands (`perform`).
 @Observable
 final class PhoneModel {
     /// Whether an album, artist or list's songs are on the phone.
@@ -54,6 +56,12 @@ final class PhoneModel {
 
     /// The song whose details are shown (Song Info).
     var infoTrack: Track?
+    /// An album a widget opened (`SearchIndex.albumKey`), pushed on the Library tab once the library has loaded.
+    var pendingAlbumKey: String?
+
+    /// The summary the widgets and the watch show, and the watch connection.
+    @ObservationIgnored let glance: GlanceFeed
+    @ObservationIgnored let watch: WatchLink
 
     /// Bumped when the library, the history or ownership changes (Insights recompute).
     private(set) var libraryVersion = 0
@@ -69,8 +77,12 @@ final class PhoneModel {
     @ObservationIgnored private var currentPlay: (track: Track, startedAt: Date, tracker: ListenTracker)?
     @ObservationIgnored private var loadedStamp: Stamp?
     @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var loading: Task<Void, Never>?
     @ObservationIgnored private var restoredPlayerState = false
     @ObservationIgnored private let pathMonitor = NWPathMonitor()
+
+    /// The app's model; widget buttons (`PlaybackCommandCenter`) can need it before SwiftUI has created the app.
+    static let shared = PhoneModel()
 
     var library: LibrarySnapshot? {
         if case .loaded(let s) = state { return s }
@@ -78,6 +90,9 @@ final class PhoneModel {
     }
 
     init() {
+        let glance = GlanceFeed()
+        self.glance = glance
+        watch = WatchLink(store: glance.store)
         sync.onLibraryChanged = { [weak self] in self?.reload() }
         sync.pendingEvents = { [weak self] in
             guard let self else { return ([], [], nil) }
@@ -109,6 +124,11 @@ final class PhoneModel {
             self?.advancePlay(track, position: position, playing: playing)
         }
         player.onPlaybackEnded = { [weak self] in self?.finishPlay() }
+        player.onStateChange = { [weak self] in self?.glance.setNeedsUpdate(full: false) }
+        glance.inputs = { [weak self] in self?.glanceInputs }
+        glance.onChange = { [weak self] in self?.watch.send($0) }
+        watch.current = { [weak self] in self?.glance.current }
+        watch.perform = { [weak self] in await self?.perform($0) ?? .failed("Music Library isn't ready on the iPhone.") }
         // Scrobbles made offline go out as soon as the phone is back online.
         pathMonitor.pathUpdateHandler = { [weak self] path in
             guard path.status == .satisfied else { return }
@@ -144,7 +164,7 @@ final class PhoneModel {
         let generation = generation
         let documents = URL.documentsDirectory
         if library == nil { state = .loading }
-        Task.detached(priority: .userInitiated) {
+        loading = Task.detached(priority: .userInitiated) {
             let (state, stamp) = Self.load(documents: documents)
             await MainActor.run {
                 guard generation == self.generation else { return }
@@ -158,6 +178,14 @@ final class PhoneModel {
                 self.refreshOverlays()
             }
         }
+    }
+
+    /// Loads the library if it isn't yet: a widget button or the watch can start the app in the background, where
+    /// it never becomes active.
+    private func ensureLoaded() async {
+        guard library == nil else { return }
+        if loading == nil { reload() }
+        await loading?.value
     }
 
     nonisolated private static func load(documents: URL) -> (State, Stamp?) {
@@ -191,6 +219,7 @@ final class PhoneModel {
             library?.track(id: id).map { SearchIndex.albumKey(album: $0.album, artist: $0.effectiveAlbumArtist) }
         }
         purchasesVersion += 1
+        glance.setNeedsUpdate()
     }
 
     private func refreshPlays(_ events: [SyncEvent]) {
@@ -213,6 +242,7 @@ final class PhoneModel {
         playTotals = totals
         artistPlayTotals = artists
         historyVersion += 1
+        glance.setNeedsUpdate()
     }
 
     // MARK: Likes and plays
@@ -228,6 +258,7 @@ final class PhoneModel {
     func toggleLike(_ track: Track) {
         outbox.append(SyncEvent(track: track, at: Date(), kind: .like(!isLiked(track))))
         likedDates = SyncOutbox.liked(base: library?.likedDates ?? [:], events: outbox.events)
+        glance.setNeedsUpdate()
     }
 
     func artistPlayTotal(_ name: String) -> PlayTotal { artistPlayTotals[LibrarySnapshot.artistKey(name)] ?? PlayTotal() }
@@ -394,6 +425,57 @@ final class PhoneModel {
         guard let data = try? Data(contentsOf: Self.interruptedPlayURL) else { return }
         try? FileManager.default.removeItem(at: Self.interruptedPlayURL)
         if let event = try? JSONDecoder().decode(SyncEvent.self, from: data) { outbox.append(event) }
+    }
+
+    // MARK: Widgets and the watch
+
+    private var glanceInputs: GlanceFeed.Inputs? {
+        guard let library else { return nil }
+        let playing = player.currentTrack.map { t in
+            Glance.Playing(track: t, isPlaying: player.isPlaying, position: player.currentTime,
+                           duration: player.duration > 0 ? player.duration : t.duration, next: player.nextTrack)
+        }
+        return GlanceFeed.Inputs(root: library.root, tracks: library.tracks, present: library.presentIDs, plays: plays,
+                                 likedDates: likedDates, purchases: purchases, playTotals: playTotals, playing: playing)
+    }
+
+    /// Runs a command from a widget button or the watch.
+    func perform(_ command: GlanceCommand) async -> GlanceCommandResult {
+        await ensureLoaded()
+        guard let library else { return .failed("There's no library on the iPhone yet.") }
+        switch command {
+        case .playPause:
+            guard player.currentTrack != nil else { return .failed("Nothing is queued on the iPhone.") }
+            player.togglePlayPause()
+        case .next:
+            player.next()
+        case .previous:
+            player.previous()
+        case .toggleLike:
+            guard let track = player.currentTrack else { return .failed("Nothing is playing.") }
+            toggleLike(track)
+        case .playAlbum(let key):
+            guard let album = library.album(forKey: key) else { return .failed("That album isn't in the library anymore.") }
+            let tracks = library.playable(library.tracks(album: album))
+            guard !tracks.isEmpty else { return .failed("“\(album.album)” isn't on the iPhone.") }
+            player.play(queue: tracks, source: album.album)
+        case .playSong(let id):
+            guard let track = library.track(id: id), library.isPresent(track) else { return .failed("That song isn't on the iPhone.") }
+            let album = library.album(of: track).map { library.playable(library.tracks(album: $0)) } ?? [track]
+            player.play(queue: album, startAt: album.firstIndex { $0.id == id } ?? 0, source: track.album)
+        case .shuffleLiked:
+            let tracks = library.playable(likedTracks).shuffled()
+            guard !tracks.isEmpty else { return .failed("No liked songs are on the iPhone.") }
+            player.play(queue: tracks, source: "Liked Songs")
+        case .shuffleAll:
+            let tracks = library.presentTracks.shuffled()
+            guard !tracks.isEmpty else { return .failed("No music is on the iPhone yet.") }
+            player.play(queue: tracks, source: "On This iPhone")
+        }
+        // The app may be in the background, where iOS can end it without warning.
+        savePlayerState()
+        await glance.updateNow()
+        return .done
     }
 
     // MARK: Player state

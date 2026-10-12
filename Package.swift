@@ -11,17 +11,20 @@ let testSwiftSettings: [SwiftSetting] = usesCommandLineTools && FileManager.defa
 
 let package = Package(
     name: "MusicLibrary",
-    platforms: [.macOS(.v14), .iOS("27.0")],
+    platforms: [.macOS(.v14), .iOS("27.0"), .watchOS("26.0")],
     products: [
         .executable(name: "MusicLibrary", targets: ["MusicLibrary"]),
         .library(name: "MusicLibraryCore", targets: ["MusicLibraryCore"]),
+        // What the iPhone's widgets and the watch app show; Foundation only, so they don't need the core.
+        .library(name: "MusicLibraryGlance", targets: ["MusicLibraryGlance"]),
     ],
     targets: [
-        .target(name: "MusicLibraryCore"),
+        .target(name: "MusicLibraryGlance"),
+        .target(name: "MusicLibraryCore", dependencies: ["MusicLibraryGlance"]),
         .executableTarget(name: "MusicLibrary", dependencies: ["MusicLibraryCore"]),
         .testTarget(
             name: "MusicLibraryCoreTests",
-            dependencies: ["MusicLibraryCore"],
+            dependencies: ["MusicLibraryCore", "MusicLibraryGlance"],
             resources: [.copy("Fixtures")],
             swiftSettings: testSwiftSettings
         ),
