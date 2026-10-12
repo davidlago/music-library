@@ -212,6 +212,11 @@ import Testing
         #expect(CatalogText.key("Lin‐Manuel Miranda") == CatalogText.key("Lin-Manuel Miranda"))
         #expect(CatalogText.barcodeVariants("00075678668432") == ["075678668432", "0075678668432"])
         #expect(CatalogText.barcodeVariants("5099902987422") == ["5099902987422"])
+        // Leading zero and check digit dropped: completed first. Valid UPCs with the zero dropped stay as they were.
+        #expect(CatalogText.barcodeVariants("7464395412") == ["074643954129", "0074643954129", "007464395412", "0007464395412"])
+        #expect(CatalogText.barcodeVariants("02894382352").prefix(2) == ["028943823524", "0028943823524"])
+        #expect(CatalogText.barcodeVariants("75678668432") == ["075678668432", "0075678668432"])
+        #expect(CatalogText.isTruncatedUPC("7464395412") && !CatalogText.isTruncatedUPC("75678668432") && !CatalogText.isTruncatedUPC("075678668432"))
         #expect(CatalogText.year("p2015, c2016") == 2015 && CatalogText.year("[2025]") == 2025 && CatalogText.year("n.d.") == nil)
     }
 
@@ -277,5 +282,20 @@ import Testing
         details.editions = try CatalogParser.parseEditions(try TestSupport.fixture("minlib_editions_hamilton"))
         try db.saveCatalogDetails(details)
         #expect(try db.catalogDetails()["w1"] == details)
+    }
+
+    @Test func missesWithTruncatedUPCsAreLookedUpAgain() {
+        var miss = CatalogAlbumDetails(workId: "w")
+        miss.editions = [CatalogEdition(recordId: ".b1", upc: "7464395412", statusText: "", availability: .unknown)]
+        #expect(miss.isOutdatedMiss)
+        var current = miss
+        current.version = CatalogEnricher.version
+        #expect(!current.isOutdatedMiss)
+        var matched = miss
+        matched.releaseId = "r1"
+        #expect(!matched.isOutdatedMiss)
+        var fullUPC = miss
+        fullUPC.editions = [CatalogEdition(recordId: ".b1", upc: "074643954129", statusText: "", availability: .unknown)]
+        #expect(!fullUPC.isOutdatedMiss)
     }
 }

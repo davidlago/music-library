@@ -118,6 +118,8 @@ public struct CatalogAlbumDetails: Codable, Hashable, Sendable {
     public var match: Match?
     public var album: AlbumInfo?
     public var fetchedAt: Date
+    /// The `CatalogEnricher.version` that looked the title up (nil before versions).
+    public var version: Int?
 
     public init(workId: String, fetchedAt: Date = Date()) {
         self.workId = workId
@@ -125,6 +127,12 @@ public struct CatalogAlbumDetails: Codable, Hashable, Sendable {
     }
 
     public var isMatched: Bool { releaseId != nil || releaseGroupId != nil }
+
+    /// Not matched by an older enricher that the current one may do better on, so worth looking up again now.
+    public var isOutdatedMiss: Bool {
+        guard !isMatched, (version ?? 1) < CatalogEnricher.version else { return false }
+        return editions.contains { $0.upc.map(CatalogText.isTruncatedUPC) ?? false }
+    }
 
     /// The original release year, falling back to this release's.
     public var year: Int? { album?.firstReleaseYear ?? releaseDate.flatMap { Int($0.prefix(4)) } }
@@ -210,6 +218,9 @@ extension MusicBrainzClient {
 /// Looks a catalog title up: its editions (and UPCs) from the catalog, then the MusicBrainz release by barcode,
 /// falling back to a release group search on title and artist, then the album info for that release.
 public struct CatalogEnricher: Sendable {
+    /// Bumped when matching improves. 2: truncated UPCs are completed with their check digit.
+    public static let version = 2
+
     /// GETs a path on the catalog site.
     public typealias CatalogGet = @Sendable (String) async throws -> Data
 
@@ -225,6 +236,7 @@ public struct CatalogEnricher: Sendable {
 
     public func details(for item: CatalogItem, now: Date = Date()) async throws -> CatalogAlbumDetails {
         var details = CatalogAlbumDetails(workId: item.id, fetchedAt: now)
+        details.version = Self.version
         if let variation = item.variationId {
             details.editions = try CatalogParser.parseEditions(try await catalog(CatalogPaths.editions(workId: item.id, variationId: variation)))
         }

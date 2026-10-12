@@ -577,6 +577,7 @@ final class LibraryCatalogStore {
 
     func needsLookup(_ id: String, now: Date = Date()) -> Bool {
         guard let d = details[id] else { return true }
+        if d.isOutdatedMiss { return true }
         return now.timeIntervalSince(d.fetchedAt) > (d.isMatched ? Self.maxAge : Self.notFoundRetry)
     }
 
