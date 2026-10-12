@@ -2,8 +2,11 @@ import AppKit
 import CoreGraphics
 import Foundation
 
-// Usage: swift scripts/make-icon.swift  (from anywhere; writes into <repo>/Resources)
-// Draws the app icon with paths only (no SF Symbols or font glyphs).
+// Usage: swift scripts/make-icon.swift  (from anywhere; writes into <repo>/Resources and the iPhone and watch asset
+// catalogs). Draws the app icon with paths only (no SF Symbols or font glyphs).
+//
+// The Mac icon is the rounded body on a transparent margin, as macOS expects. iOS and watchOS round (or circle) the
+// icon themselves and fill transparency, so theirs is full bleed and opaque: the body fills the square.
 
 let space = CGColorSpace(name: CGColorSpace.sRGB)!
 
@@ -21,17 +24,23 @@ func circle(_ c: CGPoint, _ r: CGFloat) -> CGPath {
     CGPath(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r), transform: nil)
 }
 
-func render(size: Int) -> CGImage {
+func render(size: Int, fullBleed: Bool = false) -> CGImage {
     let ctx = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0, space: space,
-                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+                        bitmapInfo: (fullBleed ? CGImageAlphaInfo.noneSkipLast : .premultipliedLast).rawValue)!
     ctx.interpolationQuality = .high
     ctx.scaleBy(x: CGFloat(size) / 1024, y: CGFloat(size) / 1024)
+    if fullBleed {
+        // The body (100…924) fills the canvas.
+        ctx.scaleBy(x: 1024 / 824, y: 1024 / 824)
+        ctx.translateBy(x: -100, y: -100)
+    }
     let small = size <= 32
 
-    // Body with shadow
-    let body = CGPath(roundedRect: CGRect(x: 100, y: 100, width: 824, height: 824), cornerWidth: 185, cornerHeight: 185, transform: nil)
+    // Body, with a shadow on the Mac
+    let rect = CGRect(x: 100, y: 100, width: 824, height: 824)
+    let body = fullBleed ? CGPath(rect: rect, transform: nil) : CGPath(roundedRect: rect, cornerWidth: 185, cornerHeight: 185, transform: nil)
     ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 20, color: color(0x000000, alpha: 0.3))
+    if !fullBleed { ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 20, color: color(0x000000, alpha: 0.3)) }
     ctx.setFillColor(color(0x3A1C71))
     ctx.addPath(body)
     ctx.fillPath()
@@ -146,6 +155,10 @@ for base in [16, 32, 128, 256, 512] {
     try writePNG(render(size: base * 2), to: iconset.appendingPathComponent("icon_\(base)x\(base)@2x.png"))
 }
 try writePNG(render(size: 1024), to: resources.appendingPathComponent("AppIcon-1024.png"))
+for app in ["MusicLibraryMobile", "MusicLibraryWatch"] {
+    let url = root.appendingPathComponent("iOS/\(app)/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png")
+    try writePNG(render(size: 1024, fullBleed: true), to: url)
+}
 
 let icns = resources.appendingPathComponent("AppIcon.icns")
 let process = Process()
