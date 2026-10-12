@@ -185,7 +185,7 @@ final class AppModel {
     @ObservationIgnored let player: Player
     /// Apple Music previews of catalog CDs.
     @ObservationIgnored let previews = PreviewPlayer()
-    @ObservationIgnored let scrobbler = Scrobbler()
+    @ObservationIgnored let scrobbler = Scrobbler(openURL: { NSWorkspace.shared.open($0) })
     @ObservationIgnored let artistInfo = ArtistInfoStore()
     @ObservationIgnored let albumInfo = AlbumInfoStore()
     /// The public library's catalog of music CDs.

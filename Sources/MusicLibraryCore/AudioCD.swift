@@ -149,6 +149,7 @@ public enum CDTrackMapping {
     }
 }
 
+#if os(macOS)
 public struct CDRipper: Sendable {
     public let tools: ToolLocator
     public init(tools: ToolLocator = ToolLocator()) { self.tools = tools }
@@ -218,3 +219,4 @@ public struct CDImporter: Sendable {
         return try await service.commit(item, metadata: metadata, cover: cover)
     }
 }
+#endif

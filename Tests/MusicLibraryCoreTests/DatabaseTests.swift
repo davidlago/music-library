@@ -138,4 +138,26 @@ import Testing
         #expect(try db2.trackCount() == 1)
         #expect(try db2.query("PRAGMA user_version") { $0.int(0) }.first == Database.schemaVersion)
     }
+
+    @Test func snapshotOpensReadOnly() throws {
+        let dir = try TestSupport.tempDir()
+        let db = try Database(path: dir.appendingPathComponent("library.sqlite").path)
+        let track = try db.insertTrack(makeTrack(1))
+        try db.setLiked([track.id], true)
+        let snapshot = dir.appendingPathComponent("snapshot.sqlite")
+        try db.vacuum(into: snapshot.path)
+        let before = try Data(contentsOf: snapshot)
+
+        let copy = try Database(snapshotAt: snapshot.path)
+        #expect(try copy.fetchAllTracks().map(\.sha256) == [track.sha256])
+        #expect(try copy.likedTrackDates().keys.sorted() == [track.id])
+        #expect(throws: DatabaseError.self) { try copy.insertTrack(makeTrack(2)) }
+        #expect(try Data(contentsOf: snapshot) == before)
+    }
+
+    @Test func snapshotFromNewerVersionIsRefused() throws {
+        let path = try TestSupport.tempDir().appendingPathComponent("library.sqlite").path
+        try Database(path: path).exec("PRAGMA user_version=\(Database.schemaVersion + 1)")
+        #expect(throws: DatabaseError.self) { try Database(snapshotAt: path) }
+    }
 }

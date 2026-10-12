@@ -234,6 +234,7 @@ public struct CatalogEnricher: Sendable {
         self.info = info
     }
 
+    #if os(macOS)
     public func details(for item: CatalogItem, now: Date = Date()) async throws -> CatalogAlbumDetails {
         var details = CatalogAlbumDetails(workId: item.id, fetchedAt: now)
         details.version = Self.version
@@ -259,6 +260,7 @@ public struct CatalogEnricher: Sendable {
                                                   releaseGroupId: details.releaseGroupId, releaseId: details.releaseId)
         return details
     }
+    #endif
 
     func apply(_ release: MBReleaseSummary, to details: inout CatalogAlbumDetails, match: CatalogAlbumDetails.Match) {
         details.releaseId = release.id

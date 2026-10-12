@@ -1,11 +1,11 @@
-import AppKit
 import Foundation
-import MusicLibraryCore
+import Observation
 
 /// Scrobbles what the player plays to Last.fm: connects the account through Last.fm's browser
 /// authorization, sends "now playing" updates, and queues scrobbles so none are lost while offline.
+/// Shared by the Mac and iPhone apps; each passes how to open the authorization page in the browser.
 @MainActor @Observable
-final class Scrobbler {
+public final class Scrobbler {
     private enum Keys {
         static let apiKey = "lastfmAPIKey"
         static let secret = "lastfmSharedSecret"
@@ -15,7 +15,7 @@ final class Scrobbler {
         static let nowPlaying = "lastfmNowPlaying"
     }
 
-    enum Status: Equatable {
+    public enum Status: Equatable {
         case notConfigured
         case disconnected
         case authorizing
@@ -23,21 +23,21 @@ final class Scrobbler {
         case needsReauthorization(String)
     }
 
-    var apiKey: String { didSet { keychain.set(apiKey, for: Keys.apiKey); credentialsChanged() } }
-    var sharedSecret: String { didSet { keychain.set(sharedSecret, for: Keys.secret); credentialsChanged() } }
-    var scrobblingEnabled: Bool { didSet { UserDefaults.standard.set(scrobblingEnabled, forKey: Keys.enabled) } }
-    var sendsNowPlaying: Bool { didSet { UserDefaults.standard.set(sendsNowPlaying, forKey: Keys.nowPlaying) } }
+    public var apiKey: String { didSet { keychain.set(apiKey, for: Keys.apiKey); credentialsChanged() } }
+    public var sharedSecret: String { didSet { keychain.set(sharedSecret, for: Keys.secret); credentialsChanged() } }
+    public var scrobblingEnabled: Bool { didSet { UserDefaults.standard.set(scrobblingEnabled, forKey: Keys.enabled) } }
+    public var sendsNowPlaying: Bool { didSet { UserDefaults.standard.set(sendsNowPlaying, forKey: Keys.nowPlaying) } }
 
-    private(set) var session: LastFMSession?
-    private(set) var isAuthorizing = false
-    private(set) var sessionInvalid = false
-    private(set) var lastError: String?
-    private(set) var pendingCount = 0
-    private(set) var isSending = false
+    public private(set) var session: LastFMSession?
+    public private(set) var isAuthorizing = false
+    public private(set) var sessionInvalid = false
+    public private(set) var lastError: String?
+    public private(set) var pendingCount = 0
+    public private(set) var isSending = false
     /// Most recent first; only scrobbles sent during this run.
-    private(set) var recent: [Scrobble] = []
+    public private(set) var recent: [Scrobble] = []
     /// The track currently playing has been scrobbled.
-    private(set) var currentPlayScrobbled = false
+    public private(set) var currentPlayScrobbled = false
 
     @ObservationIgnored private let keychain = KeychainStore.app
     @ObservationIgnored private let queue: ScrobbleQueue
@@ -47,25 +47,27 @@ final class Scrobbler {
     @ObservationIgnored private var authTask: Task<Void, Never>?
     @ObservationIgnored private var retryTask: Task<Void, Never>?
     @ObservationIgnored private var retryDelay: TimeInterval = 30
-    @ObservationIgnored private(set) var pendingAuthURL: URL?
+    @ObservationIgnored public private(set) var pendingAuthURL: URL?
+    @ObservationIgnored private let openURL: @MainActor (URL) -> Void
 
-    var hasCredentials: Bool {
+    public var hasCredentials: Bool {
         !apiKey.trimmingCharacters(in: .whitespaces).isEmpty && !sharedSecret.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
-    var status: Status {
+    public var status: Status {
         if !hasCredentials { return .notConfigured }
         if isAuthorizing { return .authorizing }
         guard let session else { return .disconnected }
         return sessionInvalid ? .needsReauthorization(session.username) : .connected(session.username)
     }
 
-    var isActive: Bool {
+    public var isActive: Bool {
         if case .connected = status { return scrobblingEnabled }
         return false
     }
 
-    init(queueURL: URL = Scrobbler.defaultQueueURL) {
+    public init(queueURL: URL = Scrobbler.defaultQueueURL, openURL: @escaping @MainActor (URL) -> Void) {
+        self.openURL = openURL
         let d = UserDefaults.standard
         let keychain = KeychainStore.app
         let storedKey = keychain.migratedString(for: Keys.apiKey, from: d, key: Keys.apiKey) ?? ""
@@ -85,7 +87,7 @@ final class Scrobbler {
         flush()
     }
 
-    static var defaultQueueURL: URL {
+    public static var defaultQueueURL: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
         return base.appendingPathComponent("MusicLibrary/lastfm-queue.json")
@@ -99,7 +101,7 @@ final class Scrobbler {
     // MARK: Account
 
     /// Gets a token, opens Last.fm in the browser for the user to allow access, and waits for approval.
-    func connect() {
+    public func connect() {
         cancelAuthorization()
         lastError = nil
         isAuthorizing = true
@@ -110,7 +112,7 @@ final class Scrobbler {
                 let url = await client.authorizationURL(token: token)
                 guard let self, !Task.isCancelled else { return }
                 self.pendingAuthURL = url
-                NSWorkspace.shared.open(url)
+                self.openURL(url)
                 // Tokens are valid for 60 minutes; stop asking well before that.
                 for _ in 0..<200 {
                     try await Task.sleep(for: .seconds(3))
@@ -132,11 +134,11 @@ final class Scrobbler {
         }
     }
 
-    func reopenAuthorizationPage() {
-        if let pendingAuthURL { NSWorkspace.shared.open(pendingAuthURL) }
+    public func reopenAuthorizationPage() {
+        if let pendingAuthURL { openURL(pendingAuthURL) }
     }
 
-    func cancelAuthorization() {
+    public func cancelAuthorization() {
         authTask?.cancel()
         authTask = nil
         isAuthorizing = false
@@ -155,7 +157,7 @@ final class Scrobbler {
         flush()
     }
 
-    func disconnect() {
+    public func disconnect() {
         cancelAuthorization()
         session = nil
         sessionInvalid = false
@@ -165,7 +167,7 @@ final class Scrobbler {
 
     // MARK: Player events
 
-    func trackStarted(_ track: Track) {
+    public func trackStarted(_ track: Track) {
         tracker = ListenTracker(duration: track.duration)
         currentPlay = (track.id, Date())
         currentPlayScrobbled = false
@@ -182,7 +184,7 @@ final class Scrobbler {
         }
     }
 
-    func progress(_ track: Track, position: Double, playing: Bool) {
+    public func progress(_ track: Track, position: Double, playing: Bool) {
         guard let play = currentPlay, play.trackID == track.id, tracker != nil else { return }
         guard tracker!.advance(to: position, playing: playing) else { return }
         currentPlayScrobbled = true
@@ -198,7 +200,7 @@ final class Scrobbler {
     // MARK: Sending
 
     /// Sends queued scrobbles in batches; temporary failures are retried with backoff.
-    func flush() {
+    public func flush() {
         guard !isSending, !sessionInvalid, hasCredentials, let key = session?.key else { return }
         queue.dropExpired()
         let batch = Array(queue.pending.prefix(LastFMClient.maxBatch))

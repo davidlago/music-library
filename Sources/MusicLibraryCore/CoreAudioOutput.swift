@@ -1,3 +1,5 @@
+// The CoreAudio HAL is macOS only; the iOS app sets the output sample rate with AVAudioSession.
+#if os(macOS)
 import CoreAudio
 import Foundation
 
@@ -209,3 +211,4 @@ public final class OutputMatcher: @unchecked Sendable {
         originals.removeAll()
     }
 }
+#endif

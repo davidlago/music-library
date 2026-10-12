@@ -3,8 +3,16 @@ import Foundation
 
 public enum LibraryLocation {
     public static var defaultRoot: URL {
+        #if os(macOS)
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Music/MusicLibrary", isDirectory: true)
+        #else
+        // The companion app keeps its synced library where Finder's Files tab and the Files app can reach it.
+        URL.documentsDirectory.appendingPathComponent(phoneFolderName, isDirectory: true)
+        #endif
     }
+    /// The library's folder in the iPhone app's Documents.
+    public static let phoneFolderName = "Music Library"
+
     public static func databaseURL(root: URL) -> URL { root.appendingPathComponent("library.sqlite") }
 
     public static func openDatabase(root: URL) throws -> Database {
@@ -36,6 +44,7 @@ public struct ImportItem: Sendable {
     public var audioFormat: AudioFormat?
 }
 
+#if os(macOS)
 public struct ImportService: Sendable {
     public let root: URL
     public let database: Database
@@ -132,6 +141,7 @@ public struct ImportService: Sendable {
         }
     }
 }
+#endif
 
 extension Optional where Wrapped: Sendable {
     func asyncMap<T>(_ transform: (Wrapped) async throws -> T) async rethrows -> T? {

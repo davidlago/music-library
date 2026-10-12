@@ -70,6 +70,25 @@ jobs:
             ${{ steps.package.outputs.name }}.sha256
           if-no-files-found: error
 
+  ios:
+    name: Build for iOS
+    # The iOS deployment target (27) needs the iOS 27 SDK, which needs a newer runner than the macOS build.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select the newest stable Xcode
+        run: |
+          xcode="$(ls -d /Applications/Xcode_*.app | grep -iv beta | sort -V | tail -1)"
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+
+      - name: Build MusicLibraryCore for iOS
+        run: xcodebuild -scheme MusicLibraryCore -destination 'generic/platform=iOS Simulator' build
+
+      - name: Build the iPhone app
+        run: xcodebuild -project iOS/MusicLibraryMobile.xcodeproj -scheme MusicLibraryMobile -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+
   release:
     name: Publish release
     needs: build

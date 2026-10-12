@@ -1,0 +1,9 @@
+// Signing for the iPhone app. Your Apple developer team goes in Local.xcconfig next to this file (not committed):
+//
+//     DEVELOPMENT_TEAM = ABCDE12345
+//
+// With a free Apple ID (Personal Team), the bundle identifier must also be unique to you; override it there too:
+//
+//     PRODUCT_BUNDLE_IDENTIFIER = io.github.yourname.MusicLibraryMobile
+
+#include? "Local.xcconfig"
