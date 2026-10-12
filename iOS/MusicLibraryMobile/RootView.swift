@@ -2,18 +2,29 @@ import MusicLibraryCore
 import SwiftUI
 
 struct RootView: View {
+    enum Tabs: Hashable { case library, sync, search }
+
     @Environment(PhoneModel.self) private var model
     @Environment(PhonePlayer.self) private var player
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showNowPlaying = false
+    @State private var tab = Tabs.library
 
     var body: some View {
-        TabView {
-            Tab("Library", systemImage: "square.stack") {
+        TabView(selection: $tab) {
+            Tab("Library", systemImage: "square.stack", value: .library) {
                 LibraryTab()
             }
-            Tab(role: .search) {
+            Tab("Sync", systemImage: "arrow.triangle.2.circlepath", value: .sync) {
+                SyncTab()
+            }
+            Tab(value: .search, role: .search) {
                 SearchTab()
             }
+        }
+        // The phone listens for the Mac only while the Sync tab is on screen.
+        .onChange(of: tab == .sync && scenePhase == .active, initial: true) { _, visible in
+            model.sync.setVisible(visible)
         }
         .tabViewBottomAccessory {
             MiniPlayer { showNowPlaying = true }

@@ -89,8 +89,9 @@
   there are never overwritten, and playlists get `.m3u` files. Turn on the database option to also back up
   `library.sqlite` and the artist photos to the drive, for a full library backup. A single playlist can still be exported
   to its own folder.
-- **An iPhone app.** Copy part of the library to your iPhone and play it offline, through a USB DAC at each song's own
-  sample rate, with the same search, playlists, Liked Songs, covers and Last.fm scrobbling. See [iPhone app](#iphone-app).
+- **An iPhone app.** Sync part of the library to your iPhone over Wi-Fi and play it offline, through a USB DAC at each
+  song's own sample rate, with the same search, playlists, Liked Songs, covers and Last.fm scrobbling. See
+  [iPhone app](#iphone-app).
 
 ## Tour
 
@@ -218,13 +219,20 @@ works).
 5. The first time, iOS won't open an app from an unknown developer: on the phone, open
    **Settings ▸ General ▸ VPN & Device Management**, tap your Apple ID under Developer App and tap **Trust**.
 
-**Add music**
+**Sync music over Wi-Fi**
 
-1. In the Mac app, add albums, artists, playlists or songs to the Export List, turn on the database option, and export to
-   a folder (for example one named `Music Library`).
-2. Connect the iPhone, select it in Finder's sidebar, open the **Files** tab and drag the exported folder onto
-   **Music Library**.
-3. Open the app. It shows only the songs that are on the phone; export more and drag the folder in again to add albums.
+1. Pair once: on the iPhone, open the **Sync** tab and tap **Pair with a Mac**. In the Mac app, choose **iPhone** in the
+   sidebar, type the code the iPhone shows next to its name and click **Pair**. Both need to be on the same Wi-Fi network
+   (allow local network access when each asks).
+2. Choose what goes on the phone: **Add to iPhone** in the menu of any album, artist, playlist or song, or Liked Songs.
+   The iPhone list is separate from the Export List.
+3. With the iPhone's Sync tab open, click **Sync Now** on the Mac. The phone ends up with exactly the list: new and
+   changed files are copied, songs you took off the list are removed (the first sync asks before removing anything), and
+   the library, playlists and Liked Songs are updated. Keep the Sync tab on screen until it's done.
+
+For a big first load, copying through Finder is faster than Wi-Fi: export the list to a folder with the database option
+on, select the iPhone in Finder's sidebar, open the **Files** tab and drag the folder onto **Music Library**. Later syncs
+then send only what changed.
 
 **Use it**
 
@@ -273,7 +281,8 @@ secrets and your PIN are kept in your keychain. Downloading artist and album inf
 **Settings ▸ General**, and looking up library CDs in **Settings ▸ Library**.
 
 The iPhone app keeps its music and the copied database on the phone, out of iCloud backups. It talks only to Last.fm, if
-you connect it.
+you connect it, and to the Mac app it's paired with, over your local network: syncs are encrypted with a key the two
+exchange when pairing.
 
 ## Building from source
 

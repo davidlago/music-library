@@ -1,0 +1,182 @@
+import Foundation
+
+/// Wi-Fi sync between the Mac app and the iPhone app. The phone advertises `serviceType` over Bonjour while its
+/// Sync screen is open; the Mac connects (TLS with a pre-shared key, see `SyncPairing`) and exchanges `SyncMessage`s
+/// in length-prefixed frames, with file contents sent as raw chunk frames after a `.file` message.
+///
+/// A session: both send `.hello`; when pairing, the Mac sends `.pair` and the phone answers `.paired`; the phone
+/// sends its `.manifest`; the Mac sends `.plan`, `.delete`, then each file (the database last) and `.done`; the phone
+/// answers `.done` once everything is written.
+public enum SyncProtocol {
+    public static let version = 1
+    public static let serviceType = "_musiclib-sync._tcp"
+    /// File data per chunk frame.
+    public static let chunkSize = 1 << 20
+    /// Frames larger than this are refused (a manifest of tens of thousands of files fits easily).
+    static let maxFrameSize = 32 << 20
+    /// Top-level folders sync manages on the phone; nothing else under its library root is listed or deleted.
+    public static let managedFolders = ["Music", LibraryExporter.artistImageFolder]
+}
+
+public enum SyncError: Error, LocalizedError, Equatable {
+    case frameTooLarge(Int)
+    case unknownFrameKind(UInt8)
+    case badMessage(String)
+    case versionMismatch(Int)
+    case unsafePath(String)
+    case unexpected(String)
+    case remote(String)
+    case connection(String)
+    case notPaired
+
+    public var errorDescription: String? {
+        switch self {
+        case .frameTooLarge(let n): return "Sync received an oversized message (\(n) bytes)."
+        case .unknownFrameKind(let k): return "Sync received an unknown kind of message (\(k))."
+        case .badMessage(let m): return "Sync received a message it couldn't read: \(m)"
+        case .versionMismatch(let v): return "The other device uses a different sync version (\(v), this one \(SyncProtocol.version)). Update both apps."
+        case .unsafePath(let p): return "Sync refused a path outside the library: \(p)"
+        case .unexpected(let m): return "Sync got out of step: \(m)"
+        case .remote(let m): return m
+        case .connection(let m): return "Connection failed: \(m)"
+        case .notPaired: return "This iPhone isn't paired with this Mac. Pair them again."
+        }
+    }
+}
+
+// MARK: Frames
+
+/// One frame on the wire: a 4-byte big-endian payload length, a kind byte, then the payload.
+public struct SyncFrame: Equatable, Sendable {
+    public enum Kind: UInt8, Sendable {
+        case message = 1
+        case chunk = 2
+    }
+
+    public var kind: Kind
+    public var payload: Data
+
+    public init(kind: Kind, payload: Data) { self.kind = kind; self.payload = payload }
+
+    public static func message(_ m: SyncMessage) throws -> SyncFrame {
+        SyncFrame(kind: .message, payload: try JSONEncoder().encode(m))
+    }
+
+    public func message() throws -> SyncMessage {
+        guard kind == .message else { throw SyncError.unexpected("file data where a message was expected") }
+        do { return try JSONDecoder().decode(SyncMessage.self, from: payload) } catch { throw SyncError.badMessage(error.localizedDescription) }
+    }
+
+    public func encoded() -> Data {
+        var data = Data(capacity: payload.count + 5)
+        var length = UInt32(payload.count).bigEndian
+        withUnsafeBytes(of: &length) { data.append(contentsOf: $0) }
+        data.append(kind.rawValue)
+        data.append(payload)
+        return data
+    }
+}
+
+/// Cuts a byte stream into frames; data arrives in arbitrary pieces.
+public struct SyncFrameDecoder: Sendable {
+    private var buffer = Data()
+
+    public init() {}
+
+    public mutating func append(_ data: Data) throws -> [SyncFrame] {
+        buffer.append(data)
+        var frames: [SyncFrame] = []
+        while buffer.count >= 5 {
+            let start = buffer.startIndex
+            let length = buffer[start..<start + 4].reduce(0) { $0 << 8 | Int($1) }
+            guard length <= SyncProtocol.maxFrameSize else { throw SyncError.frameTooLarge(length) }
+            let rawKind = buffer[start + 4]
+            guard let kind = SyncFrame.Kind(rawValue: rawKind) else { throw SyncError.unknownFrameKind(rawKind) }
+            guard buffer.count >= 5 + length else { break }
+            frames.append(SyncFrame(kind: kind, payload: Data(buffer[start + 5..<start + 5 + length])))
+            buffer = Data(buffer[(start + 5 + length)...])
+        }
+        return frames
+    }
+}
+
+// MARK: Messages
+
+public enum SyncMessage: Codable, Equatable, Sendable {
+    case hello(SyncHello)
+    /// Mac → phone while pairing: the long-term key for later sessions.
+    case pair(SyncGrant)
+    /// Phone → Mac: the key is stored.
+    case paired
+    case manifest(SyncManifest)
+    case plan(SyncPlanSummary)
+    case delete([String])
+    /// A file follows as chunk frames totalling `size` bytes (none for an empty file).
+    case file(SyncFileHeader)
+    case done(SyncSummary)
+    case failure(String)
+}
+
+public struct SyncHello: Codable, Equatable, Sendable {
+    public var protocolVersion: Int
+    public var deviceID: String
+    public var deviceName: String
+    public var appVersion: String
+    /// The newest library database schema the sender's app reads.
+    public var schemaVersion: Int
+    /// Free space on the phone, in bytes.
+    public var freeSpace: Int64?
+
+    public init(deviceID: String, deviceName: String, appVersion: String, freeSpace: Int64? = nil) {
+        protocolVersion = SyncProtocol.version
+        schemaVersion = Database.schemaVersion
+        self.deviceID = deviceID; self.deviceName = deviceName; self.appVersion = appVersion; self.freeSpace = freeSpace
+    }
+}
+
+public struct SyncGrant: Codable, Equatable, Sendable {
+    /// 32 random bytes, base64.
+    public var key: String
+    public var macID: String
+    public var macName: String
+
+    public init(key: Data, macID: String, macName: String) {
+        self.key = key.base64EncodedString(); self.macID = macID; self.macName = macName
+    }
+
+    public var keyData: Data? { Data(base64Encoded: key).flatMap { $0.count == 32 ? $0 : nil } }
+}
+
+public struct SyncFileEntry: Codable, Hashable, Sendable {
+    public var path: String
+    public var size: Int64
+    public init(path: String, size: Int64) { self.path = path; self.size = size }
+}
+
+public struct SyncManifest: Codable, Equatable, Sendable {
+    public var files: [SyncFileEntry]
+    public init(files: [SyncFileEntry]) { self.files = files }
+}
+
+public struct SyncPlanSummary: Codable, Equatable, Sendable {
+    public var files: Int
+    public var bytes: Int64
+    public var deletes: Int
+    public init(files: Int, bytes: Int64, deletes: Int) { self.files = files; self.bytes = bytes; self.deletes = deletes }
+}
+
+public struct SyncFileHeader: Codable, Equatable, Sendable {
+    public var path: String
+    public var size: Int64
+    public init(path: String, size: Int64) { self.path = path; self.size = size }
+}
+
+public struct SyncSummary: Codable, Hashable, Sendable {
+    public var copied = 0
+    public var bytes: Int64 = 0
+    public var deleted = 0
+    public var databaseUpdated = false
+    /// Songs in the selection whose files are missing from the Mac's library.
+    public var missing = 0
+    public init() {}
+}

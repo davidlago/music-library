@@ -4,7 +4,7 @@ import MusicLibraryCore
 import SwiftUI
 
 enum SidebarItem: Hashable {
-    case songs, albums, artists, insights, musicDNA, concerts, importQueue, exportList, catalog, catalogCheckouts, catalogList
+    case songs, albums, artists, insights, musicDNA, concerts, importQueue, exportList, iPhone, catalog, catalogCheckouts, catalogList
     case likedSongs
     case playlist(Int64)
     case smartPlaylist(Int64)
@@ -192,6 +192,8 @@ final class AppModel {
     @ObservationIgnored let catalog = LibraryCatalogStore()
     /// Upcoming concerts near home.
     @ObservationIgnored let concerts = ConcertStore()
+    /// Wi-Fi sync to the iPhone app.
+    @ObservationIgnored let iPhone = SyncStore()
     @ObservationIgnored private var currentPlay: (track: Track, startedAt: Date, tracker: ListenTracker)?
     @ObservationIgnored private var terminationObserver: NSObjectProtocol?
     @ObservationIgnored private(set) var importer: ImportController!
@@ -962,6 +964,17 @@ final class AppModel {
         case .likedSongs: return likedTracks
         case .smartPlaylist(let id): return smartPlaylists.first { $0.id == id }.map(smartPlaylistTracks) ?? []
         }
+    }
+
+    /// Every track on the iPhone list once, in list order.
+    var iPhoneTracks: [Track] {
+        var seen = Set<Int64>()
+        return iPhone.list.flatMap(tracks(for:)).filter { seen.insert($0.id).inserted }
+    }
+
+    func syncIPhone(_ phone: SyncStore.PairedPhone) {
+        guard let database else { return }
+        iPhone.sync(phone, tracks: iPhoneTracks, libraryRoot: libraryRoot, database: database)
     }
 
     /// Every track in the export list once, in list order.
