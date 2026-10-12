@@ -11,9 +11,9 @@
 #   ASC_KEY=path/to/AuthKey_XXXX.p8 ASC_KEY_ID=XXXX ASC_ISSUER=…
 #                        sign in with an App Store Connect API key instead of the account in Xcode
 #   DISTRIBUTION_CERTIFICATE=1
-#                        sign everything, the archive included, with the Apple Distribution certificate in the keychain
-#                        (CI: there's no development certificate there, and an App Manager API key can't use cloud
-#                        signing)
+#                        sign manually with the Apple Distribution certificate in the keychain and App Store profiles
+#                        made for it with the API key (scripts/provisioning-profiles.swift); for CI, where there's no
+#                        development certificate and an App Manager API key can't use cloud signing
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -30,12 +30,32 @@ elif ! grep -qs '^[[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=' iOS/Local.xcconfig;
     echo "error: set DEVELOPMENT_TEAM in iOS/Local.xcconfig (see iOS/Signing.xcconfig)" >&2
     exit 1
 fi
-if [[ "${DISTRIBUTION_CERTIFICATE:-0}" == "1" ]]; then SETTINGS+=(CODE_SIGN_IDENTITY="Apple Distribution"); fi
-
 AUTH=()
 if [[ -n "${ASC_KEY:-}" ]]; then
-    AUTH=(-authenticationKeyPath "$(cd "$(dirname "$ASC_KEY")" && pwd)/$(basename "$ASC_KEY")"
+    ASC_KEY="$(cd "$(dirname "$ASC_KEY")" && pwd)/$(basename "$ASC_KEY")"
+    AUTH=(-authenticationKeyPath "$ASC_KEY"
           -authenticationKeyID "${ASC_KEY_ID:?set ASC_KEY_ID}" -authenticationKeyIssuerID "${ASC_ISSUER:?set ASC_ISSUER}")
+fi
+
+PROFILES=()   # bundle ID, profile name, … for manual signing
+if [[ "${DISTRIBUTION_CERTIFICATE:-0}" == "1" ]]; then
+    [[ -n "${ASC_KEY:-}" ]] || { echo "error: DISTRIBUTION_CERTIFICATE=1 needs ASC_KEY, ASC_KEY_ID and ASC_ISSUER" >&2; exit 1; }
+    # Manual signing with App Store profiles for that certificate (scripts/provisioning-profiles.swift names them
+    # "<bundle ID> App Store (CI)"): automatic signing can't be told to use it, and the profiles Xcode manages
+    # for cloud signing don't include it.
+    SETTINGS_JSON="$(xcodebuild -project iOS/MusicLibraryMobile.xcodeproj -alltargets -configuration Release \
+        -showBuildSettings -json "${SETTINGS[@]}" 2> /dev/null)"
+    BUNDLE_IDS=()
+    for ((i = 0; ; i++)); do
+        id="$(plutil -extract "$i.buildSettings.PRODUCT_BUNDLE_IDENTIFIER" raw - <<< "$SETTINGS_JSON" 2> /dev/null)" || break
+        BUNDLE_IDS+=("$id")
+    done
+    [[ ${#BUNDLE_IDS[@]} -gt 0 ]] || { echo "error: couldn't read the targets' bundle IDs" >&2; exit 1; }
+    BUNDLE_IDS=($(printf '%s\n' "${BUNDLE_IDS[@]}" | sort -u))
+    swift scripts/provisioning-profiles.swift "$ASC_KEY" "$ASC_KEY_ID" "$ASC_ISSUER" "${BUNDLE_IDS[@]}"
+    for id in "${BUNDLE_IDS[@]}"; do PROFILES+=("$id" "$id App Store (CI)"); done
+    SETTINGS+=(CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Apple Distribution"
+               PROVISIONING_PROFILE_SPECIFIER='$(PRODUCT_BUNDLE_IDENTIFIER) App Store (CI)')
 fi
 
 rm -rf "$ARCHIVE" "$EXPORT"
@@ -53,7 +73,16 @@ cat > "$OPTIONS" <<PLIST
 <dict>
     <key>method</key><string>app-store-connect</string>
     <key>destination</key><string>$([[ "${UPLOAD:-1}" == "1" ]] && echo upload || echo export)</string>
-    <key>signingStyle</key><string>automatic</string>
+$(if [[ ${#PROFILES[@]} -gt 0 ]]; then
+    echo "    <key>signingStyle</key><string>manual</string>"
+    echo "    <key>signingCertificate</key><string>Apple Distribution</string>"
+    echo "    <key>provisioningProfiles</key><dict>"
+    for ((i = 0; i < ${#PROFILES[@]}; i += 2)); do echo "        <key>${PROFILES[i]}</key><string>${PROFILES[i+1]}</string>"; done
+    echo "    </dict>"
+else
+    echo "    <key>signingStyle</key><string>automatic</string>"
+fi)
+$([[ -n "${DEVELOPMENT_TEAM:-}" ]] && echo "    <key>teamID</key><string>$DEVELOPMENT_TEAM</string>")
     <key>manageAppVersionAndBuildNumber</key><false/>
     <key>uploadSymbols</key><true/>
 </dict>

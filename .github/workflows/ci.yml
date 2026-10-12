@@ -156,7 +156,8 @@ jobs:
           xcodebuild -version
 
       # An App Manager API key can't use cloud-managed signing, so the Apple Distribution certificate comes from a
-      # secret; the key creates and updates the provisioning profiles and uploads.
+      # secret; with the key, testflight.sh makes App Store profiles for it (scripts/provisioning-profiles.swift),
+      # signs manually and uploads.
       - name: Import the Apple Distribution certificate
         env:
           CERTIFICATE_P12: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_P12 }}

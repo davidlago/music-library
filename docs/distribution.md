@@ -132,8 +132,10 @@ turn on automatic updates in TestFlight.
 
 Each `vX.Y.Z` tag also uploads the iPhone app as version X.Y.Z (the `testflight` job, after the build and tests pass;
 `MARKETING_VERSION` in `iOS/Version.xcconfig` only matters for local builds). It uses the notarization API key, which
-creates and updates the profiles and uploads. An App Manager key can't use Apple's cloud-managed distribution
-certificates, so CI signs with an Apple Distribution certificate of its own, from two more secrets:
+uploads. An App Manager key can't use Apple's cloud-managed distribution certificates, so CI signs manually with an
+Apple Distribution certificate of its own, from two more secrets, and an App Store profile per bundle ID named
+"<bundle ID> App Store (CI)", which `scripts/provisioning-profiles.swift` creates (or replaces, once expired or made for
+another certificate) with the API key:
 
 1. Create it in Xcode: **Settings ▸ Accounts**, your team, **Manage Certificates…**, **+** ▸ **Apple Distribution**.
 2. Store it:
