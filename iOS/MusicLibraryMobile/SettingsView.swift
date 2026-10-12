@@ -29,7 +29,7 @@ struct SettingsView: View {
                 }
                 if let library = model.library {
                     Section("Library") {
-                        LabeledContent("Songs on this iPhone", value: "\(library.tracks.count) of \(library.snapshotTrackCount)")
+                        LabeledContent("Songs on this iPhone", value: "\(library.presentIDs.count) of \(library.tracks.count)")
                         LabeledContent("Folder", value: library.root.lastPathComponent)
                         Button("Reload Library") { model.reload() }
                     }

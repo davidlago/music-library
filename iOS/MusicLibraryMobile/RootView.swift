@@ -2,7 +2,7 @@ import MusicLibraryCore
 import SwiftUI
 
 struct RootView: View {
-    enum Tabs: Hashable { case library, sync, search }
+    enum Tabs: Hashable { case library, insights, sync, search }
 
     @Environment(PhoneModel.self) private var model
     @Environment(PhonePlayer.self) private var player
@@ -14,6 +14,9 @@ struct RootView: View {
         TabView(selection: $tab) {
             Tab("Library", systemImage: "square.stack", value: .library) {
                 LibraryTab()
+            }
+            Tab("Insights", systemImage: "chart.bar.xaxis", value: .insights) {
+                InsightsTab()
             }
             Tab("Sync", systemImage: "arrow.triangle.2.circlepath", value: .sync) {
                 SyncTab()
@@ -32,6 +35,9 @@ struct RootView: View {
         .sheet(isPresented: $showNowPlaying) {
             NowPlayingView()
         }
+        .sheet(item: Binding(get: { model.infoTrack }, set: { model.infoTrack = $0 })) { track in
+            SongInfoSheet(track: track)
+        }
     }
 }
 
@@ -48,8 +54,9 @@ struct LibraryStatusView: View {
                 Label("No Library Yet", systemImage: "music.note.house")
             } description: {
                 Text("""
-                On the Mac, export to a folder named “\(LibraryLocation.phoneFolderName)” with the database backup on. \
-                Then connect the iPhone, select it in Finder, open the Files tab and drag the folder onto Music Library.
+                Pair with Music Library on your Mac in the Sync tab and sync: your whole library shows up here, and you \
+                choose what to download. Or export from the Mac to a folder named “\(LibraryLocation.phoneFolderName)” \
+                with the database backup on, and drag it onto Music Library in the Finder's Files tab for this iPhone.
                 """)
             } actions: {
                 Button("Check Again") { model.reload() }
@@ -62,11 +69,11 @@ struct LibraryStatusView: View {
             } actions: {
                 Button("Try Again") { model.reload() }
             }
-        case .loaded(let library):
+        case .loaded:
             ContentUnavailableView {
-                Label("No Music Files", systemImage: "music.note")
+                Label("No Music Yet", systemImage: "music.note")
             } description: {
-                Text("The library lists \(library.snapshotTrackCount) songs, but none of their files are on this iPhone. Export the music along with the database.")
+                Text("The library on this iPhone is empty. Add music on the Mac, then sync.")
             } actions: {
                 Button("Check Again") { model.reload() }
             }
