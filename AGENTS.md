@@ -48,7 +48,8 @@ SwiftUI's `@State`/`@Environment` macro plugin is not shipped with the CLT, so t
 
 ## CI and releases
 - `.github/workflows/ci.yml` builds, runs the tests and builds a universal app on every push and pull request (macOS runner, newest stable Xcode, ffmpeg from Homebrew). A separate `ios` job builds `MusicLibraryCore` and the iPhone app for iOS on GitHub's `xcode-27` image (Xcode 27, in preview; the macOS images stop at Xcode 26, without the iOS 27 SDK).
-- Pushing a tag `vX.Y.Z` also publishes a GitHub release with `MusicLibrary-X.Y.Z-macOS.zip` (ad-hoc signed, not notarized) and its SHA-256.
+- Pushing a tag `vX.Y.Z` also publishes a GitHub release with `MusicLibrary-X.Y.Z-macOS.zip` (ad-hoc signed, not notarized) and its SHA-256. Its notes start with that version's section of `CHANGELOG.md` (or `## Unreleased` when there's none), then the install steps and GitHub's generated list of merged PRs.
+- `CHANGELOG.md`: add user-visible changes under `## Unreleased` in the same PR as the change (plain bullets, absolute links: they're shown on GitHub's release page). Before tagging a release, rename `## Unreleased` to `## X.Y.Z` and add a new empty `## Unreleased` above it.
 - README screenshots live in `docs/screenshots/` (1600 px wide, taken from a real library window). `iphone.png` is three iOS Simulator screenshots (status bar set with `xcrun simctl status_bar … override --time 9:41`) side by side on a 1600×1000 canvas.
 
 ## Library catalog

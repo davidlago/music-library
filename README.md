@@ -159,7 +159,8 @@ The search takes the same filters as your music, with a few catalog meanings and
 ### On the iPhone
 
 Albums, artists, songs, playlists and search, a Now Playing screen that shows the file's format and the rate your DAC is
-running at, and gapless playback between songs at the same rate.
+running at, and gapless playback between songs at the same rate. Choose what goes on the phone with **Add to iPhone** on
+the Mac and sync it over Wi-Fi from the Mac's **iPhone** page.
 
 ![The iPhone app: the albums grid, an album page and Now Playing showing FLAC 24/48 going out at 48 kHz](docs/screenshots/iphone.png)
 
