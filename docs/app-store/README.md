@@ -87,16 +87,25 @@ Requires Music Library for Mac (free, macOS 14 or later) to bring your own music
 
 **Sign-in required:** No.
 
-**Notes:**
+**Notes** (what App Review asked for after the first submission, a Guideline 2.1 "Information Needed" request for new
+developer accounts: purpose and audience, setup, external services, regions and protected material, plus a recording
+from a physical device):
 
 ```
-Dave's Music Library is the iPhone companion of Music Library for Mac, a free, open-source macOS app (https://github.com/davidlago/music-library, notarized downloads at https://github.com/davidlago/music-library/releases). The Mac app holds the user's music collection and syncs a copy of it to the iPhone over the local network.
+Screen recording: the attached video was recorded on a physical iPhone running the latest iOS, starting from launching the app: syncing with the Mac (removing and downloading an album), browsing an album, playback with Now Playing and likes, an artist page, Music DNA and search.
 
-To review without a Mac: on the Library tab, tap "Explore a Sample Library". It opens a library built into the app (fictional artists and albums; the songs were synthesized for it, and the covers and pictures were drawn for it), so every feature can be tried: browsing, playback with lock screen controls, likes, Insights, Music DNA, owned albums, the widgets and the Apple Watch app. Nothing done in the sample is sent anywhere, and the user's own library replaces it after their first sync.
+Purpose and audience: Dave's Music Library is the iPhone and Apple Watch companion to Music Library for Mac, a free, open-source app (https://github.com/davidlago/music-library) for people who keep their music collection as their own audio files (ripped CDs, purchased downloads) rather than streaming. The Mac app imports, tags and organizes the collection; this app lets them take it with them: browse the whole library, play the songs they chose to copy offline (gapless, and at each song's own sample rate on USB DACs), see their listening history and who played on their records (Music DNA), and keep track of the albums they own. It doesn't sell, stream or provide any music; it only plays the user's own files.
 
-To sync your own music: install the Mac app, open the iPhone's Sync tab and tap "Pair with a Mac", then enter the code it shows in the Mac app (iPhone in the sidebar). Both need to be on the same Wi-Fi network; the app asks for local network access for this. The attached video shows the sample library and the pairing screen.
+Setup: no account or login. Without a Mac, tap "Explore a Sample Library" on the Library tab: a library built into the app (fictional artists and albums; the songs were synthesized and the covers and pictures drawn for it), with which every feature can be tried, including the widgets and the Apple Watch app. Nothing done in it is sent anywhere, and the user's own library replaces it after their first sync. With your own music: install the free Mac app (https://github.com/davidlago/music-library/releases) and import music, then on the iPhone open Sync, tap "Pair with a Mac" and enter the code it shows in the Mac app (iPhone in its sidebar); both need to be on the same Wi-Fi network (the app asks for local network access). Choose what to copy with Download on the iPhone or Add to iPhone on the Mac.
 
-Optional features need the user's own accounts or keys: Last.fm scrobbling (Settings, with a Last.fm API key) and concerts on artist pages (Ticketmaster or JamBase keys set on the Mac).
+External services: none are needed for the core functions; the library and music come from the user's own Mac over the local network (Bonjour, encrypted with TLS), with no server in between. Optional, with the user's own accounts or keys: Last.fm (scrobbling; Settings, with a Last.fm API key) and Ticketmaster and JamBase (upcoming concerts on artist pages; keys set on the Mac). Artist and album descriptions, photos and covers were looked up by the Mac app from MusicBrainz, the Cover Art Archive, Wikipedia, Wikidata, Wikimedia Commons and Deezer. No analytics, advertising, AI or payment services.
+
+Regions: the app works the same in every region; concert listings depend on Ticketmaster's and JamBase's coverage of the user's area.
+
+Regulated or protected material: not a regulated industry. The app doesn't include or distribute protected third-party material: it plays only the user's own audio files; the sample library's songs, covers and artist pictures were created for the app; descriptions and photos come from openly licensed sources (Wikipedia, Wikimedia Commons, MusicBrainz, Cover Art Archive) and are credited in the app.
 ```
 
-**Attachment:** the demo video (`build/app-store/review-demo.mp4`).
+**Attachment:** a screen recording **made on a physical iPhone running the latest iOS**, starting with launching the app
+and showing the typical flow (App Review doesn't accept simulator recordings for this). Record it with Control Center's
+Screen Recording, then compress it under 10 MB (`ffmpeg -i in.mp4 -vf "scale=-2:1920,fps=30" -c:v libx264 -crf 24 -c:a aac
+out.mp4`); it isn't committed. Send the same answers and video as a reply in App Review when they ask.
