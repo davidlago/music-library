@@ -24,6 +24,36 @@ public enum LibraryPath {
         return resolve(((trackPath as NSString).deletingLastPathComponent as NSString).appendingPathComponent("cover.jpg"), in: root)
     }
 
+    /// Folders left with nothing worth keeping once the library files `removed` are gone: their folders when only
+    /// a `cover.jpg` or hidden files remain, and those folders' parents when that leaves them with only hidden
+    /// files. Only folders at least two levels inside `root` (album and artist folders under `Music`) qualify, and
+    /// a folder is listed instead of the folders inside it.
+    public static func emptiedFolders(after removed: [URL], root: URL) -> [URL] {
+        let fm = FileManager.default
+        let rootComponents = root.standardizedFileURL.pathComponents
+        func qualifies(_ folder: URL) -> Bool {
+            let components = folder.standardizedFileURL.pathComponents
+            return components.count >= rootComponents.count + 2 && Array(components.prefix(rootComponents.count)) == rootComponents
+        }
+        func isLeftover(_ folder: URL, allowing: (String) -> Bool) -> Bool {
+            guard let names = try? fm.contentsOfDirectory(atPath: folder.path) else { return false }
+            return names.allSatisfy { $0.hasPrefix(".") || allowing($0) }
+        }
+        var emptied: [URL] = []
+        let folders = Set(removed.map { $0.deletingLastPathComponent().standardizedFileURL })
+        for folder in folders.sorted(by: { $0.path < $1.path }) where qualifies(folder) {
+            guard isLeftover(folder, allowing: { $0 == "cover.jpg" }) else { continue }
+            emptied.append(folder)
+        }
+        let emptiedNames = Set(emptied.map(\.path))
+        for parent in Set(emptied.map { $0.deletingLastPathComponent() }).sorted(by: { $0.path < $1.path }) where qualifies(parent) {
+            guard isLeftover(parent, allowing: { emptiedNames.contains(parent.appendingPathComponent($0).path) }) else { continue }
+            emptied.removeAll { $0.deletingLastPathComponent().path == parent.path }
+            emptied.append(parent)
+        }
+        return emptied
+    }
+
     /// `url` with symlinks resolved in the part that exists and the missing rest appended unchanged.
     /// Nil when a component can't be resolved, e.g. a dangling symlink that a write would follow.
     static func realPath(_ url: URL) -> String? {

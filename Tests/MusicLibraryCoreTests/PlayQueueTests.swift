@@ -139,6 +139,26 @@ import Testing
         #expect(q.current?.title == "X")
     }
 
+    @Test func removingTracksDropsAllTheirEntries() {
+        var q = PlayQueue()
+        let t = tracks("A", "B", "C", "D")
+        q.replace(with: Array(t[0...2]), startAt: 1, source: "Album")
+        q.playNext([t[3]])
+        let currentChanged = q.removeTracks([1, 3])
+        #expect(!currentChanged)
+        #expect(order(q) == ["B", "D"])
+        #expect(q.current?.title == "B")
+        #expect(titles(q.queued) == ["D"])
+        // The current song goes: the next one plays.
+        let removedCurrent = q.removeTracks([2])
+        #expect(removedCurrent)
+        #expect(q.current?.title == "D")
+        #expect(q.queued.isEmpty)
+        let removedLast = q.removeTracks([4])
+        #expect(removedLast)
+        #expect(q.current == nil && q.entries.isEmpty)
+    }
+
     @Test func clearQueuedKeepsTheList() {
         var q = queueWithXY()
         q.clearQueued()

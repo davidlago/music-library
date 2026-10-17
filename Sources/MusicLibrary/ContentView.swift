@@ -87,6 +87,7 @@ struct MainWindow: View {
             ExportSheet().themedSheet()
         }
         .sheet(item: $model.smartPlaylistDraft) { SmartPlaylistEditor(draft: $0).themedSheet() }
+        .removeFromLibraryConfirmation(model)
     }
 }
 

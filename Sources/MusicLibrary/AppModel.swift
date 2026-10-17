@@ -17,6 +17,12 @@ struct SmartPlaylistDraft: Identifiable {
     var query: String
 }
 
+/// Songs waiting for the user to confirm removing them from the library; `title` names them (an album).
+struct RemovalRequest {
+    var tracks: [Track]
+    var title: String?
+}
+
 struct ExportState: Equatable {
     var title: String
     var done = 0
@@ -111,6 +117,7 @@ final class AppModel {
     private(set) var albumAddedDates: [String: Date] = [:]
     private(set) var smartPlaylistCounts: [Int64: Int] = [:]
     var smartPlaylistDraft: SmartPlaylistDraft?
+    var pendingRemoval: RemovalRequest?
     private(set) var stats: LibraryStats?
     private(set) var statsVersion = -1
     @ObservationIgnored private var indexGeneration = 0
@@ -820,20 +827,35 @@ final class AppModel {
         track.coverURL(root: libraryRoot)
     }
 
+    /// Asks (in `ContentView`) before removing `tracks` from the library; `title` names them, e.g. an album.
+    func confirmRemoval(_ tracks: [Track], title: String? = nil) {
+        guard !tracks.isEmpty else { return }
+        pendingRemoval = RemovalRequest(tracks: tracks, title: title)
+    }
+
+    /// Moves the songs' files to the Trash (with album and artist folders left empty but for a cover) and removes
+    /// them from the library, their playlists, likes and listening history, and the play queue.
     func removeFromLibrary(_ ids: Set<Int64>) {
         guard let db = database else { return }
+        var removed: Set<Int64> = [], trashed: [URL] = []
         for id in ids {
             do {
                 guard let t = try db.track(id: id) else { continue }
                 // A path leading outside the library isn't a library file: only the entry is removed.
                 if let url = t.resolvedFileURL(root: libraryRoot), FileManager.default.fileExists(atPath: url.path) {
                     try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+                    trashed.append(url)
                 }
                 try db.deleteTrack(id: id)
+                removed.insert(id)
             } catch {
                 errorMessage = error.localizedDescription
             }
         }
+        for folder in LibraryPath.emptiedFolders(after: trashed, root: libraryRoot) {
+            try? FileManager.default.trashItem(at: folder, resultingItemURL: nil)
+        }
+        player.removeTracks(removed)
         reloadLibrary()
     }
 
