@@ -17,40 +17,32 @@ extension RipCheck {
     }
 }
 
-/// A rip's AccurateRip result, for the CD page's status column.
-struct RipCheckLabel: View {
+/// The CD page's label for a track AccurateRip found misread. Tracks that passed (or couldn't be checked) keep
+/// their usual status; the footer sums up the disc.
+struct RipMisreadLabel: View {
     let check: RipCheck
-    var checking = false
 
     var body: some View {
-        Group {
-            if checking {
-                HStack(spacing: 4) { ProgressView().controlSize(.small); Text("Checking") }
-            } else {
-                switch check.result {
-                case .accurate: Label("Accurate (\(check.confidence ?? 0))", systemImage: "checkmark.seal.fill").foregroundStyle(.green)
-                case .inaccurate: Label("Misread", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
-                case .unknown: Label("Can't verify", systemImage: "questionmark.circle").foregroundStyle(.subtext)
-                case .notListed: Label("Not in AccurateRip", systemImage: "seal").foregroundStyle(.subtext)
-                case .unchecked: Label("Imported", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                }
-            }
-        }
-        .font(.caption)
-        .lineLimit(1)
-        .help(check.explanation)
+        Label("Misread", systemImage: "exclamationmark.triangle.fill")
+            .foregroundStyle(.red)
+            .font(.caption)
+            .lineLimit(1)
+            .contentShape(Rectangle())
+            .help(check.explanation)
     }
 }
 
-/// A small mark next to a track checked with AccurateRip: accurate or misread (other results show nothing).
+/// A mark next to a track AccurateRip found misread, explained on hover. Tracks that passed show nothing.
 struct RipCheckMark: View {
     let check: RipCheck?
 
     var body: some View {
-        switch check?.result {
-        case .accurate?: Image(systemName: "checkmark.seal.fill").foregroundStyle(.green.opacity(0.8)).help(check!.explanation)
-        case .inaccurate?: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red).help(check!.explanation)
-        default: EmptyView()
+        if let check, check.result == .inaccurate {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+                .contentShape(Rectangle())
+                .help(check.explanation)
+                .accessibilityLabel("Misread: \(check.explanation)")
         }
     }
 }
