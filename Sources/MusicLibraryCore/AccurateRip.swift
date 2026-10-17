@@ -207,9 +207,14 @@ struct AccurateRipTrackAudio {
             weighted[i + 1] = weighted[i] &+ x &* UInt32(truncatingIfNeeded: i)
         }
         // Σ over the sector at k of (i − k + 1) · x[i] = Σ i · x[i] − (k − 1) · Σ x[i].
-        return (0..<range.count).map { k in
-            (weighted[k + size] &- weighted[k]) &- UInt32(truncatingIfNeeded: k &- 1) &* (sums[k + size] &- sums[k])
+        var result = [UInt32](repeating: 0, count: range.count)
+        for k in 0..<range.count {
+            let weightedSum: UInt32 = weighted[k + size] &- weighted[k]
+            let sum: UInt32 = sums[k + size] &- sums[k]
+            let factor = UInt32(truncatingIfNeeded: k - 1)
+            result[k] = weightedSum &- factor &* sum
         }
+        return result
     }
 }
 
