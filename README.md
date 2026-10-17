@@ -13,12 +13,14 @@
   <a href="https://github.com/davidlago/music-library/releases/latest"><img src="https://img.shields.io/github/v/release/davidlago/music-library?label=download" alt="Latest release"></a>
   <a href="https://github.com/davidlago/music-library/actions/workflows/ci.yml"><img src="https://github.com/davidlago/music-library/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-blue" alt="macOS 14+">
-  <img src="https://img.shields.io/badge/iPhone%20app-iOS%2027%2B-blue" alt="iPhone app: iOS 27+">
+  <a href="https://apps.apple.com/us/app/daves-music-library/id6822005512"><img src="https://img.shields.io/badge/App%20Store-iPhone%20app-blue?logo=apple" alt="iPhone app on the App Store"></a>
+  <img src="https://img.shields.io/badge/iOS-27%2B-blue" alt="iOS 27+">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
 </p>
 
 <p align="center"><a href="https://davidlago.github.io/music-library/"><strong>Website</strong></a> ·
-  <a href="https://github.com/davidlago/music-library/releases/latest"><strong>Download</strong></a></p>
+  <a href="https://github.com/davidlago/music-library/releases/latest"><strong>Download for Mac</strong></a> ·
+  <a href="https://apps.apple.com/us/app/daves-music-library/id6822005512"><strong>iPhone app on the App Store</strong></a></p>
 
 ![An album page: the cover, a blurred-cover backdrop, rating, genres, listening stats and the full track list](docs/screenshots/album.png)
 
@@ -96,7 +98,7 @@
   Mac), download the music you want over Wi-Fi from the phone itself, and play it offline, through a USB DAC at each
   song's own sample rate, with the same search, playlists, Liked Songs and Last.fm scrobbling. Home and lock screen
   widgets show your listening, recent purchases and what's playing (with controls), and an Apple Watch app is a remote
-  for the phone. See [iPhone app](#iphone-app).
+  for the phone. Free on the [App Store](https://apps.apple.com/us/app/daves-music-library/id6822005512); see [iPhone app](#iphone-app).
 
 ## Tour
 
@@ -202,19 +204,20 @@ else to install. (Earlier releases needed **Open Anyway** in **System Settings �
 The first time a new version reads your saved keys and passwords, macOS may ask to allow access to the keychain; choose
 **Always Allow**.
 
+For the iPhone and Apple Watch, get [Dave's Music Library](https://apps.apple.com/us/app/daves-music-library/id6822005512)
+from the App Store (see [iPhone app](#iphone-app)).
+
 ## iPhone app
 
-The iPhone app plays a copy of part of your library, offline. It's an early companion and isn't on the App Store yet. To
-try it without the Mac app, tap **Explore a Sample Library** on its Library tab: fictional albums built into the app,
-replaced by your own library after your first sync.
-It's tested through TestFlight: if you've been invited, install [TestFlight](https://apps.apple.com/app/testflight/id899247664)
-on the iPhone and open the invitation. Otherwise, build it with Xcode and install it on your own phone, which takes a few
-one-time steps.
+The iPhone app plays a copy of part of your library, offline. Get it free on the App Store as
+[Dave's Music Library](https://apps.apple.com/us/app/daves-music-library/id6822005512)
+(iOS 27 or later; the Apple Watch app comes with it). To try it without the Mac app, tap **Explore a Sample Library** on
+its Library tab: fictional albums built into the app, replaced by your own library after your first sync.
 
-**What you need:** a Mac with Xcode 27 or later, an iPhone on iOS 27 or later with a USB cable, and an Apple ID (a free one
-works).
+**Build it yourself (optional)**
 
-**Install it**
+To run your own build instead, install it on your phone from Xcode, which takes a few one-time steps.
+You need a Mac with Xcode 27 or later, an iPhone on iOS 27 or later with a USB cable, and an Apple ID (a free one works).
 
 1. On the iPhone, turn on **Settings ▸ Privacy & Security ▸ Developer Mode** (the phone restarts), then connect it to the
    Mac and tap **Trust**.
