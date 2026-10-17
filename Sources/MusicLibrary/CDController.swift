@@ -423,10 +423,12 @@ final class CDController {
         let cover = track.coverURL(root: model.libraryRoot).flatMap { try? Data(contentsOf: $0) }
         let staged = destination.deletingLastPathComponent().appendingPathComponent(".rerip-\(UUID().uuidString).\(destination.pathExtension)")
         defer { try? FileManager.default.removeItem(at: staged) }
+        // Like an import, the track records the hash of the rip it came from (before tags), not of the library file.
+        let sha = try ImportService.sha256(of: rip)
         try await TagWriter(tools: model.tools).writeTaggedCopy(source: rip, destination: staged, metadata: track.metadata, cover: cover)
         _ = try FileManager.default.replaceItemAt(destination, withItemAt: staged)
         var updated = track
-        updated.sha256 = try ImportService.sha256(of: destination)
+        updated.sha256 = sha
         try model.database?.updateTrack(updated)
     }
 
