@@ -13,8 +13,17 @@ final class RipChecker {
         case done
     }
 
+    /// How far an album's check got: the track being read, and which of the discs it could have been ripped from.
+    struct AlbumProgress: Equatable {
+        var track = 0, tracks = 0
+        var disc = 1, discs = 1
+    }
+
     /// By album key (`AlbumInfoStore.key`).
     private(set) var albumStates: [String: AlbumState] = [:]
+    /// While an album is being checked, by album key.
+    private(set) var albumProgress: [String: AlbumProgress] = [:]
+    @ObservationIgnored private var albumTasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private unowned let model: AppModel
     @ObservationIgnored private var pressingsCache: [URL: [AccurateRipPressing]?] = [:]
 
@@ -24,7 +33,8 @@ final class RipChecker {
     /// the drive: tracks that weren't ripped are read from it at their edges, for the drive's offset. `samples`
     /// replaces a track's library file (a fresh rip being checked before it replaces the file), by track number.
     func check(toc: CDTOC, tracks: [Int: Track], volume: AudioCDVolume? = nil, samples: [Int: [UInt32]] = [:],
-               offsetHint: Int? = nil, save: Bool = true) async throws -> AccurateRipReport? {
+               offsetHint: Int? = nil, save: Bool = true,
+               progress: (@Sendable (_ done: Int, _ total: Int) async -> Void)? = nil) async throws -> AccurateRipReport? {
         let pressings = try await pressings(for: toc)
         var report: AccurateRipReport?
         if let pressings {
@@ -42,7 +52,7 @@ final class RipChecker {
             for (index, cd) in toc.audioTracks.enumerated() { inMemory[index] = samples[cd.number] }
             let source = AccurateRipAudioOverlay(base: RipAudioSource(toc: toc, files: files, disc: discFiles, tools: model.tools), tracks: inMemory)
             report = try await AccurateRipVerifier(toc: toc, pressings: pressings)
-                .verify(tracks.keys.sorted(), audio: source, offsetHint: offsetHint)
+                .verify(tracks.keys.sorted(), audio: source, offsetHint: offsetHint, progress: progress)
         }
         if save {
             model.saveRipChecks(tracks.map { RipCheck(trackId: $0.value.id, toc: toc, discTrack: $0.key, report: report) })
@@ -72,24 +82,32 @@ final class RipChecker {
     /// Checks an album from its files: per disc, against each disc it could have been ripped from (saved when ripped,
     /// or one MusicBrainz lists for its release with exactly its tracks' lengths), keeping the results of the one most
     /// of its tracks match. Discs whose tracks only start a few sectors later have the same lengths but are listed
-    /// apart in AccurateRip, sometimes as a different pressing.
+    /// apart in AccurateRip, sometimes as a different pressing. The disc saved with the tracks (the one ripped) goes
+    /// first, and once a disc has every track accurate the others aren't tried.
     func check(album: AlbumSummary) {
         let key = AlbumInfoStore.key(album)
         guard albumStates[key] != .checking else { return }
+        let previous = albumStates[key]
         albumStates[key] = .checking
-        Task {
+        albumProgress[key] = AlbumProgress()
+        albumTasks[key] = Task {
+            defer { albumProgress[key] = nil; albumTasks[key] = nil }
             do {
                 var found = false
                 let byDisc = Dictionary(grouping: model.tracks(of: album).filter(RipDiscMatcher.isCDAudio)) { $0.metadata.discNo ?? 1 }
                 var listed: [String: [Int: [CDTOC]]] = [:]
                 for (discNo, tracks) in byDisc.sorted(by: { $0.key < $1.key }) {
                     var best: (score: (Int, Int), toc: CDTOC, tracks: [Int: Track], report: AccurateRipReport?)?
-                    for (toc, numbers) in try await discs(for: tracks, discNo: discNo, listed: &listed) {
+                    let candidates = try await discs(for: tracks, discNo: discNo, listed: &listed)
+                    for (n, (toc, numbers)) in candidates.enumerated() {
                         found = true
                         let byNumber = Dictionary(tracks.compactMap { t in numbers[t.id].map { ($0, t) } }, uniquingKeysWith: { a, _ in a })
-                        let report = try await check(toc: toc, tracks: byNumber, save: false)
+                        let report = try await check(toc: toc, tracks: byNumber, save: false) { [weak self] done, total in
+                            await self?.setProgress(key, AlbumProgress(track: done, tracks: total, disc: n + 1, discs: candidates.count))
+                        }
                         let score = Self.score(report)
                         if best.map({ score > $0.score }) ?? true { best = (score, toc, byNumber, report) }
+                        if score.0 == byNumber.count { break }
                     }
                     if let best {
                         model.saveRipChecks(best.tracks.map { RipCheck(trackId: $0.value.id, toc: best.toc, discTrack: $0.key, report: best.report) })
@@ -97,9 +115,16 @@ final class RipChecker {
                 }
                 albumStates[key] = found ? .done : .noDisc
             } catch {
-                albumStates[key] = .failed(error.localizedDescription)
+                // Cancelled: back to what the page showed before (results saved for earlier discs stay).
+                albumStates[key] = Task.isCancelled ? previous : .failed(error.localizedDescription)
             }
         }
+    }
+
+    func cancel(album: AlbumSummary) { albumTasks[AlbumInfoStore.key(album)]?.cancel() }
+
+    private func setProgress(_ key: String, _ progress: AlbumProgress) {
+        if albumStates[key] == .checking { albumProgress[key] = progress }
     }
 
     /// How well a check went: accurate tracks, then their total confidence; a disc AccurateRip doesn't list is worst.

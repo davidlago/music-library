@@ -78,6 +78,13 @@ struct AlbumDetail: View {
         }
     }
 
+    /// Every CD-quality track already checked accurate: their audio doesn't change (Rip Again checks a track itself), so
+    /// there's nothing to check again.
+    private var allAccurate: Bool {
+        let cd = tracks.filter(RipDiscMatcher.isCDAudio)
+        return !cd.isEmpty && cd.allSatisfy { model.ripChecks[$0.id]?.result == .accurate }
+    }
+
     private func load() {
         tracks = model.tracks(of: album)
         model.ensureAlbumInfo(album)
@@ -116,9 +123,11 @@ struct AlbumDetail: View {
                 Menu {
                     QueueMenuButtons(player: model.player) { tracks }
                     Divider()
-                    Button("Check with AccurateRip", systemImage: "checkmark.seal") { model.rips.check(album: album) }
-                        .disabled(model.rips.albumStates[AlbumInfoStore.key(album)] == .checking
-                                  || !tracks.contains(where: RipDiscMatcher.isCDAudio) || !model.ffmpegAvailable)
+                    Button(allAccurate ? "AccurateRip: All Tracks Accurate" : "Check with AccurateRip", systemImage: "checkmark.seal") {
+                        model.rips.check(album: album)
+                    }
+                    .disabled(allAccurate || model.rips.albumStates[AlbumInfoStore.key(album)] == .checking
+                              || !tracks.contains(where: RipDiscMatcher.isCDAudio) || !model.ffmpegAvailable)
                     Divider()
                     RemoveFromLibraryButton(album: album)
                 } label: { Image(systemName: "ellipsis") }
