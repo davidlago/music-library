@@ -12,6 +12,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   **…** menu on an album page, not only in song lists. The files go to the Trash (with album and artist folders left
   with nothing but a cover), so a defective song or album can be ripped again. A removed song also leaves the play
   queue; if it was playing, the next song plays.
+- **iPhone: Play starts the first time.** Playing an album or song at a different sample rate from the last one no
+  longer stops right away until Play is tapped again: switching the output's rate was taken for an interruption.
 
 ## 1.16.0
 
