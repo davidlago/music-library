@@ -264,6 +264,23 @@ final class CDController {
                     continue
                 }
                 disc.rows[idx].status = .ripping(0)
+                // Already in the library from this disc: rip it again in place, instead of importing a second copy.
+                if let existing = disc.libraryTracks[number] {
+                    guard let self else { break }
+                    do {
+                        if case .kept(let reason) = try await self.ripInPlace(disc, track: number, replacing: existing, work: work) {
+                            failures += 1
+                            if let i = disc.rows.firstIndex(where: { $0.id == number }) { disc.rows[i].status = .failed(reason) }
+                        }
+                    } catch is CancellationError {
+                        if let i = disc.rows.firstIndex(where: { $0.id == number }) { disc.rows[i].status = .inLibrary }
+                        break
+                    } catch {
+                        failures += 1
+                        if let i = disc.rows.firstIndex(where: { $0.id == number }) { disc.rows[i].status = .failed(error.localizedDescription) }
+                    }
+                    continue
+                }
                 do {
                     let track = try await importer.ripAndImport(
                         volume: volume, cdTrack: number, release: release, releaseTrack: mb, cover: cover, service: service, workDir: work
@@ -323,53 +340,82 @@ final class CDController {
         }
     }
 
-    /// Rips a track again and, when AccurateRip says the new rip is right, puts it in place of the library's file.
-    /// The track keeps its ID, so its plays, likes and playlists stay.
+    /// Rips a misread track again (`ripInPlace`).
     func ripAgain(_ disc: CDDisc, track number: Int) {
         guard !disc.isRipping, !disc.isChecking, let track = disc.libraryTracks[number],
-              let source = disc.volume.trackFiles[number], let cd = disc.volume.toc.tracks.first(where: { $0.number == number }),
-              let destination = track.resolvedFileURL(root: model.libraryRoot), let row = disc.rows.firstIndex(where: { $0.id == number }) else { return }
+              let row = disc.rows.firstIndex(where: { $0.id == number }) else { return }
         let work = FileManager.default.temporaryDirectory.appendingPathComponent("MusicLibrary-CD-\(UUID().uuidString)")
-        let temp = work.appendingPathComponent(String(format: "%02d.flac", number))
-        let tools = model.tools
-        let toc = disc.volume.toc
-        let offset = disc.matchOffset ?? model.ripChecks[track.id]?.offset
+        let previous = disc.rows[row].status
         disc.isRipping = true
         disc.statusLine = "Ripping track \(number) again"
-        disc.rows[row].status = .ripping(0)
         disc.task = Task { [weak self] in
             defer {
                 try? FileManager.default.removeItem(at: work)
                 disc.isRipping = false
                 disc.statusLine = ""
             }
+            guard let self else { return }
             do {
-                try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
-                try await CDRipper(tools: tools).rip(source, to: temp, expectedDuration: toc.duration(of: cd)) { fraction in
-                    Task { @MainActor in
-                        guard let i = disc.rows.firstIndex(where: { $0.id == number }), disc.rows[i].status.isActive else { return }
-                        disc.rows[i].status = .ripping(fraction)
-                    }
+                if case .kept(let reason) = try await self.ripInPlace(disc, track: number, replacing: track, work: work) {
+                    disc.rows[row].status = .failed(reason)
                 }
-                guard let self else { return }
-                disc.rows[row].status = .importing
-                disc.statusLine = "Checking track \(number) with AccurateRip"
-                let report = try await self.model.rips.check(toc: toc, tracks: [number: track], volume: disc.volume, files: [number: temp],
-                                                             offsetHint: offset, save: false)
-                guard case .accurate? = report?.tracks[number] else {
-                    disc.rows[row].status = .failed("The new rip doesn't match either. Clean the disc and try again.")
-                    return
-                }
-                try await self.replaceFile(of: track, at: destination, with: temp)
-                self.model.saveRipChecks([RipCheck(trackId: track.id, toc: toc, discTrack: number, report: report)])
-                disc.rows[row].status = .done
-                self.model.reloadLibrary()
             } catch is CancellationError {
-                disc.rows[row].status = .done
+                disc.rows[row].status = previous
             } catch {
                 disc.rows[row].status = .failed(error.localizedDescription)
             }
         }
+    }
+
+    enum InPlaceOutcome { case replaced, kept(String) }
+
+    /// Rips a track that's already in the library again and swaps the new rip in for the library's file, keeping the
+    /// track (its ID, so its plays, likes and playlists). The new rip is kept unless AccurateRip says it's misread, or
+    /// the earlier rip was accurate and the new one can't be checked.
+    private func ripInPlace(_ disc: CDDisc, track number: Int, replacing track: Track, work: URL) async throws -> InPlaceOutcome {
+        guard let source = disc.volume.trackFiles[number], let cd = disc.volume.toc.tracks.first(where: { $0.number == number }),
+              let destination = track.resolvedFileURL(root: model.libraryRoot) else { throw CDError.missingTrackFile(number) }
+        let toc = disc.volume.toc
+        let temp = work.appendingPathComponent(String(format: "%02d-again.flac", number))
+        defer { try? FileManager.default.removeItem(at: temp) }
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        func setStatus(_ status: CDDisc.RowStatus) {
+            if let i = disc.rows.firstIndex(where: { $0.id == number }) { disc.rows[i].status = status }
+        }
+        setStatus(.ripping(0))
+        try await CDRipper(tools: model.tools).rip(source, to: temp, expectedDuration: toc.duration(of: cd)) { fraction in
+            Task { @MainActor in
+                guard let i = disc.rows.firstIndex(where: { $0.id == number }), disc.rows[i].status.isActive else { return }
+                disc.rows[i].status = .ripping(fraction)
+            }
+        }
+        setStatus(.importing)
+        let earlier = model.ripChecks[track.id]
+        var report: AccurateRipReport?
+        var checked = true
+        do {
+            report = try await model.rips.check(toc: toc, tracks: [number: track], volume: disc.volume, files: [number: temp],
+                                                offsetHint: disc.matchOffset ?? earlier?.offset, save: false)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            checked = false
+        }
+        if let offset = report?.offset { disc.matchOffset = offset }
+        var accurate = false
+        if case .accurate? = report?.tracks[number] { accurate = true }
+        if report?.tracks[number] == .inaccurate {
+            return .kept("Still misread, so the earlier rip was kept. Clean the disc and try again.")
+        }
+        if earlier?.result == .accurate, !accurate {
+            return .kept("The new rip couldn't be confirmed by AccurateRip, so the earlier, accurate rip was kept.")
+        }
+        try await replaceFile(of: track, at: destination, with: temp)
+        model.saveRipChecks([checked ? RipCheck(trackId: track.id, toc: toc, discTrack: number, report: report)
+                                     : RipCheck(trackId: track.id, toc: toc, discTrack: number, result: .unchecked)])
+        setStatus(.done)
+        model.reloadLibrary()
+        return .replaced
     }
 
     /// Writes the new rip with the track's tags and cover next to the old file, then swaps them.
