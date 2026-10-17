@@ -34,24 +34,35 @@ public struct PurchaseDay: Hashable, Comparable, Codable, Sendable {
     public static func < (a: PurchaseDay, b: PurchaseDay) -> Bool { (a.year, a.month, a.day) < (b.year, b.month, b.day) }
 }
 
-/// An album you own a copy of: when you bought it, what you paid and the number on the sticker you put on the case,
-/// all optional. Saved per album (`SearchIndex.albumKey`) in the `album_ownership` table, apart from the tracks, so
-/// re-importing an album keeps it.
+/// An album you own a copy of: a CD or a download, when you bought it, what you paid and (for a CD) the number on the
+/// sticker you put on the case, all optional. Saved per album (`SearchIndex.albumKey`) in the `album_ownership` table,
+/// apart from the tracks, so re-importing an album keeps it. Albums you don't own were borrowed (`OwnershipMark`).
 public struct AlbumPurchase: Hashable, Sendable {
+    /// What you bought: the CD, or the album as a download.
+    public enum Format: String, CaseIterable, Sendable {
+        case cd, digital
+    }
+
     public var album: String
     public var artist: String
+    /// Set on the Mac only. A download has no label number.
+    public var format: Format {
+        didSet { if format == .digital { labelNumber = nil } }
+    }
     public var purchasedOn: PurchaseDay?
     /// In the user's currency. Never negative.
     public var price: Decimal?
-    /// The number on the label you stuck on your copy to find it on the shelf (`validLabelNumber`). Set on the Mac only.
+    /// The number on the label you stuck on your CD to find it on the shelf (`validLabelNumber`). Set on the Mac only;
+    /// always nil for a download.
     public var labelNumber: Int? {
-        didSet { if let n = labelNumber, Self.validLabelNumber(n) == nil { labelNumber = nil } }
+        didSet { if let n = labelNumber, format == .digital || Self.validLabelNumber(n) == nil { labelNumber = nil } }
     }
 
-    public init(album: String, artist: String, purchasedOn: PurchaseDay? = nil, price: Decimal? = nil, labelNumber: Int? = nil) {
-        self.album = album; self.artist = artist; self.purchasedOn = purchasedOn
+    public init(album: String, artist: String, format: Format = .cd, purchasedOn: PurchaseDay? = nil, price: Decimal? = nil,
+                labelNumber: Int? = nil) {
+        self.album = album; self.artist = artist; self.format = format; self.purchasedOn = purchasedOn
         self.price = price.flatMap(Self.validPrice)
-        self.labelNumber = labelNumber.flatMap(Self.validLabelNumber)
+        self.labelNumber = format == .digital ? nil : labelNumber.flatMap(Self.validLabelNumber)
     }
 
     /// Label numbers run from 1 to `maxLabelNumber`.
@@ -87,8 +98,8 @@ public struct AlbumPurchase: Hashable, Sendable {
 }
 
 /// For ownership edits sent with a sync by phones before 1.18 (now ownership is edited on the Mac only): the date and
-/// price as the database stores them, and checked again when read (they come from another device). There's no label
-/// number: the Mac keeps its own when it applies the change.
+/// price as the database stores them, and checked again when read (they come from another device). There's no format
+/// or label number: the Mac keeps its own when it applies the change.
 extension AlbumPurchase: Codable {
     private enum CodingKeys: String, CodingKey { case album, artist, purchasedOn, price }
 
@@ -105,6 +116,73 @@ extension AlbumPurchase: Codable {
         try c.encode(artist, forKey: .artist)
         try c.encodeIfPresent(purchasedOn?.string, forKey: .purchasedOn)
         try c.encodeIfPresent(Self.priceText(price), forKey: .price)
+    }
+}
+
+/// A song you bought on its own or in a batch (a download), entered when importing it: when and what you paid, both
+/// optional. Saved per track in `track_purchases` (removed with the track). An album you don't own as a CD or download
+/// but whose songs you bought counts as a download (`AlbumPurchase.including(songs:tracks:in:)`).
+public struct TrackPurchase: Hashable, Sendable {
+    public var purchasedOn: PurchaseDay?
+    /// In the user's currency. Never negative.
+    public var price: Decimal?
+
+    public init(purchasedOn: PurchaseDay? = nil, price: Decimal? = nil) {
+        self.purchasedOn = purchasedOn
+        self.price = price.flatMap(AlbumPurchase.validPrice)
+    }
+
+    /// `total` (to the cent) split evenly into `count` prices that add up to it, the leftover cents going to the first
+    /// ones: $10 for 3 songs is $3.34, $3.33 and $3.33.
+    public static func split(_ total: Decimal, into count: Int) -> [Decimal] {
+        guard count > 0, let total = AlbumPurchase.validPrice(total) else { return [] }
+        var scaled = total * 100, cents = Decimal()
+        NSDecimalRound(&cents, &scaled, 0, .plain)
+        let all = NSDecimalNumber(decimal: cents).intValue
+        let base = all / count, extra = all % count
+        return (0..<count).map { Decimal(base + ($0 < extra ? 1 : 0)) / 100 }
+    }
+}
+
+extension AlbumPurchase {
+    /// `records` (albums you said you own) plus, for each album without one, a download made of the songs you bought
+    /// from it: their total (nil when none has a price) and the first one's day.
+    public static func including(songs: [Int64: TrackPurchase], tracks: [Track], in records: [String: AlbumPurchase]) -> [String: AlbumPurchase] {
+        guard !songs.isEmpty else { return records }
+        var all = records
+        var bought: [String: AlbumPurchase] = [:]
+        for t in tracks {
+            guard let song = songs[t.id] else { continue }
+            let key = SearchIndex.albumKey(album: t.album, artist: t.effectiveAlbumArtist)
+            guard records[key] == nil else { continue }
+            var p = bought[key] ?? AlbumPurchase(album: t.album, artist: t.effectiveAlbumArtist, format: .digital)
+            if let price = song.price { p.price = (p.price ?? 0) + price }
+            if let day = song.purchasedOn { p.purchasedOn = min(p.purchasedOn ?? day, day) }
+            bought[key] = p
+        }
+        all.merge(bought) { a, _ in a }
+        return all
+    }
+}
+
+/// How an album's cover shows how you got it: a CD you bought has your label on its jewel case (when it has one), a CD
+/// you borrowed (from a library or a friend; any album you don't own) and a download each have a round badge.
+public enum OwnershipMark: Hashable, Sendable {
+    case cd(label: Int?)
+    case borrowed
+    case digital
+
+    public init(_ purchase: AlbumPurchase?) {
+        switch purchase?.format {
+        case nil: self = .borrowed
+        case .cd: self = .cd(label: purchase?.labelNumber)
+        case .digital: self = .digital
+        }
+    }
+
+    public var labelNumber: Int? {
+        if case .cd(let label) = self { return label }
+        return nil
     }
 }
 
@@ -126,6 +204,9 @@ public struct OwnershipStats: Sendable {
         public var purchasedOn: PurchaseDay?
         public var price: Decimal?
         public var labelNumber: Int?
+        public var format: AlbumPurchase.Format
+        /// A download of only some of the album's songs (`TrackPurchase`).
+        public var partial: Bool
         /// All-time plays of the album's tracks.
         public var plays: Int
         public var listened: Double
@@ -142,6 +223,23 @@ public struct OwnershipStats: Sendable {
         public var name: String
         public var albums: Int
         public var spent: Decimal
+    }
+
+    /// The albums you own as CDs or as downloads.
+    public struct FormatShare: Identifiable, Hashable, Sendable {
+        public var id: AlbumPurchase.Format { format }
+        public var format: AlbumPurchase.Format
+        public var albums = 0
+        public var pricedAlbums = 0
+        public var spent: Decimal = 0
+        public var duration: Double = 0
+        public var plays = 0
+        /// CDs with a label number.
+        public var labeled = 0
+        /// Downloads of only some of an album's songs.
+        public var partial = 0
+
+        public var averagePrice: Decimal? { pricedAlbums == 0 ? nil : spent / Decimal(pricedAlbums) }
     }
 
     public enum Granularity: String, Sendable { case month, year }
@@ -193,6 +291,11 @@ public struct OwnershipStats: Sendable {
     public var genres: [Spend] = []
     /// By release decade ("1990s"), oldest first.
     public var decades: [Spend] = []
+    /// CDs, then downloads; only formats you own something in.
+    public var formats: [FormatShare] = []
+
+    /// Library albums you don't own: borrowed (from a library or a friend).
+    public var borrowedCount: Int { libraryAlbumCount - ownedCount }
 
     public var ownedFraction: Double { libraryAlbumCount == 0 ? 0 : Double(ownedCount) / Double(libraryAlbumCount) }
     public var costPerPlay: Decimal? { pricedPlays == 0 || totalSpent == 0 ? nil : totalSpent / Decimal(pricedPlays) }
@@ -200,10 +303,11 @@ public struct OwnershipStats: Sendable {
 
     public init() {}
 
+    /// `songPurchases` tells which downloads are of only some of an album's songs.
     public init(tracks: [Track], purchases: [String: AlbumPurchase], playTotals: [Int64: PlayTotal] = [:],
-                now: Date = Date(), calendar: Calendar = .current, listLimit: Int = 25) {
+                songPurchases: [Int64: TrackPurchase] = [:], now: Date = Date(), calendar: Calendar = .current, listLimit: Int = 25) {
         struct Group {
-            var album: String, artist: String, year: Int?, tracks = 0, duration = 0.0, plays = 0, listened = 0.0
+            var album: String, artist: String, year: Int?, tracks = 0, duration = 0.0, plays = 0, listened = 0.0, songsBought = 0
             var genres: [String] = []
         }
         var groups: [String: Group] = [:]
@@ -215,6 +319,7 @@ public struct OwnershipStats: Sendable {
             g.duration += t.duration.isFinite ? max(0, t.duration) : 0
             if let y = t.year, y > 0 { g.year = max(g.year ?? y, y) }
             if let p = playTotals[t.id] { g.plays += p.plays; g.listened += p.listened }
+            if songPurchases[t.id] != nil { g.songsBought += 1 }
             for genre in SearchIndex.genres(of: t.metadata) where !g.genres.contains(where: { $0.caseInsensitiveCompare(genre) == .orderedSame }) {
                 g.genres.append(genre)
             }
@@ -227,11 +332,25 @@ public struct OwnershipStats: Sendable {
             guard let g = groups[key] else { continue }
             owned.append((OwnedAlbum(id: key, album: g.album, artist: g.artist, year: g.year, trackCount: g.tracks,
                                      duration: g.duration, purchasedOn: p.purchasedOn, price: p.price,
-                                     labelNumber: p.labelNumber, plays: g.plays, listened: g.listened), g.genres))
+                                     labelNumber: p.labelNumber, format: p.format,
+                                     partial: p.format == .digital && g.songsBought > 0 && g.songsBought < g.tracks,
+                                     plays: g.plays, listened: g.listened), g.genres))
         }
         guard !owned.isEmpty else { return }
 
         let list = owned.map(\.album)
+        formats = AlbumPurchase.Format.allCases.compactMap { format in
+            var share = FormatShare(format: format)
+            for a in list where a.format == format {
+                share.albums += 1
+                share.duration += a.duration
+                share.plays += a.plays
+                if let price = a.price { share.pricedAlbums += 1; share.spent += price }
+                if a.labelNumber != nil { share.labeled += 1 }
+                if a.partial { share.partial += 1 }
+            }
+            return share.albums > 0 ? share : nil
+        }
         let byTitle: (OwnedAlbum, OwnedAlbum) -> Bool = {
             let c = $0.album.localizedCaseInsensitiveCompare($1.album)
             return c != .orderedSame ? c == .orderedAscending : $0.artist.localizedCaseInsensitiveCompare($1.artist) == .orderedAscending

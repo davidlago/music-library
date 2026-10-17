@@ -18,6 +18,7 @@ struct OwnedContent: View {
                     OwnedTiles(stats: stats)
                     if !stats.timeline.isEmpty { SpendingCard(stats: stats) }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 400), spacing: 18, alignment: .top)], alignment: .leading, spacing: 18) {
+                        OwnedFormatsCard(stats: stats)
                         OwnedAlbumsCard(stats: stats)
                         OwnedArtistsCard(stats: stats)
                         if !stats.genres.isEmpty { OwnedBreakdownCard(title: "Genres", subtitle: "Albums can carry several", items: stats.genres, stats: stats) { SearchFilterKey.token("genre", $0.name) } }
@@ -246,12 +247,89 @@ struct OwnedAlbumsCard: View {
 
     private func secondary(_ a: OwnershipStats.OwnedAlbum, _ list: Shelf) -> String? {
         switch list {
-        case .value: "\(playCount(a.plays)) · \(a.price.map { formatMoney($0) } ?? "")"
-        case .missing: a.labelNumber.map { "#\($0)" }
-        case .labeled: [a.price.map { formatMoney($0) }, a.purchasedOn.map(dayLabel)].compactMap { $0 }.joined(separator: " · ")
+        case .value: return "\(playCount(a.plays)) · \(a.price.map { formatMoney($0) } ?? "")"
+        case .missing: return a.labelNumber.map { "#\($0)" }
+        case .labeled: return [a.price.map { formatMoney($0) }, a.purchasedOn.map(dayLabel)].compactMap { $0 }.joined(separator: " · ")
         default:
-            if let day = a.purchasedOn.map(dayLabel) { a.labelNumber.map { "#\($0) · \(day)" } ?? day } else { a.labelNumber.map { "#\($0)" } }
+            let parts = [a.labelNumber.map { "#\($0)" } ?? (a.format == .digital ? "Download" : nil), a.purchasedOn.map(dayLabel)].compactMap { $0 }
+            return parts.isEmpty ? nil : parts.joined(separator: " · ")
         }
+    }
+}
+
+// MARK: Formats
+
+/// How you own your music: CDs, downloads, and the albums you borrowed, as a bar of the whole library and a row each.
+struct OwnedFormatsCard: View {
+    @Environment(\.theme) private var theme
+    let stats: OwnershipStats
+
+    private struct Part: Identifiable {
+        var id: String { name }
+        var name: String
+        var icon: String
+        var albums: Int
+        var color: Color
+        var detail: String
+    }
+
+    var body: some View {
+        let parts = parts
+        let total = max(parts.reduce(0) { $0 + $1.albums }, 1)
+        InsightCard(title: "How You Own It", subtitle: "CDs, downloads and borrowed albums, of your \(albumCount(stats.libraryAlbumCount))") {
+            VStack(alignment: .leading, spacing: 12) {
+                GeometryReader { geo in
+                    HStack(spacing: 2) {
+                        ForEach(parts) { p in
+                            Rectangle().fill(p.color)
+                                .frame(width: max(3, (geo.size.width - CGFloat(parts.count - 1) * 2) * CGFloat(p.albums) / CGFloat(total)))
+                                .help("\(p.name): \(albumCount(p.albums))")
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                .frame(height: 12)
+                ForEach(parts) { p in
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Image(systemName: p.icon).foregroundStyle(p.color).frame(width: 18)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(p.name)
+                            Text(p.detail).font(.caption).foregroundStyle(.subtext)
+                        }
+                        Spacer(minLength: 8)
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text(albumCount(p.albums)).monospacedDigit()
+                            Text((Double(p.albums) / Double(total)).formatted(.percent.precision(.fractionLength(0))))
+                                .font(.caption).foregroundStyle(.subtext).monospacedDigit()
+                        }
+                    }
+                    .font(.callout)
+                }
+            }
+        }
+    }
+
+    private var parts: [Part] {
+        var out: [Part] = []
+        for f in stats.formats {
+            var bits: [String] = []
+            if f.spent > 0 { bits.append("\(formatMoney(f.spent)) spent") }
+            if let avg = f.averagePrice, f.pricedAlbums > 1 { bits.append("\(formatMoney(avg)) on average") }
+            switch f.format {
+            case .cd:
+                if f.labeled > 0 { bits.append(f.labeled == f.albums ? "all labeled" : "\(f.labeled) labeled") }
+                out.append(Part(name: "CDs", icon: "opticaldisc", albums: f.albums, color: theme.series, detail: bits.joined(separator: " · ")))
+            case .digital:
+                if f.partial > 0 { bits.append(f.partial == 1 ? "1 only partly" : "\(f.partial) only partly") }
+                out.append(Part(name: "Downloads", icon: "dollarsign.circle", albums: f.albums, color: theme.series.opacity(0.55),
+                                detail: bits.joined(separator: " · ")))
+            }
+        }
+        if stats.borrowedCount > 0 {
+            out.append(Part(name: "Borrowed", icon: "arrow.left.arrow.right", albums: stats.borrowedCount, color: theme.neutral,
+                            detail: "From a library or a friend; not yours"))
+        }
+        return out
     }
 }
 

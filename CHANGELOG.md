@@ -7,6 +7,25 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- **Sort albums and songs on the iPhone.** The Albums grid has the Mac's orders (Date Added, Title, Artist, Release
+  Year, Most Played, Recently Played) in its menu, with the same line under each album saying when it was added or
+  played. Songs can be sorted by title, artist, album, composer, year, time, format or date added, either way round.
+- **Label stickers on the hinge.** On the Mac and the iPhone, an album's label number now sits on a tall sticker across
+  the top of the jewel case's hinge, where it goes on the real case, reading from bottom to top; covers shown without
+  their case have it in the top-left corner.
+- **CDs, downloads and borrowed CDs look different.** An album you own is now either a CD or a download (**Your Copy ›
+  Format** on its page in the Mac app). A CD you bought has its label on the jewel case; one you borrowed (any album
+  you don't own) has a round badge with two arrows, and a download a round dollar-sign badge, on the Mac and the
+  iPhone.
+- **Prices for imported songs.** The Import page has **Paid** and **Bought** fields for each song (still editable once
+  it's imported), and a field for what you paid for all the songs in the list (a whole album, say), split evenly
+  across them as you type; changing a song's price changes the total. An album you bought songs from counts as a
+  download you own, even if only some of its songs: its page shows it owned since the first song, for their total, and
+  so does Insights. **Import** is now ⌘Return, so Return in a text field doesn't import.
+- **How you own your music, in Insights.** The Owned pane, on the Mac and the iPhone, shows your albums as CDs,
+  downloads and borrowed, with what each cost, how many CDs are labeled and how many downloads are only some of an
+  album's songs; **Your Albums** marks the downloads.
+
 ## 1.18.0
 
 - **Label numbers for your CDs.** When you say you own an album in the Mac app (on its page, or when ripping a CD),

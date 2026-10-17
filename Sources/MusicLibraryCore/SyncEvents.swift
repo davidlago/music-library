@@ -89,8 +89,8 @@ public final class SyncOutbox: @unchecked Sendable {
         var owned = base
         for e in events.sorted(by: { $0.at < $1.at }) {
             guard case .purchase(let p) = e.kind, let key = albumKey(e.trackID) else { continue }
-            // Label numbers come from the Mac only, as when it applies the event.
-            owned[key] = p.map { var p = $0; p.labelNumber = base[key]?.labelNumber; return p }
+            // Formats and label numbers come from the Mac only, as when it applies the event.
+            owned[key] = p.map { var p = $0; p.format = base[key]?.format ?? .cd; p.labelNumber = base[key]?.labelNumber; return p }
         }
         return owned
     }
@@ -146,11 +146,11 @@ extension Database {
                     let key = SearchIndex.albumKey(album: track.album, artist: track.effectiveAlbumArtist)
                     let updated = try query("SELECT updated_at FROM album_ownership WHERE key=?", [.text(key)]) { $0.double(0) }.first ?? nil
                     if let updated, updated > e.at.timeIntervalSince1970 { continue }
-                    // Label numbers are only set on the Mac: the album keeps its own.
-                    let label = try albumPurchases()[key]?.labelNumber
+                    // Formats and label numbers are only set on the Mac: the album keeps its own.
+                    let current = try albumPurchases()[key]
                     try saveAlbumPurchase(key: key, purchase.map {
-                        AlbumPurchase(album: track.album, artist: track.effectiveAlbumArtist, purchasedOn: $0.purchasedOn, price: $0.price,
-                                      labelNumber: label)
+                        AlbumPurchase(album: track.album, artist: track.effectiveAlbumArtist, format: current?.format ?? .cd,
+                                      purchasedOn: $0.purchasedOn, price: $0.price, labelNumber: current?.labelNumber)
                     }, at: e.at)
                     result.purchases += 1
                 }

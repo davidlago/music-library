@@ -140,6 +140,18 @@ import Testing
         #expect(overlay[key] == nil)
         let labeled = SyncOutbox.purchases(base: [key: AlbumPurchase(album: "First", artist: "Artist", labelNumber: 7)], events: events) { _ in key }
         #expect(labeled[key]?.labelNumber == 7 && labeled[key]?.price == 9.5)
+        let download = SyncOutbox.purchases(base: [key: AlbumPurchase(album: "First", artist: "Artist", format: .digital)], events: events) { _ in key }
+        #expect(download[key]?.format == .digital && download[key]?.price == 9.5)
+    }
+
+    /// Phones before 1.18 send ownership changes without a format: the Mac's stays.
+    @Test func ownershipFromThePhoneKeepsTheFormat() throws {
+        let f = try SyncFixture()
+        let key = SearchIndex.albumKey(album: "First", artist: "Artist")
+        try f.db.saveAlbumPurchase(key: key, AlbumPurchase(album: "First", artist: "Artist", format: .digital, price: 10), at: Date(timeIntervalSince1970: 1000))
+        let repriced = SyncEvent(track: f.tracks[0], at: Date(timeIntervalSince1970: 2000), kind: .purchase(AlbumPurchase(album: "First", artist: "Artist", price: 8)))
+        #expect(try f.db.applySyncEvents([repriced], libraryID: f.db.libraryID()).purchases == 1)
+        #expect(try f.db.albumPurchases()[key] == AlbumPurchase(album: "First", artist: "Artist", format: .digital, price: 8))
     }
 
     @Test func purchasesFromAnotherDeviceAreChecked() throws {
@@ -151,6 +163,8 @@ import Testing
         #expect(try JSONDecoder().decode(AlbumPurchase.self, from: try JSONEncoder().encode(good)) == good)
         let labeled = String(decoding: try JSONEncoder().encode(AlbumPurchase(album: "A", artist: "B", labelNumber: 5)), as: UTF8.self)
         #expect(!labeled.contains("label"), "label numbers stay on the Mac")
+        let download = String(decoding: try JSONEncoder().encode(AlbumPurchase(album: "A", artist: "B", format: .digital)), as: UTF8.self)
+        #expect(!download.contains("format") && !download.contains("digital"), "formats stay on the Mac")
     }
 
     actor Box<T: Sendable> {

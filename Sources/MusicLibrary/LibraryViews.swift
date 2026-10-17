@@ -103,21 +103,6 @@ struct AlbumsView: View {
     /// Only albums you own (`model.purchase(for:)`).
     @AppStorage("albumsOwnedOnly") private var ownedOnly = false
 
-    enum AlbumSort: String, CaseIterable, Identifiable {
-        case added, title, artist, year, mostPlayed, recent
-        var id: String { rawValue }
-        var label: String {
-            switch self {
-            case .added: "Date Added"
-            case .title: "Title"
-            case .artist: "Artist"
-            case .year: "Release Year"
-            case .mostPlayed: "Most Played"
-            case .recent: "Recently Played"
-            }
-        }
-    }
-
     var body: some View {
         let shown = sorted(ownedOnly ? model.albums.filter { model.purchase(for: $0) != nil } : model.albums)
         ScrollView {
@@ -139,9 +124,9 @@ struct AlbumsView: View {
                     ForEach(shown) { a in
                         NavigationLink(value: a) {
                             VStack(alignment: .leading, spacing: 4) {
-                                JewelCase(width: 150) {
+                                JewelCase(width: 150, ownership: OwnershipMark(model.purchase(for: a))) {
                                     CoverThumb(url: model.coverURL(forAlbum: a), size: JewelCase<EmptyView>.bookletSide(width: 150),
-                                               revision: model.coverRevision, labelNumber: model.purchase(for: a)?.labelNumber, cornerRadius: 0)
+                                               revision: model.coverRevision, cornerRadius: 0)
                                 }
                                 .padding(.bottom, 4)
                                 Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.headline).lineLimit(1)
@@ -180,23 +165,8 @@ struct AlbumsView: View {
 
     private func key(_ a: AlbumSummary) -> String { AlbumInfoStore.key(a) }
 
-    /// Albums arrive sorted by artist; other orders are stable on top of that.
     private func sorted(_ albums: [AlbumSummary]) -> [AlbumSummary] {
-        func plays(_ a: AlbumSummary) -> PlayTotal { model.albumPlayTotals[key(a)] ?? PlayTotal() }
-        func by<T: Comparable>(_ value: (AlbumSummary) -> T, descending: Bool) -> [AlbumSummary] {
-            albums.enumerated().sorted { x, y in
-                let a = value(x.element), b = value(y.element)
-                return a != b ? (descending ? a > b : a < b) : x.offset < y.offset
-            }.map(\.element)
-        }
-        switch sort {
-        case .artist: return albums
-        case .added: return by({ model.albumAddedDates[key($0)] ?? .distantPast }, descending: true)
-        case .title: return by({ $0.album.isEmpty ? "\u{FFFF}" : $0.album.lowercased() }, descending: false)
-        case .year: return by({ $0.year ?? Int.min }, descending: true)
-        case .mostPlayed: return by({ plays($0).plays * 1_000_000 + Int(plays($0).listened) }, descending: true)
-        case .recent: return by({ plays($0).lastPlayed ?? .distantPast }, descending: true)
-        }
+        sort.sorted(albums, added: model.albumAddedDates, plays: model.albumPlayTotals)
     }
 
     /// A third line matching the sort, so the order makes sense at a glance.

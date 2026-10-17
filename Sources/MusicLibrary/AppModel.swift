@@ -130,8 +130,12 @@ final class AppModel {
     private(set) var historyVersion = 0
     @ObservationIgnored private var listeningRequest: (period: ListeningStats.Period, library: Int, history: Int, at: Date)?
     @ObservationIgnored private var listeningTask: Task<Void, Never>?
-    /// Albums you own, with purchase date and price (keyed by `AlbumInfoStore.key`).
+    /// Albums you own, with purchase date and price (keyed by `AlbumInfoStore.key`), including those whose songs you
+    /// bought (`AlbumPurchase.including`).
     private(set) var purchases: [String: AlbumPurchase] = [:]
+    /// The albums you said you own (album page, CD ripping), and the songs you bought (entered when importing).
+    private(set) var purchaseRecords: [String: AlbumPurchase] = [:]
+    private(set) var trackPurchases: [Int64: TrackPurchase] = [:]
     /// Bumped whenever `purchases` changes.
     private(set) var purchasesVersion = 0
     /// Bumped when an album gets a new cover, so views showing the same cover.jpg load it again.
@@ -249,8 +253,7 @@ final class AppModel {
         // Plays and likes from the iPhone are in the database now: likes, play counts and Insights follow.
         iPhone.onHistoryChanged = { [unowned self] in
             self.reloadLibrary()
-            self.purchases = (try? self.database?.albumPurchases()) ?? self.purchases
-            self.purchasesVersion += 1
+            self.loadPurchases()
             self.historyVersion += 1
         }
         iPhone.context = { [unowned self] in self.syncContext }
@@ -314,8 +317,6 @@ final class AppModel {
             artistInfo.open(database: database, root: libraryRoot)
             albumInfo.open(database: database)
             catalog.open(database: database)
-            purchases = (try? database?.albumPurchases()) ?? [:]
-            purchasesVersion += 1
             reloadLibrary()
             Task { await backfillAudioFormats() }
         } catch {
@@ -358,7 +359,7 @@ final class AppModel {
         playTotals = [:]; artistPlayTotals = [:]; albumPlayTotals = [:]; albumAddedDates = [:]
         index = .empty; searchResults = SearchResults(); stats = nil; statsVersion = -1
         listening = nil; listeningRequest = nil
-        purchases = [:]; ownershipStats = nil; ownershipRequest = nil
+        purchases = [:]; purchaseRecords = [:]; trackPurchases = [:]; ownershipStats = nil; ownershipRequest = nil
         openLibrary()
     }
 
@@ -376,6 +377,7 @@ final class AppModel {
             totalTracks = tracks.count
             trackByID = Dictionary(tracks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             recomputeGroupTotals()
+            loadPurchases()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -598,18 +600,45 @@ final class AppModel {
 
     // MARK: Ownership
 
+    /// How you own the album, if you do: as you said, or as a download made of the songs you bought from it.
     func purchase(for album: AlbumSummary) -> AlbumPurchase? { purchases[AlbumInfoStore.key(album)] }
+
+    /// That you own the album, as you said on its page or when ripping it (not counting songs you bought).
+    func purchaseRecord(for album: AlbumSummary) -> AlbumPurchase? { purchaseRecords[AlbumInfoStore.key(album)] }
 
     /// Records that you own the album (with nil, that you don't).
     func setPurchase(_ purchase: AlbumPurchase?, forKey key: String) {
-        guard let db = database, purchases[key] != purchase else { return }
+        guard let db = database, purchaseRecords[key] != purchase else { return }
         do {
             try db.saveAlbumPurchase(key: key, purchase)
-            purchases[key] = purchase
-            purchasesVersion += 1
+            purchaseRecords[key] = purchase
+            combinePurchases()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Records what you paid for a song (with nil, forgets it).
+    func setTrackPurchase(_ purchase: TrackPurchase?, for trackID: Int64) {
+        guard let db = database, trackPurchases[trackID] != purchase else { return }
+        do {
+            try db.saveTrackPurchase(trackID: trackID, purchase)
+            trackPurchases[trackID] = purchase
+            combinePurchases()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func loadPurchases() {
+        purchaseRecords = (try? database?.albumPurchases()) ?? purchaseRecords
+        trackPurchases = (try? database?.trackPurchases()) ?? trackPurchases
+        combinePurchases()
+    }
+
+    private func combinePurchases() {
+        purchases = AlbumPurchase.including(songs: trackPurchases, tracks: tracks, in: purchaseRecords)
+        purchasesVersion += 1
     }
 
     func setPurchase(_ purchase: AlbumPurchase?, for album: AlbumSummary) {
@@ -763,10 +792,10 @@ final class AppModel {
         let request = (library: libraryVersion, purchases: purchasesVersion, history: historyVersion)
         if let r = ownershipRequest, r == request, ownershipStats != nil { return }
         ownershipRequest = request
-        let all = tracks, owned = purchases, totals = playTotals
+        let all = tracks, owned = purchases, totals = playTotals, songs = trackPurchases
         ownershipTask?.cancel()
         ownershipTask = Task.detached(priority: .userInitiated) {
-            let stats = OwnershipStats(tracks: all, purchases: owned, playTotals: totals)
+            let stats = OwnershipStats(tracks: all, purchases: owned, playTotals: totals, songPurchases: songs)
             guard !Task.isCancelled else { return }
             await MainActor.run { [weak self] in
                 guard let self, let r = self.ownershipRequest, r == request else { return }

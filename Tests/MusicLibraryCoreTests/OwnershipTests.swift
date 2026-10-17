@@ -70,6 +70,102 @@ import Testing
         #expect(try db.albumPurchases()["k"]?.labelNumber == nil)
     }
 
+    @Test func downloadsHaveNoLabelAndTheFormatIsSaved() throws {
+        #expect(AlbumPurchase(album: "A", artist: "B", format: .digital, labelNumber: 4).labelNumber == nil)
+        var p = AlbumPurchase(album: "A", artist: "B", labelNumber: 4)
+        p.format = .digital
+        #expect(p.labelNumber == nil)
+        p.labelNumber = 5
+        #expect(p.labelNumber == nil)
+        p.format = .cd
+        p.labelNumber = 5
+        #expect(p.labelNumber == 5)
+
+        let db = try Database(path: ":memory:")
+        try db.saveAlbumPurchase(key: "d", AlbumPurchase(album: "A", artist: "B", format: .digital, price: 9))
+        try db.saveAlbumPurchase(key: "c", AlbumPurchase(album: "C", artist: "B", labelNumber: 2))
+        #expect(try db.albumPurchases()["d"]?.format == .digital)
+        #expect(try db.albumPurchases()["c"]?.format == .cd)
+        // A CD is stored as NULL, like every purchase before formats; something unknown reads as a CD.
+        #expect(try db.query("SELECT format FROM album_ownership WHERE key='c'") { $0.string(0) }.first == .some(nil))
+        try db.exec("UPDATE album_ownership SET format='vinyl' WHERE key='d'")
+        #expect(try db.albumPurchases()["d"]?.format == .cd)
+    }
+
+    @Test func ownershipMarks() {
+        #expect(OwnershipMark(nil) == .borrowed)
+        #expect(OwnershipMark(AlbumPurchase(album: "A", artist: "B", labelNumber: 3)) == .cd(label: 3))
+        #expect(OwnershipMark(AlbumPurchase(album: "A", artist: "B")) == .cd(label: nil))
+        #expect(OwnershipMark(AlbumPurchase(album: "A", artist: "B", format: .digital)) == .digital)
+        #expect(OwnershipMark.cd(label: 3).labelNumber == 3 && OwnershipMark.digital.labelNumber == nil)
+    }
+
+    @Test func batchPricesSplitEvenlyToTheCent() {
+        #expect(TrackPurchase.split(10, into: 3) == [Decimal(string: "3.34")!, Decimal(string: "3.33")!, Decimal(string: "3.33")!])
+        #expect(TrackPurchase.split(Decimal(string: "9.99")!, into: 1) == [Decimal(string: "9.99")!])
+        #expect(TrackPurchase.split(12, into: 12) == Array(repeating: Decimal(1), count: 12))
+        #expect(TrackPurchase.split(Decimal(string: "0.02")!, into: 3) == [Decimal(string: "0.01")!, Decimal(string: "0.01")!, 0])
+        #expect(TrackPurchase.split(Decimal(string: "1.005")!, into: 1) == [Decimal(string: "1.01")!])
+        #expect(TrackPurchase.split(5, into: 0).isEmpty)
+        #expect(TrackPurchase.split(-5, into: 2).isEmpty)
+        #expect(TrackPurchase.split(Decimal(string: "9.99")!, into: 7).reduce(0, +) == Decimal(string: "9.99")!)
+    }
+
+    @Test func songPurchasesAreSavedAndGoWithTheTrack() throws {
+        let db = try Database(path: ":memory:")
+        let track = try db.insertTrack(Track(path: "Music/A/B/01 - C.flac", metadata: TrackMetadata(title: "C", artist: "A", album: "B"),
+                                             duration: 60, format: "flac", sha256: "s"))
+        let bought = TrackPurchase(purchasedOn: PurchaseDay(year: 2026, month: 10, day: 1), price: Decimal(string: "1.29"))
+        try db.saveTrackPurchase(trackID: track.id, bought)
+        #expect(try db.trackPurchases() == [track.id: bought])
+        try db.exec("UPDATE track_purchases SET price='free', purchased_on='soon'")
+        #expect(try db.trackPurchases() == [track.id: TrackPurchase()])
+        try db.deleteTracks(ids: [track.id])
+        #expect(try db.trackPurchases().isEmpty)
+        #expect(TrackPurchase(price: -1).price == nil)
+    }
+
+    @Test func boughtSongsMakeAnAlbumADownload() {
+        func track(_ id: Int64, _ album: String) -> Track {
+            Track(id: id, path: "\(id)", metadata: TrackMetadata(title: "T\(id)", artist: "A", album: album), duration: 60, format: "flac", sha256: "\(id)")
+        }
+        let tracks = [track(1, "Songs"), track(2, "Songs"), track(3, "Songs"), track(4, "CD"), track(5, "Free")]
+        let cd = AlbumPurchase(album: "CD", artist: "A", price: 12, labelNumber: 4)
+        let records = [key("CD", "A"): cd]
+        let songs: [Int64: TrackPurchase] = [
+            1: TrackPurchase(purchasedOn: PurchaseDay(year: 2026, month: 5, day: 2), price: Decimal(string: "1.29")),
+            2: TrackPurchase(purchasedOn: PurchaseDay(year: 2026, month: 3, day: 9), price: Decimal(string: "0.99")),
+            4: TrackPurchase(price: 1),
+            5: TrackPurchase(),
+        ]
+        let all = AlbumPurchase.including(songs: songs, tracks: tracks, in: records)
+        #expect(all[key("Songs", "A")] == AlbumPurchase(album: "Songs", artist: "A", format: .digital,
+                                                        purchasedOn: PurchaseDay(year: 2026, month: 3, day: 9), price: Decimal(string: "2.28")))
+        #expect(all[key("CD", "A")] == cd, "an album you said you own keeps its own details")
+        #expect(all[key("Free", "A")] == AlbumPurchase(album: "Free", artist: "A", format: .digital))
+        #expect(AlbumPurchase.including(songs: [:], tracks: tracks, in: records) == records)
+    }
+
+    @Test func formatsSplitCDsDownloadsAndBorrowed() {
+        func track(_ id: Int64, _ album: String) -> Track {
+            Track(id: id, path: "\(id)", metadata: TrackMetadata(title: "T\(id)", artist: "A", album: album), duration: 100, format: "flac", sha256: "\(id)")
+        }
+        let tracks = [track(1, "CD1"), track(2, "CD2"), track(3, "Full"), track(4, "Part"), track(5, "Part"), track(6, "Borrowed")]
+        let songs: [Int64: TrackPurchase] = [4: TrackPurchase(price: 1)]
+        let records = [key("CD1", "A"): AlbumPurchase(album: "CD1", artist: "A", price: 10, labelNumber: 1),
+                       key("CD2", "A"): AlbumPurchase(album: "CD2", artist: "A", price: 14),
+                       key("Full", "A"): AlbumPurchase(album: "Full", artist: "A", format: .digital, price: 8)]
+        let s = OwnershipStats(tracks: tracks, purchases: AlbumPurchase.including(songs: songs, tracks: tracks, in: records), songPurchases: songs)
+        #expect(s.formats.map(\.format) == [.cd, .digital])
+        let cd = s.formats[0], digital = s.formats[1]
+        #expect(cd.albums == 2 && cd.spent == 24 && cd.labeled == 1 && cd.averagePrice == 12 && cd.partial == 0)
+        #expect(digital.albums == 2 && digital.spent == 9 && digital.partial == 1 && digital.labeled == 0)
+        #expect(s.borrowedCount == 1)
+        #expect(s.albums.first { $0.album == "Part" }?.partial == true)
+        #expect(s.albums.first { $0.album == "Full" }?.partial == false)
+        #expect(OwnershipStats(tracks: tracks, purchases: [:]).formats.isEmpty)
+    }
+
     @Test func nextLabelNumberFollowsTheHighest() {
         #expect(AlbumPurchase.nextLabelNumber(in: [:]) == 1)
         let purchases = [
@@ -109,6 +205,8 @@ import Testing
         let db = try Database(path: path)
         try db.saveAlbumPurchase(key: "k", AlbumPurchase(album: "A", artist: "B", labelNumber: 9))
         #expect(try db.albumPurchases()["k"]?.labelNumber == 9)
+        try db.saveAlbumPurchase(key: "k", AlbumPurchase(album: "A", artist: "B", format: .digital))
+        #expect(try db.albumPurchases()["k"]?.format == .digital)
     }
 
     // MARK: Stats
