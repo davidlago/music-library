@@ -11,6 +11,15 @@ public enum ExportItem: Codable, Hashable, Identifiable, Sendable {
     case likedSongs
 
     public var id: Self { self }
+
+    /// Still means something with no songs: a playlist or Liked Songs can fill up again, but an album, artist or song
+    /// with none has left the library.
+    public var staysWhenEmpty: Bool {
+        switch self {
+        case .library, .playlist, .smartPlaylist, .likedSongs: true
+        case .album, .artist, .track: false
+        }
+    }
 }
 
 /// What the iPhone keeps: an ordered list of rules, each adding an item's songs to the phone or keeping them off it.
@@ -65,12 +74,18 @@ public struct SyncSelection: Codable, Equatable, Sendable {
         compact(tracks)
     }
 
+    /// Drops what no longer decides anything, like albums that left the library (see `compact`). Call it when the
+    /// library changes; never with a library that isn't loaded.
+    public mutating func dropMissing(tracks: (ExportItem) -> Set<Int64>) {
+        compact(tracks)
+    }
+
     /// Removes rules that make no difference: ones whose songs later rules all decide, additions of songs already
-    /// added, and exclusions of songs no earlier rule adds. Additions with no songs right now (an empty playlist,
-    /// say) are kept.
+    /// added, exclusions of songs no earlier rule adds, and albums, artists and songs no longer in the library.
+    /// Additions of a playlist or Liked Songs with no songs right now are kept (`ExportItem.staysWhenEmpty`).
     mutating func compact(_ tracks: (ExportItem) -> Set<Int64>) {
         let sets = rules.map { tracks($0.item) }
-        var keep = Array(repeating: true, count: rules.count)
+        var keep = rules.indices.map { !sets[$0].isEmpty || rules[$0].item.staysWhenEmpty }
         var decidedLater = Set<Int64>()
         for i in rules.indices.reversed() {
             let ids = sets[i]

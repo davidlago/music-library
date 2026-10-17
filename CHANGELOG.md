@@ -26,6 +26,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   downloads and borrowed, with what each cost, how many CDs are labeled and how many downloads are only some of an
   album's songs; **Your Albums** marks the downloads.
 - **Newest first on the iPhone page.** The Mac app's iPhone list shows what you added most recently at the top.
+- **Removed CDs leave the iPhone page.** Albums, artists and songs that are no longer in the Mac's library drop off its
+  iPhone list, so a CD removed on the iPhone no longer lingers there with no songs when it had left the library first.
 
 ## 1.18.0
 

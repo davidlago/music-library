@@ -67,6 +67,22 @@ import Testing
         #expect(s.contains(.likedSongs, tracks: tracks))
     }
 
+    /// An album that left the library (or never matched it) leaves the list, even when the phone's Remove for it comes
+    /// after; a playlist stays.
+    @Test func itemsThatLeftTheLibraryLeaveTheList() {
+        let gone = ExportItem.album(album: "Gone", artist: "A")
+        var s = SyncSelection(rules: [SyncSelection.Rule(item: .playlist(9), include: true), SyncSelection.Rule(item: gone, include: true),
+                                      SyncSelection.Rule(item: .album(album: "X", artist: "A"), include: true),
+                                      SyncSelection.Rule(item: .artist("Nobody"), include: true), SyncSelection.Rule(item: .track(99), include: true)])
+        s.dropMissing(tracks: ids)
+        #expect(s.rules.map(\.item) == [.playlist(9), .album(album: "X", artist: "A")])
+
+        var t = SyncSelection(rules: [SyncSelection.Rule(item: .album(album: "X", artist: "A"), include: true),
+                                      SyncSelection.Rule(item: gone, include: true)])
+        t.apply(.album(album: "Other", artist: "Spelling"), include: false, tracks: ids)
+        #expect(t.rules.map(\.item) == [.album(album: "X", artist: "A")])
+    }
+
     @Test func oldListsDecodeAsAdditions() throws {
         let old = try JSONEncoder().encode([ExportItem.artist("A"), .track(4)])
         let items = try JSONDecoder().decode([ExportItem].self, from: old)

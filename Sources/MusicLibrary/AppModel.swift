@@ -378,6 +378,7 @@ final class AppModel {
             trackByID = Dictionary(tracks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             recomputeGroupTotals()
             loadPurchases()
+            iPhone.dropMissing()
         } catch {
             errorMessage = error.localizedDescription
         }
