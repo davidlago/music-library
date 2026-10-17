@@ -16,6 +16,7 @@ struct OwnedInsightsPane: View {
         } else {
             VStack(alignment: .leading, spacing: 16) {
                 InsightsOwnedTiles(stats: stats)
+                InsightsOwnedFormatsCard(stats: stats)
                 if !stats.timeline.isEmpty { InsightsSpendingCard(stats: stats) }
                 InsightsOwnedAlbumsCard(stats: stats)
                 InsightsOwnedArtistsCard(stats: stats)
@@ -249,14 +250,90 @@ struct InsightsOwnedAlbumsCard: View {
 
     private func secondary(_ a: OwnershipStats.OwnedAlbum, _ list: Shelf) -> String? {
         switch list {
-        case .value: "\(playCount(a.plays)) · \(a.price.map { formatMoney($0) } ?? "")"
-        case .missing: nil
-        default: a.purchasedOn.map(InsightOwned.dayLabel)
+        case .value: return "\(playCount(a.plays)) · \(a.price.map { formatMoney($0) } ?? "")"
+        case .missing: return nil
+        default:
+            let parts = [a.format == .digital ? "Download" : nil, a.purchasedOn.map(InsightOwned.dayLabel)].compactMap { $0 }
+            return parts.isEmpty ? nil : parts.joined(separator: " · ")
         }
     }
 }
 
 // MARK: Breakdowns
+
+/// How you own your music: CDs, downloads, and the albums you borrowed, as a bar of the whole library and a row each.
+struct InsightsOwnedFormatsCard: View {
+    let stats: OwnershipStats
+
+    private struct Part: Identifiable {
+        var id: String { name }
+        var name: String
+        var icon: String
+        var albums: Int
+        var color: Color
+        var detail: String
+    }
+
+    var body: some View {
+        let parts = parts
+        let total = max(parts.reduce(0) { $0 + $1.albums }, 1)
+        InsightCard(title: "How You Own It", subtitle: "CDs, downloads and borrowed albums, of your \(InsightOwned.albumCount(stats.libraryAlbumCount))") {
+            VStack(alignment: .leading, spacing: 12) {
+                GeometryReader { geo in
+                    HStack(spacing: 2) {
+                        ForEach(parts) { p in
+                            Rectangle().fill(p.color)
+                                .frame(width: max(3, (geo.size.width - CGFloat(parts.count - 1) * 2) * CGFloat(p.albums) / CGFloat(total)))
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                .frame(height: 12)
+                .accessibilityHidden(true)
+                ForEach(parts) { p in
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Image(systemName: p.icon).foregroundStyle(p.color).frame(width: 20)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(p.name)
+                            if !p.detail.isEmpty { Text(p.detail).font(.caption).foregroundStyle(.secondary) }
+                        }
+                        Spacer(minLength: 8)
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text(InsightOwned.albumCount(p.albums)).monospacedDigit()
+                            Text((Double(p.albums) / Double(total)).formatted(.percent.precision(.fractionLength(0))))
+                                .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                        }
+                    }
+                    .font(.subheadline)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+
+    private var parts: [Part] {
+        var out: [Part] = []
+        for f in stats.formats {
+            var bits: [String] = []
+            if f.spent > 0 { bits.append("\(formatMoney(f.spent)) spent") }
+            if let avg = f.averagePrice, f.pricedAlbums > 1 { bits.append("\(formatMoney(avg)) on average") }
+            switch f.format {
+            case .cd:
+                if f.labeled > 0 { bits.append(f.labeled == f.albums ? "all labeled" : "\(f.labeled) labeled") }
+                out.append(Part(name: "CDs", icon: "opticaldisc", albums: f.albums, color: .accentColor, detail: bits.joined(separator: " · ")))
+            case .digital:
+                if f.partial > 0 { bits.append(f.partial == 1 ? "1 only partly" : "\(f.partial) only partly") }
+                out.append(Part(name: "Downloads", icon: "dollarsign.circle", albums: f.albums, color: .accentColor.opacity(0.55),
+                                detail: bits.joined(separator: " · ")))
+            }
+        }
+        if stats.borrowedCount > 0 {
+            out.append(Part(name: "Borrowed", icon: "arrow.left.arrow.right", albums: stats.borrowedCount, color: Color(.systemGray3),
+                            detail: "From a library or a friend; not yours"))
+        }
+        return out
+    }
+}
 
 struct InsightsOwnedArtistsCard: View {
     let stats: OwnershipStats

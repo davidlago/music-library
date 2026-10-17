@@ -17,6 +17,9 @@ struct ImportView: View {
             }
             .frame(minWidth: 260, idealWidth: 300, maxWidth: 420)
             .themedScrollBackground()
+            .safeAreaInset(edge: .bottom) {
+                if !importer.batch.isEmpty { ImportBatchPurchaseBar(importer: importer) }
+            }
             .overlay {
                 if importer.entries.isEmpty {
                     ContentUnavailableView("Nothing to Import", systemImage: "square.and.arrow.down",
@@ -87,16 +90,37 @@ struct ImportDetail: View {
             VStack(alignment: .leading, spacing: 16) {
                 header
                 HStack(alignment: .top, spacing: 20) {
-                    form
-                    coverColumn
+                    VStack(alignment: .leading, spacing: 12) {
+                        form.disabled(!editable)
+                        purchase
+                    }
+                    coverColumn.disabled(!editable)
                 }
-                .disabled(!editable)
                 candidatesSection.disabled(!editable)
                 actions
             }
             .padding(20)
         }
         .onAppear { pick = entry.selectedCandidateID }
+    }
+
+    /// What you paid for the song and when; editable after it's imported too, and for a duplicate of a song in the
+    /// library (saved at once to the library's copy).
+    private var purchase: some View {
+        Form {
+            LabeledContent("Paid") {
+                PurchasePriceField(price: Binding(get: { entry.price }, set: { price in
+                    // A price usually means you just bought it.
+                    let day = entry.purchasedOn ?? (entry.price == nil && price != nil ? PurchaseDay(Date()) : nil)
+                    importer.setPurchase(entry, price: price, day: day)
+                }))
+            }
+            .help("What you paid for this song, if you bought it")
+            LabeledContent("Bought") {
+                PurchaseDateField(day: Binding(get: { entry.purchasedOn }, set: { importer.setPurchase(entry, price: entry.price, day: $0) }))
+            }
+        }
+        .disabled(entry.status == .importing || (entry.status == .duplicate && entry.trackID == nil))
     }
 
     private var header: some View {
@@ -209,10 +233,47 @@ struct ImportDetail: View {
             }
             Spacer()
             Button("Remove", role: .destructive) { importer.remove(entry) }
+            // ⌘Return, so Return in a text field (a price, say) doesn't import the song.
             Button("Import") { Task { await importer.importEntry(entry) } }
-                .keyboardShortcut(.defaultAction)
+                .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!entry.canImport || entry.metadata.title.isEmpty)
         }
+    }
+}
+
+/// Below the import list: what you paid for all its songs (bought together, like a whole album), split evenly across
+/// them as you type, and when. Changing a song's own price changes the total.
+struct ImportBatchPurchaseBar: View {
+    let importer: ImportController
+
+    var body: some View {
+        let count = importer.batch.count
+        VStack(alignment: .leading, spacing: 8) {
+            Text(count == 1 ? "Paid for this song" : "Paid for all \(count) songs").font(.callout.weight(.semibold))
+            HStack(spacing: 8) {
+                PurchasePriceField(price: Binding(get: { importer.batchTotal }, set: { importer.setBatchTotal($0, day: importer.batchDay ?? PurchaseDay(Date())) }))
+                PurchaseDateField(day: Binding(get: { importer.batchDay }, set: { importer.setBatchDay($0) }))
+            }
+            .help("Split evenly across the songs; each song's own price can still be changed")
+            if let note = note(), count > 1 {
+                Text(note).font(.caption).foregroundStyle(.subtext)
+            }
+        }
+        .controlSize(.small)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(.bar)
+    }
+
+    /// "$0.79 each" for an even split, else how many songs have a price.
+    private func note() -> String? {
+        let prices = importer.batch.map(\.price)
+        let known = prices.compactMap { $0 }
+        guard !known.isEmpty else { return nil }
+        if known.count < prices.count { return "\(known.count) of \(prices.count) songs have a price" }
+        guard let low = known.min(), let high = known.max() else { return nil }
+        if low == high { return "\(formatMoney(low)) each" }
+        return high - low <= Decimal(string: "0.01")! ? "About \(formatMoney(high)) each" : nil
     }
 }
 

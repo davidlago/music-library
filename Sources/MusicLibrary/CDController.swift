@@ -228,9 +228,9 @@ final class CDController {
 
     // MARK: Ownership
 
-    /// Fills in the ownership answer from the library when the album is already marked as owned (re-ripping a disc).
+    /// Fills in the ownership answer from the library when you already said you own the CD (re-ripping a disc).
     private func prefillOwnership(_ disc: CDDisc) {
-        guard disc.owned == nil, !disc.ownershipSaved, let key = disc.albumKey, let p = model.purchases[key] else { return }
+        guard disc.owned == nil, !disc.ownershipSaved, let key = disc.albumKey, let p = model.purchaseRecords[key], p.format == .cd else { return }
         disc.owned = true
         disc.purchasedOn = p.purchasedOn
         disc.price = p.price

@@ -21,6 +21,8 @@ public struct LibrarySnapshot: Sendable {
     /// Every album and artist, in the Mac app's order.
     public let albums: [AlbumSummary]
     public let artists: [ArtistSummary]
+    /// When each album's newest song was added, by `SearchIndex.albumKey`.
+    public let albumAddedDates: [String: Date]
     /// Playlists with at least one track.
     public let playlists: [PlaylistItem]
     public let smartPlaylists: [SmartPlaylist]
@@ -31,8 +33,10 @@ public struct LibrarySnapshot: Sendable {
     /// The listening history and its totals per track, as of the sync.
     public let plays: [Play]
     public let playTotals: [Int64: PlayTotal]
-    /// Albums owned, by `SearchIndex.albumKey`.
+    /// Albums owned, by `SearchIndex.albumKey`, including those whose songs you bought (`AlbumPurchase.including`).
     public let purchases: [String: AlbumPurchase]
+    /// Songs bought as downloads, by track ID.
+    public let songPurchases: [Int64: TrackPurchase]
     /// Cached online info, by `LibrarySnapshot.artistKey` and `SearchIndex.albumKey`.
     public let artistInfos: [String: ArtistInfo]
     public let albumInfos: [String: AlbumInfo]
@@ -58,6 +62,7 @@ public struct LibrarySnapshot: Sendable {
         var playTotals = (try? db.playTotals()) ?? [:]
         var likedDates = (try? db.likedTrackDates()) ?? [:]
         var purchases = (try? db.albumPurchases()) ?? [:]
+        var songPurchases = (try? db.trackPurchases()) ?? [:]
         if datesRelativeToNow {
             let shift = Self.dayShift(latest: plays.last?.startedAt ?? all.map(\.addedAt).max(), now: now)
             for i in all.indices { all[i].addedAt += shift }
@@ -65,6 +70,11 @@ public struct LibrarySnapshot: Sendable {
             playTotals = playTotals.mapValues { var t = $0; t.lastPlayed = t.lastPlayed.map { $0 + shift }; return t }
             likedDates = likedDates.mapValues { $0 + shift }
             purchases = purchases.mapValues { p in
+                var p = p
+                p.purchasedOn = p.purchasedOn.map { PurchaseDay($0.date().addingTimeInterval(shift)) }
+                return p
+            }
+            songPurchases = songPurchases.mapValues { p in
                 var p = p
                 p.purchasedOn = p.purchasedOn.map { PurchaseDay($0.date().addingTimeInterval(shift)) }
                 return p
@@ -102,13 +112,15 @@ public struct LibrarySnapshot: Sendable {
         self.index = index
         self.albums = Self.albums(from: albumTracks)
         self.artists = Self.artists(from: albumTracks)
+        self.albumAddedDates = AlbumSort.addedDates(all)
         self.playlists = playlists
         self.smartPlaylists = (try? db.smartPlaylists()) ?? []
         self.likedDates = likedDates
         self.libraryID = db.libraryID()
         self.plays = plays
         self.playTotals = playTotals
-        self.purchases = purchases
+        self.purchases = AlbumPurchase.including(songs: songPurchases, tracks: all, in: purchases)
+        self.songPurchases = songPurchases
         self.artistInfos = infos.mapValues(\.info)
         self.albumInfos = (try? db.albumInfos()) ?? [:]
         self.artistImageFiles = imageFiles

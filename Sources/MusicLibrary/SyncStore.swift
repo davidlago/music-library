@@ -118,6 +118,14 @@ final class SyncStore {
         for item in items { selection.apply(item, include: true) { Set(context.tracks($0).map(\.id)) } }
     }
 
+    /// Drops albums, artists and songs that left the library from the list (they'd stay there with no songs).
+    func dropMissing() {
+        guard let context = context(), !context.library.isEmpty else { return }
+        var pruned = selection
+        pruned.dropMissing { Set(context.tracks($0).map(\.id)) }
+        if pruned != selection { selection = pruned }
+    }
+
     /// Deletes rules from the list (an exclusion deleted puts its songs back).
     func remove(_ rules: Set<SyncSelection.Rule>) { selection.rules.removeAll { rules.contains($0) } }
 

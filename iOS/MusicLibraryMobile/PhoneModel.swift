@@ -55,6 +55,8 @@ final class PhoneModel {
     private(set) var playTotals: [Int64: PlayTotal] = [:]
     /// By `LibrarySnapshot.artistKey` (album artist).
     private(set) var artistPlayTotals: [String: PlayTotal] = [:]
+    /// By `SearchIndex.albumKey`.
+    private(set) var albumPlayTotals: [String: PlayTotal] = [:]
     /// What the phone asked for that the Mac hasn't applied yet, oldest first.
     private(set) var requests: [SyncRequest] = []
     /// Songs asked for and not here yet.
@@ -292,17 +294,20 @@ final class PhoneModel {
             plays.append(Play(trackId: e.trackID, startedAt: e.at, listened: listened, counted: counted))
             totals[e.trackID] = (totals[e.trackID] ?? PlayTotal()) + PlayTotal(plays: counted ? 1 : 0, listened: listened, lastPlayed: e.at)
         }
-        var artists: [String: PlayTotal] = [:]
+        var artists: [String: PlayTotal] = [:], albums: [String: PlayTotal] = [:]
         if let library {
             for (id, total) in totals {
                 guard let t = library.track(id: id) else { continue }
                 let key = LibrarySnapshot.artistKey(t.effectiveAlbumArtist)
                 artists[key] = (artists[key] ?? PlayTotal()) + total
+                let albumKey = SearchIndex.albumKey(album: t.album, artist: t.effectiveAlbumArtist)
+                albums[albumKey] = (albums[albumKey] ?? PlayTotal()) + total
             }
         }
         self.plays = plays
         playTotals = totals
         artistPlayTotals = artists
+        albumPlayTotals = albums
         historyVersion += 1
         glance.setNeedsUpdate()
     }
@@ -434,7 +439,7 @@ final class PhoneModel {
         ownershipKey = key
         let owned = purchases, totals = playTotals
         Task.detached(priority: .userInitiated) {
-            let stats = OwnershipStats(tracks: library.tracks, purchases: owned, playTotals: totals)
+            let stats = OwnershipStats(tracks: library.tracks, purchases: owned, playTotals: totals, songPurchases: library.songPurchases)
             await MainActor.run {
                 guard let k = self.ownershipKey, k == key else { return }
                 self.ownershipStats = stats

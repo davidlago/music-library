@@ -21,7 +21,8 @@ struct IPhoneSyncView: View {
                     .frame(maxHeight: .infinity)
             } else {
                 List(selection: $selection) {
-                    ForEach(store.selection.rules) { rule in
+                    // Newest first: rules are added (and re-added) at the end, and a later one decides over an earlier one.
+                    ForEach(store.selection.rules.reversed()) { rule in
                         HStack {
                             ExportItemRow(item: rule.item)
                             if !rule.include {

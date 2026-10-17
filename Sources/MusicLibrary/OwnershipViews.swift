@@ -107,8 +107,8 @@ struct LabelNumberField: View {
 
 // MARK: Album page
 
-/// "Your Copy" on the album page: whether you own the album and, if so, when you bought it, what you paid and its
-/// label number (the next in the series when you first say you own it).
+/// "Your Copy" on the album page: whether you own the album and, if so, whether you bought the CD or a download, when,
+/// what you paid and the CD's label number (the next in the series when you first say you own it).
 struct AlbumOwnershipSection: View {
     @Environment(AppModel.self) private var model
     let album: AlbumSummary
@@ -118,13 +118,29 @@ struct AlbumOwnershipSection: View {
     @State private var draft: AlbumPurchase?
 
     var body: some View {
-        let purchase = model.purchase(for: album)
+        // What you said about the album, else a download made of the songs you bought from it.
+        let record = model.purchaseRecord(for: album)
+        let purchase = record ?? model.purchase(for: album)
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader(title: "Your Copy")
             Toggle("I own this album", isOn: Binding(get: { purchase != nil }, set: { setOwned($0) }))
                 .toggleStyle(.switch)
+                // Owned through its songs: change their prices on the Import page, or edit the details below.
+                .disabled(record == nil && purchase != nil)
+            if record == nil, let songs = songsBought() {
+                Text(songs).font(.callout).foregroundStyle(.subtext)
+            }
             if let purchase {
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+                    GridRow {
+                        Text("Format").foregroundStyle(.subtext)
+                        Picker("Format", selection: field(\.format)) {
+                            Text("CD").tag(AlbumPurchase.Format.cd)
+                            Text("Download").tag(AlbumPurchase.Format.digital)
+                        }
+                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                        .help("Whether you bought the CD or the album as a download")
+                    }
                     GridRow {
                         Text("Bought").foregroundStyle(.subtext)
                         PurchaseDateField(day: field(\.purchasedOn))
@@ -133,12 +149,14 @@ struct AlbumOwnershipSection: View {
                         Text("Paid").foregroundStyle(.subtext)
                         PurchasePriceField(price: field(\.price))
                     }
-                    GridRow {
-                        Text("Label").foregroundStyle(.subtext)
-                        LabelNumberField(number: field(\.labelNumber), suggestion: AlbumPurchase.nextLabelNumber(in: model.purchases),
-                                         taken: purchase.labelNumber.flatMap {
-                                             AlbumPurchase.album(labeled: $0, in: model.purchases, excluding: AlbumInfoStore.key(album))
-                                         })
+                    if purchase.format == .cd {
+                        GridRow {
+                            Text("Label").foregroundStyle(.subtext)
+                            LabelNumberField(number: field(\.labelNumber), suggestion: AlbumPurchase.nextLabelNumber(in: model.purchases),
+                                             taken: purchase.labelNumber.flatMap {
+                                                 AlbumPurchase.album(labeled: $0, in: model.purchases, excluding: AlbumInfoStore.key(album))
+                                             })
+                        }
                     }
                 }
                 .font(.callout)
@@ -155,16 +173,26 @@ struct AlbumOwnershipSection: View {
             model.setPurchase(draft ?? AlbumPurchase(album: album.album, artist: album.artist,
                                                      labelNumber: AlbumPurchase.nextLabelNumber(in: model.purchases)), for: album)
         } else {
-            draft = model.purchase(for: album)
+            draft = model.purchaseRecord(for: album)
             model.setPurchase(nil, for: album)
         }
     }
 
-    /// A binding to one field of the saved purchase; every change is saved.
+    /// "From the 3 of 12 songs you bought as downloads", for an album owned through its songs (entered when importing them).
+    private func songsBought() -> String? {
+        let tracks = model.tracks(of: album)
+        let bought = tracks.filter { model.trackPurchases[$0.id] != nil }.count
+        guard bought > 0 else { return nil }
+        if bought == tracks.count { return bought == 1 ? "From the song you bought as a download." : "From the \(bought) songs you bought as downloads." }
+        return "From the \(bought) of \(tracks.count) songs you bought as downloads."
+    }
+
+    /// A binding to one field of the album's purchase; every change is saved. Editing an album owned through its songs
+    /// saves what's shown as the album's own details, which then take their place.
     private func field<T>(_ path: WritableKeyPath<AlbumPurchase, T>) -> Binding<T> {
-        Binding(get: { (model.purchase(for: album) ?? AlbumPurchase(album: album.album, artist: album.artist))[keyPath: path] },
+        Binding(get: { (model.purchaseRecord(for: album) ?? model.purchase(for: album) ?? AlbumPurchase(album: album.album, artist: album.artist))[keyPath: path] },
                 set: { value in
-                    guard var p = model.purchase(for: album) else { return }
+                    guard var p = model.purchaseRecord(for: album) ?? model.purchase(for: album) else { return }
                     p[keyPath: path] = value
                     model.setPurchase(p, for: album)
                 })

@@ -1,3 +1,4 @@
+import MusicLibraryCore
 import SwiftUI
 
 /// An album's cover drawn as a CD jewel case (album pages and the album grid), 142 × 125 mm: the cover is the square
@@ -6,6 +7,9 @@ import SwiftUI
 /// The Mac app has the same view (`Sources/MusicLibrary/JewelCase.swift`).
 struct JewelCase<Booklet: View>: View {
     let width: CGFloat
+    /// How you got the album: your CD's label number on a sticker across the top of the hinge (where it goes on the real
+    /// case), or a round badge on the booklet for a borrowed CD or a download.
+    var ownership: OwnershipMark?
     @ViewBuilder var booklet: Booklet
 
     static func height(width: CGFloat) -> CGFloat { width * 125 / 142 }
@@ -37,6 +41,14 @@ struct JewelCase<Booklet: View>: View {
                 hingeStrip(radius: radius).frame(width: hinge, height: h)
                 ForEach([h * 0.022, h * 0.913], id: \.self) { y in
                     knuckle.frame(width: hinge * 0.65, height: h * 0.065).offset(x: hinge * 0.19, y: y)
+                }
+                if let label = ownership?.labelNumber {
+                    LabelSticker(number: label, width: hinge * 0.88).offset(x: hinge * 0.04, y: h * 0.012)
+                }
+                if let ownership, ownership == .borrowed || ownership == .digital {
+                    OwnershipBadge(mark: ownership, coverSide: side)
+                        .frame(width: side, height: side, alignment: .bottomTrailing)
+                        .offset(x: w - margin - side, y: margin)
                 }
                 RoundedRectangle(cornerRadius: radius)
                     .strokeBorder(LinearGradient(colors: [.white.opacity(0.35), .white.opacity(0.14)], startPoint: .top, endPoint: .bottom),

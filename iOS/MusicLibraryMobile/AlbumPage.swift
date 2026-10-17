@@ -82,9 +82,8 @@ private struct AlbumPageContent: View {
 
     private var header: some View {
         VStack(spacing: 8) {
-            JewelCase(width: 310) {
-                CoverImage(url: library.coverURL(album: album), size: JewelCase<EmptyView>.bookletSide(width: 310),
-                           labelNumber: model.purchase(for: album)?.labelNumber, labelScale: 2 / 3, cornerRadius: 0)
+            JewelCase(width: 310, ownership: OwnershipMark(model.purchase(for: album))) {
+                CoverImage(url: library.coverURL(album: album), size: JewelCase<EmptyView>.bookletSide(width: 310), cornerRadius: 0)
             }
             .padding(.top, 8)
             .padding(.bottom, 8)
@@ -451,6 +450,7 @@ struct AlbumOwnershipSection: View {
 
     private func rows(_ p: AlbumPurchase) -> [(title: String, value: String, emphasized: Bool)] {
         var rows: [(title: String, value: String, emphasized: Bool)] = []
+        if p.format == .digital { rows.append(("Format", "Download", false)) }
         if let n = p.labelNumber { rows.append(("Label", "#\(n)", true)) }
         if let day = p.purchasedOn { rows.append(("Bought", day.date().formatted(date: .abbreviated, time: .omitted), false)) }
         if let price = p.price { rows.append(("Paid", formatMoney(price), false)) }

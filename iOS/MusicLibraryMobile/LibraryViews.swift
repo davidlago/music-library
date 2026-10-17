@@ -190,7 +190,7 @@ private struct LibraryRoutePage: View {
                 AlbumGrid(albums: scoped(library.albums) { library.tracks(album: $0) }, library: library)
                     .navigationTitle("Albums")
             case .songs:
-                TrackListPage(title: "Songs", tracks: scope == .onPhone ? library.presentTracks : library.tracks)
+                TrackListPage(title: "Songs", tracks: scope == .onPhone ? library.presentTracks : library.tracks, sortable: true)
             case .liked:
                 TrackListPage(title: "Liked Songs", tracks: scopedTracks(model.likedTracks), item: .likedSongs)
             case .playlist(let id):
@@ -250,13 +250,16 @@ struct AlbumGrid: View {
     let library: LibrarySnapshot
     /// Only albums you own (`model.purchase(for:)`).
     @AppStorage("albumsOwnedOnly") private var ownedOnly = false
+    /// The Mac's orders (`AlbumSort`).
+    @AppStorage("albumSort") private var sort = AlbumSort.artist
 
     var body: some View {
-        let shown = ownedOnly ? albums.filter { model.purchase(for: $0) != nil } : albums
+        let owned = ownedOnly ? albums.filter { model.purchase(for: $0) != nil } : albums
+        let shown = sort.sorted(owned, added: library.albumAddedDates, plays: model.albumPlayTotals)
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 20) {
                 ForEach(shown) { album in
-                    NavigationLink(value: album) { AlbumCell(album: album, library: library, jewelCase: true) }
+                    NavigationLink(value: album) { AlbumCell(album: album, library: library, detail: detail(album), jewelCase: true) }
                         .buttonStyle(.plain)
                         .contextMenu { AlbumMenu(album: album) }
                 }
@@ -271,14 +274,38 @@ struct AlbumGrid: View {
         }
         .toolbar {
             Menu {
-                Picker("Show", selection: $ownedOnly) {
-                    Label("All Albums", systemImage: "square.stack").tag(false)
-                    Label("Owned", systemImage: "opticaldisc").tag(true)
+                Picker("Sort By", selection: $sort) {
+                    ForEach(AlbumSort.allCases) { Text($0.label).tag($0) }
+                }
+                Section {
+                    Picker("Show", selection: $ownedOnly) {
+                        Label("All Albums", systemImage: "square.stack").tag(false)
+                        Label("Owned", systemImage: "opticaldisc").tag(true)
+                    }
                 }
             } label: {
                 Image(systemName: ownedOnly ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
             }
-            .accessibilityLabel("Filter")
+            .accessibilityLabel("Sort and Filter")
+        }
+    }
+
+    /// A third line matching the sort, so the order makes sense at a glance (as on the Mac).
+    private func detail(_ a: AlbumSummary) -> String? {
+        let key = SearchIndex.albumKey(album: a.album, artist: a.artist)
+        switch sort {
+        case .added:
+            return library.albumAddedDates[key].map { "Added " + $0.formatted(.relative(presentation: .named)) }
+        case .year:
+            return a.year.map(String.init)
+        case .mostPlayed:
+            let p = model.albumPlayTotals[key] ?? PlayTotal()
+            if p.plays > 0 { return "\(p.plays) play\(p.plays == 1 ? "" : "s") · \(formatListened(p.listened))" }
+            return p.listened >= 1 ? formatListened(p.listened) + " listened" : nil
+        case .recent:
+            return model.albumPlayTotals[key]?.lastPlayed.map { "Played " + $0.formatted(.relative(presentation: .named)) }
+        case .title, .artist:
+            return nil
         }
     }
 }
@@ -291,6 +318,8 @@ struct AlbumCell: View {
     let library: LibrarySnapshot
     var size: CGFloat = 160
     var subtitle: String?
+    /// A third line, like when it was added.
+    var detail: String?
     var jewelCase = false
 
     var body: some View {
@@ -298,15 +327,15 @@ struct AlbumCell: View {
         let availability = model.availability(tracks)
         VStack(alignment: .leading, spacing: 4) {
             Group {
-                let label = model.purchase(for: album)?.labelNumber
+                let ownership = OwnershipMark(model.purchase(for: album))
                 if jewelCase {
-                    JewelCase(width: size) {
+                    JewelCase(width: size, ownership: ownership) {
                         CoverImage(url: library.coverURL(album: album), size: JewelCase<EmptyView>.bookletSide(width: size),
-                                   labelNumber: label, cornerRadius: 0)
+                                   cornerRadius: 0)
                     }
                     .padding(.bottom, 4)
                 } else {
-                    CoverImage(url: library.coverURL(album: album), size: size, labelNumber: label)
+                    CoverImage(url: library.coverURL(album: album), size: size, ownership: ownership)
                 }
             }
             .opacity(availability == .notOnPhone ? 0.55 : 1)
@@ -316,6 +345,9 @@ struct AlbumCell: View {
                 AvailabilityMark(availability: availability, pending: model.isDownloadPending(tracks))
             }
             Text(subtitle ?? album.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            if let detail {
+                Text(detail).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            }
         }
         .frame(width: size, alignment: .leading)
     }
@@ -345,24 +377,47 @@ struct AlbumMenu: View {
     }
 }
 
-/// Songs with Play and Shuffle at the top (and, for lists, what's on the phone).
+/// Songs with Play and Shuffle at the top (and, for lists, what's on the phone). A `sortable` list (Songs) has the
+/// Mac's song table orders in its toolbar.
 struct TrackListPage: View {
     let title: String
     let tracks: [Track]
     var item: ExportItem?
+    var sortable = false
+    @AppStorage("songSort") private var sort = SongSort.artist
+    @AppStorage("songSortAscending") private var ascending = true
 
     var body: some View {
+        let shown = sortable ? sort.sorted(tracks, ascending: ascending) : tracks
         List {
             if let item, !tracks.isEmpty {
                 AvailabilityBar(item: item, tracks: tracks, noun: "list")
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
             }
-            PlayButtons(tracks: tracks, source: title)
-            TrackRows(tracks: tracks, source: title)
+            PlayButtons(tracks: shown, source: title)
+            TrackRows(tracks: shown, source: title)
         }
         .listStyle(.plain)
         .navigationTitle(title)
+        .toolbar {
+            if sortable {
+                Menu {
+                    Picker("Sort By", selection: Binding(get: { sort }, set: { sort = $0; ascending = $0.defaultAscending })) {
+                        ForEach(SongSort.allCases) { Text($0.label).tag($0) }
+                    }
+                    Section {
+                        Picker("Order", selection: $ascending) {
+                            Text(sort.directionLabels.ascending).tag(true)
+                            Text(sort.directionLabels.descending).tag(false)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                }
+                .accessibilityLabel("Sort")
+            }
+        }
     }
 }
 

@@ -146,11 +146,10 @@ struct AlbumDetail: View {
     /// image on it opens the cover sheet with that image.
     private func coverArt(size: CGFloat) -> some View {
         let side = JewelCase<EmptyView>.bookletSide(width: size)
-        return JewelCase(width: size) {
+        return JewelCase(width: size, ownership: OwnershipMark(model.purchase(for: album))) {
             if let cover {
                 Image(nsImage: cover).resizable().scaledToFill()
                     .frame(width: side, height: side).clipped()
-                    .overlay { if let n = model.purchase(for: album)?.labelNumber { LabelSticker(number: n, size: side, scale: 2 / 3) } }
             } else {
                 ZStack {
                     Rectangle().fill(theme.fill)

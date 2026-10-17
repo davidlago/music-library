@@ -34,6 +34,12 @@ final class ImportEntry: Identifiable {
     var searchAlbum = ""
     var appliedRelease: ReleaseInfo?
     var note: String?
+    /// What you paid for the song and when, if you bought it (saved as a `TrackPurchase` when it's imported, and on every
+    /// change after that). Change them through `ImportController.setPurchase`.
+    var price: Decimal?
+    var purchasedOn: PurchaseDay?
+    /// The imported track, or the library's copy of a duplicate.
+    var trackID: Int64?
 
     init(url: URL) { self.url = url }
 
@@ -119,7 +125,11 @@ final class ImportController {
             let item = try await service.prepare(entry.url)
             entry.item = item
             entry.metadata = item.tags
-            if item.duplicateOf != nil {
+            if let dup = item.duplicateOf {
+                // Its price goes to the library's copy, which may have one already.
+                entry.trackID = dup.id
+                entry.price = model.trackPurchases[dup.id]?.price
+                entry.purchasedOn = model.trackPurchases[dup.id]?.purchasedOn
                 entry.status = .duplicate
                 entry.note = "Already in library as \(item.duplicateOf?.path ?? "")"
                 return
@@ -237,14 +247,69 @@ final class ImportController {
         guard entry.canImport, let item = entry.item, let service = model.importService else { return }
         entry.status = .importing
         do {
-            _ = try await service.commit(item, metadata: entry.metadata, cover: entry.cover)
+            let track = try await service.commit(item, metadata: entry.metadata, cover: entry.cover)
+            entry.trackID = track.id
             entry.status = .done
             model.reloadLibrary()
+            savePurchase(entry)
         } catch ImportError.duplicate {
             entry.status = .duplicate
         } catch {
             entry.status = .failed(error.localizedDescription)
         }
+    }
+
+    /// The songs a price for the whole batch is split across: all of them but failures, including the ones already
+    /// imported and duplicates of songs in the library (their price goes to the library's copy).
+    var batch: [ImportEntry] {
+        entries.filter { entry in
+            switch entry.status {
+            case .failed: return false
+            case .duplicate: return entry.trackID != nil
+            default: return true
+            }
+        }
+    }
+
+    /// What the batch cost: its songs' prices added up (nil when none has one).
+    var batchTotal: Decimal? {
+        let prices = batch.compactMap(\.price)
+        return prices.isEmpty ? nil : prices.reduce(0, +)
+    }
+
+    /// The day the batch's songs were bought, when they all share one.
+    var batchDay: PurchaseDay? {
+        let days = Set(batch.map(\.purchasedOn))
+        return days.count == 1 ? days.first ?? nil : nil
+    }
+
+    /// For songs bought together (a whole album, say): `total` split evenly across the batch (nil clears their prices).
+    /// Songs without a purchase day get `day`.
+    func setBatchTotal(_ total: Decimal?, day: PurchaseDay?) {
+        let songs = batch
+        let prices: [Decimal?] = total.map { TrackPurchase.split($0, into: songs.count) } ?? Array(repeating: nil, count: songs.count)
+        for (entry, price) in zip(songs, prices) {
+            setPurchase(entry, price: price, day: entry.purchasedOn ?? (price == nil ? nil : day))
+        }
+    }
+
+    /// Every song in the batch bought on `day`.
+    func setBatchDay(_ day: PurchaseDay?) {
+        for entry in batch { setPurchase(entry, price: entry.price, day: day) }
+    }
+
+    /// Sets what you paid for one song and when; an imported song's purchase is saved at once.
+    func setPurchase(_ entry: ImportEntry, price: Decimal?, day: PurchaseDay?) {
+        guard entry.price != price || entry.purchasedOn != day else { return }
+        entry.price = price
+        entry.purchasedOn = day
+        savePurchase(entry)
+    }
+
+    private func savePurchase(_ entry: ImportEntry) {
+        guard let id = entry.trackID else { return }
+        let purchase = entry.price == nil && entry.purchasedOn == nil ? nil : TrackPurchase(purchasedOn: entry.purchasedOn, price: entry.price)
+        model.setTrackPurchase(purchase, for: id)
     }
 
     func importAllReady() async {

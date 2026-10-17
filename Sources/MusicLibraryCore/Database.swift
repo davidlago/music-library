@@ -248,8 +248,14 @@ public final class Database: @unchecked Sendable {
         try createRipChecksTable()
         // Added without a schema change too: older phones read the table's other columns by name, so synced copies
         // stay readable there.
-        if try !columns(of: "album_ownership").contains("label_number") {
+        let ownershipColumns = try columns(of: "album_ownership")
+        if !ownershipColumns.contains("label_number") {
             try exec("ALTER TABLE album_ownership ADD COLUMN label_number INTEGER")
+        }
+        try createTrackPurchasesTable()
+        // NULL is a CD, as everything owned was before.
+        if !ownershipColumns.contains("format") {
+            try exec("ALTER TABLE album_ownership ADD COLUMN format TEXT")
         }
         try exec("PRAGMA user_version=\(Self.schemaVersion)")
     }
@@ -575,19 +581,54 @@ public final class Database: @unchecked Sendable {
             try exec("DELETE FROM album_ownership WHERE key=?", [.text(key)])
             return
         }
-        try exec("INSERT OR REPLACE INTO album_ownership(key,album,artist,purchased_on,price,label_number,updated_at) VALUES(?,?,?,?,?,?,?)",
-                 [.text(key), .text(p.album), .text(p.artist), .text(p.purchasedOn?.string),
-                  .text(AlbumPurchase.priceText(p.price)), .int(p.labelNumber), .double(date.timeIntervalSince1970)])
+        try exec("INSERT OR REPLACE INTO album_ownership(key,album,artist,format,purchased_on,price,label_number,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                 [.text(key), .text(p.album), .text(p.artist), .text(p.format == .cd ? nil : p.format.rawValue),
+                  .text(p.purchasedOn?.string), .text(AlbumPurchase.priceText(p.price)), .int(p.labelNumber),
+                  .double(date.timeIntervalSince1970)])
     }
 
     /// Owned albums by key. Dates, prices and label numbers that don't parse (the file may come from elsewhere) read
-    /// as unknown, and so do label numbers in a snapshot from a version before them.
+    /// as unknown, a format that doesn't as a CD, and so do label numbers and formats in a snapshot from a version
+    /// before them.
     public func albumPurchases() throws -> [String: AlbumPurchase] {
-        let label = try columns(of: "album_ownership").contains("label_number") ? "label_number" : "NULL"
-        let rows = try query("SELECT key, album, artist, purchased_on, price, \(label) FROM album_ownership") { r in
+        let columns = try columns(of: "album_ownership")
+        let label = columns.contains("label_number") ? "label_number" : "NULL"
+        let format = columns.contains("format") ? "format" : "NULL"
+        let rows = try query("SELECT key, album, artist, purchased_on, price, \(label), \(format) FROM album_ownership") { r in
             (r.string(0) ?? "", AlbumPurchase(album: r.string(1) ?? "", artist: r.string(2) ?? "",
+                                              format: r.string(6).flatMap(AlbumPurchase.Format.init(rawValue:)) ?? .cd,
                                               purchasedOn: r.string(3).flatMap(PurchaseDay.init(string:)),
                                               price: AlbumPurchase.price(text: r.string(4)), labelNumber: r.int(5)))
+        }
+        return Dictionary(rows, uniquingKeysWith: { a, _ in a })
+    }
+
+    /// Songs you bought, created on open without a schema change (like `rip_checks`): phones on older versions read
+    /// synced copies without it.
+    func createTrackPurchasesTable() throws {
+        try exec("""
+        CREATE TABLE IF NOT EXISTS track_purchases(
+            track_id INTEGER PRIMARY KEY REFERENCES tracks(id) ON DELETE CASCADE,
+            purchased_on TEXT, price TEXT, updated_at REAL NOT NULL)
+        """)
+    }
+
+    /// Saves (or with nil, forgets) what you paid for a song.
+    public func saveTrackPurchase(trackID: Int64, _ purchase: TrackPurchase?, at date: Date = Date()) throws {
+        guard let p = purchase else {
+            try exec("DELETE FROM track_purchases WHERE track_id=?", [.int(trackID)])
+            return
+        }
+        try exec("INSERT OR REPLACE INTO track_purchases(track_id,purchased_on,price,updated_at) VALUES(?,?,?,?)",
+                 [.int(trackID), .text(p.purchasedOn?.string), .text(AlbumPurchase.priceText(p.price)), .double(date.timeIntervalSince1970)])
+    }
+
+    /// Songs you bought, by track ID. Dates and prices that don't parse read as unknown; a snapshot from a version
+    /// before song purchases has none.
+    public func trackPurchases() throws -> [Int64: TrackPurchase] {
+        guard try !columns(of: "track_purchases").isEmpty else { return [:] }
+        let rows = try query("SELECT track_id, purchased_on, price FROM track_purchases") { r in
+            (r.int64(0), TrackPurchase(purchasedOn: r.string(1).flatMap(PurchaseDay.init(string:)), price: AlbumPurchase.price(text: r.string(2))))
         }
         return Dictionary(rows, uniquingKeysWith: { a, _ in a })
     }
