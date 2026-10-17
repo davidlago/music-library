@@ -25,6 +25,7 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 - **How you own your music, in Insights.** The Owned pane, on the Mac and the iPhone, shows your albums as CDs,
   downloads and borrowed, with what each cost, how many CDs are labeled and how many downloads are only some of an
   album's songs; **Your Albums** marks the downloads.
+- **Newest first on the iPhone page.** The Mac app's iPhone list shows what you added most recently at the top.
 
 ## 1.18.0
 
