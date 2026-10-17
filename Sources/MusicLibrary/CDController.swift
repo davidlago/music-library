@@ -47,8 +47,8 @@ final class CDDisc: Identifiable {
     var libraryTracks: [Int: Track] = [:]
     var isChecking = false
     var checkError: String?
-    /// The drive's read offset AccurateRip found for this disc, for checking a track ripped again.
-    var driveOffset: Int?
+    /// Where this disc's rip lined up with AccurateRip's (`AccurateRipReport.offset`), for checking a track ripped again.
+    var matchOffset: Int?
     @ObservationIgnored var task: Task<Void, Never>?
     @ObservationIgnored var removed = false
 
@@ -316,7 +316,7 @@ final class CDController {
         defer { disc.isChecking = false }
         do {
             let report = try await model.rips.check(toc: toc, tracks: tracks, volume: disc.volume)
-            disc.driveOffset = report?.offset ?? disc.driveOffset
+            disc.matchOffset = report?.offset ?? disc.matchOffset
         } catch is CancellationError {
         } catch {
             disc.checkError = error.localizedDescription
@@ -333,7 +333,7 @@ final class CDController {
         let temp = work.appendingPathComponent(String(format: "%02d.flac", number))
         let tools = model.tools
         let toc = disc.volume.toc
-        let offset = disc.driveOffset ?? model.ripChecks[track.id]?.offset
+        let offset = disc.matchOffset ?? model.ripChecks[track.id]?.offset
         disc.isRipping = true
         disc.statusLine = "Ripping track \(number) again"
         disc.rows[row].status = .ripping(0)

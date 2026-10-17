@@ -97,24 +97,24 @@ private func database(_ audio: [UInt32] = discAudio) -> [AccurateRipPressing] {
     }
 
     @Test func checksumsMatchTheDefinitionAtEveryOffset() {
+        // Silence before and after the disc, as the verifier reads it.
+        let reach = AccurateRip.maxPressingOffset
+        let padded = [UInt32](repeating: 0, count: reach) + discAudio + [UInt32](repeating: 0, count: reach)
         for index in 0..<3 {
-            let start = discLengths[..<index].reduce(0, +)
-            let lead = index == 0 ? 0 : AccurateRip.maxOffset
-            let tail = index == 2 ? 0 : AccurateRip.maxOffset
-            let samples = Array(discAudio[(start - lead)..<(start + discLengths[index] + tail)])
-            let audio = AccurateRipTrackAudio(samples: samples, lead: lead, count: discLengths[index], isFirst: index == 0, isLast: index == 2)
+            let start = reach + discLengths[..<index].reduce(0, +)
+            let samples = Array(padded[(start - reach)..<(start + discLengths[index] + reach)])
+            let audio = AccurateRipTrackAudio(samples: samples, lead: reach, count: discLengths[index], isFirst: index == 0, isLast: index == 2)
             let range = audio.offsets!
-            #expect(range == -AccurateRip.maxOffset...AccurateRip.maxOffset)
-            let v1 = audio.v1Checksums(range)
-            // Silence before and after the disc, for the first and last tracks' offsets.
-            let padded = [UInt32](repeating: 0, count: AccurateRip.maxOffset) + discAudio + [UInt32](repeating: 0, count: AccurateRip.maxOffset)
-            for offset in [range.lowerBound, -588, -1, 0, 1, 700, range.upperBound] {
-                let at = AccurateRip.maxOffset + start + offset
-                let shifted = padded[at..<(at + discLengths[index])]
+            #expect(range == -reach...reach)
+            let drive = -AccurateRip.maxOffset...AccurateRip.maxOffset
+            let v1 = audio.v1Checksums(drive)
+            let sector450 = audio.sector450Checksums(range)!
+            for offset in [-reach, -5574, -AccurateRip.maxOffset, -588, -1, 0, 1, 700, AccurateRip.maxOffset, 6000, reach] {
+                let shifted = padded[(start + offset)..<(start + offset + discLengths[index])]
                 let reference = referenceChecksums(shifted, isFirst: index == 0, isLast: index == 2)
-                #expect(v1[offset - range.lowerBound] == reference.v1, "track \(index + 1) at \(offset)")
-                #expect(audio.v2Checksum(at: offset) == reference.v2, "track \(index + 1) at \(offset)")
-                #expect(audio.sector450Checksum(at: offset) == referenceSector450(shifted))
+                if drive.contains(offset) { #expect(v1[offset - drive.lowerBound] == reference.v1, "track \(index + 1) at \(offset)") }
+                #expect(audio.checksums(at: offset) == reference, "track \(index + 1) at \(offset)")
+                #expect(sector450[offset - range.lowerBound] == referenceSector450(shifted), "track \(index + 1) at \(offset)")
             }
         }
     }
@@ -125,6 +125,19 @@ private func database(_ audio: [UInt32] = discAudio) -> [AccurateRipPressing] {
         let report = try await AccurateRipVerifier(toc: discTOC, pressings: database()).verify([1, 2, 3], audio: rip)
         #expect(report.offset == offset)
         #expect(report.tracks == [1: .accurate(confidence: 40), 2: .accurate(confidence: 40), 3: .accurate(confidence: 40)])
+    }
+
+    @Test func findsAnotherPressingsOffset() async throws {
+        // Pressings can hold the same audio further apart than drives read: found by the sector 450 checksums (not by
+        // the older v1-only pressing). Like real CDs, the disc starts and ends in silence.
+        var quiet = discAudio
+        for i in 0..<10_000 { quiet[i] = 0; quiet[quiet.count - 1 - i] = 0 }
+        for offset in [6000, -5574] {
+            let rip = SimulatedDisc(audio: quiet, lengths: discLengths, offset: offset)
+            let report = try await AccurateRipVerifier(toc: discTOC, pressings: database(quiet)).verify([1, 2, 3], audio: rip)
+            #expect(report.offset == offset)
+            #expect(report.tracks == [1: .accurate(confidence: 40), 2: .accurate(confidence: 40), 3: .accurate(confidence: 40)])
+        }
     }
 
     @Test func findsTheMisreadTrack() async throws {

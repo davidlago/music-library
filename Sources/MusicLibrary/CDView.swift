@@ -257,7 +257,7 @@ struct CDView: View {
                 }
             }
             .font(.callout)
-            .help(disc.driveOffset.map { "Drive read offset: \($0 > 0 ? "+" : "")\($0) samples" } ?? "")
+            .help(disc.matchOffset.map { "The rip lines up with AccurateRip's at \($0 > 0 ? "+" : "")\($0) samples (the drive's read offset, plus the pressing's)." } ?? "")
         }
     }
 

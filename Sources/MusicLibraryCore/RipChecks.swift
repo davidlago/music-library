@@ -23,7 +23,7 @@ public struct RipCheck: Sendable, Equatable {
     public var discTrack: Int
     public var result: Result
     public var confidence: Int?
-    /// The drive's read offset found, in samples.
+    /// The offset the rip lined up with the matching rips at (`AccurateRipReport.offset`).
     public var offset: Int?
     public var checkedAt: Date
 
@@ -65,7 +65,7 @@ extension Database {
         let rows = try query("SELECT track_id, toc, disc_track, result, confidence, drive_offset, checked_at FROM rip_checks") { r -> RipCheck? in
             guard let toc = r.string(1).flatMap(CDTOC.init(tocString:)), let disc = r.int(2), toc.audioTracks.contains(where: { $0.number == disc }),
                   let result = r.string(3).flatMap(RipCheck.Result.init(rawValue:)) else { return nil }
-            let offset = r.int(5).flatMap { abs($0) <= AccurateRip.maxOffset ? $0 : nil }
+            let offset = r.int(5).flatMap { abs($0) <= AccurateRip.maxPressingOffset ? $0 : nil }
             return RipCheck(trackId: r.int64(0), toc: toc, discTrack: disc, result: result, confidence: r.int(4).map { max(0, $0) },
                             offset: offset, checkedAt: Date(timeIntervalSince1970: r.double(6)))
         }

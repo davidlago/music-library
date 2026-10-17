@@ -20,7 +20,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   listening. **Rip Again** rips a misread track again and replaces it only once AccurateRip confirms the new rip, keeping
   its plays, likes and playlists; the disc isn't ejected while a track is misread. Albums ripped before can be checked
   too, without the disc: **Check with AccurateRip** in the **…** menu of an album page finds the CD they were ripped
-  from on MusicBrainz. Misread tracks are marked on album pages (hover over the mark for what it means).
+  from on MusicBrainz. Misread tracks are marked on album pages (hover over the mark for what it means). Rips of
+  a pressing with the audio slightly earlier or later than the one in AccurateRip are recognized too.
 
 ## 1.16.0
 
