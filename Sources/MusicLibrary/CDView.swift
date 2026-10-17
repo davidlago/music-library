@@ -201,20 +201,17 @@ struct CDView: View {
 
     @ViewBuilder
     private func statusView(_ row: CDDisc.Row) -> some View {
-        if case .failed(let message) = row.status, disc.tryHarder.contains(row.id) {
+        if let track = disc.libraryTracks[row.id], let check = model.ripChecks[track.id], check.result == .inaccurate, row.status.showsCheck {
             HStack(spacing: 8) {
-                Label("Still misread", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red).font(.caption).lineLimit(1)
-                    .help(message)
-                Button("Try Extra Hard") { model.cd.ripAgain(disc, track: row.id, passes: CDController.extraHardPasses) }
-                    .controlSize(.small)
-                    .disabled(disc.isRipping || disc.isChecking)
-                    .help("Read the track up to \(CDController.extraHardPasses) times, combining the reads, and keep the result if AccurateRip confirms it")
-            }
-        } else if row.status == .done || row.status == .inLibrary, let track = disc.libraryTracks[row.id], let check = model.ripChecks[track.id],
-           check.result == .inaccurate {
-            HStack(spacing: 8) {
-                RipMisreadLabel(check: check)
+                if case .failed(let reason) = row.status {
+                    // A round of Rip Again that didn't fix it: another round can.
+                    Label("Still misread", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red).font(.caption).lineLimit(1)
+                        .contentShape(Rectangle())
+                        .help(reason)
+                } else {
+                    RipMisreadLabel(check: check)
+                }
                 Button("Rip Again") { model.cd.ripAgain(disc, track: row.id) }
                     .controlSize(.small)
                     .disabled(disc.isRipping || disc.isChecking)

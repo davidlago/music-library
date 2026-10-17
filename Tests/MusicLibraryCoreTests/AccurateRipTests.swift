@@ -213,5 +213,50 @@ private func database(_ audio: [UInt32] = discAudio) -> [AccurateRipPressing] {
         let fixed = AccurateRipAudioOverlay(base: disc, tracks: [1: Array(track(1))])
         #expect(try await verifier.verify([2], audio: fixed, offsetHint: 0).tracks == [2: .accurate(confidence: 40)])
     }
+
+    /// Reads of track 2 with `spots` damaged spots of 30 samples: at each, one read (never the first) has the right
+    /// version and the others each a different wrong one, so voting keeps the first read's wrong version. `missing`
+    /// spots have no right version in any read.
+    private func damagedReads(spots: Int, reads: Int, missing: Set<Int> = []) -> ReadVote {
+        let truth = Array(track(1))
+        func read(_ r: Int) -> [UInt32] {
+            var out = truth
+            for spot in 0..<spots where missing.contains(spot) || r != spot % (reads - 1) + 1 {
+                for k in 0..<30 { out[20_000 + spot * 12_000 + k] ^= UInt32(r + 1) << 16 }
+            }
+            return out
+        }
+        var vote = ReadVote(first: read(0))
+        for r in 1..<reads { vote.add(read(r)) }
+        return vote
+    }
+
+    @Test func groupsDisagreementsIntoSpots() {
+        let vote = damagedReads(spots: 3, reads: 4)
+        let spots = vote.spots()
+        #expect(spots.count == 3)
+        #expect(spots.map(\.positions.count) == [30, 30, 30])
+        #expect(spots[0].positions.first == 20_000)
+        // The vote's version (here the first read's), then each read's other version.
+        #expect(spots[0].versions.count == 4)
+        #expect(spots[0].versions[0] == Array(vote.result[20_000..<20_030]))
+    }
+
+    @Test func repairsWhatVotingCant() async throws {
+        let rest = SimulatedDisc(audio: discAudio, lengths: discLengths)
+        let truth = Array(track(1))
+        // One pressing listed: from 4,096 combinations, its checksum alone confirms the right one.
+        let small = damagedReads(spots: 6, reads: 4)
+        #expect(small.result != truth)
+        let onePressing = AccurateRipVerifier(toc: discTOC, pressings: [database()[1]])
+        #expect(try await onePressing.repair(2, vote: small, audio: rest, offsetHint: 0) == truth)
+        // From 16.8 million, one checksum isn't trusted; two pressings' are.
+        let large = damagedReads(spots: 12, reads: 4)
+        #expect(try await onePressing.repair(2, vote: large, audio: rest, offsetHint: 0) == nil)
+        let twoPressings = AccurateRipVerifier(toc: discTOC, pressings: database())
+        #expect(try await twoPressings.repair(2, vote: large, audio: rest, offsetHint: 0) == truth)
+        // A spot no read got right can't be repaired.
+        #expect(try await twoPressings.repair(2, vote: damagedReads(spots: 6, reads: 4, missing: [2]), audio: rest, offsetHint: 0) == nil)
+    }
 }
 

@@ -25,14 +25,7 @@ final class RipChecker {
     /// replaces a track's library file (a fresh rip being checked before it replaces the file), by track number.
     func check(toc: CDTOC, tracks: [Int: Track], volume: AudioCDVolume? = nil, samples: [Int: [UInt32]] = [:],
                offsetHint: Int? = nil, save: Bool = true) async throws -> AccurateRipReport? {
-        let disc = AccurateRipDisc(toc: toc)
-        let pressings: [AccurateRipPressing]?
-        if let cached = pressingsCache[disc.url] {
-            pressings = cached
-        } else {
-            pressings = try await AccurateRipClient().pressings(for: disc)
-            pressingsCache[disc.url] = pressings
-        }
+        let pressings = try await pressings(for: toc)
         var report: AccurateRipReport?
         if let pressings {
             var files: [Int: URL] = [:]
@@ -55,6 +48,25 @@ final class RipChecker {
             model.saveRipChecks(tracks.map { RipCheck(trackId: $0.value.id, toc: toc, discTrack: $0.key, report: report) })
         }
         return report
+    }
+
+    /// AccurateRip's pressings of a disc (nil when it isn't listed), downloaded once per session.
+    private func pressings(for toc: CDTOC) async throws -> [AccurateRipPressing]? {
+        let disc = AccurateRipDisc(toc: toc)
+        if let cached = pressingsCache[disc.url] { return cached }
+        let pressings = try await AccurateRipClient().pressings(for: disc)
+        pressingsCache[disc.url] = pressings
+        return pressings
+    }
+
+    /// Repairs a misread track from several reads of it, with AccurateRip confirming the result
+    /// (`AccurateRipVerifier.repair`); the tracks around it are read from the disc.
+    func repair(toc: CDTOC, track number: Int, volume: AudioCDVolume, vote: ReadVote, offsetHint: Int?) async throws -> [UInt32]? {
+        guard let pressings = try await pressings(for: toc) else { return nil }
+        var discFiles: [Int: URL] = [:]
+        for (index, cd) in toc.audioTracks.enumerated() { discFiles[index] = volume.trackFiles[cd.number] }
+        let source = RipAudioSource(toc: toc, files: [:], disc: discFiles, tools: model.tools)
+        return try await AccurateRipVerifier(toc: toc, pressings: pressings).repair(number, vote: vote, audio: source, offsetHint: offsetHint)
     }
 
     /// Checks an album from its files: per disc, against each disc it could have been ripped from (saved when ripped,

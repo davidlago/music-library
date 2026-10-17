@@ -356,3 +356,148 @@ public struct AccurateRipVerifier: Sendable {
         return AccurateRipTrackAudio(samples: before + own + after, lead: before.count, count: count, isFirst: isFirst, isLast: isLast)
     }
 }
+
+// MARK: Repairing
+
+extension AccurateRipVerifier {
+    /// The most combinations a single confirmation is trusted for: AccurateRip's checksums are 32 bits, so a search
+    /// this size finds a wrong combination by chance about once in 20,000 searches per checksum tried. Beyond it, and
+    /// whenever one is found, a second pressing's checksum confirms the combination too (a 64-bit match).
+    public static let maxSingleConfirmation = 100_000
+    /// The most combinations searched at all (about its square root kept in memory, for each half of the search).
+    static let maxCombinations = 10_000_000_000
+
+    /// Repairs a misread track from several reads of it (`vote`): for each damaged spot, the versions the reads gave are
+    /// tried in combination, and a combination is kept when AccurateRip confirms it: by two pressings' checksums of the
+    /// track (each at the offset the disc lines up at, or where its sector 450 matches), or, from at most
+    /// `maxSingleConfirmation` combinations, by one when none matches two (a pressing whose track differs, or the only
+    /// one listed). `audio` gives the tracks around it. Returns the repaired track, or nil when none is confirmed.
+    public func repair(_ trackNumber: Int, vote: ReadVote, audio: AccurateRipAudioSource, offsetHint: Int?) async throws -> [UInt32]? {
+        guard let index = toc.audioTracks.firstIndex(where: { $0.number == trackNumber }) else { return nil }
+        let voted = vote.result
+        let spots = vote.spots().filter { $0.versions.count > 1 }
+        guard !spots.isEmpty, let track = try await load(index, audio: AccurateRipAudioOverlay(base: audio, tracks: [index: voted])),
+              let range = track.offsets else { return nil }
+        let combinations = spots.reduce(1.0) { $0 * Double($1.versions.count) }
+        guard combinations <= Double(Self.maxCombinations) else { return nil }
+
+        // Every listed checksum of the track, at each offset it could apply at.
+        let sector450 = track.sector450Checksums(range)
+        var targets: [RepairTarget] = []
+        for (p, pressing) in pressings.enumerated() where pressing.tracks.indices.contains(index) && !pressing.tracks[index].isEmpty {
+            let entry = pressing.tracks[index]
+            var offsets: [Int] = []
+            if let offsetHint, range.contains(offsetHint) { offsets.append(offsetHint) }
+            if entry.sector450 != 0, let sector450 {
+                for (k, crc) in sector450.enumerated() where crc == entry.sector450 && !offsets.contains(range.lowerBound + k) {
+                    offsets.append(range.lowerBound + k)
+                }
+            }
+            for offset in offsets {
+                targets.append(RepairTarget(pressing: p, confidence: entry.confidence, checksum: entry.checksum, offset: offset,
+                                            base: track.checksums(at: offset), changes: Self.changes(spots, track: track, offset: offset)))
+            }
+        }
+        func apply(_ choice: [Int]) -> [UInt32] {
+            var repaired = voted
+            for (spot, version) in zip(spots, choice) where version > 0 {
+                for (k, position) in spot.positions.enumerated() { repaired[position] = spot.versions[version][k] }
+            }
+            return repaired
+        }
+        // The most confirmed pressings first.
+        var singlyConfirmed: [Int]?
+        for primary in targets.sorted(by: { $0.confidence > $1.confidence }) {
+            try Task.checkCancellation()
+            for choice in Self.search(spots, primary) {
+                if targets.contains(where: { $0.pressing != primary.pressing && $0.matches(choice) }) { return apply(choice) }
+                if singlyConfirmed == nil, combinations <= Double(Self.maxSingleConfirmation) { singlyConfirmed = choice }
+            }
+        }
+        return singlyConfirmed.map(apply)
+    }
+
+    /// How each version of each spot changes the track's v1 and v2 checksums at `offset`, against the vote's version.
+    private static func changes(_ spots: [ReadVote.Spot], track: AccurateRipTrackAudio, offset: Int) -> [[(v1: UInt32, v2: UInt32)]] {
+        func contribution(_ value: UInt32, at position: Int) -> (UInt32, UInt32) {
+            let i = position - offset
+            guard i >= track.from, i < track.to else { return (0, 0) }
+            let product = UInt64(value) &* UInt64(i + 1)
+            let low = UInt32(truncatingIfNeeded: product)
+            return (low, low &+ UInt32(truncatingIfNeeded: product >> 32))
+        }
+        return spots.map { spot in
+            spot.versions.map { version in
+                var d1: UInt32 = 0, d2: UInt32 = 0
+                for (k, position) in spot.positions.enumerated() where version[k] != spot.versions[0][k] {
+                    let new = contribution(version[k], at: position), old = contribution(spot.versions[0][k], at: position)
+                    d1 = d1 &+ new.0 &- old.0
+                    d2 = d2 &+ new.1 &- old.1
+                }
+                return (d1, d2)
+            }
+        }
+    }
+
+    /// The combinations (a version per spot) whose checksum is the target's, by meeting in the middle: the sums of one
+    /// half's combinations are indexed, and each of the other half's looks up the rest. At most 100 are returned.
+    private static func search(_ spots: [ReadVote.Spot], _ target: RepairTarget) -> [[Int]] {
+        // Split the spots so both halves have about as many combinations.
+        var halves: ([Int], [Int]) = ([], [])
+        var sizes = (0.0, 0.0)
+        for s in spots.indices.sorted(by: { spots[$0].versions.count > spots[$1].versions.count }) {
+            let size = log(Double(spots[s].versions.count))
+            if sizes.0 <= sizes.1 { halves.0.append(s); sizes.0 += size } else { halves.1.append(s); sizes.1 += size }
+        }
+        func combinations(_ half: [Int]) -> [(choice: [Int], v1: UInt32, v2: UInt32)] {
+            var result: [(choice: [Int], v1: UInt32, v2: UInt32)] = [([], 0, 0)]
+            for s in half {
+                result = result.flatMap { partial in
+                    target.changes[s].enumerated().map { version, change in
+                        (partial.choice + [version], partial.v1 &+ change.v1, partial.v2 &+ change.v2)
+                    }
+                }
+            }
+            return result
+        }
+        let left = combinations(halves.0)
+        var byV1: [UInt32: [Int]] = [:], byV2: [UInt32: [Int]] = [:]
+        for (k, c) in left.enumerated() {
+            byV1[c.v1, default: []].append(k)
+            byV2[c.v2, default: []].append(k)
+        }
+        // The checksum listed is either a v1 or a v2 one: look for both.
+        let need1 = target.checksum &- target.base.v1, need2 = target.checksum &- target.base.v2
+        var found: [[Int]] = []
+        for right in combinations(halves.1) {
+            for k in (byV1[need1 &- right.v1] ?? []) + (byV2[need2 &- right.v2] ?? []) {
+                var choice = [Int](repeating: 0, count: spots.count)
+                for (s, version) in zip(halves.0, left[k].choice) { choice[s] = version }
+                for (s, version) in zip(halves.1, right.choice) { choice[s] = version }
+                if !found.contains(choice) { found.append(choice) }
+                if found.count >= 100 { return found }
+            }
+        }
+        return found
+    }
+}
+
+/// A listed checksum a repaired track could match, with the track's checksums at its offset and what each version of
+/// each damaged spot changes in them.
+private struct RepairTarget {
+    var pressing: Int
+    var confidence: Int
+    var checksum: UInt32
+    var offset: Int
+    var base: (v1: UInt32, v2: UInt32)
+    var changes: [[(v1: UInt32, v2: UInt32)]]
+
+    func matches(_ choice: [Int]) -> Bool {
+        var v1 = base.v1, v2 = base.v2
+        for (s, version) in choice.enumerated() {
+            v1 = v1 &+ changes[s][version].v1
+            v2 = v2 &+ changes[s][version].v2
+        }
+        return v1 == checksum || v2 == checksum
+    }
+}
