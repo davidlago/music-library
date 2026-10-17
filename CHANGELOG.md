@@ -7,6 +7,24 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.17.0
+
+- **The iPhone app is on the App Store**, free, as
+  [Dave's Music Library](https://apps.apple.com/us/app/daves-music-library/id6822005512). The README and the
+  [website](https://davidlago.github.io/music-library/) link to it.
+- **Check rips with AccurateRip.** After ripping a CD, every track is compared with other people's rips of the same CD
+  in [AccurateRip](https://www.accuraterip.com). A track that isn't bit for bit the same as theirs was misread: a
+  scratch or smudge the drive didn't report, which you'd otherwise only notice as a skip or glitch while listening.
+  It's marked **Misread** on the CD page and with a red mark on the album page (hover over it for what it means), and
+  the disc isn't ejected while a track is misread. Pressings with the audio slightly earlier or later than the one in
+  AccurateRip are recognized too.
+- **Rip Again** fixes a misread track while the disc is in: it reads the track up to 5 times and combines the reads
+  sample by sample, and when the majority still gets a damaged spot wrong, it tries the versions of each spot the reads
+  gave until AccurateRip confirms one. The file is replaced only once AccurateRip confirms it, keeping the song's plays,
+  likes and playlists, and Rip Again can be tried again. Ripping a track that's already in the library from the CD page
+  works the same way, instead of adding a second copy.
+- **Check albums you ripped before**, without the disc: **Check with AccurateRip** in the **…** menu of an album page
+  finds the CD they were ripped from among the ones MusicBrainz lists for the album.
 - **Remove songs and albums from the library anywhere.** **Remove from Library…** is now in the context menu of songs
   on album and artist pages and in playlists, of albums in the Albums grid, search results and artist pages, and in the
   **…** menu on an album page, not only in song lists. The files go to the Trash (with album and artist folders left
@@ -14,18 +32,6 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   queue; if it was playing, the next song plays.
 - **iPhone: Play starts the first time.** Playing an album or song at a different sample rate from the last one no
   longer stops right away until Play is tapped again: switching the output's rate was taken for an interruption.
-- **Check rips with AccurateRip.** After ripping a CD, each track is compared with other people's rips of the same CD
-  in [AccurateRip](https://www.accuraterip.com): **Accurate** means it's bit for bit the same as theirs, **Misread** means
-  the drive got part of it wrong (a scratch or smudge), which you'd otherwise only notice as a skip or glitch when
-  listening. **Rip Again** reads a misread track up to 5 times: a damaged spot reads differently each time, so the reads
-  are combined sample by sample, and when the majority still gets a spot wrong, the versions of each damaged spot the
-  reads gave are tried in combination until AccurateRip confirms one (by two pressings when it's listed in more than
-  one). The track is replaced only once AccurateRip confirms it, keeping its plays, likes and playlists, and Rip Again
-  can be tried again; the disc isn't ejected while a track is misread. Checking a track that's already in the
-  library on the CD page and ripping it does the same, instead of adding a second copy. Albums ripped before can be checked
-  too, without the disc: **Check with AccurateRip** in the **…** menu of an album page finds the CD they were ripped
-  from on MusicBrainz. Misread tracks are marked on album pages (hover over the mark for what it means). Rips of
-  a pressing with the audio slightly earlier or later than the one in AccurateRip are recognized too.
 
 ## 1.16.0
 
