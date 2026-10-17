@@ -179,7 +179,7 @@ struct CDView: View {
                 Text("Title").frame(maxWidth: .infinity, alignment: .leading)
                 Text("Artist").frame(width: 180, alignment: .leading)
                 Text("Time").frame(width: 50, alignment: .trailing)
-                Text("Status").frame(width: 150, alignment: .leading)
+                Text("Status").frame(width: 250, alignment: .leading)
             }
             .font(.caption.bold()).foregroundStyle(.subtext)
 
@@ -192,7 +192,7 @@ struct CDView: View {
                     Text(row.title).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                     Text(row.artist).lineLimit(1).foregroundStyle(.subtext).frame(width: 180, alignment: .leading)
                     Text(formatTime(row.duration)).monospacedDigit().foregroundStyle(.subtext).frame(width: 50, alignment: .trailing)
-                    statusView(row.status).frame(width: 150, alignment: .leading)
+                    statusView(row).frame(width: 250, alignment: .leading)
                 }
             }
         }
@@ -200,7 +200,30 @@ struct CDView: View {
     }
 
     @ViewBuilder
-    private func statusView(_ status: CDDisc.RowStatus) -> some View {
+    private func statusView(_ row: CDDisc.Row) -> some View {
+        if let track = disc.libraryTracks[row.id], let check = model.ripChecks[track.id], check.result == .inaccurate, row.status.showsCheck {
+            HStack(spacing: 8) {
+                if case .failed(let reason) = row.status {
+                    // A round of Rip Again that didn't fix it: another round can.
+                    Label("Still misread", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red).font(.caption).lineLimit(1)
+                        .contentShape(Rectangle())
+                        .help(reason)
+                } else {
+                    RipMisreadLabel(check: check)
+                }
+                Button("Rip Again") { model.cd.ripAgain(disc, track: row.id) }
+                    .controlSize(.small)
+                    .disabled(disc.isRipping || disc.isChecking)
+                    .help("Read the track up to \(CDController.readPasses) times, combining the reads, and keep the result if AccurateRip confirms it")
+            }
+        } else {
+            plainStatus(row.status)
+        }
+    }
+
+    @ViewBuilder
+    private func plainStatus(_ status: CDDisc.RowStatus) -> some View {
         switch status {
         case .pending:
             Text("")
@@ -220,6 +243,30 @@ struct CDView: View {
     }
 
     // MARK: Footer
+
+    @ViewBuilder
+    private var accurateRipStatus: some View {
+        let checks = disc.libraryTracks.values.compactMap { model.ripChecks[$0.id] }.filter { $0.result != .unchecked }
+        if disc.isChecking {
+            HStack(spacing: 6) { ProgressView().controlSize(.small); Text("Checking with AccurateRip…") }.font(.callout)
+        } else if let error = disc.checkError {
+            Label("Couldn't check with AccurateRip: \(error)", systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(.red).lineLimit(2)
+        } else if !checks.isEmpty {
+            let accurate = checks.filter { $0.result == .accurate }.count
+            let misread = checks.filter { $0.result == .inaccurate }.count
+            Group {
+                if checks.allSatisfy({ $0.result == .notListed }) {
+                    Text("This CD isn't in AccurateRip yet.")
+                } else if misread > 0 {
+                    Text("AccurateRip: \(misread) misread, \(accurate) of \(checks.count) accurate").foregroundStyle(.red)
+                } else {
+                    Text("AccurateRip: \(accurate) of \(checks.count) accurate")
+                }
+            }
+            .font(.callout)
+            .help(disc.matchOffset.map { "The rip lines up with AccurateRip's at \($0 > 0 ? "+" : "")\($0) samples (the drive's read offset, plus the pressing's)." } ?? "")
+        }
+    }
 
     private var overallFraction: Double {
         let selected = disc.rows.filter(\.selected)
@@ -246,7 +293,13 @@ struct CDView: View {
                 if !model.ffmpegAvailable {
                     Label("ffmpeg is required for ripping", systemImage: "exclamationmark.triangle").foregroundStyle(.orange).font(.callout)
                 }
+                accurateRipStatus
                 Spacer()
+                if !disc.libraryTracks.isEmpty {
+                    Button("Check with AccurateRip") { Task { await model.cd.checkRips(disc) } }
+                        .disabled(disc.isChecking || !model.ffmpegAvailable)
+                        .help("Compare the library's rips of this disc with other people's rips in AccurateRip")
+                }
                 if disc.release == nil {
                     Button("Rip to Import Queue") { model.cd.ripToImportQueue(disc) }
                         .disabled(disc.selectedCount == 0 || !model.ffmpegAvailable || disc.lookup == .looking)

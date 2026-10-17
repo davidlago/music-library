@@ -33,8 +33,11 @@
   automatically and the rest wait in the Import queue with candidates to pick from. Tracks get rich metadata and credits
   (players, producers, engineers, writers), cover art from the Cover Art Archive, and a clean
   `Artist/Album (Year)/NN - Title` folder. Your original files are never modified.
-- **Rip CDs to FLAC.** Insert a disc and it's identified on MusicBrainz by its table of contents; pick the release (the app
-  warns when there's no exact match), choose tracks, and they're ripped and imported like any other file. The disc can be
+- **Rip CDs to FLAC, verified.** Insert a disc and it's identified on MusicBrainz by its table of contents; pick the
+  release (the app warns when there's no exact match), choose tracks, and they're ripped and imported like any other
+  file. Each rip is then checked against [AccurateRip](https://www.accuraterip.com): a track that isn't bit for bit the
+  same as other people's rips of the CD was misread, and **Rip Again** replaces it, keeping its plays and likes. Albums
+  ripped earlier can be checked from their files too (**Check with AccurateRip** on the album page). The disc can be
   ejected when it's done.
 
 **Explore it**

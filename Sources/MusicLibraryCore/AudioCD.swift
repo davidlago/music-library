@@ -111,6 +111,29 @@ public struct CDTOC: Sendable, Equatable {
     }
 }
 
+extension CDTOC {
+    /// An audio disc with tracks numbered from 1 starting at `offsets` (blocks, lead-in included), as MusicBrainz
+    /// lists a disc ID. Nil unless the values could be a real CD's.
+    public init?(offsets: [Int], leadout: Int) {
+        guard !offsets.isEmpty, offsets.count <= 99, (0...Self.maxBlock).contains(leadout),
+              offsets.allSatisfy({ (0...Self.maxBlock).contains($0) }),
+              zip(offsets, offsets.dropFirst() + [leadout]).allSatisfy({ $0 < $1 }) else { return nil }
+        tracks = offsets.enumerated().map { CDTrack(number: $0.offset + 1, startBlock: $0.element, isData: false, session: 1) }
+        firstTrack = 1
+        lastTrack = offsets.count
+        self.leadout = leadout
+    }
+
+    /// Reads back `tocString` ("first last leadout offset…"). Nil unless it's well formed.
+    public init?(tocString: String) {
+        let values = tocString.split(separator: " ").map { Int($0) }
+        guard values.count >= 4, values.allSatisfy({ $0 != nil }) else { return nil }
+        let numbers = values.compactMap { $0 }
+        guard numbers[0] == 1, numbers[1] == numbers.count - 3 else { return nil }
+        self.init(offsets: Array(numbers.dropFirst(3)), leadout: numbers[2])
+    }
+}
+
 public struct AudioCDVolume: Sendable {
     public var url: URL
     public var name: String
