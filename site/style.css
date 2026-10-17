@@ -344,6 +344,8 @@ p { margin: 0; }
 .install-card h3 { display: flex; align-items: center; gap: 10px; margin: 0; }
 .install-card .btn { margin-top: auto; align-self: flex-start; }
 .install-card a:not(.btn) { color: var(--peach); }
+.install-card .card-actions { margin-top: auto; display: flex; flex-wrap: wrap; gap: 10px; }
+.install-card .card-actions .btn { margin-top: 0; }
 .step-badge {
   font: 700 12px var(--font); letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px;
   background: var(--grad); color: #1a0f22;

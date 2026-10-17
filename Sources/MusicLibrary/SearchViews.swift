@@ -182,6 +182,8 @@ struct TopHitsStrip: View {
                         AlbumMenuButtons(album: a)
                         Divider()
                         AddToExportListButton(album: a)
+                        Divider()
+                        RemoveFromLibraryButton(album: a)
                     }
                 }
             }

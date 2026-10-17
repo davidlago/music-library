@@ -366,7 +366,11 @@ final class PhonePlayer {
 
     private func observeAudioSession() {
         let center = NotificationCenter.default
-        observers.append(center.addObserver(forName: AVAudioSession.didBecomeInactiveNotification, object: nil, queue: .main) { [weak self] _ in
+        observers.append(center.addObserver(forName: AVAudioSession.didBecomeInactiveNotification, object: nil, queue: .main) { [weak self] note in
+            // The player deactivates the session itself to change the output rate (`configureSession`), right before
+            // it starts the song: only the system's deactivations (a call, another app) interrupt playback.
+            let context = note.userInfo?[AVAudioSession.deactivationContextKey] as? AVAudioSession.DeactivationContext
+            guard context?.source != .app else { return }
             MainActor.assumeIsolated {
                 guard let self, self.isPlaying else { return }
                 self.interrupted = true

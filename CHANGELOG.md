@@ -7,6 +7,13 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- **Remove songs and albums from the library anywhere.** **Remove from Library…** is now in the context menu of songs
+  on album and artist pages and in playlists, of albums in the Albums grid, search results and artist pages, and in the
+  **…** menu on an album page, not only in song lists. The files go to the Trash (with album and artist folders left
+  with nothing but a cover), so a defective song or album can be ripped again. A removed song also leaves the play
+  queue; if it was playing, the next song plays.
+- **iPhone: Play starts the first time.** Playing an album or song at a different sample rate from the last one no
+  longer stops right away until Play is tapped again: switching the output's rate was taken for an interruption.
 - **Check rips with AccurateRip.** After ripping a CD, each track is compared with other people's rips of the same CD
   in [AccurateRip](https://www.accuraterip.com): **Accurate** means it's bit for bit the same as theirs, **Misread** means
   the drive got part of it wrong (a scratch or smudge), which you'd otherwise only notice as a skip or glitch when

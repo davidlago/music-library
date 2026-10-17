@@ -179,6 +179,21 @@ public struct PlayQueue: Sendable {
         entries = entries.enumerated().filter { $0.offset <= index || !ids.contains($0.element.id) }.map(\.element)
     }
 
+    /// Drops every entry of the songs with these track IDs (removed from the library), played ones included. When
+    /// the current song is one of them, the next remaining one becomes current, or the queue is cleared when none
+    /// is left after it. Returns whether the current song changed.
+    @discardableResult
+    public mutating func removeTracks(_ ids: Set<Int64>) -> Bool {
+        guard let index, !ids.isEmpty else { return false }
+        let currentRemoved = ids.contains(entries[index].track.id)
+        let keptBefore = entries[..<index].filter { !ids.contains($0.track.id) }.count
+        entries.removeAll { ids.contains($0.track.id) }
+        guard currentRemoved else { self.index = keptBefore; return false }
+        guard keptBefore < entries.count else { clear(); return true }
+        setCurrent(keptBefore)
+        return true
+    }
+
     /// Removes everything queued, keeping the list.
     public mutating func clearQueued() { entries.removeSubrange(queuedRange) }
 

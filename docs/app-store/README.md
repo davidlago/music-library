@@ -1,7 +1,7 @@
 # App Store listing
 
 What's entered in [App Store Connect](https://appstoreconnect.apple.com) for the iPhone app (with its widgets and
-Apple Watch app). Keep it in step with the app and the README; [docs/distribution.md](../distribution.md#the-app-store)
+Apple Watch app), live at https://apps.apple.com/us/app/daves-music-library/id6822005512. Keep it in step with the app and the README; [docs/distribution.md](../distribution.md#the-app-store)
 says how a version is submitted.
 
 Screenshots: `iphone-6.3/` (1206 × 2622, from the iPhone 17 simulator), the required "iPhone with Dynamic Island
@@ -41,10 +41,10 @@ analytics. Export compliance: `ITSAppUsesNonExemptEncryption = NO` (only the enc
 
 ## Version text
 
-**Promotional text** (can change without a review):
+**Promotional text** (at most 170 characters; can change at any time without a review):
 
 ```
-Try it right away with the built-in sample library, then sync your own collection from the free Music Library app for Mac.
+Try it right away with the built-in sample library, then sync your own collection from the free Music Library app for Mac: davidlago.github.io/music-library
 ```
 
 **Keywords:**
@@ -56,7 +56,7 @@ player,flac,lossless,offline,hi-res,dac,scrobble,lastfm,mac,sync,collection,albu
 **Description:**
 
 ```
-Your own music collection, on your iPhone and Apple Watch. Dave's Music Library is the companion to Music Library for Mac, a free and open-source app for people who keep their music as files: rip your CDs, tag everything from MusicBrainz, and explore your collection in ways streaming apps don't.
+Your own music collection, on your iPhone and Apple Watch. Dave's Music Library is the companion to Music Library for Mac, a free and open-source app for people who keep their music as files: rip your CDs, tag everything from MusicBrainz, and explore your collection in ways streaming apps don't. Get the Mac app at https://davidlago.github.io/music-library/
 
 Browse your whole library
 Every album, artist, cover and artist photo comes over from your Mac, with album and artist info, credits, your playlists and smart playlists. Choose which music to keep on the iPhone; everything else can still be browsed and downloaded when you want it.
@@ -78,8 +78,11 @@ No account, no ads, no tracking. Your iPhone and Mac sync directly over your Wi-
 
 No Mac app yet? Tap Explore a Sample Library to try everything with fictional artists and albums.
 
-Requires Music Library for Mac (free, macOS 14 or later) to bring your own music: https://davidlago.github.io/music-library/
+Get the companion Mac app
+Your music comes from Music Library for Mac (free, macOS 14 or later): it imports and rips your music, then syncs it to your iPhone. Download it, and find help and the source code, on the website: https://davidlago.github.io/music-library/
 ```
+
+The description can only be changed with a new version (the promotional text can change at any time).
 
 **What's New** (each version): that version's section of `CHANGELOG.md`, as plain text.
 

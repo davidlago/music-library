@@ -10,7 +10,6 @@ struct TrackTable: View {
     var source: String?
     @State private var selection = Set<Track.ID>()
     @State private var sortOrder: [KeyPathComparator<Track>] = []
-    @State private var pendingRemoval: Set<Track.ID>?
     @State private var infoTrack: Track?
 
     private var sorted: [Track] { sortOrder.isEmpty ? tracks : tracks.sorted(using: sortOrder) }
@@ -40,17 +39,6 @@ struct TrackTable: View {
                 .keyboardShortcut("i", modifiers: .command)
                 .opacity(0).allowsHitTesting(false)
         }
-        .confirmationDialog(
-            "Remove \(pendingRemoval?.count ?? 0) song\(pendingRemoval?.count == 1 ? "" : "s") from the library?",
-            isPresented: Binding(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } }),
-            titleVisibility: .visible
-        ) {
-            Button("Move Files to Trash", role: .destructive) {
-                if let ids = pendingRemoval { model.removeFromLibrary(ids); selection.subtract(ids) }
-                pendingRemoval = nil
-            }
-            Button("Cancel", role: .cancel) { pendingRemoval = nil }
-        } message: { Text("The files are moved to the Trash and removed from all playlists.") }
         .overlay {
             if tracks.isEmpty {
                 let empty = emptyState ?? (model.isSearching
@@ -95,7 +83,7 @@ struct TrackTable: View {
         }
         Divider()
         Button("Show in Finder") { model.showInFinder(chosen) }
-        Button("Remove from Library…", role: .destructive) { pendingRemoval = ids }
+        RemoveFromLibraryButton(tracks: chosen)
     }
 }
 
@@ -158,6 +146,8 @@ struct AlbumsView: View {
                             AlbumMenuButtons(album: a)
                             Divider()
                             AddToExportListButton(album: a)
+                            Divider()
+                            RemoveFromLibraryButton(album: a)
                         }
                     }
                 }
@@ -246,6 +236,7 @@ struct PlaylistView: View {
                 AddToExportListButton(tracks: positions.sorted().compactMap { tracks.indices.contains($0) ? tracks[$0] : nil })
                 Divider()
                 Button("Remove from Playlist") { remove(positions) }
+                RemoveFromLibraryButton(tracks: positions.sorted().compactMap { tracks.indices.contains($0) ? tracks[$0] : nil })
             }
         } primaryAction: { positions in play(from: positions.min() ?? 0) }
         .overlay {
@@ -293,6 +284,48 @@ struct AlbumMenuButtons: View {
         Button("Play") { model.player.play(queue: model.tracks(of: album), startAt: 0, source: title) }
         Button("Shuffle") { model.player.play(queue: model.tracks(of: album).shuffled(), startAt: 0, source: title) }
         QueueMenuButtons(player: model.player) { model.tracks(of: album) }
+    }
+}
+
+/// "Remove from Library…" for songs or a whole album; `removeFromLibraryConfirmation` asks before anything goes.
+struct RemoveFromLibraryButton: View {
+    @Environment(AppModel.self) private var model
+    var tracks: [Track] = []
+    var album: AlbumSummary?
+
+    var body: some View {
+        Button("Remove from Library…", role: .destructive) {
+            if let album {
+                model.confirmRemoval(model.tracks(of: album), title: album.album.isEmpty ? "Unknown Album" : album.album)
+            } else {
+                model.confirmRemoval(tracks)
+            }
+        }
+    }
+}
+
+extension View {
+    /// Asks before removing `model.pendingRemoval` from the library. Shown once, by `ContentView`.
+    func removeFromLibraryConfirmation(_ model: AppModel) -> some View {
+        let request = model.pendingRemoval
+        let count = request?.tracks.count ?? 0
+        let what = request?.title.map { "“\($0)”" }
+            ?? (count == 1 ? request.map { "“\($0.tracks[0].title)”" } ?? "1 song" : "\(count) songs")
+        return confirmationDialog(
+            "Remove \(what) from the library?",
+            isPresented: Binding(get: { model.pendingRemoval != nil }, set: { if !$0 { model.pendingRemoval = nil } }),
+            titleVisibility: .visible,
+            presenting: request
+        ) { request in
+            Button("Move to Trash", role: .destructive) { model.removeFromLibrary(Set(request.tracks.map(\.id))) }
+            Button("Cancel", role: .cancel) {}
+        } message: { request in
+            Text("""
+                \(request.tracks.count == 1 ? "The file is" : "The \(request.tracks.count) files are") moved to the Trash. \
+                \(request.tracks.count == 1 ? "The song is" : "The songs are") removed from all playlists, \
+                with \(request.tracks.count == 1 ? "its" : "their") plays and likes.
+                """)
+        }
     }
 }
 

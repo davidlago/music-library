@@ -7,6 +7,7 @@ import SwiftUI
 struct AlbumDetail: View {
     @Environment(AppModel.self) private var model
     @Environment(\.theme) private var theme
+    @Environment(\.dismiss) private var dismiss
     let album: AlbumSummary
     @State private var tracks: [Track] = []
     @State private var cover: NSImage?
@@ -64,7 +65,11 @@ struct AlbumDetail: View {
             }
         }
         .onAppear(perform: load)
-        .onChange(of: model.libraryVersion) { load() }
+        .onChange(of: model.libraryVersion) {
+            load()
+            // The album was removed from the library.
+            if tracks.isEmpty { dismiss() }
+        }
         .sheet(item: $coverSheet) { AlbumCoverSheet(album: album, tracks: tracks, request: $0).themedSheet() }
         .task(id: "\(album.id)|\(model.coverRevision)") {
             guard let url = model.coverURL(forAlbum: album) else { cover = nil; return }
@@ -114,9 +119,11 @@ struct AlbumDetail: View {
                     Button("Check with AccurateRip", systemImage: "checkmark.seal") { model.rips.check(album: album) }
                         .disabled(model.rips.albumStates[AlbumInfoStore.key(album)] == .checking
                                   || !tracks.contains(where: RipDiscMatcher.isCDAudio) || !model.ffmpegAvailable)
+                    Divider()
+                    RemoveFromLibraryButton(album: album)
                 } label: { Image(systemName: "ellipsis") }
                     .menuStyle(.button).buttonStyle(.bordered).menuIndicator(.hidden).fixedSize()
-                    .help("Play Next, Add to Queue or check the rip with AccurateRip")
+                    .help("Play Next, Add to Queue, check the rip with AccurateRip or remove the album")
             }
             .controlSize(.large)
             .disabled(tracks.isEmpty)
@@ -480,6 +487,7 @@ struct AlbumTrackRow: View {
             AddToExportListButton(tracks: [track])
             Divider()
             Button("Show in Finder") { model.showInFinder([track]) }
+            RemoveFromLibraryButton(tracks: [track])
         }
         .help("Double-click to play")
     }

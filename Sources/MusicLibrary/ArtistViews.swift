@@ -182,6 +182,7 @@ struct SyncStatus: View {
 struct ArtistDetail: View {
     @Environment(AppModel.self) private var model
     @Environment(\.theme) private var theme
+    @Environment(\.dismiss) private var dismiss
     let artist: ArtistSummary
     @State private var tracks: [Track] = []
     @State private var albums: [AlbumSummary] = []
@@ -227,7 +228,11 @@ struct ArtistDetail: View {
         }
         .sheet(item: $photoSheet) { ArtistPhotoSheet(name: artist.name, request: $0).themedSheet() }
         .onAppear(perform: load)
-        .onChange(of: model.libraryVersion) { load() }
+        .onChange(of: model.libraryVersion) {
+            load()
+            // All of the artist's songs were removed from the library.
+            if tracks.isEmpty { dismiss() }
+        }
     }
 
     private func load() {
@@ -408,7 +413,11 @@ struct ArtistDetail: View {
                         .frame(width: 140, alignment: .leading)
                     }
                     .buttonStyle(.plain)
-                    .contextMenu { AddToExportListButton(album: a) }
+                    .contextMenu {
+                        AddToExportListButton(album: a)
+                        Divider()
+                        RemoveFromLibraryButton(album: a)
+                    }
                 }
             }
         }
@@ -569,6 +578,7 @@ struct ArtistSongRow: View {
             AddToExportListButton(tracks: [track])
             Divider()
             Button("Show in Finder") { model.showInFinder([track]) }
+            RemoveFromLibraryButton(tracks: [track])
         }
         .help("Double-click to play")
     }
