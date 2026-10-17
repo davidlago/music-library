@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.19.0
+
 - **Sort albums and songs on the iPhone.** The Albums grid has the Mac's orders (Date Added, Title, Artist, Release
   Year, Most Played, Recently Played) in its menu, with the same line under each album saying when it was added or
   played. Songs can be sorted by title, artist, album, composer, year, time, format or date added, either way round.
