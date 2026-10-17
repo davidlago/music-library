@@ -84,6 +84,22 @@ final class Player {
 
     func removeFromQueue(_ ids: Set<PlayQueue.Entry.ID>) { queue.remove(ids) }
     func clearQueued() { queue.clearQueued() }
+
+    /// Drops songs removed from the library from the queue. When the current one was removed, the next one plays
+    /// in its place (or waits, if paused), and playback stops when nothing is left.
+    func removeTracks(_ ids: Set<Int64>) {
+        guard queue.removeTracks(ids) else { return }
+        guard let current = currentTrack else { stop(); return }
+        if isPlaying { loadCurrent(); return }
+        loadGeneration += 1
+        avPlayer.pause()
+        avPlayer.replaceCurrentItem(with: nil)
+        finishedQueue = false
+        restoredPaused = true
+        currentTime = 0
+        duration = current.duration
+        loadCover(for: current)
+    }
     func moveQueued(from offsets: IndexSet, to destination: Int) { queue.moveQueued(from: offsets, to: destination) }
     func moveUpcoming(from offsets: IndexSet, to destination: Int) { queue.moveUpcoming(from: offsets, to: destination) }
 
