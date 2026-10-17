@@ -55,8 +55,10 @@ final class RipChecker {
         return report
     }
 
-    /// Checks an album from its files: per disc, against the disc it was ripped from (saved when ripped, or found
-    /// among the discs MusicBrainz lists for its release).
+    /// Checks an album from its files: per disc, against each disc it could have been ripped from (saved when ripped,
+    /// or one MusicBrainz lists for its release with exactly its tracks' lengths), keeping the results of the one most
+    /// of its tracks match. Discs whose tracks only start a few sectors later have the same lengths but are listed
+    /// apart in AccurateRip, sometimes as a different pressing.
     func check(album: AlbumSummary) {
         let key = AlbumInfoStore.key(album)
         guard albumStates[key] != .checking else { return }
@@ -67,10 +69,17 @@ final class RipChecker {
                 let byDisc = Dictionary(grouping: model.tracks(of: album).filter(RipDiscMatcher.isCDAudio)) { $0.metadata.discNo ?? 1 }
                 var listed: [String: [Int: [CDTOC]]] = [:]
                 for (discNo, tracks) in byDisc.sorted(by: { $0.key < $1.key }) {
-                    guard let (toc, numbers) = try await disc(for: tracks, discNo: discNo, listed: &listed) else { continue }
-                    found = true
-                    let byNumber = Dictionary(tracks.compactMap { t in numbers[t.id].map { ($0, t) } }, uniquingKeysWith: { a, _ in a })
-                    _ = try await check(toc: toc, tracks: byNumber)
+                    var best: (score: (Int, Int), toc: CDTOC, tracks: [Int: Track], report: AccurateRipReport?)?
+                    for (toc, numbers) in try await discs(for: tracks, discNo: discNo, listed: &listed) {
+                        found = true
+                        let byNumber = Dictionary(tracks.compactMap { t in numbers[t.id].map { ($0, t) } }, uniquingKeysWith: { a, _ in a })
+                        let report = try await check(toc: toc, tracks: byNumber, save: false)
+                        let score = Self.score(report)
+                        if best.map({ score > $0.score }) ?? true { best = (score, toc, byNumber, report) }
+                    }
+                    if let best {
+                        model.saveRipChecks(best.tracks.map { RipCheck(trackId: $0.value.id, toc: best.toc, discTrack: $0.key, report: best.report) })
+                    }
                 }
                 albumStates[key] = found ? .done : .noDisc
             } catch {
@@ -79,14 +88,31 @@ final class RipChecker {
         }
     }
 
-    private func disc(for tracks: [Track], discNo: Int, listed: inout [String: [Int: [CDTOC]]]) async throws -> (CDTOC, [Int64: Int])? {
-        // The disc saved when the tracks were ripped, when they all share one.
-        let saved = tracks.compactMap { model.ripChecks[$0.id] }
-        if saved.count == tracks.count, let toc = saved.first?.toc, saved.allSatisfy({ $0.toc == toc }) {
-            return (toc, Dictionary(uniqueKeysWithValues: saved.map { ($0.trackId, $0.discTrack) }))
+    /// How well a check went: accurate tracks, then their total confidence; a disc AccurateRip doesn't list is worst.
+    static func score(_ report: AccurateRipReport?) -> (Int, Int) {
+        guard let report else { return (-1, -1) }
+        var count = 0, confidence = 0
+        for case .accurate(let c) in report.tracks.values {
+            count += 1
+            confidence += c
         }
-        guard let release = tracks.first(where: { $0.metadata.mbReleaseId != nil })?.metadata.mbReleaseId else { return nil }
-        if listed[release] == nil { listed[release] = try await model.musicBrainz.discTOCs(releaseId: release) }
-        return RipDiscMatcher.disc(for: tracks, among: listed[release]?[discNo] ?? []).map { ($0.toc, $0.discTracks) }
+        return (count, confidence)
+    }
+
+    /// The discs the tracks could have been ripped from: those saved with them, and those MusicBrainz lists for their
+    /// release, when every track has its track's exact length.
+    private func discs(for tracks: [Track], discNo: Int, listed: inout [String: [Int: [CDTOC]]]) async throws -> [(CDTOC, [Int64: Int])] {
+        var tocs: [CDTOC] = []
+        for toc in tracks.compactMap({ model.ripChecks[$0.id]?.toc }) where !tocs.contains(toc) { tocs.append(toc) }
+        if let release = tracks.first(where: { $0.metadata.mbReleaseId != nil })?.metadata.mbReleaseId {
+            do {
+                if listed[release] == nil { listed[release] = try await model.musicBrainz.discTOCs(releaseId: release) }
+            } catch {
+                // Without MusicBrainz, the discs saved with the tracks are enough.
+                if tocs.isEmpty { throw error }
+            }
+            for toc in listed[release]?[discNo] ?? [] where !tocs.contains(toc) { tocs.append(toc) }
+        }
+        return RipDiscMatcher.discs(for: tracks, among: tocs).map { ($0.toc, $0.discTracks) }
     }
 }

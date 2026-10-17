@@ -74,6 +74,15 @@ private func rippedTracks(_ toc: CDTOC, codec: String = "flac", bitDepth: Int = 
         #expect(RipDiscMatcher.disc(for: odd, among: medium2) == nil)
     }
 
+    @Test func findsEveryDiscWithTheAlbumsLengths() {
+        // A disc whose tracks all start 32 sectors later (a real pressing of another album) has the same lengths and
+        // is listed apart in AccurateRip: both are candidates.
+        let shifted = CDTOC(offsets: medium2[0].offsets.map { $0 + 32 }, leadout: medium2[0].leadout + 32)!
+        let found = RipDiscMatcher.discs(for: rippedTracks(medium2[0]), among: [medium2[0], medium2[1], shifted])
+        #expect(found.map(\.toc) == [medium2[0], shifted])
+        #expect(AccurateRipDisc(toc: shifted) != AccurateRipDisc(toc: medium2[0]))
+    }
+
     @Test(arguments: ["pcm_s16be", "pcm_s16le"])
     func readsCDTrackFilesLikeTheirRips(codec: String) async throws {
         // macOS shows CD tracks as AIFF-C with little-endian samples (`sowt`); plain big-endian AIFF reads the same.

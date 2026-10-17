@@ -94,10 +94,17 @@ public enum RipDiscMatcher {
     }
 
     /// `tracks` are one medium's tracks; each must be its track number's length on the disc, within half a sector
-    /// (durations are rounded; discs differ by whole sectors). Returns the disc and the tracks' numbers on it.
+    /// (durations are rounded; discs differ by whole sectors). Returns the first such disc and the tracks' numbers on it.
     public static func disc(for tracks: [Track], among tocs: [CDTOC]) -> (toc: CDTOC, discTracks: [Int64: Int])? {
+        discs(for: tracks, among: tocs).first
+    }
+
+    /// Every disc of `tocs` the tracks fit. Several can: discs whose tracks all start a few sectors later have the
+    /// same lengths, and AccurateRip lists them apart.
+    public static func discs(for tracks: [Track], among tocs: [CDTOC]) -> [(toc: CDTOC, discTracks: [Int64: Int])] {
         let candidates = tracks.filter(isCDAudio)
-        guard !candidates.isEmpty else { return nil }
+        guard !candidates.isEmpty else { return [] }
+        var found: [(toc: CDTOC, discTracks: [Int64: Int])] = []
         for toc in tocs {
             var numbers: [Int64: Int] = [:]
             for t in candidates {
@@ -106,9 +113,9 @@ public enum RipDiscMatcher {
                 guard abs(t.duration * 44100 - samples) < Double(AccurateRip.samplesPerSector / 2) else { break }
                 numbers[t.id] = n
             }
-            if numbers.count == candidates.count { return (toc, numbers) }
+            if numbers.count == candidates.count { found.append((toc, numbers)) }
         }
-        return nil
+        return found
     }
 }
 
