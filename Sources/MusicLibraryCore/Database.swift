@@ -244,6 +244,8 @@ public final class Database: @unchecked Sendable {
                 try exec("CREATE TABLE IF NOT EXISTS sync_events(id TEXT PRIMARY KEY, applied_at REAL NOT NULL)")
             }
         }
+        // Tables only the Mac uses, added without a schema change (see `createRipChecksTable`).
+        try createRipChecksTable()
         try exec("PRAGMA user_version=\(Self.schemaVersion)")
     }
 

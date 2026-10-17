@@ -7,6 +7,14 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- **Check rips with AccurateRip.** After ripping a CD, each track is compared with other people's rips of the same CD
+  in [AccurateRip](https://www.accuraterip.com): **Accurate** means it's bit for bit the same as theirs, **Misread** means
+  the drive got part of it wrong (a scratch or smudge), which you'd otherwise only notice as a skip or glitch when
+  listening. **Rip Again** rips a misread track again and replaces it only once AccurateRip confirms the new rip, keeping
+  its plays, likes and playlists; the disc isn't ejected while a track is misread. Albums ripped before can be checked
+  too, without the disc: **Check with AccurateRip** in the **…** menu of an album page finds the CD they were ripped
+  from on MusicBrainz. Album pages mark accurate and misread tracks.
+
 ## 1.16.0
 
 - **Try the iPhone app without a Mac.** **Explore a Sample Library** on the empty Library tab opens a sample library

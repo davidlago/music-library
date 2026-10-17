@@ -43,6 +43,12 @@ final class CDDisc: Identifiable {
     var price: Decimal?
     /// Set once ripping has started, from then on changes to the answer are saved right away.
     var ownershipSaved = false
+    /// The library's tracks from this disc, by track number: ripped now or before (for checking them).
+    var libraryTracks: [Int: Track] = [:]
+    var isChecking = false
+    var checkError: String?
+    /// The drive's read offset AccurateRip found for this disc, for checking a track ripped again.
+    var driveOffset: Int?
     @ObservationIgnored var task: Task<Void, Never>?
     @ObservationIgnored var removed = false
 
@@ -173,11 +179,14 @@ final class CDController {
         disc.warning = (mediumCount != audio.count || mapping.count != audio.count)
             ? "The disc has \(audio.count) audio tracks but this edition lists \(mediumCount). Check the track names before ripping." : nil
         let existing = (try? model.database?.tracks(releaseId: release.id)) ?? []
+        disc.libraryTracks = [:]
         disc.rows = audio.map { t in
             let mb = mapping[t.number]
-            let inLibrary = mb.map { mb in
-                existing.contains { ($0.metadata.discNo == mb.discNo && $0.trackNo == mb.trackNo) || $0.metadata.mbRecordingId == mb.recordingId }
-            } ?? false
+            let match = mb.flatMap { mb in
+                existing.first { ($0.metadata.discNo == mb.discNo && $0.trackNo == mb.trackNo) || $0.metadata.mbRecordingId == mb.recordingId }
+            }
+            disc.libraryTracks[t.number] = match
+            let inLibrary = match != nil
             return CDDisc.Row(id: t.number, title: mb?.title ?? "Track \(t.number)", artist: mb?.artist ?? "",
                               duration: disc.volume.toc.duration(of: t), selected: !inLibrary,
                               status: inLibrary ? .inLibrary : .pending)
@@ -256,7 +265,7 @@ final class CDController {
                 }
                 disc.rows[idx].status = .ripping(0)
                 do {
-                    _ = try await importer.ripAndImport(
+                    let track = try await importer.ripAndImport(
                         volume: volume, cdTrack: number, release: release, releaseTrack: mb, cover: cover, service: service, workDir: work
                     ) { fraction in
                         Task { @MainActor in
@@ -265,6 +274,9 @@ final class CDController {
                         }
                     }
                     if let i = disc.rows.firstIndex(where: { $0.id == number }) { disc.rows[i].status = .done }
+                    disc.libraryTracks[number] = track
+                    // The disc is saved with the track right away, so it can be checked later if checking now fails.
+                    self?.model.saveRipChecks([RipCheck(trackId: track.id, toc: volume.toc, discTrack: number, result: .unchecked)])
                     self?.model.reloadLibrary()
                 } catch is CancellationError {
                     if let i = disc.rows.firstIndex(where: { $0.id == number }) { disc.rows[i].status = .pending }
@@ -280,8 +292,96 @@ final class CDController {
             disc.isRipping = false
             disc.statusLine = ""
             guard let self, !disc.removed, !Task.isCancelled else { return }
-            if failures == 0, self.model.ejectAfterRip { self.eject(disc) }
+            await self.checkRips(disc)
+            // A misread track can be ripped again while the disc is still in.
+            if failures == 0, !self.hasInaccurateTracks(disc), self.model.ejectAfterRip { self.eject(disc) }
         }
+    }
+
+    // MARK: Checking with AccurateRip
+
+    /// The disc's tracks in the library that AccurateRip found misread.
+    func hasInaccurateTracks(_ disc: CDDisc) -> Bool {
+        disc.libraryTracks.values.contains { model.ripChecks[$0.id]?.result == .inaccurate }
+    }
+
+    /// Checks the disc's tracks in the library with AccurateRip, reading the tracks around them from the disc.
+    func checkRips(_ disc: CDDisc) async {
+        let toc = disc.volume.toc
+        // Tracks saved as ripped from another disc (another pressing of the album) keep that disc's result.
+        let tracks = disc.libraryTracks.filter { model.ripChecks[$0.value.id].map { $0.toc == toc } ?? true }
+        guard !tracks.isEmpty, !disc.isChecking else { return }
+        disc.isChecking = true
+        disc.checkError = nil
+        defer { disc.isChecking = false }
+        do {
+            let report = try await model.rips.check(toc: toc, tracks: tracks, volume: disc.volume)
+            disc.driveOffset = report?.offset ?? disc.driveOffset
+        } catch is CancellationError {
+        } catch {
+            disc.checkError = error.localizedDescription
+        }
+    }
+
+    /// Rips a track again and, when AccurateRip says the new rip is right, puts it in place of the library's file.
+    /// The track keeps its ID, so its plays, likes and playlists stay.
+    func ripAgain(_ disc: CDDisc, track number: Int) {
+        guard !disc.isRipping, !disc.isChecking, let track = disc.libraryTracks[number],
+              let source = disc.volume.trackFiles[number], let cd = disc.volume.toc.tracks.first(where: { $0.number == number }),
+              let destination = track.resolvedFileURL(root: model.libraryRoot), let row = disc.rows.firstIndex(where: { $0.id == number }) else { return }
+        let work = FileManager.default.temporaryDirectory.appendingPathComponent("MusicLibrary-CD-\(UUID().uuidString)")
+        let temp = work.appendingPathComponent(String(format: "%02d.flac", number))
+        let tools = model.tools
+        let toc = disc.volume.toc
+        let offset = disc.driveOffset ?? model.ripChecks[track.id]?.offset
+        disc.isRipping = true
+        disc.statusLine = "Ripping track \(number) again"
+        disc.rows[row].status = .ripping(0)
+        disc.task = Task { [weak self] in
+            defer {
+                try? FileManager.default.removeItem(at: work)
+                disc.isRipping = false
+                disc.statusLine = ""
+            }
+            do {
+                try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+                try await CDRipper(tools: tools).rip(source, to: temp, expectedDuration: toc.duration(of: cd)) { fraction in
+                    Task { @MainActor in
+                        guard let i = disc.rows.firstIndex(where: { $0.id == number }), disc.rows[i].status.isActive else { return }
+                        disc.rows[i].status = .ripping(fraction)
+                    }
+                }
+                guard let self else { return }
+                disc.rows[row].status = .importing
+                disc.statusLine = "Checking track \(number) with AccurateRip"
+                let report = try await self.model.rips.check(toc: toc, tracks: [number: track], volume: disc.volume, files: [number: temp],
+                                                             offsetHint: offset, save: false)
+                guard case .accurate? = report?.tracks[number] else {
+                    disc.rows[row].status = .failed("The new rip doesn't match either. Clean the disc and try again.")
+                    return
+                }
+                try await self.replaceFile(of: track, at: destination, with: temp)
+                self.model.saveRipChecks([RipCheck(trackId: track.id, toc: toc, discTrack: number, report: report)])
+                disc.rows[row].status = .done
+                self.model.reloadLibrary()
+            } catch is CancellationError {
+                disc.rows[row].status = .done
+            } catch {
+                disc.rows[row].status = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    /// Writes the new rip with the track's tags and cover next to the old file, then swaps them.
+    private func replaceFile(of track: Track, at destination: URL, with rip: URL) async throws {
+        let cover = track.coverURL(root: model.libraryRoot).flatMap { try? Data(contentsOf: $0) }
+        let staged = destination.deletingLastPathComponent().appendingPathComponent(".rerip-\(UUID().uuidString).\(destination.pathExtension)")
+        defer { try? FileManager.default.removeItem(at: staged) }
+        try await TagWriter(tools: model.tools).writeTaggedCopy(source: rip, destination: staged, metadata: track.metadata, cover: cover)
+        _ = try FileManager.default.replaceItemAt(destination, withItemAt: staged)
+        var updated = track
+        updated.sha256 = try ImportService.sha256(of: destination)
+        try model.database?.updateTrack(updated)
     }
 
     /// Rips the checked tracks to FLAC files and hands them to the normal import queue.

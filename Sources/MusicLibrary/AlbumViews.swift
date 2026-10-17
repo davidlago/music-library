@@ -110,14 +110,19 @@ struct AlbumDetail: View {
                     .buttonStyle(.bordered)
                 Menu {
                     QueueMenuButtons(player: model.player) { tracks }
+                    Divider()
+                    Button("Check with AccurateRip", systemImage: "checkmark.seal") { model.rips.check(album: album) }
+                        .disabled(model.rips.albumStates[AlbumInfoStore.key(album)] == .checking
+                                  || !tracks.contains(where: RipDiscMatcher.isCDAudio) || !model.ffmpegAvailable)
                 } label: { Image(systemName: "ellipsis") }
                     .menuStyle(.button).buttonStyle(.bordered).menuIndicator(.hidden).fixedSize()
-                    .help("Play Next or Add to Queue")
+                    .help("Play Next, Add to Queue or check the rip with AccurateRip")
             }
             .controlSize(.large)
             .disabled(tracks.isEmpty)
             .padding(.top, 6)
             listening(info).padding(.top, 8)
+            AlbumRipSummary(album: album, tracks: tracks)
         }
     }
 
@@ -451,6 +456,7 @@ struct AlbumTrackRow: View {
                 }
             }
             Spacer()
+            RipCheckMark(check: model.ripChecks[track.id])
             LikeButton(model: model, track: track, showsUnliked: hovering)
             if let plays = total?.plays, plays > 0 {
                 Text("\(plays)×").font(.caption).foregroundStyle(.subtext).monospacedDigit().help("\(plays) plays")

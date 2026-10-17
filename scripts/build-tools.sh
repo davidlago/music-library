@@ -53,12 +53,12 @@ join() { local IFS=,; echo "$*"; }
 
 DEMUXERS=(aac ac3 aiff eac3 flac mov mp3 ogg wav w64 asf gif image2 image2pipe
     image_bmp_pipe image_gif_pipe image_jpeg_pipe image_png_pipe image_tiff_pipe image_webp_pipe)
-MUXERS=(flac mp3 ipod mp4 mov image2 image2pipe)
+MUXERS=(flac mp3 ipod mp4 mov image2 image2pipe pcm_s16le)
 DECODERS=(aac alac flac mp3 mp3float mp2 mp2float vorbis opus wmav1 wmav2 ac3 eac3
     pcm_s8 pcm_u8 pcm_s16le pcm_s16be pcm_s24le pcm_s24be pcm_s32le pcm_s32be
     pcm_f32le pcm_f32be pcm_f64le pcm_f64be pcm_alaw pcm_mulaw
     mjpeg png webp gif bmp tiff)
-ENCODERS=(flac mjpeg)
+ENCODERS=(flac mjpeg pcm_s16le)
 PARSERS=(aac ac3 flac mpegaudio opus vorbis mjpeg png webp gif bmp)
 BSFS=(aac_adtstoasc)
 FILTERS=(abuffer abuffersink buffer buffersink aformat anull aresample format null scale transpose hflip vflip)

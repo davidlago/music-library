@@ -103,6 +103,8 @@ final class AppModel {
     var dnaDepth: Int { didSet { UserDefaults.standard.set(dnaDepth, forKey: Keys.dnaDepth) } }
     /// Listening history per track.
     private(set) var playTotals: [Int64: PlayTotal] = [:]
+    /// What AccurateRip said about tracks ripped from CDs, by track ID.
+    private(set) var ripChecks: [Int64: RipCheck] = [:]
     /// Listening history per album artist (keyed by `ArtistInfoStore.key`).
     private(set) var artistPlayTotals: [String: PlayTotal] = [:]
     /// Listening history per album (keyed by `AlbumInfoStore.key`).
@@ -198,6 +200,7 @@ final class AppModel {
     @ObservationIgnored private var terminationObserver: NSObjectProtocol?
     @ObservationIgnored private(set) var importer: ImportController!
     @ObservationIgnored private(set) var cd: CDController!
+    @ObservationIgnored private(set) var rips: RipChecker!
     @ObservationIgnored private var keyMonitor: Any?
 
     init() {
@@ -251,6 +254,7 @@ final class AppModel {
         }
         importer = ImportController(model: self)
         cd = CDController(model: self)
+        rips = RipChecker(model: self)
         let matcher = outputMatcher
         terminationObserver = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -360,6 +364,7 @@ final class AppModel {
             playlists = try db.playlists()
             smartPlaylists = try db.smartPlaylists()
             likedDates = try db.likedTrackDates()
+            ripChecks = try db.ripChecks()
             playTotals = try db.playTotals()
             totalTracks = tracks.count
             trackByID = Dictionary(tracks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
@@ -915,6 +920,16 @@ final class AppModel {
     }
 
     func toggleLike(_ track: Track) { setLiked([track], !isLiked(track)) }
+
+    func saveRipChecks(_ checks: [RipCheck]) {
+        guard let db = database, !checks.isEmpty else { return }
+        do {
+            try db.saveRipChecks(checks)
+            for c in checks { ripChecks[c.trackId] = c }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
 
     func exportPlaylist(_ playlist: Playlist) {
         export(name: playlist.name, tracks: playlistTracks(playlist.id))
