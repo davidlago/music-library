@@ -21,9 +21,9 @@ final class RipChecker {
     init(model: AppModel) { self.model = model }
 
     /// Checks `tracks` (by their number on the disc `toc`) and saves the results. `volume` is the disc when it's in
-    /// the drive: tracks that weren't ripped are read from it at their edges, for the drive's offset. `files`
-    /// replaces a track's library file (a fresh rip being checked before it replaces the file).
-    func check(toc: CDTOC, tracks: [Int: Track], volume: AudioCDVolume? = nil, files override: [Int: URL] = [:],
+    /// the drive: tracks that weren't ripped are read from it at their edges, for the drive's offset. `samples`
+    /// replaces a track's library file (a fresh rip being checked before it replaces the file), by track number.
+    func check(toc: CDTOC, tracks: [Int: Track], volume: AudioCDVolume? = nil, samples: [Int: [UInt32]] = [:],
                offsetHint: Int? = nil, save: Bool = true) async throws -> AccurateRipReport? {
         let disc = AccurateRipDisc(toc: toc)
         let pressings: [AccurateRipPressing]?
@@ -38,14 +38,16 @@ final class RipChecker {
             var files: [Int: URL] = [:]
             var discFiles: [Int: URL] = [:]
             for (index, cd) in toc.audioTracks.enumerated() {
-                if let url = override[cd.number] {
-                    files[index] = url
-                } else if let t = tracks[cd.number], RipDiscMatcher.isCDAudio(t), let url = t.resolvedFileURL(root: model.libraryRoot) {
+                // A track given in memory is read from there (the overlay below).
+                if samples[cd.number] == nil, let t = tracks[cd.number], RipDiscMatcher.isCDAudio(t),
+                   let url = t.resolvedFileURL(root: model.libraryRoot) {
                     files[index] = url
                 }
                 if let url = volume?.trackFiles[cd.number] { discFiles[index] = url }
             }
-            let source = RipAudioSource(toc: toc, files: files, disc: discFiles, tools: model.tools)
+            var inMemory: [Int: [UInt32]] = [:]
+            for (index, cd) in toc.audioTracks.enumerated() { inMemory[index] = samples[cd.number] }
+            let source = AccurateRipAudioOverlay(base: RipAudioSource(toc: toc, files: files, disc: discFiles, tools: model.tools), tracks: inMemory)
             report = try await AccurateRipVerifier(toc: toc, pressings: pressings)
                 .verify(tracks.keys.sorted(), audio: source, offsetHint: offsetHint)
         }

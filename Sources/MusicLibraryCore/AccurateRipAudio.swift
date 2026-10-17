@@ -62,10 +62,36 @@ public struct CDTrackAudioFile: Sendable {
         defer { try? handle.close() }
         try handle.seek(toOffset: dataStart + UInt64(range.lowerBound) * 4)
         guard let data = try handle.read(upToCount: range.count * 4), data.count == range.count * 4 else { return nil }
+        return words(data)
+    }
+
+    /// The whole track, read from the disc again: the system's file cache is bypassed, so each read of a damaged spot
+    /// is a new attempt by the drive. Reads in 5-second chunks, reporting progress and stopping when cancelled.
+    public func readAll(progress: @Sendable (Double) -> Void = { _ in }) async throws -> [UInt32] {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        _ = fcntl(handle.fileDescriptor, F_NOCACHE, 1)
+        try handle.seek(toOffset: dataStart)
+        let total = sampleCount * 4
+        var data = Data()
+        data.reserveCapacity(total)
+        while data.count < total {
+            try Task.checkCancellation()
+            guard let chunk = try handle.read(upToCount: min(5 * 75 * AccurateRip.samplesPerSector * 4, total - data.count)), !chunk.isEmpty else {
+                throw CDAudioError.unreadable(url.lastPathComponent)
+            }
+            data.append(chunk)
+            progress(Double(data.count) / Double(total))
+        }
+        return words(data)
+    }
+
+    /// 16-bit stereo frames as AccurateRip words (left in the low half).
+    private func words(_ data: Data) -> [UInt32] {
         let littleEndian = littleEndian
         return data.withUnsafeBytes { raw in
             let b = raw.bindMemory(to: UInt8.self)
-            return (0..<range.count).map { i in
+            return (0..<(data.count / 4)).map { i in
                 let p = i * 4
                 if littleEndian { return UInt32(b[p]) | UInt32(b[p + 1]) << 8 | UInt32(b[p + 2]) << 16 | UInt32(b[p + 3]) << 24 }
                 let left = UInt32(b[p]) << 8 | UInt32(b[p + 1]), right = UInt32(b[p + 2]) << 8 | UInt32(b[p + 3])
@@ -101,6 +127,28 @@ public enum PCMDecoder {
                 return UInt32(b[p]) | UInt32(b[p + 1]) << 8 | UInt32(b[p + 2]) << 16 | UInt32(b[p + 3]) << 24
             }
         }
+    }
+}
+
+public enum PCMEncoder {
+    /// Writes CD audio (AccurateRip words) as a FLAC file like a rip's, through a WAV file ffmpeg reads.
+    public static func writeFLAC(_ samples: [UInt32], to url: URL, tools: ToolLocator) async throws {
+        let ffmpeg = try tools.require("ffmpeg")
+        let wav = url.deletingLastPathComponent().appendingPathComponent(".\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: wav) }
+        let size = UInt32(samples.count * 4)
+        var header = Data()
+        func add(_ text: String) { header.append(contentsOf: Array(text.utf8)) }
+        func add32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { header.append(contentsOf: $0) } }
+        func add16(_ v: UInt16) { withUnsafeBytes(of: v.littleEndian) { header.append(contentsOf: $0) } }
+        add("RIFF"); add32(36 + size); add("WAVE")
+        add("fmt "); add32(16); add16(1); add16(2); add32(44100); add32(44100 * 4); add16(4); add16(16)
+        add("data"); add32(size)
+        // In memory (little-endian on every Mac) each word is a left/right pair of 16-bit samples, as WAV stores them.
+        var file = header
+        samples.withUnsafeBytes { file.append(contentsOf: $0) }
+        try file.write(to: wav)
+        _ = try await ProcessRunner.run(ffmpeg, ["-nostdin", "-v", "error", "-y", "-i", wav.path, "-c:a", "flac", "-compression_level", "8", url.path])
     }
 }
 

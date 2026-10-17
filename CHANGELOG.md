@@ -17,8 +17,10 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 - **Check rips with AccurateRip.** After ripping a CD, each track is compared with other people's rips of the same CD
   in [AccurateRip](https://www.accuraterip.com): **Accurate** means it's bit for bit the same as theirs, **Misread** means
   the drive got part of it wrong (a scratch or smudge), which you'd otherwise only notice as a skip or glitch when
-  listening. **Rip Again** rips a misread track again and replaces it only once AccurateRip confirms the new rip, keeping
-  its plays, likes and playlists; the disc isn't ejected while a track is misread. Checking a track that's already in the
+  listening. **Rip Again** reads a misread track up to 5 times, combining the reads sample by sample (a damaged spot
+  reads differently each time, so the value most reads agree on can be right where no single read is), and replaces it
+  only once AccurateRip confirms the result, keeping its plays, likes and playlists; if 5 reads aren't enough, **Try
+  Extra Hard** reads it up to 10 times; the disc isn't ejected while a track is misread. Checking a track that's already in the
   library on the CD page and ripping it does the same, instead of adding a second copy. Albums ripped before can be checked
   too, without the disc: **Check with AccurateRip** in the **…** menu of an album page finds the CD they were ripped
   from on MusicBrainz. Misread tracks are marked on album pages (hover over the mark for what it means). Rips of

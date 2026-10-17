@@ -226,6 +226,20 @@ public protocol AccurateRipAudioSource: Sendable {
     func samples(track index: Int, range: Range<Int>) async throws -> [UInt32]?
 }
 
+/// Audio with some tracks' samples in memory (a track being ripped again), the others read from `base`.
+public struct AccurateRipAudioOverlay: AccurateRipAudioSource {
+    let base: AccurateRipAudioSource
+    let tracks: [Int: [UInt32]]
+
+    /// `tracks` are keyed by the track's index among the disc's audio tracks.
+    public init(base: AccurateRipAudioSource, tracks: [Int: [UInt32]]) { self.base = base; self.tracks = tracks }
+
+    public func samples(track index: Int, range: Range<Int>) async throws -> [UInt32]? {
+        guard let own = tracks[index] else { return try await base.samples(track: index, range: range) }
+        return range.lowerBound >= 0 && range.upperBound <= own.count ? Array(own[range]) : nil
+    }
+}
+
 public struct AccurateRipReport: Sendable, Equatable {
     public enum Result: Sendable, Equatable {
         /// Bit for bit the same as `confidence` other rips.

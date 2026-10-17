@@ -101,5 +101,10 @@ private func rippedTracks(_ toc: CDTOC, codec: String = "flac", bitDepth: Int = 
         // Left and right are different tones: the left channel is the low half.
         #expect(decoded[1000] & 0xFFFF != decoded[1000] >> 16)
         #expect(throws: CDAudioError.self) { try CDTrackAudioFile(url: flac) }
+        // Reading the whole track again gives the same samples, and they write back to FLAC unchanged.
+        #expect(try await file.readAll() == decoded)
+        let written = dir.appendingPathComponent("written.flac")
+        try await PCMEncoder.writeFLAC(decoded, to: written, tools: ToolLocator())
+        #expect(try await PCMDecoder.samples(of: written, tools: ToolLocator()) == decoded)
     }
 }

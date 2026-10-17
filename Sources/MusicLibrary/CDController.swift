@@ -47,6 +47,8 @@ final class CDDisc: Identifiable {
     var libraryTracks: [Int: Track] = [:]
     var isChecking = false
     var checkError: String?
+    /// Tracks still misread after ripping them again, which more reads (Try Extra Hard) might get right.
+    var tryHarder: Set<Int> = []
     /// Where this disc's rip lined up with AccurateRip's (`AccurateRipReport.offset`), for checking a track ripped again.
     var matchOffset: Int?
     @ObservationIgnored var task: Task<Void, Never>?
@@ -268,9 +270,11 @@ final class CDController {
                 if let existing = disc.libraryTracks[number] {
                     guard let self else { break }
                     do {
-                        if case .kept(let reason) = try await self.ripInPlace(disc, track: number, replacing: existing, work: work) {
+                        disc.tryHarder.remove(number)
+                        if case .kept(let reason, let tryHarder) = try await self.ripInPlace(disc, track: number, replacing: existing, work: work) {
                             failures += 1
                             if let i = disc.rows.firstIndex(where: { $0.id == number }) { disc.rows[i].status = .failed(reason) }
+                            if tryHarder { disc.tryHarder.insert(number) }
                         }
                     } catch is CancellationError {
                         if let i = disc.rows.firstIndex(where: { $0.id == number }) { disc.rows[i].status = .inLibrary }
@@ -340,8 +344,8 @@ final class CDController {
         }
     }
 
-    /// Rips a misread track again (`ripInPlace`).
-    func ripAgain(_ disc: CDDisc, track number: Int) {
+    /// Rips a misread track again (`ripInPlace`), reading it up to `passes` times.
+    func ripAgain(_ disc: CDDisc, track number: Int, passes: Int = CDController.readPasses) {
         guard !disc.isRipping, !disc.isChecking, let track = disc.libraryTracks[number],
               let row = disc.rows.firstIndex(where: { $0.id == number }) else { return }
         let work = FileManager.default.temporaryDirectory.appendingPathComponent("MusicLibrary-CD-\(UUID().uuidString)")
@@ -356,8 +360,10 @@ final class CDController {
             }
             guard let self else { return }
             do {
-                if case .kept(let reason) = try await self.ripInPlace(disc, track: number, replacing: track, work: work) {
+                disc.tryHarder.remove(number)
+                if case .kept(let reason, let tryHarder) = try await self.ripInPlace(disc, track: number, replacing: track, work: work, passes: passes) {
                     disc.rows[row].status = .failed(reason)
+                    if tryHarder { disc.tryHarder.insert(number) }
                 }
             } catch is CancellationError {
                 disc.rows[row].status = previous
@@ -367,55 +373,85 @@ final class CDController {
         }
     }
 
-    enum InPlaceOutcome { case replaced, kept(String) }
+    enum InPlaceOutcome {
+        case replaced
+        /// The earlier rip stays; `tryHarder` when more reads might still get it right.
+        case kept(String, tryHarder: Bool)
+    }
+
+    /// How many times ripping a track again reads it at most, normally and when trying extra hard.
+    static let readPasses = 5
+    static let extraHardPasses = 10
 
     /// Rips a track that's already in the library again and swaps the new rip in for the library's file, keeping the
-    /// track (its ID, so its plays, likes and playlists). The new rip is kept unless AccurateRip says it's misread, or
-    /// the earlier rip was accurate and the new one can't be checked.
-    private func ripInPlace(_ disc: CDDisc, track number: Int, replacing track: Track, work: URL) async throws -> InPlaceOutcome {
-        guard let source = disc.volume.trackFiles[number], let cd = disc.volume.toc.tracks.first(where: { $0.number == number }),
-              let destination = track.resolvedFileURL(root: model.libraryRoot) else { throw CDError.missingTrackFile(number) }
+    /// track (its ID, so its plays, likes and playlists). While AccurateRip says the rip is misread, the track is read
+    /// again, up to `passes` times, and the reads are combined sample by sample (`ReadVote`): a damaged spot reads
+    /// differently each time, so the values most reads agree on can be right where no single read is. The new rip is
+    /// kept unless it's still misread, or the earlier rip was accurate and the new one can't be confirmed.
+    private func ripInPlace(_ disc: CDDisc, track number: Int, replacing track: Track, work: URL,
+                            passes: Int = CDController.readPasses) async throws -> InPlaceOutcome {
         let toc = disc.volume.toc
-        let temp = work.appendingPathComponent(String(format: "%02d-again.flac", number))
-        defer { try? FileManager.default.removeItem(at: temp) }
-        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        guard let source = disc.volume.trackFiles[number], let cd = toc.audioTracks.first(where: { $0.number == number }),
+              let destination = track.resolvedFileURL(root: model.libraryRoot) else { throw CDError.missingTrackFile(number) }
+        let file = try CDTrackAudioFile(url: source)
+        guard file.sampleCount == toc.sectors(of: cd) * AccurateRip.samplesPerSector else { throw CDError.missingTrackFile(number) }
         func setStatus(_ status: CDDisc.RowStatus) {
             if let i = disc.rows.firstIndex(where: { $0.id == number }) { disc.rows[i].status = status }
         }
-        setStatus(.ripping(0))
-        try await CDRipper(tools: model.tools).rip(source, to: temp, expectedDuration: toc.duration(of: cd)) { fraction in
-            Task { @MainActor in
-                guard let i = disc.rows.firstIndex(where: { $0.id == number }), disc.rows[i].status.isActive else { return }
-                disc.rows[i].status = .ripping(fraction)
-            }
-        }
-        setStatus(.importing)
         let earlier = model.ripChecks[track.id]
-        var report: AccurateRipReport?
-        var checked = true
-        do {
-            report = try await model.rips.check(toc: toc, tracks: [number: track], volume: disc.volume, files: [number: temp],
-                                                offsetHint: disc.matchOffset ?? earlier?.offset, save: false)
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            checked = false
+        var vote: ReadVote?
+        for pass in 1...passes {
+            disc.statusLine = pass == 1 ? "Ripping track \(number) again" : "Reading track \(number) again: \(pass) of \(passes)"
+            setStatus(.ripping(Double(pass - 1) / Double(passes)))
+            let read = try await file.readAll { fraction in
+                Task { @MainActor in
+                    guard let i = disc.rows.firstIndex(where: { $0.id == number }), disc.rows[i].status.isActive else { return }
+                    disc.rows[i].status = .ripping((Double(pass - 1) + fraction) / Double(passes))
+                }
+            }
+            if vote == nil {
+                vote = ReadVote(first: read)
+            } else {
+                let identical = vote!.add(read)
+                if pass == 2, identical {
+                    return .kept("The drive reads this track the same way every time, so more reads won't help: the disc is likely damaged there.",
+                                 tryHarder: false)
+                }
+            }
+            // Two reads that differ can't outvote each other: read a third time first.
+            if pass == 2 { continue }
+            let samples = vote!.result
+            setStatus(.importing)
+            disc.statusLine = "Checking track \(number) with AccurateRip"
+            var report: AccurateRipReport?
+            var checked = true
+            do {
+                report = try await model.rips.check(toc: toc, tracks: [number: track], volume: disc.volume, samples: [number: samples],
+                                                    offsetHint: disc.matchOffset ?? earlier?.offset, save: false)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                checked = false
+            }
+            if let offset = report?.offset { disc.matchOffset = offset }
+            if report?.tracks[number] == .inaccurate { continue }
+            var accurate = false
+            if case .accurate? = report?.tracks[number] { accurate = true }
+            if earlier?.result == .accurate, !accurate {
+                return .kept("The new rip couldn't be confirmed by AccurateRip, so the earlier, accurate rip was kept.", tryHarder: false)
+            }
+            try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+            let temp = work.appendingPathComponent(String(format: "%02d-again.flac", number))
+            defer { try? FileManager.default.removeItem(at: temp) }
+            try await PCMEncoder.writeFLAC(samples, to: temp, tools: model.tools)
+            try await replaceFile(of: track, at: destination, with: temp)
+            model.saveRipChecks([checked ? RipCheck(trackId: track.id, toc: toc, discTrack: number, report: report)
+                                         : RipCheck(trackId: track.id, toc: toc, discTrack: number, result: .unchecked)])
+            setStatus(.done)
+            model.reloadLibrary()
+            return .replaced
         }
-        if let offset = report?.offset { disc.matchOffset = offset }
-        var accurate = false
-        if case .accurate? = report?.tracks[number] { accurate = true }
-        if report?.tracks[number] == .inaccurate {
-            return .kept("Still misread, so the earlier rip was kept. Clean the disc and try again.")
-        }
-        if earlier?.result == .accurate, !accurate {
-            return .kept("The new rip couldn't be confirmed by AccurateRip, so the earlier, accurate rip was kept.")
-        }
-        try await replaceFile(of: track, at: destination, with: temp)
-        model.saveRipChecks([checked ? RipCheck(trackId: track.id, toc: toc, discTrack: number, report: report)
-                                     : RipCheck(trackId: track.id, toc: toc, discTrack: number, result: .unchecked)])
-        setStatus(.done)
-        model.reloadLibrary()
-        return .replaced
+        return .kept("Still misread after \(vote?.reads ?? passes) reads, so the earlier rip was kept.", tryHarder: passes < CDController.extraHardPasses)
     }
 
     /// Writes the new rip with the track's tags and cover next to the old file, then swaps them.

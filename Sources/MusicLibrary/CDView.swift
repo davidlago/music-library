@@ -179,7 +179,7 @@ struct CDView: View {
                 Text("Title").frame(maxWidth: .infinity, alignment: .leading)
                 Text("Artist").frame(width: 180, alignment: .leading)
                 Text("Time").frame(width: 50, alignment: .trailing)
-                Text("Status").frame(width: 170, alignment: .leading)
+                Text("Status").frame(width: 250, alignment: .leading)
             }
             .font(.caption.bold()).foregroundStyle(.subtext)
 
@@ -192,7 +192,7 @@ struct CDView: View {
                     Text(row.title).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                     Text(row.artist).lineLimit(1).foregroundStyle(.subtext).frame(width: 180, alignment: .leading)
                     Text(formatTime(row.duration)).monospacedDigit().foregroundStyle(.subtext).frame(width: 50, alignment: .trailing)
-                    statusView(row).frame(width: 170, alignment: .leading)
+                    statusView(row).frame(width: 250, alignment: .leading)
                 }
             }
         }
@@ -201,14 +201,24 @@ struct CDView: View {
 
     @ViewBuilder
     private func statusView(_ row: CDDisc.Row) -> some View {
-        if row.status == .done || row.status == .inLibrary, let track = disc.libraryTracks[row.id], let check = model.ripChecks[track.id],
+        if case .failed(let message) = row.status, disc.tryHarder.contains(row.id) {
+            HStack(spacing: 8) {
+                Label("Still misread", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red).font(.caption).lineLimit(1)
+                    .help(message)
+                Button("Try Extra Hard") { model.cd.ripAgain(disc, track: row.id, passes: CDController.extraHardPasses) }
+                    .controlSize(.small)
+                    .disabled(disc.isRipping || disc.isChecking)
+                    .help("Read the track up to \(CDController.extraHardPasses) times, combining the reads, and keep the result if AccurateRip confirms it")
+            }
+        } else if row.status == .done || row.status == .inLibrary, let track = disc.libraryTracks[row.id], let check = model.ripChecks[track.id],
            check.result == .inaccurate {
             HStack(spacing: 8) {
                 RipMisreadLabel(check: check)
                 Button("Rip Again") { model.cd.ripAgain(disc, track: row.id) }
                     .controlSize(.small)
                     .disabled(disc.isRipping || disc.isChecking)
-                    .help("Rip the track again and keep the new rip if AccurateRip confirms it")
+                    .help("Read the track up to \(CDController.readPasses) times, combining the reads, and keep the result if AccurateRip confirms it")
             }
         } else {
             plainStatus(row.status)

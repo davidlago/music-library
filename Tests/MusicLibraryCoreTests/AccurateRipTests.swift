@@ -174,4 +174,44 @@ private func database(_ audio: [UInt32] = discAudio) -> [AccurateRipPressing] {
         let report = try await AccurateRipVerifier(toc: discTOC, pressings: database()).verify([1, 2], audio: rip)
         #expect(report.tracks == [1: .accurate(confidence: 40), 2: .unknown])
     }
+
+    @Test func combinesReadsSampleBySample() {
+        // Each read gets a few samples wrong, in different places: the majority is the true audio.
+        let truth = randomAudio(50_000, seed: 3)
+        func read(_ errors: [Int]) -> [UInt32] {
+            var r = truth
+            for i in errors { r[i] ^= 0x0001_0001 }
+            return r
+        }
+        var vote = ReadVote(first: read([10, 20_000]))
+        let second = vote.add(read([10, 30_000])), third = vote.add(read([40_000]))
+        #expect(!second && !third)
+        #expect(vote.reads == 3)
+        #expect(vote.disagreements == 4)
+        // Sample 10 was misread twice out of three: the majority is wrong there; the other spots are right.
+        let combined = vote.result
+        #expect(combined[10] == truth[10] ^ 0x0001_0001)
+        #expect(combined[20_000] == truth[20_000] && combined[30_000] == truth[30_000] && combined[40_000] == truth[40_000])
+        let sameAsFirst = vote.add(read([10, 20_000]))
+        #expect(sameAsFirst)
+        // Two reads that disagree: a tie, so the first read's value.
+        var pair = ReadVote(first: read([5]))
+        pair.add(read([6]))
+        #expect(pair.result == read([5]))
+        // A read of another length isn't counted.
+        let wrongLength = pair.add([1, 2, 3])
+        #expect(!wrongLength && pair.reads == 2)
+    }
+
+    @Test func checksATrackHeldInMemory() async throws {
+        // The rip being checked comes from memory; the tracks around it from the disc.
+        var damaged = discAudio
+        damaged[discLengths[0] + 100_000] ^= 0x0001_0000
+        let disc = SimulatedDisc(audio: damaged, lengths: discLengths)
+        let verifier = AccurateRipVerifier(toc: discTOC, pressings: database())
+        #expect(try await verifier.verify([2], audio: disc, offsetHint: 0).tracks == [2: .inaccurate])
+        let fixed = AccurateRipAudioOverlay(base: disc, tracks: [1: Array(track(1))])
+        #expect(try await verifier.verify([2], audio: fixed, offsetHint: 0).tracks == [2: .accurate(confidence: 40)])
+    }
 }
+
