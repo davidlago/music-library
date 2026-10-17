@@ -34,18 +34,41 @@ public struct PurchaseDay: Hashable, Comparable, Codable, Sendable {
     public static func < (a: PurchaseDay, b: PurchaseDay) -> Bool { (a.year, a.month, a.day) < (b.year, b.month, b.day) }
 }
 
-/// An album you own a copy of: when you bought it and what you paid, both optional. Saved per album
-/// (`SearchIndex.albumKey`) in the `album_ownership` table, apart from the tracks, so re-importing an album keeps it.
+/// An album you own a copy of: when you bought it, what you paid and the number on the sticker you put on the case,
+/// all optional. Saved per album (`SearchIndex.albumKey`) in the `album_ownership` table, apart from the tracks, so
+/// re-importing an album keeps it.
 public struct AlbumPurchase: Hashable, Sendable {
     public var album: String
     public var artist: String
     public var purchasedOn: PurchaseDay?
     /// In the user's currency. Never negative.
     public var price: Decimal?
+    /// The number on the label you stuck on your copy to find it on the shelf (`validLabelNumber`). Set on the Mac only.
+    public var labelNumber: Int? {
+        didSet { if let n = labelNumber, Self.validLabelNumber(n) == nil { labelNumber = nil } }
+    }
 
-    public init(album: String, artist: String, purchasedOn: PurchaseDay? = nil, price: Decimal? = nil) {
+    public init(album: String, artist: String, purchasedOn: PurchaseDay? = nil, price: Decimal? = nil, labelNumber: Int? = nil) {
         self.album = album; self.artist = artist; self.purchasedOn = purchasedOn
         self.price = price.flatMap(Self.validPrice)
+        self.labelNumber = labelNumber.flatMap(Self.validLabelNumber)
+    }
+
+    /// Label numbers run from 1 to `maxLabelNumber`.
+    public static let maxLabelNumber = 9_999_999
+
+    public static func validLabelNumber(_ n: Int) -> Int? { (1...maxLabelNumber).contains(n) ? n : nil }
+
+    /// The number to suggest for the next album you label: one past the highest in use (counting albums no longer in
+    /// the library, whose stickers are still on the shelf), or 1 for the first.
+    public static func nextLabelNumber(in purchases: [String: AlbumPurchase]) -> Int {
+        min((purchases.values.compactMap(\.labelNumber).max() ?? 0) + 1, maxLabelNumber)
+    }
+
+    /// Another album already labeled with this number, if any (the album with key `excluding` doesn't count).
+    public static func album(labeled number: Int, in purchases: [String: AlbumPurchase], excluding key: String?) -> AlbumPurchase? {
+        purchases.filter { $0.key != key && $0.value.labelNumber == number }
+            .min { ($0.value.album, $0.value.artist, $0.key) < ($1.value.album, $1.value.artist, $1.key) }?.value
     }
 
     /// The price if it's a usable amount (not NaN, not negative), else nil.
@@ -63,8 +86,9 @@ public struct AlbumPurchase: Hashable, Sendable {
     }
 }
 
-/// For the phone's ownership edits sent with a sync: the date and price as the database stores them, and checked
-/// again when read (they come from another device).
+/// For ownership edits sent with a sync by phones before 1.18 (now ownership is edited on the Mac only): the date and
+/// price as the database stores them, and checked again when read (they come from another device). There's no label
+/// number: the Mac keeps its own when it applies the change.
 extension AlbumPurchase: Codable {
     private enum CodingKeys: String, CodingKey { case album, artist, purchasedOn, price }
 
@@ -101,6 +125,7 @@ public struct OwnershipStats: Sendable {
         public var duration: Double
         public var purchasedOn: PurchaseDay?
         public var price: Decimal?
+        public var labelNumber: Int?
         /// All-time plays of the album's tracks.
         public var plays: Int
         public var listened: Double
@@ -157,6 +182,8 @@ public struct OwnershipStats: Sendable {
     public var unplayed: [OwnedAlbum] = []
     /// Owned albums without a purchase date or price.
     public var missingDetails: [OwnedAlbum] = []
+    /// Owned albums with a label number, in label order.
+    public var labeled: [OwnedAlbum] = []
 
     /// Spending per month or year, every period from the first purchase to now (or the last, if later).
     public var timeline: [Period] = []
@@ -200,7 +227,7 @@ public struct OwnershipStats: Sendable {
             guard let g = groups[key] else { continue }
             owned.append((OwnedAlbum(id: key, album: g.album, artist: g.artist, year: g.year, trackCount: g.tracks,
                                      duration: g.duration, purchasedOn: p.purchasedOn, price: p.price,
-                                     plays: g.plays, listened: g.listened), g.genres))
+                                     labelNumber: p.labelNumber, plays: g.plays, listened: g.listened), g.genres))
         }
         guard !owned.isEmpty else { return }
 
@@ -257,6 +284,8 @@ public struct OwnershipStats: Sendable {
             }
         }
         missingDetails = albums.filter { $0.purchasedOn == nil || $0.price == nil }
+        labeled = list.filter { $0.labelNumber != nil }
+            .sorted { $0.labelNumber! != $1.labelNumber! ? $0.labelNumber! < $1.labelNumber! : byTitle($0, $1) }
 
         // Spending over time: by month for up to two years of purchases, by year beyond that.
         if let first = dated.last?.purchasedOn, let last = dated.first?.purchasedOn {

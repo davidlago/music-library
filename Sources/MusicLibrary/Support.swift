@@ -38,8 +38,10 @@ struct CoverThumb: View {
     var size: CGFloat = 140
     /// Pass `AppModel.coverRevision` so a replaced cover.jpg is loaded again.
     var revision = 0
-    /// Draws the Owned badge in the corner (`model.purchase(for:) != nil`).
-    var owned = false
+    /// Your label number for the album (`model.purchase(for:)?.labelNumber`), drawn as a sticker in the corner.
+    var labelNumber: Int?
+    /// 0 for a booklet in a `JewelCase`.
+    var cornerRadius: CGFloat = 6
     @State private var image: NSImage?
 
     var body: some View {
@@ -50,10 +52,10 @@ struct CoverThumb: View {
                 Rectangle().fill(.quaternary)
                 Image(systemName: "music.note").font(.system(size: size / 3)).foregroundStyle(.subtext)
             }
-            if owned { OwnedBadge(size: size) }
+            if let labelNumber { LabelSticker(number: labelNumber, size: size) }
         }
         .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         .task(id: "\(url?.path ?? "")|\(revision)") {
             guard let url else { image = nil; return }
             let data = await Task.detached { try? Data(contentsOf: url) }.value
@@ -62,23 +64,26 @@ struct CoverThumb: View {
     }
 }
 
-/// A small disc in the top-right corner of an owned album's cover.
-struct OwnedBadge: View {
+/// The white sticker with your label number, in the top-right corner of a cover: like the one on the CD's case.
+struct LabelSticker: View {
+    let number: Int
+    /// The cover's size.
     let size: CGFloat
-    @Environment(\.theme) private var theme
+    /// Smaller on the big covers of album pages.
+    var scale: CGFloat = 1
 
     var body: some View {
-        let diameter = max(14, size * 0.13)
-        Image(systemName: "opticaldisc.fill")
-            .font(.system(size: diameter * 0.55, weight: .bold))
-            .foregroundStyle(theme.palette.map { Color($0.mantle) } ?? .white)
-            .frame(width: diameter, height: diameter)
-            .background(Circle().fill(theme.accent))
-            .shadow(color: .black.opacity(0.3), radius: 1.5, y: 0.5)
+        let font = max(9, size * 0.075 * scale)
+        Text(String(number))
+            .font(.system(size: font, weight: .semibold).monospacedDigit())
+            .foregroundStyle(Color(white: 0.1))
+            .padding(.horizontal, font * 0.45).padding(.vertical, font * 0.15)
+            .background(RoundedRectangle(cornerRadius: font * 0.25).fill(Color(white: 0.98)))
+            .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
             .padding(max(4, size * 0.04))
             .frame(width: size, height: size, alignment: .topTrailing)
             .allowsHitTesting(false)
-            .accessibilityHidden(true)
+            .accessibilityLabel("Label \(number)")
     }
 }
 

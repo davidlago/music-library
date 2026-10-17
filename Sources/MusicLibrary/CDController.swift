@@ -37,10 +37,13 @@ final class CDDisc: Identifiable {
     var searchArtist = ""
     var statusLine = ""
     var message: String?
-    /// Your answer to "Do you own this CD?" (nil until answered), with the purchase date and price.
+    /// Your answer to "Do you own this CD?" (nil until answered), with the purchase date, price and label number.
     var owned: Bool?
     var purchasedOn: PurchaseDay?
     var price: Decimal?
+    var labelNumber: Int?
+    /// Set once a label number was suggested (or came from the library), so clearing it doesn't bring it back.
+    var labelSuggested = false
     /// Set once ripping has started, from then on changes to the answer are saved right away.
     var ownershipSaved = false
     /// The library's tracks from this disc, by track number: ripped now or before (for checking them).
@@ -231,13 +234,29 @@ final class CDController {
         disc.owned = true
         disc.purchasedOn = p.purchasedOn
         disc.price = p.price
+        disc.labelNumber = p.labelNumber
+        disc.labelSuggested = true
+    }
+
+    /// The next number in your label series, past the ones saved and the ones suggested for other discs in the drives.
+    func nextLabelNumber() -> Int {
+        let pending = discs.filter { !$0.ownershipSaved && $0.owned == true }.compactMap(\.labelNumber)
+        return max(AlbumPurchase.nextLabelNumber(in: model.purchases), min((pending.max() ?? 0) + 1, AlbumPurchase.maxLabelNumber))
+    }
+
+    /// Answering yes for the first time fills in the next label number.
+    func suggestLabel(_ disc: CDDisc) {
+        guard disc.owned == true, !disc.labelSuggested else { return }
+        disc.labelSuggested = true
+        if disc.labelNumber == nil { disc.labelNumber = nextLabelNumber() }
     }
 
     /// Saves the answer for the matched album: owned with its details, or not owned. Unanswered changes nothing.
     func saveOwnership(_ disc: CDDisc) {
         guard let owned = disc.owned, let release = disc.release, let key = disc.albumKey else { return }
         model.setPurchase(owned ? AlbumPurchase(album: release.album, artist: release.albumArtist,
-                                                purchasedOn: disc.purchasedOn, price: disc.price) : nil,
+                                                purchasedOn: disc.purchasedOn, price: disc.price,
+                                                labelNumber: disc.labelNumber) : nil,
                           forKey: key)
     }
 

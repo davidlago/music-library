@@ -110,7 +110,8 @@ import Testing
     @Test func ownershipFromThePhoneIsAppliedOnceAndTheLatestWins() throws {
         let f = try SyncFixture()
         let key = SearchIndex.albumKey(album: "First", artist: "Artist")
-        let bought = AlbumPurchase(album: "ignored", artist: "ignored", purchasedOn: PurchaseDay(year: 2020, month: 5, day: 1), price: 9.5)
+        let bought = AlbumPurchase(album: "ignored", artist: "ignored", purchasedOn: PurchaseDay(year: 2020, month: 5, day: 1), price: 9.5,
+                                   labelNumber: 31)
         let events = [SyncEvent(track: f.tracks[0], at: Date(timeIntervalSince1970: 1000), kind: .purchase(bought))]
         var result = try f.db.applySyncEvents(events, libraryID: f.db.libraryID(), now: Date(timeIntervalSince1970: 1001))
         #expect(result.purchases == 1)
@@ -118,20 +119,27 @@ import Testing
         #expect(saved.album == "First")
         #expect(saved.price == 9.5)
         #expect(saved.purchasedOn == PurchaseDay(year: 2020, month: 5, day: 1))
+        #expect(saved.labelNumber == nil, "label numbers are set on the Mac only")
         #expect(try f.db.applySyncEvents(events, libraryID: nil).purchases == 0)
 
         // The Mac changed it after the phone did: the phone's older change loses.
-        try f.db.saveAlbumPurchase(key: key, AlbumPurchase(album: "First", artist: "Artist", price: 20), at: Date(timeIntervalSince1970: 3000))
+        try f.db.saveAlbumPurchase(key: key, AlbumPurchase(album: "First", artist: "Artist", price: 20, labelNumber: 7), at: Date(timeIntervalSince1970: 3000))
         let older = SyncEvent(track: f.tracks[1], at: Date(timeIntervalSince1970: 2000), kind: .purchase(nil))
         result = try f.db.applySyncEvents([older], libraryID: nil)
         #expect(result.purchases == 0)
         #expect(try f.db.albumPurchases()[key]?.price == 20)
+        // A newer change from the phone keeps the Mac's label number.
+        let repriced = SyncEvent(track: f.tracks[1], at: Date(timeIntervalSince1970: 3500), kind: .purchase(AlbumPurchase(album: "First", artist: "Artist", price: 18)))
+        #expect(try f.db.applySyncEvents([repriced], libraryID: nil).purchases == 1)
+        #expect(try f.db.albumPurchases()[key] == AlbumPurchase(album: "First", artist: "Artist", price: 18, labelNumber: 7))
         let newer = SyncEvent(track: f.tracks[1], at: Date(timeIntervalSince1970: 4000), kind: .purchase(nil))
         #expect(try f.db.applySyncEvents([newer], libraryID: nil).purchases == 1)
         #expect(try f.db.albumPurchases()[key] == nil)
 
         let overlay = SyncOutbox.purchases(base: [:], events: events + [older]) { _ in key }
         #expect(overlay[key] == nil)
+        let labeled = SyncOutbox.purchases(base: [key: AlbumPurchase(album: "First", artist: "Artist", labelNumber: 7)], events: events) { _ in key }
+        #expect(labeled[key]?.labelNumber == 7 && labeled[key]?.price == 9.5)
     }
 
     @Test func purchasesFromAnotherDeviceAreChecked() throws {
@@ -141,6 +149,8 @@ import Testing
         #expect(p.price == nil)
         let good = AlbumPurchase(album: "A", artist: "B", purchasedOn: PurchaseDay(year: 2021, month: 1, day: 2), price: Decimal(string: "12.99"))
         #expect(try JSONDecoder().decode(AlbumPurchase.self, from: try JSONEncoder().encode(good)) == good)
+        let labeled = String(decoding: try JSONEncoder().encode(AlbumPurchase(album: "A", artist: "B", labelNumber: 5)), as: UTF8.self)
+        #expect(!labeled.contains("label"), "label numbers stay on the Mac")
     }
 
     actor Box<T: Sendable> {

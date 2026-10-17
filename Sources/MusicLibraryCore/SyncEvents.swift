@@ -83,12 +83,14 @@ public final class SyncOutbox: @unchecked Sendable {
     }
 
     /// Owned albums after the outbox's ownership events, starting from the copy's. `albumKey` gives an event's
-    /// album (`SearchIndex.albumKey`) from its track.
+    /// album (`SearchIndex.albumKey`) from its track. Only versions before 1.18 edited ownership on the phone: their
+    /// events may still be waiting for a sync.
     public static func purchases(base: [String: AlbumPurchase], events: [SyncEvent], albumKey: (Int64) -> String?) -> [String: AlbumPurchase] {
         var owned = base
         for e in events.sorted(by: { $0.at < $1.at }) {
             guard case .purchase(let p) = e.kind, let key = albumKey(e.trackID) else { continue }
-            owned[key] = p
+            // Label numbers come from the Mac only, as when it applies the event.
+            owned[key] = p.map { var p = $0; p.labelNumber = base[key]?.labelNumber; return p }
         }
         return owned
     }
@@ -144,8 +146,11 @@ extension Database {
                     let key = SearchIndex.albumKey(album: track.album, artist: track.effectiveAlbumArtist)
                     let updated = try query("SELECT updated_at FROM album_ownership WHERE key=?", [.text(key)]) { $0.double(0) }.first ?? nil
                     if let updated, updated > e.at.timeIntervalSince1970 { continue }
+                    // Label numbers are only set on the Mac: the album keeps its own.
+                    let label = try albumPurchases()[key]?.labelNumber
                     try saveAlbumPurchase(key: key, purchase.map {
-                        AlbumPurchase(album: track.album, artist: track.effectiveAlbumArtist, purchasedOn: $0.purchasedOn, price: $0.price)
+                        AlbumPurchase(album: track.album, artist: track.effectiveAlbumArtist, purchasedOn: $0.purchasedOn, price: $0.price,
+                                      labelNumber: label)
                     }, at: e.at)
                     result.purchases += 1
                 }
