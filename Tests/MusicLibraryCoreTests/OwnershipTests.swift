@@ -54,6 +54,63 @@ import Testing
         #expect(p.purchasedOn == nil && p.price == nil)
     }
 
+    @Test func labelNumbersAreValidatedAndSaved() throws {
+        #expect(AlbumPurchase(album: "A", artist: "B", labelNumber: 0).labelNumber == nil)
+        #expect(AlbumPurchase(album: "A", artist: "B", labelNumber: -4).labelNumber == nil)
+        #expect(AlbumPurchase(album: "A", artist: "B", labelNumber: AlbumPurchase.maxLabelNumber + 1).labelNumber == nil)
+        var p = AlbumPurchase(album: "A", artist: "B", labelNumber: 7)
+        #expect(p.labelNumber == 7)
+        p.labelNumber = -1
+        #expect(p.labelNumber == nil)
+
+        let db = try Database(path: ":memory:")
+        try db.saveAlbumPurchase(key: "k", AlbumPurchase(album: "A", artist: "B", labelNumber: 42))
+        #expect(try db.albumPurchases()["k"]?.labelNumber == 42)
+        try db.exec("UPDATE album_ownership SET label_number='forty' WHERE key='k'")
+        #expect(try db.albumPurchases()["k"]?.labelNumber == nil)
+    }
+
+    @Test func nextLabelNumberFollowsTheHighest() {
+        #expect(AlbumPurchase.nextLabelNumber(in: [:]) == 1)
+        let purchases = [
+            "a": AlbumPurchase(album: "A", artist: "X", labelNumber: 3),
+            "b": AlbumPurchase(album: "B", artist: "X", labelNumber: 12),
+            "c": AlbumPurchase(album: "C", artist: "X"),
+            "d": AlbumPurchase(album: "D", artist: "X", labelNumber: 12),
+        ]
+        #expect(AlbumPurchase.nextLabelNumber(in: purchases) == 13)
+        #expect(AlbumPurchase.nextLabelNumber(in: ["z": AlbumPurchase(album: "Z", artist: "X", labelNumber: AlbumPurchase.maxLabelNumber)])
+                == AlbumPurchase.maxLabelNumber)
+        #expect(AlbumPurchase.album(labeled: 12, in: purchases, excluding: "b")?.album == "D")
+        #expect(AlbumPurchase.album(labeled: 3, in: purchases, excluding: "a") == nil)
+        #expect(AlbumPurchase.album(labeled: 5, in: purchases, excluding: nil) == nil)
+    }
+
+    /// A library from before label numbers gets the column when opened, and a snapshot of one (read-only, so never
+    /// migrated) reads without them.
+    @Test func ownershipTableFromBeforeLabelNumbers() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ownership-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let path = dir.appendingPathComponent("library.sqlite").path
+        do {
+            let db = try Database(path: path)
+            try db.exec("DROP TABLE album_ownership")
+            try db.exec("""
+            CREATE TABLE album_ownership(key TEXT PRIMARY KEY, album TEXT NOT NULL, artist TEXT NOT NULL,
+                purchased_on TEXT, price TEXT, updated_at REAL NOT NULL)
+            """)
+            try db.exec("INSERT INTO album_ownership(key,album,artist,purchased_on,price,updated_at) VALUES('k','A','B','2020-01-02','5',0)")
+            try db.exec("PRAGMA wal_checkpoint(TRUNCATE)")
+        }
+        let snapshot = try Database(snapshotAt: path)
+        #expect(try snapshot.albumPurchases()["k"] == AlbumPurchase(album: "A", artist: "B", purchasedOn: PurchaseDay(year: 2020, month: 1, day: 2), price: 5))
+
+        let db = try Database(path: path)
+        try db.saveAlbumPurchase(key: "k", AlbumPurchase(album: "A", artist: "B", labelNumber: 9))
+        #expect(try db.albumPurchases()["k"]?.labelNumber == 9)
+    }
+
     // MARK: Stats
 
     func key(_ album: String, _ artist: String) -> String { SearchIndex.albumKey(album: album, artist: artist) }

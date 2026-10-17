@@ -31,9 +31,13 @@ struct CDView: View {
         .onChange(of: disc.lookup) { _, new in
             if new == .matched { showWrongAlbum = !hasExactMatch }
         }
-        .onChange(of: disc.owned) { if disc.ownershipSaved { model.cd.saveOwnership(disc) } }
+        .onChange(of: disc.owned) {
+            model.cd.suggestLabel(disc)
+            if disc.ownershipSaved { model.cd.saveOwnership(disc) }
+        }
         .onChange(of: disc.purchasedOn) { if disc.ownershipSaved { model.cd.saveOwnership(disc) } }
         .onChange(of: disc.price) { if disc.ownershipSaved { model.cd.saveOwnership(disc) } }
+        .onChange(of: disc.labelNumber) { if disc.ownershipSaved { model.cd.saveOwnership(disc) } }
         .sheet(isPresented: $askOwnership) { CDOwnershipSheet(disc: disc) { model.cd.rip(disc) }.themedSheet() }
     }
 

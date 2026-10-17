@@ -7,6 +7,25 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.18.0
+
+- **Label numbers for your CDs.** When you say you own an album in the Mac app (on its page, or when ripping a CD),
+  give it the number on the sticker you put on the case, so you can find it on the shelf later. The next number in
+  your series is filled in for you, a number already used on another album is pointed out, and
+  **Insights › Owned › Your Albums** lists them **By Label**.
+- **Covers in jewel cases.** Album pages and the Albums grid, on the Mac and the iPhone, show each cover as a CD in
+  its jewel case: the ribbed hinge, the black tray, the tabs and the shine on the clear lid.
+- **Show only the CDs you own.** The Albums page has an **All Albums / Owned** switch on the Mac, and a filter
+  menu on the iPhone.
+- **Label stickers instead of the Owned badge.** The little disc on owned albums' covers is gone; an album with a
+  label number shows it on a small white sticker in the corner instead.
+- **Your Copy is read-only on the iPhone.** The album page shows the label number, purchase date and price, so you can
+  find the CD at home, but ownership is now edited only in the Mac app.
+- **Faster AccurateRip checks of an album.** Checking an album from its page stops as soon as one CD's listing
+  matches every track, no longer keeps the whole album's audio in memory, and shows which track it's on (and which
+  pressing, when several could be the CD you ripped), with **Cancel**. An album whose tracks all passed already isn't
+  checked again: the menu says **AccurateRip: All Tracks Accurate**.
+
 ## 1.17.0
 
 - **The iPhone app is on the App Store**, free, as

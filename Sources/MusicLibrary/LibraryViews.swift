@@ -100,6 +100,8 @@ struct SongsView: View {
 struct AlbumsView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("albumSort") private var sort = AlbumSort.artist
+    /// Only albums you own (`model.purchase(for:)`).
+    @AppStorage("albumsOwnedOnly") private var ownedOnly = false
 
     enum AlbumSort: String, CaseIterable, Identifiable {
         case added, title, artist, year, mostPlayed, recent
@@ -117,10 +119,16 @@ struct AlbumsView: View {
     }
 
     var body: some View {
-        let shown = sorted(model.albums)
+        let shown = sorted(ownedOnly ? model.albums.filter { model.purchase(for: $0) != nil } : model.albums)
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
+                    Picker("Show", selection: $ownedOnly) {
+                        Text("All Albums").tag(false)
+                        Text("Owned").tag(true)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    .help("Show only the albums you own")
                     Picker("Sort by", selection: $sort) {
                         ForEach(AlbumSort.allCases) { Text($0.label).tag($0) }
                     }
@@ -131,8 +139,11 @@ struct AlbumsView: View {
                     ForEach(shown) { a in
                         NavigationLink(value: a) {
                             VStack(alignment: .leading, spacing: 4) {
-                                CoverThumb(url: model.coverURL(forAlbum: a), size: 150, revision: model.coverRevision,
-                                           owned: model.purchase(for: a) != nil)
+                                JewelCase(width: 150) {
+                                    CoverThumb(url: model.coverURL(forAlbum: a), size: JewelCase<EmptyView>.bookletSide(width: 150),
+                                               revision: model.coverRevision, labelNumber: model.purchase(for: a)?.labelNumber, cornerRadius: 0)
+                                }
+                                .padding(.bottom, 4)
                                 Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.headline).lineLimit(1)
                                 Text(a.artist.isEmpty ? "Unknown Artist" : a.artist).font(.subheadline).foregroundStyle(.subtext).lineLimit(1)
                                 if let detail = detail(a) {
@@ -151,12 +162,20 @@ struct AlbumsView: View {
                         }
                     }
                 }
+                if shown.isEmpty, !model.albums.isEmpty {
+                    // Below the controls, not over them, so the filter can be switched back.
+                    ContentUnavailableView("No Owned Albums", systemImage: "opticaldisc",
+                                           description: Text("Turn on \u{201C}I own this album\u{201D} on an album's page."))
+                        .padding(.top, 40)
+                }
             }
             .padding(20)
         }
-        .overlay { if model.albums.isEmpty { ContentUnavailableView("No Albums", systemImage: "square.stack") } }
+        .overlay {
+            if model.albums.isEmpty { ContentUnavailableView("No Albums", systemImage: "square.stack") }
+        }
         .navigationTitle("Albums")
-        .navigationSubtitle(model.albums.count == 1 ? "1 album" : "\(model.albums.count) albums")
+        .navigationSubtitle(shown.count == 1 ? "1 album" : "\(shown.count) albums")
     }
 
     private func key(_ a: AlbumSummary) -> String { AlbumInfoStore.key(a) }

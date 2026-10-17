@@ -248,35 +248,68 @@ struct AlbumGrid: View {
     @Environment(PhoneModel.self) private var model
     let albums: [AlbumSummary]
     let library: LibrarySnapshot
+    /// Only albums you own (`model.purchase(for:)`).
+    @AppStorage("albumsOwnedOnly") private var ownedOnly = false
 
     var body: some View {
+        let shown = ownedOnly ? albums.filter { model.purchase(for: $0) != nil } : albums
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 20) {
-                ForEach(albums) { album in
-                    NavigationLink(value: album) { AlbumCell(album: album, library: library) }
+                ForEach(shown) { album in
+                    NavigationLink(value: album) { AlbumCell(album: album, library: library, jewelCase: true) }
                         .buttonStyle(.plain)
                         .contextMenu { AlbumMenu(album: album) }
                 }
             }
             .padding()
         }
+        .overlay {
+            if ownedOnly, shown.isEmpty, !albums.isEmpty {
+                ContentUnavailableView("No Owned Albums", systemImage: "opticaldisc",
+                                       description: Text("Albums you mark as owned in Music Library on your Mac show up here."))
+            }
+        }
+        .toolbar {
+            Menu {
+                Picker("Show", selection: $ownedOnly) {
+                    Label("All Albums", systemImage: "square.stack").tag(false)
+                    Label("Owned", systemImage: "opticaldisc").tag(true)
+                }
+            } label: {
+                Image(systemName: ownedOnly ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+            }
+            .accessibilityLabel("Filter")
+        }
     }
 }
 
-/// A cover with the title and artist; dimmed when none of its songs are on the phone.
+/// A cover (in its jewel case in the album grid) with the title and artist; dimmed when none of its songs are on the
+/// phone.
 struct AlbumCell: View {
     @Environment(PhoneModel.self) private var model
     let album: AlbumSummary
     let library: LibrarySnapshot
     var size: CGFloat = 160
     var subtitle: String?
+    var jewelCase = false
 
     var body: some View {
         let tracks = library.tracks(album: album)
         let availability = model.availability(tracks)
         VStack(alignment: .leading, spacing: 4) {
-            CoverImage(url: library.coverURL(album: album), size: size, owned: model.purchase(for: album) != nil)
-                .opacity(availability == .notOnPhone ? 0.55 : 1)
+            Group {
+                let label = model.purchase(for: album)?.labelNumber
+                if jewelCase {
+                    JewelCase(width: size) {
+                        CoverImage(url: library.coverURL(album: album), size: JewelCase<EmptyView>.bookletSide(width: size),
+                                   labelNumber: label, cornerRadius: 0)
+                    }
+                    .padding(.bottom, 4)
+                } else {
+                    CoverImage(url: library.coverURL(album: album), size: size, labelNumber: label)
+                }
+            }
+            .opacity(availability == .notOnPhone ? 0.55 : 1)
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(album.album.isEmpty ? "Unknown Album" : album.album).font(.subheadline).lineLimit(1)
                 Spacer(minLength: 0)

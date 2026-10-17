@@ -120,13 +120,10 @@ public enum PCMDecoder {
             "-nostdin", "-v", "error", "-i", url.path, "-map", "0:a:0", "-f", "s16le", "-c:a", "pcm_s16le", "-",
         ])
         let data = result.stdout
-        return data.withUnsafeBytes { raw in
-            let b = raw.bindMemory(to: UInt8.self)
-            return (0..<(data.count / 4)).map { i in
-                let p = i * 4
-                return UInt32(b[p]) | UInt32(b[p + 1]) << 8 | UInt32(b[p + 2]) << 16 | UInt32(b[p + 3]) << 24
-            }
-        }
+        // Copied as is: little-endian on every Mac, which is how the words are laid out.
+        var samples = [UInt32](repeating: 0, count: data.count / 4)
+        samples.withUnsafeMutableBytes { _ = data.copyBytes(to: $0, count: $0.count) }
+        return samples
     }
 }
 
@@ -181,7 +178,7 @@ public actor RipAudioSource: AccurateRipAudioSource {
                 if decoded.count > 3 { decoded.removeFirst() }
             }
             guard lengths.indices.contains(index), all.count == lengths[index], range.lowerBound >= 0, range.upperBound <= all.count else { return nil }
-            return Array(all[range])
+            return range == all.indices ? all : Array(all[range])
         }
         if let url = disc[index] { return try CDTrackAudioFile(url: url).samples(range) }
         return nil

@@ -246,7 +246,16 @@ public final class Database: @unchecked Sendable {
         }
         // Tables only the Mac uses, added without a schema change (see `createRipChecksTable`).
         try createRipChecksTable()
+        // Added without a schema change too: older phones read the table's other columns by name, so synced copies
+        // stay readable there.
+        if try !columns(of: "album_ownership").contains("label_number") {
+            try exec("ALTER TABLE album_ownership ADD COLUMN label_number INTEGER")
+        }
         try exec("PRAGMA user_version=\(Self.schemaVersion)")
+    }
+
+    func columns(of table: String) throws -> Set<String> {
+        Set(try query("SELECT name FROM pragma_table_info(?)", [.text(table)]) { $0.string(0) ?? "" })
     }
 
     /// This library's identity (made once, kept in exports, backups and synced copies). Nil in a snapshot from a
@@ -566,17 +575,19 @@ public final class Database: @unchecked Sendable {
             try exec("DELETE FROM album_ownership WHERE key=?", [.text(key)])
             return
         }
-        try exec("INSERT OR REPLACE INTO album_ownership(key,album,artist,purchased_on,price,updated_at) VALUES(?,?,?,?,?,?)",
+        try exec("INSERT OR REPLACE INTO album_ownership(key,album,artist,purchased_on,price,label_number,updated_at) VALUES(?,?,?,?,?,?,?)",
                  [.text(key), .text(p.album), .text(p.artist), .text(p.purchasedOn?.string),
-                  .text(AlbumPurchase.priceText(p.price)), .double(date.timeIntervalSince1970)])
+                  .text(AlbumPurchase.priceText(p.price)), .int(p.labelNumber), .double(date.timeIntervalSince1970)])
     }
 
-    /// Owned albums by key. Dates and prices that don't parse (the file may come from elsewhere) read as unknown.
+    /// Owned albums by key. Dates, prices and label numbers that don't parse (the file may come from elsewhere) read
+    /// as unknown, and so do label numbers in a snapshot from a version before them.
     public func albumPurchases() throws -> [String: AlbumPurchase] {
-        let rows = try query("SELECT key, album, artist, purchased_on, price FROM album_ownership") { r in
+        let label = try columns(of: "album_ownership").contains("label_number") ? "label_number" : "NULL"
+        let rows = try query("SELECT key, album, artist, purchased_on, price, \(label) FROM album_ownership") { r in
             (r.string(0) ?? "", AlbumPurchase(album: r.string(1) ?? "", artist: r.string(2) ?? "",
                                               purchasedOn: r.string(3).flatMap(PurchaseDay.init(string:)),
-                                              price: AlbumPurchase.price(text: r.string(4))))
+                                              price: AlbumPurchase.price(text: r.string(4)), labelNumber: r.int(5)))
         }
         return Dictionary(rows, uniquingKeysWith: { a, _ in a })
     }

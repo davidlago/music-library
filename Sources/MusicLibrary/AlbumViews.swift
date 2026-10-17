@@ -78,6 +78,13 @@ struct AlbumDetail: View {
         }
     }
 
+    /// Every CD-quality track already checked accurate: their audio doesn't change (Rip Again checks a track itself), so
+    /// there's nothing to check again.
+    private var allAccurate: Bool {
+        let cd = tracks.filter(RipDiscMatcher.isCDAudio)
+        return !cd.isEmpty && cd.allSatisfy { model.ripChecks[$0.id]?.result == .accurate }
+    }
+
     private func load() {
         tracks = model.tracks(of: album)
         model.ensureAlbumInfo(album)
@@ -116,9 +123,11 @@ struct AlbumDetail: View {
                 Menu {
                     QueueMenuButtons(player: model.player) { tracks }
                     Divider()
-                    Button("Check with AccurateRip", systemImage: "checkmark.seal") { model.rips.check(album: album) }
-                        .disabled(model.rips.albumStates[AlbumInfoStore.key(album)] == .checking
-                                  || !tracks.contains(where: RipDiscMatcher.isCDAudio) || !model.ffmpegAvailable)
+                    Button(allAccurate ? "AccurateRip: All Tracks Accurate" : "Check with AccurateRip", systemImage: "checkmark.seal") {
+                        model.rips.check(album: album)
+                    }
+                    .disabled(allAccurate || model.rips.albumStates[AlbumInfoStore.key(album)] == .checking
+                              || !tracks.contains(where: RipDiscMatcher.isCDAudio) || !model.ffmpegAvailable)
                     Divider()
                     RemoveFromLibraryButton(album: album)
                 } label: { Image(systemName: "ellipsis") }
@@ -133,36 +142,39 @@ struct AlbumDetail: View {
         }
     }
 
-    /// The cover, with "Change Cover…" on hover (or "Add Cover…" when there is none); dropping an image on it opens
-    /// the cover sheet with that image.
+    /// The cover in its jewel case, with your label sticker, and "Change Cover…" on hover (or "Add Cover…" when there is none); dropping an
+    /// image on it opens the cover sheet with that image.
     private func coverArt(size: CGFloat) -> some View {
-        ZStack(alignment: .bottomTrailing) {
-            Group {
-                if let cover {
-                    Image(nsImage: cover).resizable().scaledToFill()
-                } else {
-                    ZStack {
-                        Rectangle().fill(theme.fill)
-                        VStack(spacing: 12) {
-                            Image(systemName: "music.note").font(.system(size: size / 4)).foregroundStyle(.subtext)
-                            if !tracks.isEmpty {
-                                Button("Add Cover…") { coverSheet = CoverSheetRequest() }
-                            }
+        let side = JewelCase<EmptyView>.bookletSide(width: size)
+        return JewelCase(width: size) {
+            if let cover {
+                Image(nsImage: cover).resizable().scaledToFill()
+                    .frame(width: side, height: side).clipped()
+                    .overlay { if let n = model.purchase(for: album)?.labelNumber { LabelSticker(number: n, size: side, scale: 2 / 3) } }
+            } else {
+                ZStack {
+                    Rectangle().fill(theme.fill)
+                    VStack(spacing: 12) {
+                        Image(systemName: "music.note").font(.system(size: side / 4)).foregroundStyle(.subtext)
+                        if !tracks.isEmpty {
+                            Button("Add Cover…") { coverSheet = CoverSheetRequest() }
                         }
                     }
                 }
             }
-            .frame(width: size, height: size)
+        }
+        .overlay(alignment: .bottomTrailing) {
             if cover != nil, hoveringCover, !tracks.isEmpty {
                 Button { coverSheet = CoverSheetRequest() } label: { Label("Change Cover…", systemImage: "photo") }
                     .controlSize(.small)
-                    .padding(10)
+                    .padding(14)
             }
         }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay { if coverDropTargeted { RoundedRectangle(cornerRadius: 12).strokeBorder(theme.accent, lineWidth: 3) } }
-        .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
+        .overlay {
+            if coverDropTargeted {
+                RoundedRectangle(cornerRadius: JewelCase<EmptyView>.cornerRadius(width: size)).strokeBorder(theme.accent, lineWidth: 3)
+            }
+        }
         .onHover { hoveringCover = $0 }
         .contextMenu {
             Button(cover == nil ? "Add Cover…" : "Change Cover…") { coverSheet = CoverSheetRequest() }.disabled(tracks.isEmpty)

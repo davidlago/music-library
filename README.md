@@ -256,10 +256,11 @@ You need a Mac with Xcode 27 or later, an iPhone on iOS 27 or later with a USB c
    songs from the phone at once and tells the Mac to stop syncing them. Or choose it on the Mac with **Add to iPhone** in
    any album, artist, playlist or song menu; the Mac's **iPhone** page shows the list, including what was taken off the
    phone, and **Sync Now** there works while the iPhone's Sync tab is open.
-4. Each sync also brings back what you did on the phone: songs you liked or unliked there, albums you marked as owned
-   (with when you bought them and what you paid) and what you listened to, so the Mac's Liked Songs, Insights and album
-   pages include the phone. If the Mac is connected to Last.fm and the phone isn't, the sync connects the phone with the
-   Mac's account; the Mac's concert settings come along too, for concerts on artist pages.
+4. Each sync also brings back what you did on the phone: songs you liked or unliked there and what you listened to, so
+   the Mac's Liked Songs, Insights and album pages include the phone. Albums you own show on the phone's album pages
+   with their label numbers, dates and prices; you mark them in the Mac app. If the Mac is connected to Last.fm and the
+   phone isn't, the sync connects the phone with the Mac's account; the Mac's concert settings come along too, for
+   concerts on artist pages.
 
 For a big first load, copying through Finder is faster than Wi-Fi: export the list to a folder with the database option
 on, select the iPhone in Finder's sidebar, open the **Files** tab and drag the folder onto **Music Library**. Later syncs

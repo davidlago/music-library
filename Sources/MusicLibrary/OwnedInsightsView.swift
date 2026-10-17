@@ -160,7 +160,7 @@ struct OwnedAlbumsCard: View {
     @Environment(\.theme) private var theme
     @Environment(AppModel.self) private var model
     let stats: OwnershipStats
-    enum Shelf: String, CaseIterable { case recent = "Recent", priciest = "Priciest", value = "Best Value", unplayed = "Unplayed", missing = "Needs Details" }
+    enum Shelf: String, CaseIterable { case recent = "Recent", priciest = "Priciest", value = "Best Value", unplayed = "Unplayed", labeled = "By Label", missing = "Needs Details" }
     @State private var list = Shelf.recent
     @State private var expanded = false
     @State private var hovered: String?
@@ -192,6 +192,7 @@ struct OwnedAlbumsCard: View {
         case .priciest: stats.albums.filter { $0.price != nil }.sorted { $0.price! > $1.price! }
         case .value: stats.bestValue
         case .unplayed: stats.unplayed
+        case .labeled: stats.labeled
         case .missing: stats.missingDetails
         }
     }
@@ -202,6 +203,7 @@ struct OwnedAlbumsCard: View {
         case .priciest: "What you paid most for"
         case .value: "Lowest cost per play"
         case .unplayed: "Owned but never played here"
+        case .labeled: "In the order of their label numbers"
         case .missing: "Owned, without a purchase date or price"
         }
     }
@@ -235,6 +237,7 @@ struct OwnedAlbumsCard: View {
     private func primary(_ a: OwnershipStats.OwnedAlbum, _ list: Shelf) -> String {
         switch list {
         case .value: a.pricePerPlay.map { "\(formatMoney($0)) a play" } ?? ""
+        case .labeled: a.labelNumber.map { "#\($0)" } ?? ""
         case .missing:
             a.purchasedOn == nil && a.price == nil ? "No date or price" : (a.purchasedOn == nil ? "No date" : "No price")
         default: a.price.map { formatMoney($0) } ?? "—"
@@ -244,8 +247,10 @@ struct OwnedAlbumsCard: View {
     private func secondary(_ a: OwnershipStats.OwnedAlbum, _ list: Shelf) -> String? {
         switch list {
         case .value: "\(playCount(a.plays)) · \(a.price.map { formatMoney($0) } ?? "")"
-        case .missing: nil
-        default: a.purchasedOn.map(dayLabel)
+        case .missing: a.labelNumber.map { "#\($0)" }
+        case .labeled: [a.price.map { formatMoney($0) }, a.purchasedOn.map(dayLabel)].compactMap { $0 }.joined(separator: " · ")
+        default:
+            if let day = a.purchasedOn.map(dayLabel) { a.labelNumber.map { "#\($0) · \(day)" } ?? day } else { a.labelNumber.map { "#\($0)" } }
         }
     }
 }

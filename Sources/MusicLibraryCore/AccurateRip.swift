@@ -155,25 +155,32 @@ struct AccurateRipTrackAudio {
         return from < to && low <= high ? low...high : nil
     }
 
+    // The loops over a track's samples are `while` loops: in a Debug build a `for` over a range calls the iterator
+    // through generic witnesses, which makes a check take minutes instead of seconds.
+
     /// The original (v1) checksum at every offset, in one pass: Σ (i + 1) · sample[i + offset] over the checksummed
     /// samples, modulo 2³², updated from one offset to the next with the running sum of the samples.
     func v1Checksums(_ range: ClosedRange<Int>) -> [UInt32] {
         samples.withUnsafeBufferPointer { s in
             let base = lead + range.lowerBound
             var crc: UInt32 = 0, sum: UInt32 = 0
-            for i in from..<to {
+            var i = from
+            while i < to {
                 let x = s[base + i]
                 crc &+= x &* UInt32(truncatingIfNeeded: i + 1)
                 sum &+= x
+                i += 1
             }
             var result = [UInt32](repeating: 0, count: range.count)
             let f = UInt32(truncatingIfNeeded: from), t = UInt32(truncatingIfNeeded: to)
-            for k in 0..<range.count {
+            var k = 0
+            while k < range.count {
                 result[k] = crc
                 guard k + 1 < range.count else { break }
                 let first = s[base + k + from], next = s[base + k + to]
                 crc = crc &- sum &- f &* first &+ t &* next
                 sum = sum &- first &+ next
+                k += 1
             }
             return result
         }
@@ -184,10 +191,12 @@ struct AccurateRipTrackAudio {
         samples.withUnsafeBufferPointer { s in
             var low: UInt32 = 0, high: UInt32 = 0
             let base = lead + offset
-            for i in from..<to {
+            var i = from
+            while i < to {
                 let product = UInt64(s[base + i]) &* UInt64(i + 1)
                 low &+= UInt32(truncatingIfNeeded: product)
                 high &+= UInt32(truncatingIfNeeded: product >> 32)
+                i += 1
             }
             return (low, low &+ high)
         }
@@ -201,18 +210,22 @@ struct AccurateRipTrackAudio {
         let n = range.count + size
         guard count >= (AccurateRip.offsetFindingSector + 1) * size, start >= 0, start + n <= samples.count else { return nil }
         var sums = [UInt32](repeating: 0, count: n + 1), weighted = [UInt32](repeating: 0, count: n + 1)
-        for i in 0..<n {
+        var i = 0
+        while i < n {
             let x = samples[start + i]
             sums[i + 1] = sums[i] &+ x
             weighted[i + 1] = weighted[i] &+ x &* UInt32(truncatingIfNeeded: i)
+            i += 1
         }
         // Σ over the sector at k of (i − k + 1) · x[i] = Σ i · x[i] − (k − 1) · Σ x[i].
         var result = [UInt32](repeating: 0, count: range.count)
-        for k in 0..<range.count {
+        var k = 0
+        while k < range.count {
             let weightedSum: UInt32 = weighted[k + size] &- weighted[k]
             let sum: UInt32 = sums[k + size] &- sums[k]
             let factor = UInt32(truncatingIfNeeded: k - 1)
             result[k] = weightedSum &- factor &* sum
+            k += 1
         }
         return result
     }
@@ -268,17 +281,25 @@ public struct AccurateRipVerifier: Sendable {
     private struct Match { var track: Int; var offset: Int; var confidence: Int }
 
     /// Checks `trackNumbers` (CD track numbers). `offsetHint` is the drive's offset found earlier for this disc, used
-    /// when the rip alone can't establish it (checking one track again).
-    public func verify(_ trackNumbers: [Int], audio: AccurateRipAudioSource, offsetHint: Int? = nil) async throws -> AccurateRipReport {
+    /// when the rip alone can't establish it (checking one track again). `progress` is told how many of the tracks were
+    /// read so far, out of how many.
+    public func verify(_ trackNumbers: [Int], audio: AccurateRipAudioSource, offsetHint: Int? = nil,
+                       progress: (@Sendable (_ done: Int, _ total: Int) async -> Void)? = nil) async throws -> AccurateRipReport {
         let tracks = toc.audioTracks
+        let checked = tracks.indices.filter { trackNumbers.contains(tracks[$0].number) }
         var matches: [Match] = []
-        var loaded: [Int: AccurateRipTrackAudio] = [:]
-        for index in tracks.indices where trackNumbers.contains(tracks[index].number) {
+        // The offsets each track allows, and the audio of those that matched nothing yet, for the pass at the rip's
+        // offset below: a whole album's audio would take a gigabyte.
+        var offsets: [Int: ClosedRange<Int>] = [:]
+        var unmatched: [Int: AccurateRipTrackAudio] = [:]
+        for (done, index) in checked.enumerated() {
             try Task.checkCancellation()
+            await progress?(done, checked.count)
             guard let track = try await load(index, audio: audio), let range = track.offsets else { continue }
-            loaded[index] = track
+            offsets[index] = range
             let entries = pressings.compactMap { $0.tracks.indices.contains(index) ? $0.tracks[index] : nil }.filter { !$0.isEmpty }
             guard !entries.isEmpty else { continue }
+            defer { if !matches.contains(where: { $0.track == index }) { unmatched[index] = track } }
             // Drive offsets: v1 checksums at every one.
             let drive = max(range.lowerBound, -AccurateRip.maxOffset)...min(range.upperBound, AccurateRip.maxOffset)
             for (k, crc) in track.v1Checksums(drive).enumerated() {
@@ -288,9 +309,13 @@ public struct AccurateRipVerifier: Sendable {
             // track checked there (v2, or v1).
             let withSector450 = entries.filter { $0.sector450 != 0 }
             if !withSector450.isEmpty, let s450 = track.sector450Checksums(range) {
+                // Several pressings often match at the same offset: the whole track is summed once there.
+                var sumsAt: [Int: (v1: UInt32, v2: UInt32)] = [:]
                 for (k, crc) in s450.enumerated() {
                     for e in withSector450 where e.sector450 == crc {
-                        let offset = range.lowerBound + k, sums = track.checksums(at: offset)
+                        let offset = range.lowerBound + k
+                        let sums = sumsAt[offset] ?? track.checksums(at: offset)
+                        sumsAt[offset] = sums
                         if sums.v1 == e.checksum || sums.v2 == e.checksum {
                             matches.append(Match(track: index, offset: offset, confidence: e.confidence))
                         }
@@ -298,6 +323,7 @@ public struct AccurateRipVerifier: Sendable {
                 }
             }
         }
+        await progress?(checked.count, checked.count)
         // The rip's offset: the one most tracks agree on, weighted by confidence.
         var weight: [Int: Int] = [:]
         for (offset, group) in Dictionary(grouping: matches, by: \.offset) {
@@ -306,7 +332,7 @@ public struct AccurateRipVerifier: Sendable {
         let offset = weight.max { $0.value != $1.value ? $0.value < $1.value : abs($0.key) > abs($1.key) }?.key ?? offsetHint
         // Entries without a sector 450 checksum can only be checked at a known offset.
         if let offset {
-            for (index, track) in loaded where !matches.contains(where: { $0.track == index }) {
+            for (index, track) in unmatched {
                 guard track.offsets?.contains(offset) == true else { continue }
                 let sums = track.checksums(at: offset)
                 for p in pressings where p.tracks.indices.contains(index) && !p.tracks[index].isEmpty
@@ -322,7 +348,7 @@ public struct AccurateRipVerifier: Sendable {
             let listed = pressings.contains { $0.tracks.indices.contains(index) && !$0.tracks[index].isEmpty }
             if let best {
                 results[tracks[index].number] = .accurate(confidence: best)
-            } else if let offset, loaded[index]?.offsets?.contains(offset) == true, listed {
+            } else if let offset, offsets[index]?.contains(offset) == true, listed {
                 results[tracks[index].number] = .inaccurate
             } else {
                 results[tracks[index].number] = .unknown
@@ -353,7 +379,11 @@ public struct AccurateRipVerifier: Sendable {
             after = try await audio.samples(track: index + 1, range: 0..<n) ?? []
             if after.count != n { after = [] }
         }
-        return AccurateRipTrackAudio(samples: before + own + after, lead: before.count, count: count, isFirst: isFirst, isLast: isLast)
+        var samples = before
+        samples.reserveCapacity(before.count + own.count + after.count)
+        samples.append(contentsOf: own)
+        samples.append(contentsOf: after)
+        return AccurateRipTrackAudio(samples: samples, lead: before.count, count: count, isFirst: isFirst, isLast: isLast)
     }
 }
 

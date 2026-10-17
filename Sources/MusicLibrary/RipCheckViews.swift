@@ -58,7 +58,12 @@ struct AlbumRipSummary: View {
         let checks = tracks.compactMap { model.ripChecks[$0.id] }.filter { $0.result != .unchecked }
         Group {
             if state == .checking {
-                HStack(spacing: 6) { ProgressView().controlSize(.small); Text("Checking with AccurateRip…") }
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text(checkingText(model.rips.albumProgress[AlbumInfoStore.key(album)]))
+                    Button("Cancel") { model.rips.cancel(album: album) }
+                        .buttonStyle(.link)
+                }
             } else if case .failed(let message)? = state {
                 Label("Couldn't check with AccurateRip: \(message)", systemImage: "exclamationmark.circle").foregroundStyle(.red)
             } else if state == .noDisc {
@@ -70,6 +75,14 @@ struct AlbumRipSummary: View {
         }
         .font(.callout)
         .foregroundStyle(.subtext)
+    }
+
+    /// "Checking with AccurateRip: track 3 of 12", and which pressing when several CDs could be the one ripped.
+    private func checkingText(_ progress: RipChecker.AlbumProgress?) -> String {
+        guard let progress, progress.tracks > 0 else { return "Checking with AccurateRip…" }
+        var text = "Checking with AccurateRip: track \(min(progress.track + 1, progress.tracks)) of \(progress.tracks)"
+        if progress.discs > 1 { text += ", pressing \(progress.disc) of \(progress.discs)" }
+        return text + "…"
     }
 
     @ViewBuilder

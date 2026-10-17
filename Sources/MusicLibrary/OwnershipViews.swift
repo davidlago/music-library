@@ -66,9 +66,49 @@ struct PurchasePriceField: View {
     }
 }
 
+/// The number on the sticker on your copy, saved as you type (digits only; anything else clears it). While empty it
+/// offers `suggestion`, the next number in your series, and `taken` names another album with the same number.
+struct LabelNumberField: View {
+    @Binding var number: Int?
+    let suggestion: Int
+    var taken: AlbumPurchase?
+    @State private var text = ""
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text("#").foregroundStyle(.subtext)
+            TextField("Label number", text: $text, prompt: Text(String(suggestion)))
+                .textFieldStyle(.roundedBorder)
+                .labelsHidden()
+                .frame(width: 70)
+                .help("The number on the label you put on this CD")
+                .onSubmit { text = Self.format(number) }
+            if number == nil {
+                Button("Use \(suggestion)") { number = suggestion }
+                    .help("The next number in your series")
+            } else if let taken {
+                Label("Also on \(taken.album)", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange).lineLimit(1)
+                    .help("\(taken.album) — \(taken.artist) has this number too")
+            }
+        }
+        .onAppear { text = Self.format(number) }
+        .onChange(of: text) { let n = Self.parse(text); if n != number { number = n } }
+        .onChange(of: number) { if Self.parse(text) != number { text = Self.format(number) } }
+    }
+
+    static func format(_ number: Int?) -> String { number.map(String.init) ?? "" }
+
+    static func parse(_ text: String) -> Int? {
+        let s = text.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        return Int(s).flatMap(AlbumPurchase.validLabelNumber)
+    }
+}
+
 // MARK: Album page
 
-/// "Your Copy" on the album page: whether you own the album and, if so, when you bought it and what you paid.
+/// "Your Copy" on the album page: whether you own the album and, if so, when you bought it, what you paid and its
+/// label number (the next in the series when you first say you own it).
 struct AlbumOwnershipSection: View {
     @Environment(AppModel.self) private var model
     let album: AlbumSummary
@@ -93,6 +133,13 @@ struct AlbumOwnershipSection: View {
                         Text("Paid").foregroundStyle(.subtext)
                         PurchasePriceField(price: field(\.price))
                     }
+                    GridRow {
+                        Text("Label").foregroundStyle(.subtext)
+                        LabelNumberField(number: field(\.labelNumber), suggestion: AlbumPurchase.nextLabelNumber(in: model.purchases),
+                                         taken: purchase.labelNumber.flatMap {
+                                             AlbumPurchase.album(labeled: $0, in: model.purchases, excluding: AlbumInfoStore.key(album))
+                                         })
+                    }
                 }
                 .font(.callout)
                 if let summary = summary(purchase) {
@@ -105,7 +152,8 @@ struct AlbumOwnershipSection: View {
 
     private func setOwned(_ on: Bool) {
         if on {
-            model.setPurchase(draft ?? AlbumPurchase(album: album.album, artist: album.artist), for: album)
+            model.setPurchase(draft ?? AlbumPurchase(album: album.album, artist: album.artist,
+                                                     labelNumber: AlbumPurchase.nextLabelNumber(in: model.purchases)), for: album)
         } else {
             draft = model.purchase(for: album)
             model.setPurchase(nil, for: album)
@@ -136,8 +184,8 @@ struct AlbumOwnershipSection: View {
 
 // MARK: CD ripping
 
-/// "Do you own this CD?" with the purchase date and price, shown above a matched disc's tracks. The answer is saved
-/// for the album when ripping starts, and again on any change after that.
+/// "Do you own this CD?" with the purchase date, price and label number, shown above a matched disc's tracks. The
+/// answer is saved for the album when ripping starts, and again on any change after that.
 struct CDOwnershipPanel: View {
     @Bindable var disc: CDDisc
 
@@ -152,12 +200,25 @@ struct CDOwnershipPanel: View {
                 PurchaseDateField(day: $disc.purchasedOn)
                 Text("Paid").foregroundStyle(.subtext)
                 PurchasePriceField(price: $disc.price)
+                Text("Label").foregroundStyle(.subtext)
+                CDLabelNumberField(disc: disc)
             }
             Spacer(minLength: 0)
         }
         .font(.callout)
         .padding(.horizontal, 14).padding(.vertical, 8)
         .background(Color.secondary.opacity(0.06))
+    }
+}
+
+/// The disc's label number; another album with the same number is pointed out.
+struct CDLabelNumberField: View {
+    @Environment(AppModel.self) private var model
+    @Bindable var disc: CDDisc
+
+    var body: some View {
+        LabelNumberField(number: $disc.labelNumber, suggestion: model.cd.nextLabelNumber(),
+                         taken: disc.labelNumber.flatMap { AlbumPurchase.album(labeled: $0, in: model.purchases, excluding: disc.albumKey) })
     }
 }
 
@@ -197,6 +258,10 @@ struct CDOwnershipSheet: View {
                         Text("Paid").foregroundStyle(.subtext)
                         PurchasePriceField(price: $disc.price)
                     }
+                    GridRow {
+                        Text("Label").foregroundStyle(.subtext)
+                        CDLabelNumberField(disc: disc)
+                    }
                 }
             }
             Text("You can change this later on the album's page.").font(.caption).foregroundStyle(.subtext)
@@ -208,6 +273,6 @@ struct CDOwnershipSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 400)
+        .frame(width: 440)
     }
 }

@@ -9,11 +9,11 @@ import UIKit
 /// it changes (a sync, or an export dragged in through Finder's Files tab). The snapshot lists the whole library;
 /// only the songs whose files are here play, and the rest can be asked for (`requests`, sent at each sync, which
 /// starts as soon as the Mac is around). Also connects the player to Last.fm, keeps the play queue across launches,
-/// and records plays, likes and ownership changes for the Mac (`outbox`, sent at each sync). Keeps the widgets' and the
+/// and records plays and likes for the Mac (`outbox`, sent at each sync). Keeps the widgets' and the
 /// watch's summary up to date (`glance`, `watch`) and runs their commands (`perform`).
 ///
 /// Until there's a library of your own, it can show the sample library (`showSample`): fictional albums inside the
-/// app, opened read-only. What happens in it (likes, plays, ownership, the queue) is kept apart (`sampleOutbox`,
+/// app, opened read-only. What happens in it (likes, plays, the queue) is kept apart (`sampleOutbox`,
 /// its own player state), never sent to the Mac or Last.fm, and dropped once your own library arrives.
 @Observable
 final class PhoneModel {
@@ -40,7 +40,7 @@ final class PhoneModel {
     let scrobbler = Scrobbler(openURL: { UIApplication.shared.open($0) })
     let sync = PhoneSync()
     let concerts = PhoneConcerts()
-    /// Plays, likes and ownership changes since the last sync.
+    /// Plays and likes since the last sync (and ownership changes from versions that could edit it here).
     @ObservationIgnored let outbox = SyncOutbox(url: URL.applicationSupportDirectory.appendingPathComponent("sync-outbox.json"))
     /// The same, for the sample library; never sent anywhere.
     @ObservationIgnored let sampleOutbox = SyncOutbox(url: URL.applicationSupportDirectory.appendingPathComponent("sample-outbox.json"))
@@ -328,13 +328,6 @@ final class PhoneModel {
     // MARK: Ownership
 
     func purchase(for album: AlbumSummary) -> AlbumPurchase? { purchases[SearchIndex.albumKey(album: album.album, artist: album.artist)] }
-
-    /// Records that you own the album (with nil, that you don't); the change goes to the Mac at the next sync.
-    func setPurchase(_ purchase: AlbumPurchase?, for album: AlbumSummary) {
-        guard self.purchase(for: album) != purchase, let track = library?.tracks(album: album).first else { return }
-        activeOutbox.append(SyncEvent(track: track, at: Date(), kind: .purchase(purchase)))
-        refreshPurchases(activeOutbox.events)
-    }
 
     // MARK: Availability, downloads and removals
 

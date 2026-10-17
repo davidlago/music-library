@@ -82,10 +82,12 @@ private struct AlbumPageContent: View {
 
     private var header: some View {
         VStack(spacing: 8) {
-            CoverImage(url: library.coverURL(album: album), size: 270)
-                .shadow(color: .black.opacity(0.3), radius: 18, y: 8)
-                .padding(.top, 8)
-                .padding(.bottom, 8)
+            JewelCase(width: 310) {
+                CoverImage(url: library.coverURL(album: album), size: JewelCase<EmptyView>.bookletSide(width: 310),
+                           labelNumber: model.purchase(for: album)?.labelNumber, labelScale: 2 / 3, cornerRadius: 0)
+            }
+            .padding(.top, 8)
+            .padding(.bottom, 8)
             Text(typeLine).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.secondary)
             Text(title).font(.title2.bold()).multilineTextAlignment(.center).textSelection(.enabled)
             artistButton
@@ -416,97 +418,43 @@ struct AlbumTrackList: View {
 
 // MARK: Your copy
 
-/// "Your Copy": whether you own the album and, if so, when you bought it and what you paid. Changes go to the Mac
-/// at the next sync.
+/// "Your Copy": the album's label number (to find the CD on the shelf), when you bought it and what you paid, as set
+/// in the Mac app. Read-only here, and shown only for albums you own.
 struct AlbumOwnershipSection: View {
     @Environment(PhoneModel.self) private var model
     let album: AlbumSummary
     /// All-time plays of the album's tracks.
     let plays: Int
-    /// What was entered before switching ownership off, restored if it's switched back on.
-    @State private var draft: AlbumPurchase?
-    @State private var priceText = ""
-    @FocusState private var priceFocused: Bool
 
     var body: some View {
-        let purchase = model.purchase(for: album)
-        VStack(alignment: .leading, spacing: 8) {
-            SectionHeader(title: "Your Copy")
-            VStack(spacing: 0) {
-                Toggle("I own this album", isOn: Binding(get: { purchase != nil }, set: { setOwned($0) }))
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                if let purchase {
-                    Divider().padding(.leading, 14)
-                    HStack {
-                        Text("Bought")
-                        Spacer()
-                        if let day = purchase.purchasedOn {
-                            DatePicker("Purchase date", selection: Binding(get: { day.date() }, set: { update(\.purchasedOn, PurchaseDay($0)) }),
-                                       in: ...Date(), displayedComponents: .date)
-                                .labelsHidden()
-                            Button { update(\.purchasedOn, nil) } label: { Image(systemName: "xmark.circle.fill") }
-                                .buttonStyle(.plain).foregroundStyle(.secondary)
-                                .accessibilityLabel("Clear the purchase date")
-                        } else {
-                            Button("Add Date") { update(\.purchasedOn, PurchaseDay(Date())) }
+        if let purchase = model.purchase(for: album) {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionHeader(title: "Your Copy")
+                VStack(spacing: 0) {
+                    let rows = rows(purchase)
+                    ForEach(Array(rows.enumerated()), id: \.offset) { i, row in
+                        if i > 0 { Divider().padding(.leading, 14) }
+                        LabeledContent(row.title) {
+                            Text(row.value).monospacedDigit().foregroundStyle(row.emphasized ? .primary : .secondary)
+                                .fontWeight(row.emphasized ? .semibold : .regular)
                         }
+                        .padding(.horizontal, 14).padding(.vertical, 10)
                     }
-                    .padding(.horizontal, 14).padding(.vertical, 8)
-                    Divider().padding(.leading, 14)
-                    HStack {
-                        Text("Paid")
-                        Spacer()
-                        Text(Locale.current.currencySymbol ?? "$").foregroundStyle(.secondary)
-                        TextField("Price", text: $priceText, prompt: Text(Decimal(0).formatted(.number.precision(.fractionLength(2)))))
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(maxWidth: 110)
-                            .focused($priceFocused)
-                            .onSubmit(commitPrice)
-                    }
-                    .padding(.horizontal, 14).padding(.vertical, 10)
                 }
-            }
-            .card()
-            if let purchase, let summary = summary(purchase) {
-                Text(summary).font(.caption).foregroundStyle(.secondary)
-            }
-        }
-        .onAppear { priceText = Self.format(purchase?.price) }
-        .onChange(of: album.id) { draft = nil; priceText = Self.format(model.purchase(for: album)?.price) }
-        .onChange(of: priceFocused) { if !priceFocused { commitPrice() } }
-        .toolbar {
-            if priceFocused {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { priceFocused = false }
+                .card()
+                if let summary = summary(purchase) {
+                    Text(summary).font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
     }
 
-    private func setOwned(_ on: Bool) {
-        if on {
-            let p = draft ?? AlbumPurchase(album: album.album, artist: album.artist)
-            model.setPurchase(p, for: album)
-            priceText = Self.format(p.price)
-        } else {
-            draft = model.purchase(for: album)
-            model.setPurchase(nil, for: album)
-        }
-    }
-
-    private func update<T>(_ path: WritableKeyPath<AlbumPurchase, T>, _ value: T) {
-        guard var p = model.purchase(for: album) else { return }
-        p[keyPath: path] = value
-        model.setPurchase(p, for: album)
-    }
-
-    /// Saved when editing ends rather than per keystroke: each change is an event sent to the Mac.
-    private func commitPrice() {
-        let price = Self.parse(priceText)
-        if model.purchase(for: album)?.price != price { update(\.price, price) }
-        priceText = Self.format(price)
+    private func rows(_ p: AlbumPurchase) -> [(title: String, value: String, emphasized: Bool)] {
+        var rows: [(title: String, value: String, emphasized: Bool)] = []
+        if let n = p.labelNumber { rows.append(("Label", "#\(n)", true)) }
+        if let day = p.purchasedOn { rows.append(("Bought", day.date().formatted(date: .abbreviated, time: .omitted), false)) }
+        if let price = p.price { rows.append(("Paid", formatMoney(price), false)) }
+        return rows.isEmpty ? [("You own this album", "", false)] : rows
     }
 
     private func summary(_ p: AlbumPurchase) -> String? {
@@ -518,18 +466,6 @@ struct AlbumOwnershipSection: View {
             parts.append("\(formatMoney(price / Decimal(plays))) a play so far")
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-
-    static func format(_ price: Decimal?) -> String {
-        price.map { $0.formatted(.number.precision(.fractionLength(0...2)).grouping(.never)) } ?? ""
-    }
-
-    static func parse(_ text: String) -> Decimal? {
-        var s = text.trimmingCharacters(in: .whitespaces)
-        if let symbol = Locale.current.currencySymbol { s = s.replacingOccurrences(of: symbol, with: "") }
-        s = s.trimmingCharacters(in: .whitespaces)
-        guard !s.isEmpty, let value = try? Decimal.FormatStyle.number.parseStrategy.parse(s) else { return nil }
-        return AlbumPurchase.validPrice(value)
     }
 }
 

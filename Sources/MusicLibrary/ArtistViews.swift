@@ -405,7 +405,7 @@ struct ArtistDetail: View {
                     NavigationLink(value: a) {
                         VStack(alignment: .leading, spacing: 4) {
                             CoverThumb(url: model.coverURL(forAlbum: a), size: 140, revision: model.coverRevision,
-                                       owned: model.purchase(for: a) != nil)
+                                       labelNumber: model.purchase(for: a)?.labelNumber)
                             Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.callout.weight(.medium)).lineLimit(1)
                             Text([a.year.map(String.init), songCount(a.trackCount)].compactMap { $0 }.joined(separator: " · "))
                                 .font(.caption).foregroundStyle(.subtext)
