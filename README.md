@@ -73,6 +73,10 @@
 - **Concerts near you.** Artist pages list their upcoming shows near your ZIP code, and the Concerts page gathers every
   show by an artist in your library, month by month. Listings come from Ticketmaster and JamBase (which covers small
   clubs and independent venues), with free keys for either or both.
+- **Shop for CDs.** Find the exact CD on MusicBrainz (by album and artist, or the barcode or catalog number on the case),
+  pick the edition, and compare new and used copies that ship to the US on Discogs, eBay, CDandLP and Alibris, with
+  shipping and a total in dollars, plus links to search Amazon, Walmart, Half Price Books and Barnes & Noble. No accounts
+  or sign-ins. An album's … menu has **Shop for This CD**.
 
 **Your public library's CDs**
 
