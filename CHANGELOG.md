@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.20.0
+
 - **Shop for CDs.** A new **Shop for CDs** page in the sidebar finds the exact CD on MusicBrainz, by a few words of the album
   and artist, by an artist alone (to browse their albums), or by the barcode or catalog number on the case, and lists
   its CD editions (year, country, label, catalog number,
