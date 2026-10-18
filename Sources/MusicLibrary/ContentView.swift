@@ -137,6 +137,9 @@ struct SidebarView: View {
                     .sidebarBadge(model.catalog.listEntries.count)
                     .tag(SidebarItem.catalogList)
             }
+            Section("Shopping") {
+                Label("Shop for CDs", systemImage: "cart").tag(SidebarItem.cdShop)
+            }
             Section("Export") {
                 Label("Export List", systemImage: "externaldrive")
                     .sidebarBadge(model.exportList.count)
@@ -249,6 +252,7 @@ struct DetailRouter: View {
         case .catalog: CatalogView()
         case .catalogCheckouts: CatalogCheckoutsView()
         case .catalogList: CatalogListView()
+        case .cdShop: CDShopView()
         case .likedSongs: LikedSongsView()
         case .cd(let path):
             if let disc = model.cd.discs.first(where: { $0.id == path }) {

@@ -128,11 +128,16 @@ struct AlbumDetail: View {
                     }
                     .disabled(allAccurate || model.rips.albumStates[AlbumInfoStore.key(album)] == .checking
                               || !tracks.contains(where: RipDiscMatcher.isCDAudio) || !model.ffmpegAvailable)
+                    Button("Shop for This CD", systemImage: "cart") {
+                        let releaseId = tracks.lazy.compactMap(\.metadata.mbReleaseId).first
+                        model.cdShop.shop(releaseId: releaseId, album: album.album, artist: album.artist)
+                        model.sidebar = .cdShop
+                    }
                     Divider()
                     RemoveFromLibraryButton(album: album)
                 } label: { Image(systemName: "ellipsis") }
                     .menuStyle(.button).buttonStyle(.bordered).menuIndicator(.hidden).fixedSize()
-                    .help("Play Next, Add to Queue, check the rip with AccurateRip or remove the album")
+                    .help("Play Next, Add to Queue, check the rip with AccurateRip, shop for the CD or remove the album")
             }
             .controlSize(.large)
             .disabled(tracks.isEmpty)

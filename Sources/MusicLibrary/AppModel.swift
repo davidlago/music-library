@@ -4,7 +4,7 @@ import MusicLibraryCore
 import SwiftUI
 
 enum SidebarItem: Hashable {
-    case songs, albums, artists, insights, musicDNA, concerts, importQueue, exportList, iPhone, catalog, catalogCheckouts, catalogList
+    case songs, albums, artists, insights, musicDNA, concerts, importQueue, exportList, iPhone, catalog, catalogCheckouts, catalogList, cdShop
     case likedSongs
     case playlist(Int64)
     case smartPlaylist(Int64)
@@ -205,6 +205,8 @@ final class AppModel {
     @ObservationIgnored let catalog = LibraryCatalogStore()
     /// Upcoming concerts near home.
     @ObservationIgnored let concerts = ConcertStore()
+    /// Shopping for new and used CDs.
+    @ObservationIgnored let cdShop = CDShopStore()
     /// Wi-Fi sync to the iPhone app.
     @ObservationIgnored let iPhone = SyncStore()
     @ObservationIgnored private var currentPlay: (track: Track, startedAt: Date, tracker: ListenTracker)?
@@ -262,6 +264,7 @@ final class AppModel {
         catalog.makeEnricher = { [unowned self] client in
             CatalogEnricher(catalog: { path in try await client.get(path, priority: .background) }, musicBrainz: self.musicBrainz, info: self.artistFetcher)
         }
+        cdShop.musicBrainz = musicBrainz
         importer = ImportController(model: self)
         cd = CDController(model: self)
         rips = RipChecker(model: self)

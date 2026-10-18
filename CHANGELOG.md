@@ -7,6 +7,15 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- **Shop for CDs.** A new **Shop for CDs** page in the sidebar finds the exact CD on MusicBrainz, by a few words of the album
+  and artist, by an artist alone (to browse their albums), or by the barcode or catalog number on the case, and lists
+  its CD editions (year, country, label, catalog number,
+  barcode). Pick one, or any CD edition of the album, and the app gathers new and used copies that ship to the US from
+  Discogs, eBay, CDandLP and Alibris: price, shipping, condition, seller and where it ships from, with a total in
+  dollars, listed as this edition, other editions or possible matches. Links search Amazon, Walmart, Half Price Books and
+  Barnes & Noble too. A CD MusicBrainz doesn't list yet (new, local or rare releases) can be searched for on the
+  stores by name. Nothing needs an account or a sign-in. Album pages have **Shop for This CD** in their … menu.
+
 ## 1.19.0
 
 - **Sort albums and songs on the iPhone.** The Albums grid has the Mac's orders (Date Added, Title, Artist, Release
