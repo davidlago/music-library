@@ -296,7 +296,8 @@ extension Database {
 
     /// Saves (or with nil, forgets) that you own the album with this key (`SearchIndex.albumKey`): sets the album's
     /// primary CD or download (adding one when it has neither), or removes its CDs and downloads; records are kept.
-    /// Deprecated: for the app's ownership views until they move to `saveCollectionItem`; removed in the cleanup.
+    /// What the album page did before the collection; the apps use `saveCollectionItem` now, and the tests file
+    /// ownership through it the way older versions did.
     public func saveAlbumPurchase(key: String, _ purchase: AlbumPurchase?, at date: Date = Date()) throws {
         try transaction {
             var items = try collectionItems().items.filter { CollectionLegacy.isProjectable($0) && $0.albumKey == key }

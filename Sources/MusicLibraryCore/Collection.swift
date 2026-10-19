@@ -349,7 +349,7 @@ public enum DigitalState: Hashable, Sendable {
     }
 }
 
-/// How a cover shows what you own. Replaces `OwnershipMark`.
+/// How a cover shows what you own.
 public enum CopyMark: Hashable, Sendable {
     /// The "Borrowed" badge.
     case notInCollection
@@ -679,21 +679,6 @@ public struct MusicCollection: Sendable {
         if let file = item.coverFile, let path = CollectionCovers.path(file) { return path }
         guard let first = tracksByKey[item.albumKey]?.map(\.path).min(), LibraryPath.isPlainRelative(first) else { return nil }
         return ((first as NSString).deletingLastPathComponent as NSString).appendingPathComponent("cover.jpg")
-    }
-
-    /// Albums owned as the app saw them before the collection, by album key: each album's primary CD or download
-    /// (`CollectionLegacy.primary`), else the download made of its bought songs. Records aren't in it.
-    /// Deprecated: for call sites not yet moved to the collection; removed in the cleanup.
-    public var legacyPurchases: [String: AlbumPurchase] {
-        var out: [String: AlbumPurchase] = [:]
-        for (key, copies) in byKey {
-            if let p = CollectionLegacy.primary(copies, albumKey: key) {
-                out[key] = CollectionLegacy.purchase(of: p)
-            } else if let d = copies.first(where: { $0.origin == .songs }) {
-                out[key] = AlbumPurchase(album: d.album, artist: d.artist, format: .digital, purchasedOn: d.purchasedOn, price: d.price)
-            }
-        }
-        return out
     }
 }
 

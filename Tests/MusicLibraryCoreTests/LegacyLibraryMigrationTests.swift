@@ -373,12 +373,12 @@ import Testing
         let old = try Database(snapshotAt: path.path)
         let tracks = try old.fetchAllTracks()
         let songs = try old.trackPurchases()
-        let legacy = AlbumPurchase.including(songs: songs, tracks: tracks, in: try old.albumPurchases())
+        let legacy = LegacyOwnership.including(songs: songs, tracks: tracks, in: try old.albumPurchases())
 
         let phone = try LibrarySnapshot(root: root, isPresent: { _ in false })
         #expect(try Self.dump(path.path) == untouched, "reading a snapshot writes nothing")
         #expect(phone.labelUnreadable == 0)
-        #expect(phone.purchases == legacy, "legacyPurchases equals the old albumPurchases() + including")
+        #expect(LegacyOwnership.purchases(of: phone.collection) == legacy, "the collection as 1.20 saw it equals the old albumPurchases() + including")
 
         let macCopy = try TestSupport.tempDir()
         try FileManager.default.copyItem(at: path, to: LibraryLocation.databaseURL(root: macCopy))
@@ -387,12 +387,12 @@ import Testing
         let macCollection = MusicCollection(items: macItems, songPurchases: try mac.trackPurchases(), tracks: try mac.fetchAllTracks())
         #expect(phone.collection.items.map(\.id) == macCollection.items.map(\.id))
         #expect(phone.collection.items == macCollection.items, "the same items, ids and values")
-        #expect(macCollection.legacyPurchases == legacy)
+        #expect(LegacyOwnership.purchases(of: macCollection) == legacy)
 
         // And reading the migrated copy (a sync or export from this version) agrees too.
         let synced = try LibrarySnapshot(root: macCopy, isPresent: { _ in false })
         #expect(synced.collection.items == macCollection.items)
-        #expect(synced.purchases == legacy)
+        #expect(LegacyOwnership.purchases(of: synced.collection) == legacy)
     }
 }
 

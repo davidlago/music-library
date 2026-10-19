@@ -17,12 +17,10 @@ struct CoverImage: View {
     @Environment(\.displayScale) private var scale
     @State private var image: UIImage?
 
-    /// Deprecated: `ownership:` is `mark:` from before the collection (removed in the cleanup).
-    init(url: URL?, size: CGFloat, ownership: OwnershipMark? = nil, mark: CopyMark? = nil, cornerRadius: CGFloat? = nil,
-         title: String? = nil) {
+    init(url: URL?, size: CGFloat, mark: CopyMark? = nil, cornerRadius: CGFloat? = nil, title: String? = nil) {
         self.url = url
         self.size = size
-        self.mark = mark ?? ownership.map(CopyMark.init)
+        self.mark = mark
         self.cornerRadius = cornerRadius
         self.title = title
     }
@@ -59,15 +57,6 @@ struct CoverImage: View {
 }
 
 extension CopyMark {
-    /// The mark an `OwnershipMark` from before the collection stands for.
-    init(_ ownership: OwnershipMark) {
-        switch ownership {
-        case .cd(let label): self = .cd(number: label, digitized: true, more: 0)
-        case .borrowed: self = .notInCollection
-        case .digital: self = .download(partial: false, more: 0)
-        }
-    }
-
     /// A CD or record with no digital copy (the case or sleeve gets the waveform badge).
     var needsDigitizing: Bool {
         switch self {

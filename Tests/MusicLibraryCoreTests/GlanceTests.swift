@@ -23,8 +23,9 @@ import Testing
          play(6, daysAgo: 200), play(6, daysAgo: 210), play(6, daysAgo: 220), play(6, daysAgo: 230)]
     }
 
-    func build(playing: Glance.Playing? = nil, purchases: [String: AlbumPurchase] = [:]) -> (glance: Glance, covers: [String: Track]) {
-        Glance.build(tracks: tracks, present: [1, 2, 5], plays: history, likedDates: [3: now, 99: now], purchases: purchases,
+    func build(playing: Glance.Playing? = nil, owned: [CollectionItem] = []) -> (glance: Glance, covers: [String: GlanceCoverSource]) {
+        Glance.build(tracks: tracks, present: [1, 2, 5], plays: history, likedDates: [3: now, 99: now],
+                     collection: MusicCollection(items: owned, songPurchases: [:], tracks: tracks),
                      playTotals: [1: PlayTotal(plays: 2, listened: 400)], playing: playing, currencyCode: "EUR",
                      now: now, calendar: calendar)
     }
@@ -66,13 +67,10 @@ import Testing
     }
 
     @Test func ownedAlbums() {
-        let ok = SearchIndex.albumKey(album: "OK Computer", artist: "Radiohead")
-        let blue = SearchIndex.albumKey(album: "Kind of Blue", artist: "Miles Davis")
-        let comp = SearchIndex.albumKey(album: "Computer World", artist: "Kraftwerk")
-        let g = build(purchases: [
-            ok: AlbumPurchase(album: "OK Computer", artist: "Radiohead", purchasedOn: PurchaseDay(year: 2026, month: 9, day: 1), price: 12.5),
-            blue: AlbumPurchase(album: "Kind of Blue", artist: "Miles Davis", purchasedOn: PurchaseDay(year: 1999, month: 2, day: 3), price: 9),
-            comp: AlbumPurchase(album: "Computer World", artist: "Kraftwerk"),
+        let g = build(owned: [
+            copy("ok", .cd, album: "OK Computer", artist: "Radiohead", day: day(2026, 9, 1), price: 12.5),
+            copy("blue", .cd, album: "Kind of Blue", artist: "Miles Davis", day: day(1999, 2, 3), price: 9),
+            copy("comp", .cd, album: "Computer World", artist: "Kraftwerk"),
         ]).glance
         #expect(g.owned.ownedCount == 3)
         #expect(g.owned.libraryAlbumCount == 6)
@@ -115,7 +113,7 @@ import Testing
         let (g, covers) = build(playing: Glance.Playing(track: tracks[5], isPlaying: false, position: 0, duration: 435))
         #expect(Set(covers.keys) == g.coverNames)
         let name = Glance.coverName(albumKey: SearchIndex.albumKey(album: "OK Computer", artist: "Radiohead"))
-        #expect(covers[name]?.id == 1)  // the album's first track
+        #expect(covers[name] == .track(tracks[0]))  // the album's first track
         #expect(g.nowPlaying?.song.cover == Glance.coverName(albumKey: SearchIndex.albumKey(album: "Computer World", artist: "Kraftwerk")))
     }
 
@@ -135,8 +133,8 @@ import Testing
         let dir = try TestSupport.tempDir()
         let store = GlanceStore(directory: dir.appendingPathComponent("Glance"))
         #expect(store.read() == nil)
-        let (g, _) = build(purchases: [SearchIndex.albumKey(album: "OK Computer", artist: "Radiohead"):
-                                        AlbumPurchase(album: "OK Computer", artist: "Radiohead", purchasedOn: PurchaseDay(year: 2026, month: 1, day: 2), price: Decimal(string: "12.99"))])
+        let (g, _) = build(owned: [copy("ok", .cd, album: "OK Computer", artist: "Radiohead", day: day(2026, 1, 2),
+                                        price: Decimal(string: "12.99"))])
         try store.write(g)
         let back = try #require(store.read())
         #expect(back == g)
@@ -295,14 +293,6 @@ extension GlanceTests {
         items[items.firstIndex { $0.id == "ril-lp" }!].coverFile = "ril-lp-0000beef.jpg"
         let changed = build(collection: MusicCollection(items: items, songPurchases: [:], tracks: tracks)).glance
         #expect(changed.collection?.recent?.first?.cover != rilCover)
-    }
-
-    @Test func purchasesOverloadIsUnchanged() {
-        let (g, covers) = build(purchases: [Self.okKey: AlbumPurchase(album: "OK Computer", artist: "Radiohead",
-                                                                      purchasedOn: day(2026, 9, 1), price: 12.5)])
-        #expect(g.collection == nil)
-        #expect(g.owned.ownedCount == 1 && g.owned.recent.first?.itemID == nil && g.owned.recent.first?.id == Self.okKey)
-        #expect(Set(covers.keys) == g.coverNames)
     }
 
     @Test func olderPayloadsDecode() throws {

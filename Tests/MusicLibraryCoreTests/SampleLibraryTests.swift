@@ -15,7 +15,7 @@ import Testing
         #expect(s.albums.allSatisfy { a in s.coverURL(album: a).map { FileManager.default.fileExists(atPath: $0.path) } == true })
         #expect(s.artists.allSatisfy { a in s.artistImageURL(a.name).map { FileManager.default.fileExists(atPath: $0.path) } == true })
         #expect(s.artists.allSatisfy { s.artistInfo($0.name)?.bio != nil })
-        #expect(!s.playlists.isEmpty && !s.likedDates.isEmpty && !s.purchases.isEmpty)
+        #expect(!s.playlists.isEmpty && !s.likedDates.isEmpty && !LegacyOwnership.purchases(of: s.collection).isEmpty)
         #expect(s.libraryID != nil)
         // Its history reaches today, however long ago it was made.
         let last = try #require(s.plays.last?.startedAt)

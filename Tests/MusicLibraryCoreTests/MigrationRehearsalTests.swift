@@ -85,7 +85,7 @@ struct MigrationRehearsalTests {
         let playTotals = try old.playTotals()
         let plays = try old.plays()
         let liked = try old.likedTrackDates()
-        let legacy = AlbumPurchase.including(songs: oldSongs, tracks: oldTracks, in: oldAlbums)
+        let legacy = LegacyOwnership.including(songs: oldSongs, tracks: oldTracks, in: oldAlbums)
         let ownershipRows = try #require(before.tables["album_ownership"]).namedRows
         log.append("before: album_ownership=\(ownershipRows.count) track_purchases=\(oldSongs.count) tracks=\(oldTracks.count) plays=\(plays.count)")
 
@@ -176,7 +176,7 @@ struct MigrationRehearsalTests {
         let songsNextToCD = derived.filter { oldAlbums[$0.albumKey] != nil }
         log.append("song purchases: \(songs.count) songs -> \(derived.count) derived downloads (\(songsNextToCD.count) next to an owned album)")
         #expect(try db.collectionItems().items.allSatisfy { $0.origin == .stored }, "derived downloads are never stored")
-        #expect(collection.legacyPurchases == legacy, "the old owned albums, as the collection projects them")
+        #expect(LegacyOwnership.purchases(of: collection) == legacy, "the old owned albums, as the collection projects them")
 
         // 4. Reopening changes nothing.
         let first = try Self.dump(path)
@@ -194,12 +194,12 @@ struct MigrationRehearsalTests {
         // 6. A phone reading the untouched copy sees the same collection (ids and values) as the Mac after migrating.
         let phone = try LibrarySnapshot(root: untouchedRoot, isPresent: { _ in false })
         #expect(phone.labelUnreadable == 0)
-        #expect(phone.purchases == legacy)
+        #expect(LegacyOwnership.purchases(of: phone.collection) == legacy)
         #expect(phone.collection.items.map(\.id) == collection.items.map(\.id))
         #expect(phone.collection.items == collection.items)
         let syncedDir = try Self.readableCopy(of: path).deletingLastPathComponent()
         let synced = try LibrarySnapshot(root: syncedDir, isPresent: { _ in false })
-        #expect(synced.collection.items == collection.items && synced.purchases == legacy)
+        #expect(synced.collection.items == collection.items && LegacyOwnership.purchases(of: synced.collection) == legacy)
 
         // 7. Labels: the CDs keep their numbers, in the CD series.
         let cdRows = ownershipRows.filter { $0["format"]?.text != "digital" }
@@ -230,8 +230,7 @@ struct MigrationRehearsalTests {
 
         // 9. Insights: the collection's totals are the old ones plus exactly what the old stats left out (owned
         // albums with no songs in the library, and songs bought next to an owned album), so nothing filed is lost.
-        let oldStats = OwnershipStats(tracks: tracks, purchases: legacy, playTotals: playTotals, songPurchases: songs,
-                                      now: now, calendar: calendar)
+        let oldStats = LegacyOwnership.Totals(tracks: tracks, purchases: legacy, now: now, calendar: calendar)
         let newStats = CollectionStats(collection: collection, tracks: tracks, playTotals: playTotals, albumInfos: [:],
                                        now: now, calendar: calendar)
         let trackKeys = Set(tracks.map { SearchIndex.albumKey(album: $0.album, artist: $0.effectiveAlbumArtist) })
@@ -262,10 +261,13 @@ struct MigrationRehearsalTests {
                    + "spend new == old + \(leftOut.count) items left out by the old stats: "
                    + "\(newStats.totalSpent == oldStats.totalSpent + leftOutSpend); library albums \(newStats.libraryAlbumCount)")
 
-        // 10. Glance: the same Owned counts; spending as the stats.
+        // 10. Glance: the same Owned counts; spending as the stats. (1.20's `Glance.build(purchases:)` filled
+        // `owned` with its OwnershipStats totals, `oldStats` here, and `library` without looking at ownership.)
         let present = Set(tracks.map(\.id))
-        let oldGlance = Glance.build(tracks: tracks, present: present, plays: plays, likedDates: liked, purchases: legacy,
-                                     playTotals: playTotals, playing: nil, currencyCode: "USD", now: now, calendar: calendar).glance
+        let oldGlance = (owned: oldStats,
+                         library: Glance.build(tracks: tracks, present: present, plays: plays, likedDates: liked, collection: .empty,
+                                               playTotals: playTotals, playing: nil, currencyCode: "USD", now: now,
+                                               calendar: calendar).glance.library)
         let newGlance = Glance.build(tracks: tracks, present: present, plays: plays, likedDates: liked, collection: collection,
                                      playTotals: playTotals, playing: nil, currencyCode: "USD", now: now, calendar: calendar).glance
         #expect(newGlance.owned.ownedCount == oldGlance.owned.ownedCount)

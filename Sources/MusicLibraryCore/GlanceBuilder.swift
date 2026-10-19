@@ -47,25 +47,7 @@ extension Glance {
         return (glance, builder.coverSources)
     }
 
-    /// The summary from album purchases, as before the collection (`collection` stays nil).
-    /// Deprecated: use `build(…collection:…)`; kept until the apps move to it.
-    public static func build(tracks: [Track], present: Set<Int64>, plays: [Play], likedDates: [Int64: Date],
-                             purchases: [String: AlbumPurchase], playTotals: [Int64: PlayTotal], playing: Playing?,
-                             currencyCode: String, now: Date = Date(), calendar: Calendar = .current,
-                             listLimit: Int = 8) -> (glance: Glance, covers: [String: Track]) {
-        var (builder, glance) = base(tracks: tracks, present: present, plays: plays, likedDates: likedDates, playing: playing,
-                                     currencyCode: currencyCode, now: now, calendar: calendar, listLimit: listLimit)
-        let ownership = OwnershipStats(tracks: tracks, purchases: purchases, playTotals: playTotals, now: now, calendar: calendar)
-        glance.owned = Owned(ownedCount: ownership.ownedCount, libraryAlbumCount: ownership.libraryAlbumCount,
-                             boughtThisYear: ownership.boughtThisYear, spentThisYear: ownership.spentThisYear,
-                             totalSpent: ownership.totalSpent,
-                             recent: ownership.albums.filter { $0.purchasedOn != nil }.prefix(listLimit).compactMap { a in
-                                 builder.album(key: a.id).map { Owned.Purchase(album: $0, purchasedOn: a.purchasedOn?.string, price: a.price, plays: a.plays) }
-                             })
-        return (glance, builder.usedCovers)
-    }
-
-    /// Everything but `owned` and `collection`, which the two `build`s fill in.
+    /// Everything but `owned` and `collection`, which `build` fills in.
     private static func base(tracks: [Track], present: Set<Int64>, plays: [Play], likedDates: [Int64: Date], playing: Playing?,
                              currencyCode: String, now: Date, calendar: Calendar, listLimit: Int) -> (GlanceBuilder, Glance) {
         var builder = GlanceBuilder(tracks: tracks, present: present)

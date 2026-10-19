@@ -243,7 +243,7 @@ import Testing
         #expect(stored.items.map(\.id) == ["dl"])
         let free = MusicCollection(items: [], songPurchases: [3: TrackPurchase()], tracks: tracks)
         #expect(free.items.count == 1 && free.items[0].price == nil)
-        #expect(free.legacyPurchases[key] == AlbumPurchase(album: "Album", artist: "Artist", format: .digital))
+        #expect(LegacyOwnership.purchases(of: free)[key] == AlbumPurchase(album: "Album", artist: "Artist", format: .digital))
     }
 
     @Test func marksPreferTheLowestCDThenRecordsThenDownloads() {
@@ -328,14 +328,14 @@ import Testing
         #expect(CollectionSyncScope.all.title == "Everything digitized in my collection")
     }
 
-    @Test func legacyPurchasesAreThePrimaryCDsAndDownloads() {
+    @Test func olderVersionsSeeThePrimaryCDsAndDownloads() {
         var cd = item("cd", .cd, 4, album: "A")
         cd.price = 10
         var cd2 = item("cd2", .cd, 9, album: "A")
         cd2.price = 15
         let c = MusicCollection(items: [cd, cd2, item("lp", .vinyl, 1, album: "B"), item("dl", .download, album: "C")],
                                 songPurchases: [:], tracks: [])
-        let p = c.legacyPurchases
+        let p = LegacyOwnership.purchases(of: c)
         #expect(p.count == 2, "records aren't owned for older call sites")
         #expect(p[SearchIndex.albumKey(album: "A", artist: "Artist")] == AlbumPurchase(album: "A", artist: "Artist", price: 10, labelNumber: 4))
         #expect(p[SearchIndex.albumKey(album: "C", artist: "Artist")]?.format == .digital)

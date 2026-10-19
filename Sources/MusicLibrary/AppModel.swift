@@ -192,15 +192,8 @@ final class AppModel {
     @ObservationIgnored private var appliedDefaultSidebar = false
     /// False while a reload rebuilds `index`, which is then of other tracks than `tracks`.
     @ObservationIgnored private var indexIsCurrent = false
-    /// Albums you own, with purchase date and price (keyed by `AlbumInfoStore.key`): each album's primary CD or
-    /// download, or the download made of the songs you bought (`MusicCollection.legacyPurchases`).
-    /// Deprecated: for views not yet moved to `collection`; removed in the cleanup.
-    private(set) var purchases: [String: AlbumPurchase] = [:]
-    /// The albums you said you own (album page, CD ripping), and the songs you bought (entered when importing).
-    private(set) var purchaseRecords: [String: AlbumPurchase] = [:]
+    /// The songs you bought (entered when importing).
     private(set) var trackPurchases: [Int64: TrackPurchase] = [:]
-    /// Bumped whenever `purchases` changes.
-    private(set) var purchasesVersion = 0
     /// Bumped when an album gets a new cover, so views showing the same cover.jpg load it again.
     private(set) var coverRevision = 0
     private(set) var albums: [AlbumSummary] = []
@@ -429,7 +422,7 @@ final class AppModel {
         playTotals = [:]; artistPlayTotals = [:]; albumPlayTotals = [:]; albumAddedDates = [:]
         index = .empty; searchResults = SearchResults(); stats = nil; statsVersion = -1
         listening = nil; listeningRequest = nil
-        purchases = [:]; purchaseRecords = [:]; trackPurchases = [:]
+        trackPurchases = [:]
         collection = .empty; collectionIndex = .empty; collectionStats = nil; collectionStatsRequest = nil
         unsettledItems = [:]; searchItems = []; searchLabelHits = []; collectionVersion += 1
         openLibrary()
@@ -1038,8 +1031,6 @@ final class AppModel {
         collectionIndex = built.index
         collectionVersion += 1
         for (id, change) in unsettled where unsettledItems[id] == change { unsettledItems.removeValue(forKey: id) }
-        purchases = collection.legacyPurchases
-        purchasesVersion += 1
         catalog.collection = collection
         refreshCollectionPlaylistCounts()
         // The app opens on the Shelf once there's anything on it (D19), unless something else was picked already.
@@ -1107,39 +1098,7 @@ final class AppModel {
         }
     }
 
-    // MARK: Ownership (deprecated: the views not yet moved to the collection)
-
-    /// How you own the album, if you do: its primary CD or download, or a download made of the songs you bought from it.
-    func purchase(for album: AlbumSummary) -> AlbumPurchase? { purchases[AlbumInfoStore.key(album)] }
-
-    /// That you own the album, as you said on its page or when ripping it (not counting songs you bought).
-    func purchaseRecord(for album: AlbumSummary) -> AlbumPurchase? { purchaseRecords[AlbumInfoStore.key(album)] }
-
-    /// Records that you own the album as its primary CD or download (with nil, that you don't: only that copy is
-    /// removed; any other copy of the album, a second CD or a record, stays).
-    func setPurchase(_ purchase: AlbumPurchase?, forKey key: String) {
-        guard let db = database, purchaseRecords[key] != purchase else { return }
-        do {
-            if let purchase {
-                try db.saveAlbumPurchase(key: key, purchase)
-            } else if let primary = CollectionLegacy.primary(storedCopies(albumKey: key), albumKey: key) {
-                try db.deleteCollectionItem(id: primary.id)
-                if let cover = primary.coverFile { removeCoverFile(cover) }
-                unsettledItems[primary.id] = .some(nil)
-            }
-            purchaseRecords = try db.albumPurchases()
-            rebuildCollection()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    /// The album's stored copies as they are now, including changes not in `collection` yet.
-    private func storedCopies(albumKey key: String) -> [CollectionItem] {
-        var copies = collection.copies(albumKey: key).filter { $0.origin == .stored && unsettledItems[$0.id] == nil }
-        copies += unsettledItems.values.compactMap { $0 }.filter { $0.albumKey == key }
-        return copies
-    }
+    // MARK: Song purchases
 
     /// Records what you paid for a song (with nil, forgets it).
     func setTrackPurchase(_ purchase: TrackPurchase?, for trackID: Int64) {
@@ -1154,12 +1113,7 @@ final class AppModel {
     }
 
     private func loadPurchases() {
-        purchaseRecords = (try? database?.albumPurchases()) ?? purchaseRecords
         trackPurchases = (try? database?.trackPurchases()) ?? trackPurchases
-    }
-
-    func setPurchase(_ purchase: AlbumPurchase?, for album: AlbumSummary) {
-        setPurchase(purchase, forKey: AlbumInfoStore.key(album))
     }
 
     func artistSummary(named name: String) -> ArtistSummary? {

@@ -96,7 +96,7 @@ import Testing
         #expect(s.artistImageURL("Alpha")?.lastPathComponent == "chosen.jpg")
         #expect(s.artistImageURL("Beta") == nil)
         #expect(s.photoCredit("alpha")?.label == "Deezer")
-        #expect(s.purchases.values.first?.price == 12)
+        #expect(LegacyOwnership.purchases(of: s.collection).values.first?.price == 12)
         #expect(s.collaborations.person(named: "Alpha") != nil)
     }
 
@@ -134,9 +134,9 @@ import Testing
         #expect(s.collection.item(id: "cd")?.price == 9, "an older Mac's edit is taken in")
         #expect(s.collection.item(id: "cd")?.stickerNumber == 3)
         #expect(s.collection.digitalState(s.collection.item(id: "lp")!) == .none)
-        #expect(s.purchases[onlyKey] == AlbumPurchase(album: "Only", artist: "Alpha", purchasedOn: PurchaseDay(year: 2020, month: 6, day: 1),
-                                                       price: 9, labelNumber: 3))
-        #expect(s.purchases.count == 1, "older call sites don't see records")
+        #expect(LegacyOwnership.purchases(of: s.collection)[onlyKey]
+                == AlbumPurchase(album: "Only", artist: "Alpha", purchasedOn: PurchaseDay(year: 2020, month: 6, day: 1), price: 9, labelNumber: 3))
+        #expect(LegacyOwnership.purchases(of: s.collection).count == 1, "older call sites don't see records")
         #expect(s.coverURL(item: s.collection.item(id: "lp")!)?.lastPathComponent == "lp-0000abcd.jpg")
         #expect(s.coverURL(item: s.collection.item(id: "cd")!)?.path.hasSuffix("Only (2010)/cover.jpg") == true,
                 "a cover file not on the phone falls back to the album's")
@@ -182,7 +182,7 @@ import Testing
         #expect(item.id == CollectionItem.legacyID(albumKey: SearchIndex.albumKey(album: "Only", artist: "Alpha")))
         #expect(item.medium == .cd && item.stickerNumber == 4 && item.price == 12)
         #expect(s.collection.digitalState(item) == .digitized(tracks: 1))
-        #expect(s.purchases.values.first?.labelNumber == 4)
+        #expect(LegacyOwnership.purchases(of: s.collection).values.first?.labelNumber == 4)
     }
 
     @Test func tracksOutsideTheRootAreNotPresent() throws {

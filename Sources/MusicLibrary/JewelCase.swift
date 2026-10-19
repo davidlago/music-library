@@ -18,12 +18,6 @@ struct JewelCase<Booklet: View>: View {
         self.booklet = booklet()
     }
 
-    /// Deprecated: pass a `CopyMark` (`mark:`). Kept for the views not moved to the collection yet; removed in the
-    /// cleanup.
-    init(width: CGFloat, ownership: OwnershipMark? = nil, @ViewBuilder booklet: () -> Booklet) {
-        self.init(width: width, mark: ownership.map(CopyMark.init(legacy:)), booklet: booklet)
-    }
-
     static func height(width: CGFloat) -> CGFloat { width * 125 / 142 }
     /// The booklet's side in a case this wide.
     static func bookletSide(width: CGFloat) -> CGFloat { height(width: width) * 0.944 }

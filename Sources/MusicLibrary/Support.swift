@@ -38,9 +38,6 @@ struct CoverThumb: View {
     var size: CGFloat = 140
     /// Pass `AppModel.coverRevision` so a replaced cover.jpg is loaded again.
     var revision = 0
-    /// Deprecated: pass `mark`. How you got the album (`OwnershipMark`): your label in the top-left corner or a round
-    /// badge (`CoverOwnershipMark`). In a `JewelCase`, give it to the case instead, which puts the label on the hinge.
-    var ownership: OwnershipMark?
     /// What you own (`CopyMark`): a label pill in the top-left corner and badges in the bottom-right
     /// (`CoverCopyMark`). Never for a cover inside a `JewelCase` or `RecordSleeve`: give it to the case instead.
     var mark: CopyMark?
@@ -58,8 +55,6 @@ struct CoverThumb: View {
             }
             if let mark {
                 CoverCopyMark(mark: mark, size: size)
-            } else if let ownership {
-                CoverOwnershipMark(mark: ownership, size: size)
             }
         }
         .frame(width: size, height: size)
@@ -83,8 +78,8 @@ enum StickerColors {
 
 /// The sticker with your label number. A CD's is the white strip on the case: tall, across the top of the hinge
 /// (`JewelCase(mark:)`), "CD" and the number running up it, read from bottom to top. A record's is a round yellow
-/// dot on the sleeve's top-left corner (`RecordSleeve`), read across. Both also go in the top-left corner of a cover
-/// shown without its case (`onCover`).
+/// dot on the sleeve's top-left corner (`RecordSleeve`), read across. A cover shown without its case has a
+/// `StickerPill` instead (`CoverCopyMark`).
 struct LabelSticker: View {
     let number: Int
     var series: StickerSeries = .cd
@@ -134,13 +129,6 @@ struct LabelSticker: View {
             .background(Circle().fill(StickerColors.vinyl))
             .overlay(Circle().strokeBorder(.black.opacity(0.12), lineWidth: 0.5))
     }
-
-    /// The sticker for a cover `size` wide shown without its case, in its top-left corner (where the hinge would be).
-    static func onCover(_ number: Int, series: StickerSeries = .cd, size: CGFloat) -> some View {
-        LabelSticker(number: number, series: series, width: size * (series == .cd ? 0.11 : 0.2))
-            .padding(size * 0.025)
-            .frame(width: size, height: size, alignment: .topLeading)
-    }
 }
 
 /// A label in lists and captions: a white pill with a small "CD", or a yellow one with a small "VINYL", then the
@@ -168,15 +156,6 @@ struct StickerPill: View {
 }
 
 extension CopyMark {
-    /// What an `OwnershipMark` stood for, from before the collection (its CD counts as ripped: nothing said otherwise).
-    init(legacy: OwnershipMark) {
-        switch legacy {
-        case .cd(let label): self = .cd(number: label, digitized: true, more: 0)
-        case .borrowed: self = .notInCollection
-        case .digital: self = .download(partial: false, more: 0)
-        }
-    }
-
     /// Whether this is a CD or record you own that has no digital copy in the library yet.
     var needsDigitizing: Bool {
         switch self {
@@ -296,38 +275,6 @@ struct DigitalStatusLabel: View {
             case .vinyl, .other: return "Not digitized"
             }
         case .missing: return "Missing from library"
-        }
-    }
-}
-
-/// Deprecated (`CopyBadge`): the round badge on the cover of a CD you borrowed (two arrows: lent to you) or an
-/// album you bought as a download (a dollar sign), in its bottom-right corner.
-struct OwnershipBadge: View {
-    /// `.borrowed` or `.digital`.
-    let mark: OwnershipMark
-    /// The cover's side.
-    let coverSide: CGFloat
-
-    var body: some View {
-        let digital = mark == .digital
-        CopyBadge(symbol: digital ? "dollarsign" : "arrow.left.arrow.right", label: digital ? "Bought as a download" : "Borrowed",
-                  coverSide: coverSide)
-    }
-}
-
-/// Deprecated (`CoverCopyMark`): how you got the album, on a cover shown without its case: your CD's label in the
-/// top-left corner (where the hinge would be), or the round badge of a borrowed CD or a download.
-struct CoverOwnershipMark: View {
-    let mark: OwnershipMark
-    /// The cover's side.
-    let size: CGFloat
-
-    var body: some View {
-        switch mark {
-        case .cd(let label):
-            if let label { LabelSticker.onCover(label, size: size) }
-        case .borrowed, .digital:
-            OwnershipBadge(mark: mark, coverSide: size).frame(width: size, height: size, alignment: .bottomTrailing)
         }
     }
 }

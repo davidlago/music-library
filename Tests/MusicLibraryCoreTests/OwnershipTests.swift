@@ -3,12 +3,6 @@ import Testing
 @testable import MusicLibraryCore
 
 @Suite struct AlbumOwnershipTests {
-    var calendar: Calendar {
-        var c = Calendar(identifier: .gregorian)
-        c.timeZone = TimeZone(identifier: "UTC")!
-        return c
-    }
-
     @Test func purchaseDayParsing() {
         #expect(PurchaseDay(string: "2024-03-05")?.string == "2024-03-05")
         for bad in ["", "2024-3-5", "2024-13-01", "2024-00-10", "0999-01-01", "2024-01-32", "20240101", "2024-01-01T00", "abcd-ef-gh"] {
@@ -93,14 +87,6 @@ import Testing
         #expect(try db.legacyOwnershipRows().first { $0.key == "d" }?.purchase.format == .cd, "and so it does for the collection")
     }
 
-    @Test func ownershipMarks() {
-        #expect(OwnershipMark(nil) == .borrowed)
-        #expect(OwnershipMark(AlbumPurchase(album: "A", artist: "B", labelNumber: 3)) == .cd(label: 3))
-        #expect(OwnershipMark(AlbumPurchase(album: "A", artist: "B")) == .cd(label: nil))
-        #expect(OwnershipMark(AlbumPurchase(album: "A", artist: "B", format: .digital)) == .digital)
-        #expect(OwnershipMark.cd(label: 3).labelNumber == 3 && OwnershipMark.digital.labelNumber == nil)
-    }
-
     @Test func batchPricesSplitEvenlyToTheCent() {
         #expect(TrackPurchase.split(10, into: 3) == [Decimal(string: "3.34")!, Decimal(string: "3.33")!, Decimal(string: "3.33")!])
         #expect(TrackPurchase.split(Decimal(string: "9.99")!, into: 1) == [Decimal(string: "9.99")!])
@@ -139,48 +125,16 @@ import Testing
             4: TrackPurchase(price: 1),
             5: TrackPurchase(),
         ]
-        let all = AlbumPurchase.including(songs: songs, tracks: tracks, in: records)
+        var item = CollectionItem(id: "cd", medium: .cd, album: "CD", artist: "A", now: Date(timeIntervalSince1970: 0))
+        item.price = 12
+        item.stickerNumber = 4
+        let all = LegacyOwnership.purchases(of: MusicCollection(items: [item], songPurchases: songs, tracks: tracks))
+        #expect(all == LegacyOwnership.including(songs: songs, tracks: tracks, in: records), "the downloads 1.20 derived")
         #expect(all[key("Songs", "A")] == AlbumPurchase(album: "Songs", artist: "A", format: .digital,
                                                         purchasedOn: PurchaseDay(year: 2026, month: 3, day: 9), price: Decimal(string: "2.28")))
         #expect(all[key("CD", "A")] == cd, "an album you said you own keeps its own details")
         #expect(all[key("Free", "A")] == AlbumPurchase(album: "Free", artist: "A", format: .digital))
-        #expect(AlbumPurchase.including(songs: [:], tracks: tracks, in: records) == records)
-    }
-
-    @Test func formatsSplitCDsDownloadsAndBorrowed() {
-        func track(_ id: Int64, _ album: String) -> Track {
-            Track(id: id, path: "\(id)", metadata: TrackMetadata(title: "T\(id)", artist: "A", album: album), duration: 100, format: "flac", sha256: "\(id)")
-        }
-        let tracks = [track(1, "CD1"), track(2, "CD2"), track(3, "Full"), track(4, "Part"), track(5, "Part"), track(6, "Borrowed")]
-        let songs: [Int64: TrackPurchase] = [4: TrackPurchase(price: 1)]
-        let records = [key("CD1", "A"): AlbumPurchase(album: "CD1", artist: "A", price: 10, labelNumber: 1),
-                       key("CD2", "A"): AlbumPurchase(album: "CD2", artist: "A", price: 14),
-                       key("Full", "A"): AlbumPurchase(album: "Full", artist: "A", format: .digital, price: 8)]
-        let s = OwnershipStats(tracks: tracks, purchases: AlbumPurchase.including(songs: songs, tracks: tracks, in: records), songPurchases: songs)
-        #expect(s.formats.map(\.format) == [.cd, .digital])
-        let cd = s.formats[0], digital = s.formats[1]
-        #expect(cd.albums == 2 && cd.spent == 24 && cd.labeled == 1 && cd.averagePrice == 12 && cd.partial == 0)
-        #expect(digital.albums == 2 && digital.spent == 9 && digital.partial == 1 && digital.labeled == 0)
-        #expect(s.borrowedCount == 1)
-        #expect(s.albums.first { $0.album == "Part" }?.partial == true)
-        #expect(s.albums.first { $0.album == "Full" }?.partial == false)
-        #expect(OwnershipStats(tracks: tracks, purchases: [:]).formats.isEmpty)
-    }
-
-    @Test func nextLabelNumberFollowsTheHighest() {
-        #expect(AlbumPurchase.nextLabelNumber(in: [:]) == 1)
-        let purchases = [
-            "a": AlbumPurchase(album: "A", artist: "X", labelNumber: 3),
-            "b": AlbumPurchase(album: "B", artist: "X", labelNumber: 12),
-            "c": AlbumPurchase(album: "C", artist: "X"),
-            "d": AlbumPurchase(album: "D", artist: "X", labelNumber: 12),
-        ]
-        #expect(AlbumPurchase.nextLabelNumber(in: purchases) == 13)
-        #expect(AlbumPurchase.nextLabelNumber(in: ["z": AlbumPurchase(album: "Z", artist: "X", labelNumber: AlbumPurchase.maxLabelNumber)])
-                == AlbumPurchase.maxLabelNumber)
-        #expect(AlbumPurchase.album(labeled: 12, in: purchases, excluding: "b")?.album == "D")
-        #expect(AlbumPurchase.album(labeled: 3, in: purchases, excluding: "a") == nil)
-        #expect(AlbumPurchase.album(labeled: 5, in: purchases, excluding: nil) == nil)
+        #expect(LegacyOwnership.purchases(of: MusicCollection(items: [item], songPurchases: [:], tracks: tracks)) == records)
     }
 
     /// A library from before label numbers gets the column when opened, and a snapshot of one (read-only, so never
@@ -213,89 +167,5 @@ import Testing
         #expect(try db.albumPurchases()["k"]?.format == .digital)
     }
 
-    // MARK: Stats
-
     func key(_ album: String, _ artist: String) -> String { SearchIndex.albumKey(album: album, artist: artist) }
-
-    func purchase(_ album: String, _ artist: String, _ day: String?, _ price: String?) -> (String, AlbumPurchase) {
-        (key(album, artist), AlbumPurchase(album: album, artist: artist, purchasedOn: day.flatMap(PurchaseDay.init(string:)),
-                                           price: price.flatMap { Decimal(string: $0) }))
-    }
-
-    func stats(_ purchases: [(String, AlbumPurchase)], plays: [Int64: PlayTotal] = [:]) -> OwnershipStats {
-        // SearchFixtures.now is 2026-09-21 (UTC).
-        OwnershipStats(tracks: SearchFixtures.library, purchases: Dictionary(uniqueKeysWithValues: purchases),
-                       playTotals: plays, now: SearchFixtures.now, calendar: calendar)
-    }
-
-    @Test func nothingOwned() {
-        let s = stats([])
-        #expect(s.libraryAlbumCount == 6 && s.ownedCount == 0 && s.totalSpent == 0)
-        #expect(s.albums.isEmpty && s.timeline.isEmpty && s.averagePrice == nil && s.costPerPlay == nil)
-    }
-
-    @Test func totalsAndPrices() {
-        let s = stats([
-            purchase("OK Computer", "Radiohead", "2026-02-10", "20"),
-            purchase("Kind of Blue", "Miles Davis", "2025-11-01", "10"),
-            purchase("Please Please Me", "The Beatles", nil, "15"),
-            purchase("Computer World", "Kraftwerk", "2026-03-01", nil),
-            purchase("Not In Library", "Nobody", "2026-01-01", "99"),
-        ], plays: [1: PlayTotal(plays: 3, listened: 800), 2: PlayTotal(plays: 1, listened: 260), 3: PlayTotal(plays: 5, listened: 2800)])
-        #expect(s.ownedCount == 4)  // the album not in the library is left out
-        #expect(s.ownedFraction == 4.0 / 6.0)
-        #expect(s.pricedCount == 3 && s.datedCount == 3)
-        #expect(s.totalSpent == 45)
-        #expect(s.averagePrice == 15 && s.medianPrice == 15)
-        #expect(s.mostExpensive?.album == "OK Computer" && s.cheapest?.album == "Kind of Blue")
-        #expect(s.spentThisYear == 20 && s.boughtThisYear == 2)
-        #expect(s.pricedPlays == 9)
-        #expect(s.costPerPlay == 5)
-        #expect(s.albums.map(\.album) == ["Computer World", "OK Computer", "Kind of Blue", "Please Please Me"])
-        #expect(s.latestPurchase?.album == "Computer World" && s.firstPurchase?.album == "Kind of Blue")
-        #expect(s.mostPlayed?.album == "Kind of Blue")
-        // Kind of Blue: 10 / 5 plays = 2; OK Computer: 20 / 4 = 5.
-        #expect(s.bestValue.map(\.album) == ["Kind of Blue", "OK Computer"])
-        #expect(s.unplayed.map(\.album) == ["Computer World", "Please Please Me"])
-        #expect(Set(s.missingDetails.map(\.album)) == ["Please Please Me", "Computer World"])
-    }
-
-    @Test func timelineByMonthWithGaps() {
-        let s = stats([
-            purchase("OK Computer", "Radiohead", "2026-02-10", "20"),
-            purchase("Kind of Blue", "Miles Davis", "2025-11-01", "10"),
-            purchase("Computer World", "Kraftwerk", "2026-02-20", "5"),
-        ])
-        #expect(s.granularity == .month)
-        // November 2025 through September 2026 ("now"), empty months included.
-        #expect(s.timeline.count == 11)
-        #expect(s.timeline.first?.spent == 10)
-        #expect(s.timeline.map(\.albums) == [1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0])
-        #expect(s.timeline.last?.cumulative == 35)
-        #expect(s.busiestPeriod?.spent == 25)
-        #expect(calendar.component(.month, from: s.busiestPeriod!.start) == 2)
-    }
-
-    @Test func timelineByYearForLongSpans() {
-        let s = stats([
-            purchase("OK Computer", "Radiohead", "1997-07-01", "18"),
-            purchase("Kind of Blue", "Miles Davis", "2020-01-01", "10"),
-        ])
-        #expect(s.granularity == .year)
-        #expect(s.timeline.count == 2026 - 1997 + 1)
-        #expect(s.timeline.first.map { calendar.component(.year, from: $0.start) } == 1997)
-    }
-
-    @Test func breakdowns() {
-        let s = stats([
-            purchase("OK Computer", "Radiohead", nil, "20"),
-            purchase("Kind of Blue", "Miles Davis", nil, "10"),
-            purchase("Please Please Me", "The Beatles", nil, "8"),
-            purchase("Hits 2020", "Various Artists", nil, nil),
-        ])
-        #expect(s.artists.map(\.name) == ["Radiohead", "Miles Davis", "The Beatles", "Various Artists"])
-        #expect(s.decades.map(\.name) == ["1950s", "1960s", "1990s", "2020s"])
-        #expect(s.genres.first { $0.name == "Rock" }.map { ($0.albums, $0.spent) } ?? (0, 0) == (2, 28))
-        #expect(s.timeline.isEmpty)  // no dates
-    }
 }

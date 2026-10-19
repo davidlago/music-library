@@ -33,9 +33,6 @@ public struct LibrarySnapshot: Sendable {
     /// The listening history and its totals per track, as of the sync.
     public let plays: [Play]
     public let playTotals: [Int64: PlayTotal]
-    /// Albums owned, by `SearchIndex.albumKey`, including those whose songs you bought: the collection as versions
-    /// before it saw it (`MusicCollection.legacyPurchases`). Deprecated: use `collection`; removed in the cleanup.
-    public let purchases: [String: AlbumPurchase]
     /// Everything you own (CDs, records, downloads), with or without tracks, as of the sync, plus changes an older
     /// Mac made to `album_ownership` since (`CollectionLegacy.reconcile`).
     public let collection: MusicCollection
@@ -130,7 +127,6 @@ public struct LibrarySnapshot: Sendable {
         let collection = MusicCollection(items: items.items, songPurchases: songPurchases, tracks: all, unreadable: items.unreadable)
         self.collection = collection
         self.labelUnreadable = collection.unreadable
-        self.purchases = collection.legacyPurchases
         self.songPurchases = songPurchases
         self.artistInfos = infos.mapValues(\.info)
         let albumInfos = (try? db.albumInfos()) ?? [:]

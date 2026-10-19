@@ -54,9 +54,6 @@ final class PhoneModel {
     private(set) var collection = MusicCollection.empty
     /// The collection, searchable (`LibrarySearch`).
     private(set) var collectionIndex = CollectionIndex.empty
-    /// Owned albums by `SearchIndex.albumKey`, as versions before the collection saw them (the widgets' summary still
-    /// reads it). Deprecated: use `collection`; removed in the cleanup.
-    private(set) var purchases: [String: AlbumPurchase] = [:]
     /// Library albums by `SearchIndex.albumKey`.
     private(set) var albumsByKey: [String: AlbumSummary] = [:]
     /// The copy's listening history with the phone's plays since the last sync, and their totals.
@@ -304,7 +301,6 @@ final class PhoneModel {
         let (collection, index) = library.map { Self.overlaid($0, events: events) } ?? (.empty, .empty)
         self.collection = collection
         collectionIndex = index
-        purchases = collection.legacyPurchases
         collectionVersion += 1
         glance.setNeedsUpdate()
         LabelShortcuts.update(for: collection)
@@ -368,9 +364,6 @@ final class PhoneModel {
     func artistPlayTotal(_ name: String) -> PlayTotal { artistPlayTotals[LibrarySnapshot.artistKey(name)] ?? PlayTotal() }
 
     // MARK: Collection
-
-    /// Deprecated: use `copyMark(for:)` or `collection.copies(albumKey:)`; removed in the cleanup.
-    func purchase(for album: AlbumSummary) -> AlbumPurchase? { purchases[SearchIndex.albumKey(album: album.album, artist: album.artist)] }
 
     func item(id: String) -> CollectionItem? { collection.item(id: id) }
 
