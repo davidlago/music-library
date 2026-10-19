@@ -9,8 +9,9 @@ import UIKit
 /// it changes (a sync, or an export dragged in through Finder's Files tab). The snapshot lists the whole library;
 /// only the songs whose files are here play, and the rest can be asked for (`requests`, sent at each sync, which
 /// starts as soon as the Mac is around). Also connects the player to Last.fm, keeps the play queue across launches,
-/// and records plays and likes for the Mac (`outbox`, sent at each sync). Keeps the widgets' and the
-/// watch's summary up to date (`glance`, `watch`) and runs their commands (`perform`).
+/// and records plays and likes for the Mac (`outbox`, sent at each sync). Shows the collection (CDs, records and
+/// downloads you own, with or without songs) read-only: it's edited on the Mac. Keeps the widgets' and the watch's
+/// summary up to date (`glance`, `watch`) and runs their commands (`perform`).
 ///
 /// Until there's a library of your own, it can show the sample library (`showSample`): fictional albums inside the
 /// app, opened read-only. What happens in it (likes, plays, the queue) is kept apart (`sampleOutbox`,
@@ -48,8 +49,16 @@ final class PhoneModel {
     @ObservationIgnored let requestQueue = SyncRequestQueue(url: URL.applicationSupportDirectory.appendingPathComponent("sync-requests.json"))
     /// Liked songs and when: the copy's, with the likes and unlikes made on the phone since the last sync.
     private(set) var likedDates: [Int64: Date] = [:]
-    /// Owned albums by `SearchIndex.albumKey`: the copy's, with the changes made on the phone since the last sync.
+    /// Everything you own: the copy's collection, with the ownership changes versions before 1.18 left in the outbox
+    /// (`CollectionLegacy.overlay`, the rules the Mac applies them by).
+    private(set) var collection = MusicCollection.empty
+    /// The collection, searchable (`LibrarySearch`).
+    private(set) var collectionIndex = CollectionIndex.empty
+    /// Owned albums by `SearchIndex.albumKey`, as versions before the collection saw them (the widgets' summary still
+    /// reads it). Deprecated: use `collection`; removed in the cleanup.
     private(set) var purchases: [String: AlbumPurchase] = [:]
+    /// Library albums by `SearchIndex.albumKey`.
+    private(set) var albumsByKey: [String: AlbumSummary] = [:]
     /// The copy's listening history with the phone's plays since the last sync, and their totals.
     private(set) var plays: [Play] = []
     private(set) var playTotals: [Int64: PlayTotal] = [:]
@@ -66,21 +75,23 @@ final class PhoneModel {
     var infoTrack: Track?
     /// An album a widget opened (`SearchIndex.albumKey`), pushed on the Library tab once the library has loaded.
     var pendingAlbumKey: String?
+    /// A collection item a widget opened (`GlanceLink.item(id:)`), pushed on the Collection tab once the library has loaded.
+    var pendingItemID: String?
 
     /// The summary the widgets and the watch show, and the watch connection.
     @ObservationIgnored let glance: GlanceFeed
     @ObservationIgnored let watch: WatchLink
 
-    /// Bumped when the library, the history or ownership changes (Insights recompute).
+    /// Bumped when the library, the history or the collection changes (Insights recompute).
     private(set) var libraryVersion = 0
     private(set) var historyVersion = 0
-    private(set) var purchasesVersion = 0
+    private(set) var collectionVersion = 0
     private(set) var libraryStats: LibraryStats?
     private(set) var listeningStats: ListeningStats?
-    private(set) var ownershipStats: OwnershipStats?
+    private(set) var collectionStats: CollectionStats?
     @ObservationIgnored private var statsVersion = -1
     @ObservationIgnored private var listeningKey: (period: ListeningStats.Period, library: Int, history: Int, at: Date)?
-    @ObservationIgnored private var ownershipKey: (library: Int, purchases: Int, history: Int)?
+    @ObservationIgnored private var collectionKey: (library: Int, collection: Int, history: Int)?
 
     @ObservationIgnored private var currentPlay: (track: Track, startedAt: Date, tracker: ListenTracker)?
     @ObservationIgnored private var loadedStamp: Stamp?
@@ -191,6 +202,11 @@ final class PhoneModel {
         if library == nil { state = .loading }
         loading = Task.detached(priority: .userInitiated) {
             let (state, stamp, isSample) = Self.load(documents: documents, sample: sample)
+            var albumsByKey: [String: AlbumSummary] = [:]
+            if case .loaded(let library) = state {
+                albumsByKey = Dictionary(library.albums.map { (SearchIndex.albumKey(album: $0.album, artist: $0.artist), $0) },
+                                         uniquingKeysWith: { first, _ in first })
+            }
             await MainActor.run {
                 guard generation == self.generation else { return }
                 if isSample != self.isSample { self.switchLibraries(toSample: isSample) }
@@ -202,6 +218,7 @@ final class PhoneModel {
                     self.player.library = library
                     self.restorePlayerState(library)
                 }
+                self.albumsByKey = albumsByKey
                 self.libraryVersion += 1
                 self.refreshOverlays()
             }
@@ -272,18 +289,33 @@ final class PhoneModel {
     private func refreshOverlays() {
         let events = activeOutbox.events
         likedDates = SyncOutbox.liked(base: library?.likedDates ?? [:], events: events)
-        refreshPurchases(events)
+        refreshCollection(events)
         refreshPlays(events)
         refreshRequests()
     }
 
-    private func refreshPurchases(_ events: [SyncEvent]) {
-        let library = library
-        purchases = SyncOutbox.purchases(base: library?.purchases ?? [:], events: events) { id in
-            library?.track(id: id).map { SearchIndex.albumKey(album: $0.album, artist: $0.effectiveAlbumArtist) }
-        }
-        purchasesVersion += 1
+    /// The copy's collection with the ownership changes still in the outbox. Only phones before 1.18 made those, so
+    /// usually there are none and the copy's collection is used as it is.
+    private func refreshCollection(_ events: [SyncEvent]) {
+        let (collection, index) = library.map { Self.overlaid($0, events: events) } ?? (.empty, .empty)
+        self.collection = collection
+        collectionIndex = index
+        purchases = collection.legacyPurchases
+        collectionVersion += 1
         glance.setNeedsUpdate()
+    }
+
+    nonisolated static func overlaid(_ library: LibrarySnapshot, events: [SyncEvent]) -> (MusicCollection, CollectionIndex) {
+        let changes = events.filter { if case .purchase = $0.kind { true } else { false } }
+        guard !changes.isEmpty else { return (library.collection, library.collectionIndex) }
+        let stored = library.collection.items.filter { $0.origin == .stored }
+        let items = CollectionLegacy.overlay(events: changes, on: stored) { id in
+            library.track(id: id).map { SearchIndex.albumKey(album: $0.album, artist: $0.effectiveAlbumArtist) }
+        }
+        let collection = MusicCollection(items: items, songPurchases: library.songPurchases, tracks: library.tracks,
+                                         unreadable: library.labelUnreadable)
+        return (collection, CollectionIndex(collection: collection, tracks: library.tracks, albumInfos: library.albumInfos,
+                                            index: library.index))
     }
 
     private func refreshPlays(_ events: [SyncEvent]) {
@@ -330,9 +362,41 @@ final class PhoneModel {
 
     func artistPlayTotal(_ name: String) -> PlayTotal { artistPlayTotals[LibrarySnapshot.artistKey(name)] ?? PlayTotal() }
 
-    // MARK: Ownership
+    // MARK: Collection
 
+    /// Deprecated: use `copyMark(for:)` or `collection.copies(albumKey:)`; removed in the cleanup.
     func purchase(for album: AlbumSummary) -> AlbumPurchase? { purchases[SearchIndex.albumKey(album: album.album, artist: album.artist)] }
+
+    func item(id: String) -> CollectionItem? { collection.item(id: id) }
+
+    /// How a library album's cover shows the copies you own.
+    func copyMark(for album: AlbumSummary) -> CopyMark {
+        collection.mark(albumKey: SearchIndex.albumKey(album: album.album, artist: album.artist))
+    }
+
+    /// How an item's own cover shows it.
+    func copyMark(for item: CollectionItem) -> CopyMark { collection.mark(item: item) }
+
+    /// The library album holding an item's digital copy, when it has songs.
+    func album(for item: CollectionItem) -> AlbumSummary? { albumsByKey[item.albumKey] }
+
+    /// What to ask the Mac for to get an item's songs: its library album.
+    func exportItem(for item: CollectionItem) -> ExportItem? {
+        album(for: item).map { .album(album: $0.album, artist: $0.artist) }
+    }
+
+    /// Items with a digital copy whose songs aren't all on this iPhone, one per album, in shelf order.
+    var readyToDownload: [CollectionItem] {
+        guard library != nil, !isSample else { return [] }
+        var seen = Set<String>()
+        return collection.items.filter { item in
+            guard collection.digitalState(item).hasMusic, !seen.contains(item.albumKey) else { return false }
+            let tracks = collection.libraryTracks(item)
+            guard !tracks.isEmpty, availability(tracks) != .onPhone else { return false }
+            seen.insert(item.albumKey)
+            return true
+        }
+    }
 
     // MARK: Availability, downloads and removals
 
@@ -354,9 +418,12 @@ final class PhoneModel {
     func isDownloadPending(_ tracks: [Track]) -> Bool { tracks.contains { pendingDownloads.contains($0.id) } }
 
     /// Asks the Mac for the item's songs; a sync starts as soon as the Mac is around.
-    func download(_ item: ExportItem) {
-        guard !isSample else { return }
-        requestQueue.add(SyncRequest(item: item, include: true))
+    func download(_ item: ExportItem) { download([item]) }
+
+    /// Asks the Mac for all of these at once.
+    func download(_ items: [ExportItem]) {
+        guard !isSample, !items.isEmpty else { return }
+        for item in items { requestQueue.add(SyncRequest(item: item, include: true)) }
         refreshRequests()
         sync.requestSync()
     }
@@ -432,19 +499,25 @@ final class PhoneModel {
         }
     }
 
-    func loadOwnership() {
-        let key = (library: libraryVersion, purchases: purchasesVersion, history: historyVersion)
-        if let k = ownershipKey, k == key, ownershipStats != nil { return }
+    /// The Collection pane: computed off the main thread when the library, the collection or the history changed.
+    func loadCollectionStats() {
+        let key = (library: libraryVersion, collection: collectionVersion, history: historyVersion)
+        if let k = collectionKey, k == key, collectionStats != nil { return }
         guard let library else { return }
-        ownershipKey = key
-        let owned = purchases, totals = playTotals
+        collectionKey = key
+        let collection = collection, totals = playTotals
         Task.detached(priority: .userInitiated) {
-            let stats = OwnershipStats(tracks: library.tracks, purchases: owned, playTotals: totals, songPurchases: library.songPurchases)
+            let stats = Self.collectionStats(collection: collection, library: library, playTotals: totals)
             await MainActor.run {
-                guard let k = self.ownershipKey, k == key else { return }
-                self.ownershipStats = stats
+                guard let k = self.collectionKey, k == key else { return }
+                self.collectionStats = stats
             }
         }
+    }
+
+    nonisolated static func collectionStats(collection: MusicCollection, library: LibrarySnapshot,
+                                            playTotals: [Int64: PlayTotal]) -> CollectionStats {
+        CollectionStats(collection: collection, tracks: library.tracks, playTotals: playTotals, albumInfos: library.albumInfos)
     }
 
     // The same rules as the Mac's listening history: a play is saved once something was heard, and counts when it
@@ -521,8 +594,16 @@ final class PhoneModel {
         case .toggleLike:
             guard let track = player.currentTrack else { return .failed("Nothing is playing.") }
             toggleLike(track)
-        case .playAlbum(let key):
-            guard let album = library.album(forKey: key) else { return .failed("That album isn't in the library anymore.") }
+        case .playAlbum(var key):
+            // A collection item's link: its album.
+            if let id = GlanceLink.album(key: key).itemID {
+                guard let item = collection.item(id: id) else { return .failed("That isn't in your collection anymore.") }
+                key = item.albumKey
+            }
+            guard let album = albumsByKey[key] ?? library.album(forKey: key) else {
+                // On the shelf, with no songs in the library (a CD not ripped yet, a record).
+                return .failed(collection.copies(albumKey: key).isEmpty ? "That album isn't in the library anymore." : "No digital copy")
+            }
             let tracks = library.playable(library.tracks(album: album))
             guard !tracks.isEmpty else { return .failed("“\(album.album)” isn't on the iPhone.") }
             player.play(queue: tracks, source: album.album)

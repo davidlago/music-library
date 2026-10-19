@@ -3,17 +3,26 @@ import MusicLibraryGlance
 import SwiftUI
 
 struct RootView: View {
-    enum Tabs: Hashable { case library, insights, sync, search }
+    enum Tabs: String, Hashable { case collection, library, insights, sync, search }
 
     @Environment(PhoneModel.self) private var model
     @Environment(PhonePlayer.self) private var player
     @Environment(\.scenePhase) private var scenePhase
     @State private var showNowPlaying = false
-    @State private var tab = Tabs.library
-    @AppStorage("insightsPane") private var insightsPane = InsightsPane.library
+    /// The tab last chosen; until then, the collection when there is one, else the library.
+    @SceneStorage("selectedTab") private var chosenTab: Tabs?
+    @AppStorage("insightsPane") private var insightsPane = InsightsPane.owned
+
+    private var tab: Tabs {
+        get { chosenTab ?? (model.collection.items.isEmpty ? .library : .collection) }
+        nonmutating set { chosenTab = newValue }
+    }
 
     var body: some View {
-        TabView(selection: $tab) {
+        TabView(selection: Binding(get: { tab }, set: { tab = $0 })) {
+            Tab("Collection", systemImage: "books.vertical", value: .collection) {
+                CollectionTab()
+            }
             Tab("Library", systemImage: "square.stack", value: .library) {
                 LibraryTab()
             }
@@ -61,13 +70,18 @@ struct RootView: View {
             }
             tab = .insights
         case .album(let key):
-            model.pendingAlbumKey = key
-            tab = .library
+            if let id = link.itemID {
+                model.pendingItemID = id
+                tab = .collection
+            } else {
+                model.pendingAlbumKey = key
+                tab = .library
+            }
         }
     }
 }
 
-/// What the Library and Search tabs show until the library has loaded.
+/// What the Collection, Library and Search tabs show until the library has loaded.
 struct LibraryStatusView: View {
     @Environment(PhoneModel.self) private var model
 
@@ -103,7 +117,7 @@ struct LibraryStatusView: View {
             ContentUnavailableView {
                 Label("No Music Yet", systemImage: "music.note")
             } description: {
-                Text("The library on this iPhone is empty. Add music on the Mac, then sync.")
+                Text("The library on this iPhone is empty. Add music or your CDs and records on the Mac, then sync.")
             } actions: {
                 Button("Check Again") { model.reload() }
             }
