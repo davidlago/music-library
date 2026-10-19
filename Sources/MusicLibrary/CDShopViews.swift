@@ -188,6 +188,7 @@ private struct CDShopAlbumCard: View {
 
 private struct CDShopEditionRow: View {
     @Environment(\.theme) private var theme
+    @Environment(AppModel.self) private var model
     let edition: CDEdition
     let choose: () -> Void
     @State private var hovering = false
@@ -207,8 +208,11 @@ private struct CDShopEditionRow: View {
                 Text([edition.label, edition.catalogNumber].filter { !$0.isEmpty }.joined(separator: " · "))
                     .font(.caption).foregroundStyle(.subtext).lineLimit(1)
                 Text(details).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                CDShopOwnedNote(edition: edition, releaseGroupId: edition.releaseGroupId, album: edition.title, artist: edition.artist)
             }
             Spacer()
+            Button("I Own This…") { model.addToCollection(medium: .cd, prefill: CDShopOwnedNote.prefill(edition)) }
+                .help("Add this edition to your collection, with your label number and what you paid")
             Button("Shop This Edition", action: choose).buttonStyle(.bordered)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
@@ -229,6 +233,7 @@ private struct CDShopEditionRow: View {
 /// Step two: copies for sale.
 private struct CDShopOffersSection: View {
     @Environment(\.theme) private var theme
+    @Environment(AppModel.self) private var model
     @Bindable var store: CDShopStore
     let target: CDShoppingTarget
 
@@ -296,8 +301,15 @@ private struct CDShopOffersSection: View {
                     Text("Discogs: \(stats.forSale) for sale from \(lowest.formatted()) before shipping")
                         .font(.caption).foregroundStyle(.subtext)
                 }
+                CDShopOwnedNote(edition: target.edition, releaseGroupId: target.releaseGroupId, album: target.album, artist: target.artist)
             }
             Spacer()
+            Button("I Own This…") {
+                model.addToCollection(medium: .cd, prefill: target.edition.map(CDShopOwnedNote.prefill)
+                                      ?? CollectionPrefill(album: target.album, artist: target.artist, releaseGroupID: target.releaseGroupId,
+                                                           barcode: target.typedBarcode))
+            }
+            .help("Add this CD to your collection, with your label number and what you paid")
             Button { store.unlock() } label: { Label("Choose Another", systemImage: "chevron.backward") }
                 .help("Back to the editions")
         }
@@ -500,5 +512,34 @@ struct CDShopCover: View {
             Self.cache[key] = loaded
             image = loaded
         }
+    }
+}
+
+/// Whether you own a CD the shop lists: "You own this edition (CD #142)", "You own another edition (CD #57)", or
+/// for a record or download of it, what you have. Shopping stays CD-only; this is only a reminder.
+private struct CDShopOwnedNote: View {
+    @Environment(AppModel.self) private var model
+    /// Nil: any CD edition of the album.
+    let edition: CDEdition?
+    let releaseGroupId: String?
+    let album: String
+    let artist: String
+
+    var body: some View {
+        let copies = model.catalog.collectionMatcher.items(releaseID: edition?.id, releaseGroupID: releaseGroupId, title: album,
+                                                           artists: [artist])
+        let cds = copies.filter { $0.medium == .cd }
+        if let edition, !cds.isEmpty {
+            let same = cds.filter { $0.releaseID == edition.id }
+            CollectionCopyNote(copies: same.isEmpty ? cds : same, edition: !same.isEmpty)
+        } else if !copies.isEmpty {
+            CollectionCopyNote(copies: copies)
+        }
+    }
+
+    /// Add to Collection… for an edition: found by its barcode, else by its title and artist, and picked.
+    static func prefill(_ e: CDEdition) -> CollectionPrefill {
+        CollectionPrefill(album: e.title, artist: e.artist, releaseID: e.id, releaseGroupID: e.releaseGroupId,
+                          barcode: e.barcode.isEmpty ? nil : e.barcode, catalogNumber: e.catalogNumber.isEmpty ? nil : e.catalogNumber)
     }
 }

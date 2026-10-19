@@ -203,10 +203,6 @@ final class AppModel {
     private(set) var purchasesVersion = 0
     /// Bumped when an album gets a new cover, so views showing the same cover.jpg load it again.
     private(set) var coverRevision = 0
-    /// The Owned pane of Insights.
-    private(set) var ownershipStats: OwnershipStats?
-    @ObservationIgnored private var ownershipRequest: (library: Int, purchases: Int, history: Int)?
-    @ObservationIgnored private var ownershipTask: Task<Void, Never>?
     private(set) var albums: [AlbumSummary] = []
     private(set) var artists: [ArtistSummary] = []
     private(set) var playlists: [Playlist] = []
@@ -432,7 +428,7 @@ final class AppModel {
         playTotals = [:]; artistPlayTotals = [:]; albumPlayTotals = [:]; albumAddedDates = [:]
         index = .empty; searchResults = SearchResults(); stats = nil; statsVersion = -1
         listening = nil; listeningRequest = nil
-        purchases = [:]; purchaseRecords = [:]; trackPurchases = [:]; ownershipStats = nil; ownershipRequest = nil
+        purchases = [:]; purchaseRecords = [:]; trackPurchases = [:]
         collection = .empty; collectionIndex = .empty; collectionStats = nil; collectionStatsRequest = nil
         unsettledItems = [:]; searchItems = []; searchLabelHits = []; collectionVersion += 1
         openLibrary()
@@ -952,6 +948,8 @@ final class AppModel {
     /// digital copy of.
     func importFiles(for item: CollectionItem) {
         importLinkItemID = item.id
+        // The queue takes it when the files are added; choosing none leaves nothing preset.
+        defer { importLinkItemID = nil }
         chooseFilesToImport()
     }
 
@@ -1037,6 +1035,7 @@ final class AppModel {
         for (id, change) in unsettled where unsettledItems[id] == change { unsettledItems.removeValue(forKey: id) }
         purchases = collection.legacyPurchases
         purchasesVersion += 1
+        catalog.collection = collection
         refreshCollectionPlaylistCounts()
         // The app opens on the Shelf once there's anything on it (D19), unless something else was picked already.
         if !appliedDefaultSidebar {
@@ -1310,23 +1309,6 @@ final class AppModel {
             await MainActor.run { [weak self] in
                 guard let self, self.listeningRequest?.at == request.at else { return }
                 self.listening = stats
-            }
-        }
-    }
-
-    /// Computes the Owned pane's stats in the background unless the library, purchases and history are unchanged.
-    func loadOwnershipIfNeeded() {
-        let request = (library: libraryVersion, purchases: purchasesVersion, history: historyVersion)
-        if let r = ownershipRequest, r == request, ownershipStats != nil { return }
-        ownershipRequest = request
-        let all = tracks, owned = purchases, totals = playTotals, songs = trackPurchases
-        ownershipTask?.cancel()
-        ownershipTask = Task.detached(priority: .userInitiated) {
-            let stats = OwnershipStats(tracks: all, purchases: owned, playTotals: totals, songPurchases: songs)
-            guard !Task.isCancelled else { return }
-            await MainActor.run { [weak self] in
-                guard let self, let r = self.ownershipRequest, r == request else { return }
-                self.ownershipStats = stats
             }
         }
     }
@@ -1636,8 +1618,11 @@ final class AppModel {
                                                   ticketmasterKey: concerts.ticketmasterKey, jambaseKey: concerts.jambaseKey)
         }
         return SyncContext(libraryRoot: libraryRoot, database: database, lastFM: lastFM, concerts: concertSettings,
-                           library: tracks, tracks: { [unowned self] in self.tracks(for: $0) })
+                           library: tracks, tracks: { [unowned self] in self.tracks(for: $0) }, collection: collection)
     }
+
+    /// The collection's own covers (`Music/Collection Covers`), which go with a database backup.
+    func collectionCoverPaths() -> [String] { (try? database?.collectionCoverPaths()) ?? [] }
 
     /// Every track in the export list once, in list order.
     var exportListTracks: [Track] {

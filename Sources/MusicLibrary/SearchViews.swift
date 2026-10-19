@@ -31,6 +31,15 @@ struct SearchResultsView: View {
             VStack(spacing: 0) {
                 SearchHeader(results: results)
                 Divider()
+                if !model.searchLabelHits.isEmpty || explicitLabel != nil {
+                    SearchLabelHits(hits: model.searchLabelHits, wanted: explicitLabel)
+                    Divider()
+                }
+                let items = collectionItems
+                if !items.isEmpty {
+                    CollectionHitsStrip(items: items, total: model.searchItems.count)
+                    Divider()
+                }
                 if !results.artists.isEmpty || !results.albums.isEmpty {
                     TopHitsStrip(artists: results.artists, albums: results.albums)
                     Divider()
@@ -39,6 +48,69 @@ struct SearchResultsView: View {
             }
             .navigationTitle("Search")
             .navigationSubtitle(results.tracks.isEmpty ? "" : "\(songCount(results.tracks.count)) · \(formatLongDuration(results.totalDuration))")
+    }
+
+    /// The items the search found, without the label hits shown above them.
+    private var collectionItems: [CollectionItem] {
+        let hits = Set(model.searchLabelHits.map(\.id))
+        return model.searchItems.filter { !hits.contains($0.id) }
+    }
+
+    /// A label typed with its series ("cd 157", "vinyl 12"): shown even when it's free.
+    private var explicitLabel: Sticker? {
+        guard let form = CollectionSearchQuery.labelForm(model.searchText), let series = form.series else { return nil }
+        return Sticker(series: series, number: form.number)
+    }
+}
+
+/// When the whole search is a label ("#12", "cd 12", "vinyl 12" or a bare number): what's at it on your shelf,
+/// with its neighbors, once per series it's in. A bare number that's on no item shows nothing (it's a search for
+/// "1999" or "21" too).
+struct SearchLabelHits: View {
+    @Environment(AppModel.self) private var model
+    let hits: [CollectionItem]
+    /// A label typed with its series, shown even when nothing has it ("CD #157 is free").
+    let wanted: Sticker?
+
+    var body: some View {
+        var stickers = Array(Set(hits.compactMap(\.sticker))).sorted()
+        if let wanted, !stickers.contains(wanted) { stickers.insert(wanted, at: 0) }
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Label").font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.subtext)
+            ForEach(stickers, id: \.self) { sticker in
+                LabelLookupCard(sticker: sticker, coverWidth: 96, open: { model.showItem(id: $0.id) }, step: nil)
+            }
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+    }
+}
+
+/// The collection items the search found, trackless ones included, above the library's top hits.
+struct CollectionHitsStrip: View {
+    @Environment(AppModel.self) private var model
+    let items: [CollectionItem]
+    /// Every item found, to say how many more the Shelf shows.
+    let total: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("In Your Collection").font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.subtext)
+                Spacer()
+                Button(total > 12 ? "Show All \(total)" : "Show on Shelf") { model.showShelf(query: model.searchText) }
+                    .buttonStyle(.link).font(.caption)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: 14) {
+                    ForEach(items.prefix(12)) { item in
+                        Button { model.showItem(id: item.id) } label: { CollectionCell(item: item, width: 96) }
+                            .buttonStyle(.plain)
+                            .contextMenu { CollectionItemMenu(model: model, item: item) }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
     }
 }
 
@@ -127,6 +199,14 @@ struct RefineMenus: View {
                 Button("Last year") { model.refineSearch(with: "added:1y") }
                 Button("Over a year ago") { model.refineSearch(with: "added:>1y") }
             }
+            Menu("Collection") {
+                Button("On CD") { model.refineSearch(with: "own:cd") }
+                Button("On Vinyl") { model.refineSearch(with: "own:vinyl") }
+                Button("Download") { model.refineSearch(with: "own:download") }
+                Button("Not in Collection") { model.refineSearch(with: "own:none") }
+                Divider()
+                Button("Not Ripped") { model.refineSearch(with: "ripped:no") }
+            }
             Menu("Missing") {
                 Button("Cover art") { model.refineSearch(with: "missing:cover") }
                 Button("Year") { model.refineSearch(with: "missing:year") }
@@ -170,7 +250,7 @@ struct TopHitsStrip: View {
                     NavigationLink(value: a) {
                         VStack(alignment: .leading, spacing: 4) {
                             CoverThumb(url: model.coverURL(forAlbum: a), size: size, revision: model.coverRevision,
-                                       ownership: OwnershipMark(model.purchase(for: a)))
+                                       mark: model.copyMark(for: a))
                             Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.caption.weight(.medium)).lineLimit(1)
                             Text([a.artist, a.year.map(String.init)].compactMap { $0 }.joined(separator: " · "))
                                 .font(.caption2).foregroundStyle(.subtext).lineLimit(1)
@@ -243,6 +323,22 @@ struct SearchHelpView: View {
                 }
                 Text("Numbers accept comparisons and ranges: year:>2000, year:1990-1999, time:3:00..5:00")
                     .font(.caption).foregroundStyle(.subtext)
+                Divider()
+                Text("Collection").font(.headline)
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
+                    ForEach(CollectionSearchQuery.keys, id: \.key) { k in
+                        GridRow {
+                            Text(k.key == "#" ? "#" : k.key + ":").font(.system(.callout, design: .monospaced)).bold()
+                            Text(k.help).font(.callout).foregroundStyle(.subtext)
+                                .frame(maxWidth: 260, alignment: .leading)
+                            Button(k.example) { onExample(k.example) }
+                                .buttonStyle(.link)
+                                .font(.system(.callout, design: .monospaced))
+                        }
+                    }
+                }
+                Text("Collection filters apply to the whole search: own:vinyl genre:jazz finds the songs of your jazz records. A label (#12, cd 12, vinyl 12) also shows what's at it on your shelf. iPhones with a version before 1.21 show smart playlists with these filters empty (or unfiltered when one is negated, like -own:vinyl).")
+                    .font(.caption).foregroundStyle(.subtext).fixedSize(horizontal: false, vertical: true)
             }
             .padding(16)
         }
@@ -268,7 +364,9 @@ struct SmartPlaylistEditor: View {
     init(draft: SmartPlaylistDraft) { _draft = State(initialValue: draft) }
 
     var body: some View {
-        let preview = model.index.search(draft.query, autocorrect: false)
+        // As saved: the #12 shorthand becomes sticker:12.
+        let preview = LibrarySearch.run(CollectionSearchQuery.canonical(draft.query), index: model.index, collectionIndex: model.collectionIndex,
+                                        collection: model.collection, autocorrect: false).library
         let query = draft.query.trimmingCharacters(in: .whitespaces)
         VStack(alignment: .leading, spacing: 14) {
             Text(draft.id == nil ? "New Smart Playlist" : "Edit Smart Playlist").font(.headline)
@@ -299,6 +397,7 @@ struct SmartPlaylistEditor: View {
                 Button("Save") {
                     var d = draft
                     if d.name.trimmingCharacters(in: .whitespaces).isEmpty { d.name = query }
+                    d.query = CollectionSearchQuery.canonical(d.query)
                     model.saveSmartPlaylist(d)
                     dismiss()
                 }
@@ -342,6 +441,7 @@ struct SmartPlaylistView: View {
         }
         .onAppear(perform: load)
         .onChange(of: model.libraryVersion) { load() }
+        .onChange(of: model.collectionVersion) { load() }
         .onChange(of: playlist.query) { load() }
     }
 

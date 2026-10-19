@@ -81,8 +81,13 @@ final class ImportController {
     var selectedEntry: ImportEntry? { entries.first { $0.id == selection } }
 
     func enqueue(_ urls: [URL]) {
+        // An item's Import Files… / Import a Transfer…, or a CD ripped to the queue: these files are its digital copy.
+        let preset = model.importLinkItemID
+        model.importLinkItemID = nil
         let files = ImportService.discover(urls)
         let existing = Set(entries.filter(\.isPending).map(\.url))
+        // A new batch starts with nothing linked and its songs bought one by one.
+        if !entries.contains(where: \.isPending) { resetCollection() }
         var batch: [ImportEntry] = []
         for url in files where !existing.contains(url) {
             let entry = ImportEntry(url: url)
@@ -91,6 +96,7 @@ final class ImportController {
             if selection == nil { selection = entry.id }
         }
         guard !batch.isEmpty else { return }
+        if let preset, let item = model.item(id: preset), item.isEditable { chooseLink(item) }
         Task {
             for entry in batch { await prepare(entry) }
             for entry in batch where entry.status == .reading { await matchStep(entry) }
@@ -250,6 +256,7 @@ final class ImportController {
             let track = try await service.commit(item, metadata: entry.metadata, cover: entry.cover)
             entry.trackID = track.id
             entry.status = .done
+            linkImported(track)
             model.reloadLibrary()
             savePurchase(entry)
         } catch ImportError.duplicate {
@@ -306,8 +313,10 @@ final class ImportController {
         savePurchase(entry)
     }
 
+    /// A song's own purchase, unless what you paid is on a collection item: the record or CD the files are the
+    /// digital copy of, or the album download for songs bought as a whole album.
     private func savePurchase(_ entry: ImportEntry) {
-        guard let id = entry.trackID else { return }
+        guard let id = entry.trackID, !(songsPricedElsewhere && entry.status == .done) else { return }
         let purchase = entry.price == nil && entry.purchasedOn == nil ? nil : TrackPurchase(purchasedOn: entry.purchasedOn, price: entry.price)
         model.setTrackPurchase(purchase, for: id)
     }
@@ -316,6 +325,146 @@ final class ImportController {
         for entry in entries where entry.status == .ready {
             await importEntry(entry)
         }
+    }
+
+    // MARK: Collection
+
+    /// The item these files are the digital copy of, as picked (or preset by Import a Transfer…). Until one is
+    /// picked, the best match among the items waiting to be digitized is used (`suggestedLinkItem`).
+    private(set) var linkItemID: String?
+    /// The user (or a preset) decided the link, None included.
+    private(set) var linkChosen = false
+    /// How the files relate to the item: digitized from it (a rip or needle-drop), or a download that came with it.
+    var linkSource: DigitalSource = .rip
+    /// Songs bought as a whole album: one album download in the collection with the batch's day and total, instead
+    /// of a purchase per song.
+    var boughtAsAlbum = false {
+        didSet { if boughtAsAlbum != oldValue, boughtAsAlbum, albumDay == nil { albumDay = batchDay ?? PurchaseDay(Date()) } }
+    }
+    private(set) var albumPrice: Decimal?
+    private(set) var albumDay: PurchaseDay?
+    /// The album download made (or found) for a whole album, once its first song was imported.
+    private(set) var albumItemID: String?
+    /// Items already linked to the imported album (the first imported song decides which album that is).
+    @ObservationIgnored private var linkedItems: Set<String> = []
+
+    /// The item the batch is linked to: the one picked, else the suggestion.
+    var effectiveLinkItem: CollectionItem? {
+        if linkChosen { return linkItemID.flatMap { model.item(id: $0) } }
+        return suggestedLinkItem
+    }
+
+    /// What you paid is on a collection item, not the songs.
+    var songsPricedElsewhere: Bool { effectiveLinkItem != nil || boughtAsAlbum }
+
+    func chooseLink(_ item: CollectionItem?) {
+        linkChosen = true
+        linkItemID = item?.id
+        if let item { linkSource = item.medium.isPhysical ? .rip : .download }
+    }
+
+    /// Physical items with no digital copy yet: the ones that are this batch's release, release group or album
+    /// first, then the rest (`matching` tells which).
+    var linkCandidates: (matching: [CollectionItem], others: [CollectionItem]) {
+        let waiting = model.collection.items.filter { item in
+            item.isEditable && item.medium.isPhysical && model.collection.digitalState(item).needsDigitizing
+        }
+        var releases = Set<String>(), groups = Set<String>(), keys = Set<String>()
+        for entry in entries where entry.status != .duplicate {
+            if let id = entry.appliedRelease?.id ?? entry.metadata.mbReleaseId { releases.insert(id) }
+            if let id = entry.appliedRelease?.releaseGroupId ?? MBID.validated(entry.metadata.extended.mbReleaseGroupId) { groups.insert(id) }
+            let artist = entry.metadata.albumArtist.isEmpty ? entry.metadata.artist : entry.metadata.albumArtist
+            if !entry.metadata.album.isEmpty { keys.insert(SearchIndex.albumKey(album: entry.metadata.album, artist: artist)) }
+        }
+        func rank(_ item: CollectionItem) -> Int? {
+            if let id = item.releaseID, releases.contains(id) { return 0 }
+            if let id = item.releaseGroupID, groups.contains(id) { return 1 }
+            if keys.contains(item.albumKey) { return 2 }
+            return nil
+        }
+        let ranked = waiting.compactMap { item in rank(item).map { (item, $0) } }.sorted { $0.1 < $1.1 }.map(\.0)
+        let matched = Set(ranked.map(\.id))
+        return (ranked, waiting.filter { !matched.contains($0.id) })
+    }
+
+    /// The item the batch would be linked to without a choice: the best match waiting to be digitized.
+    var suggestedLinkItem: CollectionItem? {
+        guard entries.contains(where: \.isPending) else { return nil }
+        return linkCandidates.matching.first
+    }
+
+    /// What you paid for the whole album and when (Bought as: Whole album): on its album download once it's saved.
+    func setAlbumPurchase(price: Decimal?, day: PurchaseDay?) {
+        albumPrice = price
+        albumDay = day
+        guard let id = albumItemID else { return }
+        model.changeItem(id: id) {
+            $0.price = price
+            $0.purchasedOn = day
+        }
+    }
+
+    /// The whole album's price and day as saved on its download, else as entered.
+    var albumPurchase: (price: Decimal?, day: PurchaseDay?) {
+        if let id = albumItemID, let item = model.item(id: id) { return (item.price, item.purchasedOn) }
+        return (albumPrice, albumDay)
+    }
+
+    /// After a song is imported: the item the batch is the digital copy of moves to the song's album and records
+    /// how (only an item without music of its own); songs bought as a whole album get their album download.
+    private func linkImported(_ track: Track) {
+        let key = SearchIndex.albumKey(album: track.album, artist: track.effectiveAlbumArtist)
+        if let item = effectiveLinkItem {
+            // The first song decides: the choice stays even once the item is digitized and no longer suggested.
+            linkChosen = true
+            linkItemID = item.id
+            if item.isEditable, linkedItems.insert(item.id).inserted,
+               item.albumKey == key || model.collection.libraryTracks(item).isEmpty {
+                let source = linkSource
+                model.changeItem(id: item.id) {
+                    $0.albumKey = key
+                    $0.digitalSource = source
+                }
+            }
+        } else if boughtAsAlbum {
+            saveAlbumDownload(key: key, track: track)
+        }
+    }
+
+    /// The album download for songs bought as a whole album: a download of the album already in the collection
+    /// takes the day and price where it has none; else a new one is added.
+    private func saveAlbumDownload(key: String, track: Track) {
+        if let id = albumItemID, model.item(id: id) != nil { return }
+        if let existing = model.collection.copies(albumKey: key).first(where: { $0.origin == .stored && $0.medium == .download }) {
+            albumItemID = existing.id
+            let price = albumPrice, day = albumDay
+            model.changeItem(id: existing.id) {
+                if $0.price == nil { $0.price = price }
+                if $0.purchasedOn == nil { $0.purchasedOn = day }
+                if $0.digitalSource == nil { $0.digitalSource = .download }
+            }
+            return
+        }
+        var item = CollectionItem(medium: .download, album: track.album, artist: track.effectiveAlbumArtist, albumKey: key)
+        item.price = albumPrice
+        item.purchasedOn = albumDay
+        item.digitalSource = .download
+        item.releaseID = MBID.validated(track.metadata.mbReleaseId)
+        item.releaseGroupID = MBID.validated(track.metadata.extended.mbReleaseGroupId)
+        item.year = track.year.flatMap { (1000...9999).contains($0) ? $0 : nil }
+        if (track.metadata.discTotal ?? 1) <= 1, let total = track.metadata.trackTotal, (1...999).contains(total) { item.trackCount = total }
+        if let saved = model.saveItem(item) { albumItemID = saved.id }
+    }
+
+    private func resetCollection() {
+        linkItemID = nil
+        linkChosen = false
+        linkSource = .rip
+        boughtAsAlbum = false
+        albumPrice = nil
+        albumDay = nil
+        albumItemID = nil
+        linkedItems = []
     }
 
     func remove(_ entry: ImportEntry) {

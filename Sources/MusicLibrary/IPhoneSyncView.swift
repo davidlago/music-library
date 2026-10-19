@@ -16,8 +16,9 @@ struct IPhoneSyncView: View {
             phones(store, songs: tracks.count)
             Divider()
             if store.selection.isEmpty {
-                ContentUnavailableView("Nothing to Sync Yet", systemImage: "iphone",
-                                       description: Text("Add albums, artists, playlists or songs with Add to iPhone in their menus, or tap Download on the iPhone. The iPhone keeps exactly this list."))
+                ContentUnavailableView(store.phones.contains { store.collectionScope(for: $0) != .off } ? "Nothing Else on the List" : "Nothing to Sync Yet",
+                                       systemImage: "iphone",
+                                       description: Text("Add albums, artists, playlists or songs with Add to iPhone in their menus, or tap Download on the iPhone. The iPhone keeps exactly this list, plus the digital copies its Collection on iPhone setting adds. Your whole collection, with its covers, always goes to the iPhone."))
                     .frame(maxHeight: .infinity)
             } else {
                 List(selection: $selection) {
@@ -112,14 +113,16 @@ struct IPhoneSyncView: View {
                     (Text("Last synced ") + Text(date, style: .relative) + Text(" ago" + (phone.lastSummary.map { ": " + summaryText($0) } ?? "")))
                         .font(.caption).foregroundStyle(.subtext).lineLimit(1)
                 }
+                CollectionOnIPhoneRow(phone: phone, store: store)
             }
             Spacer()
             if case .syncing(phone.id, let progress) = store.activity {
                 ProgressView(value: progress.fraction).frame(width: 160)
                 Button("Cancel") { store.cancel() }
             } else {
+                // A collection goes to the phone even with no songs (its items and covers).
                 Button("Sync Now", systemImage: "arrow.triangle.2.circlepath") { model.syncIPhone(phone) }
-                    .disabled(peer == nil || store.isBusy || songs == 0)
+                    .disabled(peer == nil || store.isBusy || (songs == 0 && model.collection.items.isEmpty))
                 Menu {
                     Button("Unpair", role: .destructive) { store.unpair(phone) }
                 } label: {
@@ -171,6 +174,61 @@ struct IPhoneSyncView: View {
         if let n = s.purchases, n > 0 { parts.append("\(n) owned \(n == 1 ? "album" : "albums") updated") }
         if s.missing > 0 { parts.append("\(s.missing) missing here") }
         return parts.joined(separator: ", ")
+    }
+}
+
+/// Collection on iPhone for one phone: Off, the digital copies of your CDs, of your records, or of everything in
+/// your collection, added to its list (Remove from iPhone still wins; new rips join at the next sync), and what that
+/// comes to: "Digital copies of 330 of your 399 CDs: 4,210 songs, 98 GB".
+struct CollectionOnIPhoneRow: View {
+    @Environment(AppModel.self) private var model
+    let phone: SyncStore.PairedPhone
+    let store: SyncStore
+    @State private var bytes: Int64?
+
+    var body: some View {
+        let scope = store.collectionScope(for: phone)
+        let songs = scope == .off ? [] : songs(scope)
+        HStack(spacing: 8) {
+            Picker("Collection on iPhone", selection: Binding(get: { scope }, set: { store.setCollectionScope($0, for: phone) })) {
+                ForEach(CollectionSyncScope.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .fixedSize()
+            .controlSize(.small)
+            .help("Also put the digital copies of what you own on this iPhone, besides the list below")
+            if let summary = summary(scope, songs: songs.count) {
+                Text(summary).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+            }
+        }
+        .padding(.top, 2)
+        .task(id: "\(scope.rawValue)|\(model.libraryVersion)|\(model.collectionVersion)") {
+            let root = model.libraryRoot, list = songs
+            bytes = nil
+            guard !list.isEmpty else { return }
+            bytes = await Task.detached(priority: .utility) {
+                list.reduce(Int64(0)) { $0 + ($1.resolvedFileURL(root: root).flatMap(LibraryExporter.size(of:)) ?? 0) }
+            }.value
+        }
+    }
+
+    /// The songs the scope adds, each once.
+    private func songs(_ scope: CollectionSyncScope) -> [Track] {
+        var seen = Set<Int64>()
+        return model.collection.syncItems(scope).flatMap(model.tracks(for:)).filter { seen.insert($0.id).inserted }
+    }
+
+    private func summary(_ scope: CollectionSyncScope, songs: Int) -> String? {
+        let items: [CollectionItem]
+        let noun: String
+        switch scope {
+        case .off: return nil
+        case .cds: items = model.collection.items.filter { $0.medium == .cd }; noun = "CDs"
+        case .vinyl: items = model.collection.items.filter { $0.medium == .vinyl }; noun = "records"
+        case .all: items = model.collection.items; noun = "CDs, records and downloads"
+        }
+        let digitized = items.filter { model.collection.digitalState($0).hasMusic }.count
+        let size = bytes.map { ", " + ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? ""
+        return "Digital copies of \(digitized.formatted()) of your \(items.count.formatted()) \(noun): \(songCount(songs))\(size)"
     }
 }
 

@@ -282,7 +282,7 @@ struct CollectionItemDetail: View {
                     status("circle.lefthalf.filled", "\(have) of \(of) songs in your library · \(formatLongDuration(songs.reduce(0) { $0 + $1.duration }))")
                     HStack {
                         albumButton(album)
-                        if let disc { Button("Rip the Rest") { model.sidebar = .cd(disc.id) } }
+                        if let disc { Button("Rip the Rest") { model.cd.show(disc, for: item) } }
                     }
                 case .otherCopy(_, let fromID):
                     let from = fromID.flatMap { model.item(id: $0) }
@@ -310,7 +310,7 @@ struct CollectionItemDetail: View {
                             Button("Unlink") { model.unlink(itemID: item.id) }
                                 .help("Mark it as never digitized")
                             if item.medium == .cd {
-                                Button("Rip Again") { if let disc { model.sidebar = .cd(disc.id) } }
+                                Button("Rip Again") { if let disc { model.cd.show(disc, for: item) } }
                                     .disabled(disc == nil)
                                     .help(disc == nil ? "Insert this CD to rip it again" : "Rip the CD in the drive")
                             }
@@ -333,7 +333,7 @@ struct CollectionItemDetail: View {
             if let disc {
                 status("opticaldisc.fill", "This CD is in the drive")
                 HStack {
-                    Button("Rip Now") { model.sidebar = .cd(disc.id) }.buttonStyle(.borderedProminent)
+                    Button("Rip Now") { model.cd.show(disc, for: item) }.buttonStyle(.borderedProminent)
                     actions(item, importTitle: "Import Files…")
                 }
             } else {

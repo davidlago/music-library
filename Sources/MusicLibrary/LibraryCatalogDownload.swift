@@ -152,6 +152,12 @@ extension LibraryCatalogStore {
 
     func refreshOwned() {
         ownedIds = Set(records.values.filter { ownership.album(for: $0.item, details: details[$0.id]) != nil }.map(\.id))
+        var media: [String: Set<String>] = [:]
+        for record in records.values {
+            let copies = collectionCopies(record.item)
+            if !copies.isEmpty { media[record.id] = Set(copies.map(\.medium.rawValue)) }
+        }
+        collectionMedia = media
         runLocalSearch()
     }
 
@@ -174,7 +180,8 @@ extension LibraryCatalogStore {
     }
 
     func runLocalSearch() {
-        let context = CatalogSearchContext(owned: ownedIds, onList: Set(listEntries.map(\.item.id)), siteLibrary: siteLibrary)
+        let context = CatalogSearchContext(owned: ownedIds, onList: Set(listEntries.map(\.item.id)), siteLibrary: siteLibrary,
+                                           collection: collectionMedia)
         localResult = index.search(localQuery, libraries: localLibraries.isEmpty ? nil : Set(localLibraries), context: context, sort: localSort)
     }
 

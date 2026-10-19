@@ -66,241 +66,209 @@ struct PurchasePriceField: View {
     }
 }
 
-/// The number on the sticker on your copy, saved as you type (digits only; anything else clears it). While empty it
-/// offers `suggestion`, the next number in your series, and `taken` names another album with the same number.
-struct LabelNumberField: View {
-    @Binding var number: Int?
-    let suggestion: Int
-    var taken: AlbumPurchase?
-    @State private var text = ""
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Text("#").foregroundStyle(.subtext)
-            TextField("Label number", text: $text, prompt: Text(String(suggestion)))
-                .textFieldStyle(.roundedBorder)
-                .labelsHidden()
-                .frame(width: 70)
-                .help("The number on the label you put on this CD")
-                .onSubmit { text = Self.format(number) }
-            if number == nil {
-                Button("Use \(suggestion)") { number = suggestion }
-                    .help("The next number in your series")
-            } else if let taken {
-                Label("Also on \(taken.album)", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange).lineLimit(1)
-                    .help("\(taken.album) — \(taken.artist) has this number too")
-            }
-        }
-        .onAppear { text = Self.format(number) }
-        .onChange(of: text) { let n = Self.parse(text); if n != number { number = n } }
-        .onChange(of: number) { if Self.parse(text) != number { text = Self.format(number) } }
-    }
-
-    static func format(_ number: Int?) -> String { number.map(String.init) ?? "" }
-
-    static func parse(_ text: String) -> Int? {
-        let s = text.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        return Int(s).flatMap(AlbumPurchase.validLabelNumber)
-    }
-}
-
 // MARK: Album page
 
-/// "Your Copy" on the album page: whether you own the album and, if so, whether you bought the CD or a download, when,
-/// what you paid and the CD's label number (the next in the series when you first say you own it).
-struct AlbumOwnershipSection: View {
+/// "Your Copies" on the album page: each copy of the album you own (its case or sleeve, label, medium, purchase and
+/// digital copy; clicking one opens its page), Add a Copy (a CD or record with the next label in its series, or a
+/// download, linked to this album; its date and price then show inline), Add Existing Item… (link a copy with no
+/// music, like the record you bought before the download), and what the album has cost you per play.
+struct YourCopiesSection: View {
     @Environment(AppModel.self) private var model
     let album: AlbumSummary
     /// All-time plays of the album's tracks.
     let plays: Int
-    /// What was entered before switching ownership off, restored if it's switched back on.
-    @State private var draft: AlbumPurchase?
+    /// The copy just added here, whose date and price show inline.
+    @State private var added: String?
+    @State private var linkingExisting = false
 
     var body: some View {
-        // What you said about the album, else a download made of the songs you bought from it.
-        let record = model.purchaseRecord(for: album)
-        let purchase = record ?? model.purchase(for: album)
+        let copies = self.copies
         VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "Your Copy")
-            Toggle("I own this album", isOn: Binding(get: { purchase != nil }, set: { setOwned($0) }))
-                .toggleStyle(.switch)
-                // Owned through its songs: change their prices on the Import page, or edit the details below.
-                .disabled(record == nil && purchase != nil)
-            if record == nil, let songs = songsBought() {
-                Text(songs).font(.callout).foregroundStyle(.subtext)
+            HStack(alignment: .firstTextBaseline) {
+                SectionHeader(title: copies.count == 1 ? "Your Copy" : "Your Copies")
+                Spacer()
+                addMenu
             }
-            if let purchase {
-                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-                    GridRow {
-                        Text("Format").foregroundStyle(.subtext)
-                        Picker("Format", selection: field(\.format)) {
-                            Text("CD").tag(AlbumPurchase.Format.cd)
-                            Text("Download").tag(AlbumPurchase.Format.digital)
-                        }
-                        .pickerStyle(.segmented).labelsHidden().fixedSize()
-                        .help("Whether you bought the CD or the album as a download")
-                    }
-                    GridRow {
-                        Text("Bought").foregroundStyle(.subtext)
-                        PurchaseDateField(day: field(\.purchasedOn))
-                    }
-                    GridRow {
-                        Text("Paid").foregroundStyle(.subtext)
-                        PurchasePriceField(price: field(\.price))
-                    }
-                    if purchase.format == .cd {
-                        GridRow {
-                            Text("Label").foregroundStyle(.subtext)
-                            LabelNumberField(number: field(\.labelNumber), suggestion: AlbumPurchase.nextLabelNumber(in: model.purchases),
-                                             taken: purchase.labelNumber.flatMap {
-                                                 AlbumPurchase.album(labeled: $0, in: model.purchases, excluding: AlbumInfoStore.key(album))
-                                             })
-                        }
+            if copies.isEmpty {
+                Label("Not in your collection", systemImage: "arrow.left.arrow.right")
+                    .font(.callout).foregroundStyle(.subtext)
+                    .help("Borrowed, or not added yet: add the copy you own")
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(copies) { item in
+                        Button { model.showItem(id: item.id) } label: { CopyRow(item: item) }
+                            .buttonStyle(.plain)
+                            .contextMenu { CollectionItemMenu(model: model, item: item) }
+                        if item.id == added, item.isEditable { addedFields(item) }
                     }
                 }
-                .font(.callout)
-                if let summary = summary(purchase) {
+                if let summary = summary(copies) {
                     Text(summary).font(.caption).foregroundStyle(.subtext)
                 }
             }
         }
-        .onChange(of: album.id) { draft = nil }
+        .onChange(of: album.id) { added = nil }
+        .sheet(isPresented: $linkingExisting) { AddExistingItemSheet(album: album).themedSheet() }
     }
 
-    private func setOwned(_ on: Bool) {
-        if on {
-            model.setPurchase(draft ?? AlbumPurchase(album: album.album, artist: album.artist,
-                                                     labelNumber: AlbumPurchase.nextLabelNumber(in: model.purchases)), for: album)
-        } else {
-            draft = model.purchaseRecord(for: album)
-            model.setPurchase(nil, for: album)
+    /// The album's copies as saved now, including one added a moment ago.
+    private var copies: [CollectionItem] {
+        let key = AlbumInfoStore.key(album)
+        var list = model.collection.copies(albumKey: key).compactMap { model.item(id: $0.id) }.filter { $0.albumKey == key }
+        if let added, !list.contains(where: { $0.id == added }), let item = model.item(id: added), item.albumKey == key { list.append(item) }
+        return list
+    }
+
+    private var addMenu: some View {
+        HStack(spacing: 8) {
+            Menu("Add a Copy") {
+                Button("CD (next CD #\(model.nextNumber(in: .cd)))") { add(.cd) }
+                Button("Vinyl (next Vinyl #\(model.nextNumber(in: .vinyl)))") { add(.vinyl) }
+                Button("Download") { add(.download) }
+            }
+            .fixedSize()
+            .help("Add the copy you own to your collection, linked to this album")
+            Button("Add Existing Item…") { linkingExisting = true }
+                .help("Link an item in your collection that has no music yet to this album")
         }
+        .controlSize(.small)
     }
 
-    /// "From the 3 of 12 songs you bought as downloads", for an album owned through its songs (entered when importing them).
-    private func songsBought() -> String? {
-        let tracks = model.tracks(of: album)
-        let bought = tracks.filter { model.trackPurchases[$0.id] != nil }.count
-        guard bought > 0 else { return nil }
-        if bought == tracks.count { return bought == 1 ? "From the song you bought as a download." : "From the \(bought) songs you bought as downloads." }
-        return "From the \(bought) of \(tracks.count) songs you bought as downloads."
+    private func add(_ medium: CollectionMedium) {
+        if let saved = model.addCopy(of: album, medium: medium) { added = saved.id }
     }
 
-    /// A binding to one field of the album's purchase; every change is saved. Editing an album owned through its songs
-    /// saves what's shown as the album's own details, which then take their place.
-    private func field<T>(_ path: WritableKeyPath<AlbumPurchase, T>) -> Binding<T> {
-        Binding(get: { (model.purchaseRecord(for: album) ?? model.purchase(for: album) ?? AlbumPurchase(album: album.album, artist: album.artist))[keyPath: path] },
-                set: { value in
-                    guard var p = model.purchaseRecord(for: album) ?? model.purchase(for: album) else { return }
-                    p[keyPath: path] = value
-                    model.setPurchase(p, for: album)
-                })
+    /// Bought and Paid for the copy just added, saved as they change.
+    private func addedFields(_ item: CollectionItem) -> some View {
+        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+            GridRow {
+                Text("Bought").foregroundStyle(.subtext)
+                PurchaseDateField(day: field(item, \.purchasedOn))
+            }
+            GridRow {
+                Text("Paid").foregroundStyle(.subtext)
+                PurchasePriceField(price: field(item, \.price))
+            }
+        }
+        .font(.callout)
+        .padding(.leading, 80).padding(.vertical, 6)
     }
 
-    private func summary(_ p: AlbumPurchase) -> String? {
+    private func field<T: Equatable>(_ item: CollectionItem, _ path: WritableKeyPath<CollectionItem, T>) -> Binding<T> {
+        Binding(get: { (model.item(id: item.id) ?? item)[keyPath: path] },
+                set: { value in model.changeItem(id: item.id) { $0[keyPath: path] = value } })
+    }
+
+    /// "Yours since 2009 · 34 plays · $0.41 a play" (what every copy cost, over the album's plays).
+    private func summary(_ copies: [CollectionItem]) -> String? {
         var parts: [String] = []
-        if let day = p.purchasedOn {
-            parts.append("Yours since \(day.date().formatted(.relative(presentation: .named)))")
+        if let first = copies.compactMap(\.purchasedOn).min() {
+            parts.append("Yours since \(first.date().formatted(.relative(presentation: .named)))")
         }
-        if let price = p.price, price > 0, plays > 0 {
-            parts.append("\(formatMoney(price / Decimal(plays))) a play so far")
-        }
+        if plays > 0 { parts.append(plays == 1 ? "1 play" : "\(plays.formatted()) plays") }
+        let spent = copies.compactMap(\.price).reduce(Decimal(0), +)
+        if spent > 0, plays > 0 { parts.append("\(formatMoney(spent / Decimal(plays))) a play") }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
 
-// MARK: CD ripping
-
-/// "Do you own this CD?" with the purchase date, price and label number, shown above a matched disc's tracks. The
-/// answer is saved for the album when ripping starts, and again on any change after that.
-struct CDOwnershipPanel: View {
-    @Bindable var disc: CDDisc
-
-    var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "bag").foregroundStyle(.subtext)
-            Text("Do you own this CD?").font(.callout.weight(.semibold))
-            CDOwnershipPicker(disc: disc)
-            if disc.owned == true {
-                Divider().frame(height: 18)
-                Text("Bought").foregroundStyle(.subtext)
-                PurchaseDateField(day: $disc.purchasedOn)
-                Text("Paid").foregroundStyle(.subtext)
-                PurchasePriceField(price: $disc.price)
-                Text("Label").foregroundStyle(.subtext)
-                CDLabelNumberField(disc: disc)
-            }
-            Spacer(minLength: 0)
-        }
-        .font(.callout)
-        .padding(.horizontal, 14).padding(.vertical, 8)
-        .background(Color.secondary.opacity(0.06))
-    }
-}
-
-/// The disc's label number; another album with the same number is pointed out.
-struct CDLabelNumberField: View {
+/// Add Existing Item… on an album page: an item in your collection with no music in the library yet (an unripped
+/// CD, a record, a download not imported), to link to this album, with how the music relates to it. Items titled
+/// like the album come first. Only what the user picks is changed: the item's album key and digital source.
+struct AddExistingItemSheet: View {
     @Environment(AppModel.self) private var model
-    @Bindable var disc: CDDisc
-
-    var body: some View {
-        LabelNumberField(number: $disc.labelNumber, suggestion: model.cd.nextLabelNumber(),
-                         taken: disc.labelNumber.flatMap { AlbumPurchase.album(labeled: $0, in: model.purchases, excluding: disc.albumKey) })
-    }
-}
-
-struct CDOwnershipPicker: View {
-    @Bindable var disc: CDDisc
-
-    var body: some View {
-        Picker("Do you own this CD?", selection: $disc.owned) {
-            Text("Yes").tag(Bool?.some(true))
-            Text("No").tag(Bool?.some(false))
-        }
-        .pickerStyle(.segmented).labelsHidden().fixedSize()
-        .help("Albums you own show up in Insights › Owned, with what you paid")
-    }
-}
-
-/// Asked when ripping starts before the ownership question was answered.
-struct CDOwnershipSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Bindable var disc: CDDisc
-    let rip: () -> Void
+    let album: AlbumSummary
+    @State private var query = ""
+    @State private var selection: String?
+    @State private var source: DigitalSource = .same
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Do you own this CD?").font(.title3.bold())
-            if let release = disc.release {
-                Text("\(release.album) — \(release.albumArtist)").foregroundStyle(.subtext)
+        let (suggested, others) = candidates
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Add Existing Item").font(.title2.bold())
+            Text("Which item in your collection is a copy of “\(album.album)”? Items with music of their own aren't listed.")
+                .font(.callout).foregroundStyle(.subtext)
+            TextField("Search your collection", text: $query, prompt: Text("Search your collection"))
+                .textFieldStyle(.roundedBorder)
+            List(selection: $selection) {
+                if !suggested.isEmpty { Section("Suggestions") { ForEach(suggested) { row($0) } } }
+                Section(query.isEmpty ? "Without Music" : "Matching “\(query)”") { ForEach(others) { row($0) } }
             }
-            CDOwnershipPicker(disc: disc)
-            if disc.owned == true {
-                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-                    GridRow {
-                        Text("Bought").foregroundStyle(.subtext)
-                        PurchaseDateField(day: $disc.purchasedOn)
-                    }
-                    GridRow {
-                        Text("Paid").foregroundStyle(.subtext)
-                        PurchasePriceField(price: $disc.price)
-                    }
-                    GridRow {
-                        Text("Label").foregroundStyle(.subtext)
-                        CDLabelNumberField(disc: disc)
-                    }
+            .frame(minHeight: 260)
+            .overlay {
+                if suggested.isEmpty && others.isEmpty {
+                    Text("Every item in your collection has music in the library.").foregroundStyle(.subtext)
                 }
             }
-            Text("You can change this later on the album's page.").font(.caption).foregroundStyle(.subtext)
+            if let item = selectedItem {
+                Picker("This album is", selection: $source) {
+                    ForEach(LinkAlbumPicker.sources(for: item.medium), id: \.0) { Text($0.1).tag($0.0) }
+                }
+                .pickerStyle(.radioGroup)
+            }
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button(disc.owned == nil ? "Rip Without Answering" : "Rip") { dismiss(); rip() }
+                Button("Link") { link() }
                     .keyboardShortcut(.defaultAction)
+                    .disabled(selectedItem == nil)
             }
         }
         .padding(20)
-        .frame(width: 440)
+        .frame(width: 540, height: 560)
+        .onAppear { selection = suggested.first?.id }
+        .onChange(of: selection) {
+            if let item = selectedItem { source = item.digitalSource ?? LinkAlbumPicker.defaultSource(item.medium) }
+        }
+    }
+
+    private var selectedItem: CollectionItem? { selection.flatMap { model.item(id: $0) } }
+
+    /// Items with no music, those titled like the album (by a compatible artist) first, then the rest matching the
+    /// search.
+    private var candidates: (suggested: [CollectionItem], others: [CollectionItem]) {
+        let key = AlbumInfoStore.key(album)
+        let open = model.collection.items.filter { item in
+            item.isEditable && item.albumKey != key && model.collection.libraryTracks(item).isEmpty
+        }
+        let title = TextNormalizer.normalize(album.album), artist = TextNormalizer.normalize(album.artist)
+        func alike(_ item: CollectionItem) -> Bool {
+            let a = TextNormalizer.normalize(item.artist)
+            return TextNormalizer.normalize(item.album) == title && (artist.isEmpty || a.isEmpty || a.contains(artist) || artist.contains(a))
+        }
+        let q = TextNormalizer.normalize(query)
+        let suggested = q.isEmpty ? open.filter(alike) : []
+        let rest = open.filter { item in
+            !suggested.contains(where: { $0.id == item.id })
+                && (q.isEmpty || TextNormalizer.normalize("\(item.album) \(item.artist) \(item.sticker?.text ?? "")").contains(q))
+        }
+        return (suggested, rest)
+    }
+
+    private func row(_ item: CollectionItem) -> some View {
+        HStack(spacing: 10) {
+            CopyArt(mark: model.collection.mark(item: item), url: model.coverURL(for: item), width: 40, revision: model.coverRevision,
+                    title: item.album)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.album.isEmpty ? "Unknown Album" : item.album).lineLimit(1)
+                Text([item.artist, item.year.map(String.init), item.formatDetail ?? item.medium.name].compactMap { $0 }
+                    .filter { !$0.isEmpty }.joined(separator: " · "))
+                    .font(.caption).foregroundStyle(.subtext).lineLimit(1)
+            }
+            Spacer()
+            if let s = item.sticker { StickerPill(sticker: s, size: 10) }
+        }
+        .tag(item.id)
+    }
+
+    private func link() {
+        guard let item = selectedItem else { return }
+        let key = AlbumInfoStore.key(album), source = self.source
+        model.changeItem(id: item.id) {
+            $0.albumKey = key
+            $0.digitalSource = source
+        }
+        dismiss()
     }
 }

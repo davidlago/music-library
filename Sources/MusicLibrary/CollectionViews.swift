@@ -468,7 +468,7 @@ struct CollectionItemMenu: View {
         }
         Divider()
         if let disc = model.discInDrive(for: item) {
-            Button("Rip This CD") { model.sidebar = .cd(disc.id) }
+            Button("Rip This CD") { model.cd.show(disc, for: item) }
         }
         if item.isEditable {
             Button("Link to Library Album…") { model.collectionSheet = .link(itemID: item.id) }

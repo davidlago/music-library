@@ -37,15 +37,28 @@ final class CDDisc: Identifiable {
     var searchArtist = ""
     var statusLine = ""
     var message: String?
-    /// Your answer to "Do you own this CD?" (nil until answered), with the purchase date, price and label number.
-    var owned: Bool?
-    var purchasedOn: PurchaseDay?
-    var price: Decimal?
-    var labelNumber: Int?
-    /// Set once a label number was suggested (or came from the library), so clearing it doesn't bring it back.
-    var labelSuggested = false
-    /// Set once ripping has started, from then on changes to the answer are saved right away.
-    var ownershipSaved = false
+    /// The stored CD items this disc may be (`MusicCollection.matches`: by release, barcode, album key or release
+    /// group), the ones not ripped yet first.
+    var matches: [CollectionItem] = []
+    /// Which copy in your collection this CD is: nil until answered (Settings ▸ Collection can ask whether a CD with
+    /// no item is yours).
+    var collectionChoice: CDCollectionChoice?
+    /// The user picked the copy (or answered), so a new lookup doesn't pick for them again.
+    var choiceTouched = false
+    /// A new copy's label number, purchase date and price, until it's saved.
+    var newSticker: Int?
+    var newPurchasedOn: PurchaseDay? = PurchaseDay(Date())
+    var newPrice: Decimal?
+    /// Set once a label number was suggested for a new copy, so clearing it doesn't bring it back.
+    var stickerSuggested = false
+    /// The item this disc's page added (when ripping or cataloging started): the only one switching off removes.
+    var createdItemID: String?
+    /// Set once ripping or cataloging has started: from then on changes to the choice are saved right away.
+    var collectionSaved = false
+    /// The rip has been linked to the item (when its first track was imported).
+    var ripLinked = false
+    /// Why the collection item couldn't be saved (a label another item has).
+    var collectionMessage: String?
     /// The library's tracks from this disc, by track number: ripped now or before (for checking them).
     var libraryTracks: [Int: Track] = [:]
     var isChecking = false
@@ -71,6 +84,24 @@ final class CDDisc: Identifiable {
     var remainingCount: Int {
         rows.filter { $0.selected && ($0.status == .pending || $0.status.isActive) }.count
     }
+    /// The collection item the rip goes with: the existing copy picked, or the new one once it's saved.
+    var itemID: String? {
+        switch collectionChoice {
+        case .existing(let id)?: id
+        case .new?: createdItemID
+        default: nil
+        }
+    }
+}
+
+/// Which copy in your collection a disc in a drive is.
+enum CDCollectionChoice: Hashable {
+    /// A CD item already in the collection (ripped or not).
+    case existing(String)
+    /// A new CD item, saved when ripping or cataloging starts.
+    case new
+    /// Not yours: nothing is added (and nothing existing is touched).
+    case none
 }
 
 extension CDDisc.RowStatus {
@@ -172,7 +203,7 @@ final class CDController {
             guard !disc.removed, disc.selectedCandidateID == candidate.id else { return }
             disc.release = release
             disc.medium = candidate.mediumPosition
-            prefillOwnership(disc)
+            matchCollectionItem(disc)
             disc.cover = (try? await model.coverArt.fetchFront(releaseId: release.id, releaseGroupId: release.releaseGroupId)) ?? nil
             buildRows(disc)
             disc.lookup = .matched
@@ -226,38 +257,155 @@ final class CDController {
         do { try NSWorkspace.shared.unmountAndEjectDevice(at: disc.volume.url) } catch { model.errorMessage = error.localizedDescription }
     }
 
-    // MARK: Ownership
+    // MARK: Collection
 
-    /// Fills in the ownership answer from the library when you already said you own the CD (re-ripping a disc).
-    private func prefillOwnership(_ disc: CDDisc) {
-        guard disc.owned == nil, !disc.ownershipSaved, let key = disc.albumKey, let p = model.purchaseRecords[key], p.format == .cd else { return }
-        disc.owned = true
-        disc.purchasedOn = p.purchasedOn
-        disc.price = p.price
-        disc.labelNumber = p.labelNumber
-        disc.labelSuggested = true
+    /// Finds the CD items this disc may be. Until the user picks, the first one (not ripped yet, then the closest
+    /// match) is chosen, else a new copy, or the question when Settings ▸ Collection asks. Nothing is matched again
+    /// once ripping or cataloging has saved the choice. Records and downloads are never matched.
+    func matchCollectionItem(_ disc: CDDisc) {
+        guard !disc.collectionSaved, let release = disc.release else { return }
+        disc.matches = model.collection.matches(releaseID: release.id, releaseGroupID: release.releaseGroupId, albumKey: disc.albumKey,
+                                                barcode: release.barcode, medium: .cd)
+        if disc.choiceTouched {
+            // A copy picked earlier that this edition doesn't match any more: pick again.
+            guard case .existing(let id)? = disc.collectionChoice, !disc.matches.contains(where: { $0.id == id }) else { return }
+        }
+        disc.collectionChoice = disc.matches.first.map { .existing($0.id) } ?? (model.askCDOwnership ? nil : .new)
+        if disc.collectionChoice == .new { suggestLabel(disc) }
     }
 
-    /// The next number in your label series, past the ones saved and the ones suggested for other discs in the drives.
-    func nextLabelNumber() -> Int {
-        let pending = discs.filter { !$0.ownershipSaved && $0.owned == true }.compactMap(\.labelNumber)
-        return max(AlbumPurchase.nextLabelNumber(in: model.purchases), min((pending.max() ?? 0) + 1, AlbumPurchase.maxLabelNumber))
+    /// Opens a disc's page from its item's (Rip Now): the rip goes with that item, unless ripping or cataloging
+    /// already saved another choice.
+    func show(_ disc: CDDisc, for item: CollectionItem) {
+        if !disc.collectionSaved, disc.matches.contains(where: { $0.id == item.id }) {
+            disc.collectionChoice = .existing(item.id)
+            disc.choiceTouched = true
+        }
+        model.sidebar = .cd(disc.id)
     }
 
-    /// Answering yes for the first time fills in the next label number.
+    /// The next number in your CD labels, past the ones saved and the ones suggested for other discs in the drives.
+    func nextLabelNumber(for disc: CDDisc? = nil) -> Int {
+        let pending = discs.filter { $0 !== disc && $0.createdItemID == nil && $0.collectionChoice == .new }.compactMap(\.newSticker)
+        return model.nextNumber(in: .cd, pending: pending)
+    }
+
+    /// A new copy gets the next label number the first time.
     func suggestLabel(_ disc: CDDisc) {
-        guard disc.owned == true, !disc.labelSuggested else { return }
-        disc.labelSuggested = true
-        if disc.labelNumber == nil { disc.labelNumber = nextLabelNumber() }
+        guard disc.collectionChoice == .new, !disc.stickerSuggested else { return }
+        disc.stickerSuggested = true
+        if disc.newSticker == nil { disc.newSticker = nextLabelNumber(for: disc) }
     }
 
-    /// Saves the answer for the matched album: owned with its details, or not owned. Unanswered changes nothing.
-    func saveOwnership(_ disc: CDDisc) {
-        guard let owned = disc.owned, let release = disc.release, let key = disc.albumKey else { return }
-        model.setPurchase(owned ? AlbumPurchase(album: release.album, artist: release.albumArtist,
-                                                purchasedOn: disc.purchasedOn, price: disc.price,
-                                                labelNumber: disc.labelNumber) : nil,
-                          forKey: key)
+    /// Changes which copy the CD is. Moving away from a new copy this page saved removes that one item (never an
+    /// item that was in the collection before); once ripping or cataloging has started, the new choice is saved at
+    /// once.
+    func setChoice(_ disc: CDDisc, _ choice: CDCollectionChoice?) {
+        guard disc.collectionChoice != choice else { return }
+        disc.choiceTouched = true
+        disc.collectionMessage = nil
+        if disc.collectionChoice == .new, let created = disc.createdItemID {
+            if model.item(id: created) != nil { model.deleteItem(id: created) }
+            disc.createdItemID = nil
+        }
+        disc.collectionChoice = choice
+        suggestLabel(disc)
+        guard disc.collectionSaved else { return }
+        _ = saveCollection(disc, cataloging: false)
+        disc.ripLinked = false
+        if let track = disc.rows.first(where: { $0.status == .done }).flatMap({ disc.libraryTracks[$0.id] }) { linkRip(disc, track: track) }
+    }
+
+    /// Saves the CD's copy in the collection: an existing item gets the album key and the release's track and disc
+    /// counts, and only the details it lacks (its medium, label and purchase are never changed here); a new one is
+    /// added with its label and purchase. Not yours (or unanswered) saves nothing. With `cataloging`, an item with no
+    /// cover of its own and no music takes the disc's cover. False (with `collectionMessage`) when it can't be saved.
+    func saveCollection(_ disc: CDDisc, cataloging: Bool) -> Bool {
+        guard let release = disc.release, let key = disc.albumKey else { return false }
+        let cover = cataloging ? disc.cover.flatMap(CoverImage.jpeg(from:)) : nil
+        switch disc.collectionChoice {
+        case .existing(let id)?:
+            guard let current = model.item(id: id), current.isEditable, current.medium == .cd else { break }
+            let jpeg = current.coverFile == nil && model.collection.libraryTracks(current).isEmpty ? cover : nil
+            model.changeItem(id: id, cover: jpeg) { fill(&$0, release: release, disc: disc, key: key) }
+        case .new?:
+            if let created = disc.createdItemID, model.item(id: created) != nil {
+                model.changeItem(id: created) { fill(&$0, release: release, disc: disc, key: key) }
+                break
+            }
+            if let n = disc.newSticker, let sticker = Sticker(series: .cd, number: n), let other = model.itemLabeled(sticker, excluding: nil) {
+                disc.collectionMessage = "\(sticker.text) is taken by “\(other.album)”. Pick another number."
+                return false
+            }
+            var item = CollectionItem(medium: .cd, album: release.album, artist: release.albumArtist, albumKey: key)
+            item.stickerNumber = disc.newSticker
+            item.purchasedOn = disc.newPurchasedOn
+            item.price = disc.newPrice
+            fill(&item, release: release, disc: disc, key: key)
+            guard let saved = model.saveItem(item, cover: cover) else { return false }
+            disc.createdItemID = saved.id
+        case .none?, nil:
+            break
+        }
+        disc.collectionMessage = nil
+        disc.collectionSaved = true
+        return true
+    }
+
+    /// The release's details on a CD item: the album key it's ripped as (unless the item is the digital copy of
+    /// another album already), the track and disc counts (of the item's own release), and the rest only where blank.
+    private func fill(_ item: inout CollectionItem, release: ReleaseInfo, disc: CDDisc, key: String) {
+        if item.albumKey != key, model.collection.libraryTracks(item).isEmpty { item.albumKey = key }
+        func blank(_ s: String?) -> Bool { s?.trimmingCharacters(in: .whitespaces).isEmpty ?? true }
+        func text(_ s: String) -> String? {
+            let t = String(s.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
+            return t.isEmpty ? nil : t
+        }
+        let tracks = release.tracks.count, discsTotal = max(release.discTotal, Set(release.tracks.map(\.discNo)).count)
+        let sameRelease = item.releaseID == nil || item.releaseID == release.id
+        if sameRelease || item.trackCount == nil { item.trackCount = (1...999).contains(tracks) ? tracks : item.trackCount }
+        if sameRelease || item.discCount == nil { item.discCount = (1...99).contains(discsTotal) ? discsTotal : item.discCount }
+        if item.album.isEmpty { item.album = String(release.album.prefix(1000)) }
+        if item.artist.isEmpty { item.artist = String(release.albumArtist.prefix(1000)) }
+        if item.releaseID == nil { item.releaseID = MBID.validated(release.id) }
+        if item.releaseGroupID == nil { item.releaseGroupID = MBID.validated(release.releaseGroupId) }
+        if item.year == nil, let y = release.year ?? release.originalYear, (1000...9999).contains(y) { item.year = y }
+        if item.barcode == nil {
+            let digits = release.barcode.filter { ("0"..."9").contains($0) }
+            if (6...20).contains(digits.count) { item.barcode = digits }
+        }
+        if blank(item.catalogNumber) { item.catalogNumber = text(release.catalogNumber) ?? item.catalogNumber }
+        if blank(item.recordLabel) { item.recordLabel = text(release.label) ?? item.recordLabel }
+        if blank(item.country) { item.country = text(release.country) ?? item.country }
+        if blank(item.formatDetail), let format = disc.selectedCandidate?.format { item.formatDetail = text(format) ?? item.formatDetail }
+    }
+
+    /// Once a track of the disc is imported, the CD it was ripped from is ripped (D4): a cancelled rip leaves it
+    /// "Not ripped". Only a CD item, and only when the songs are under its album key (or it has no music of its own).
+    private func linkRip(_ disc: CDDisc, track: Track) {
+        guard !disc.ripLinked, let id = disc.itemID, let current = model.item(id: id), current.medium == .cd, current.isEditable else { return }
+        disc.ripLinked = true
+        let key = SearchIndex.albumKey(album: track.album, artist: track.effectiveAlbumArtist)
+        guard current.albumKey == key || model.collection.libraryTracks(current).isEmpty else { return }
+        model.changeItem(id: id) {
+            $0.albumKey = key
+            $0.digitalSource = .rip
+        }
+    }
+
+    /// Catalog Without Ripping: saves the CD in your collection (the copy matched, else a new one) with the disc's
+    /// cover, and ejects it when Settings ▸ Collection says so, showing its page.
+    func catalog(_ disc: CDDisc) {
+        guard !disc.isRipping, disc.release != nil else { return }
+        if disc.collectionChoice == nil || disc.collectionChoice == CDCollectionChoice.none {
+            setChoice(disc, disc.matches.first.map { .existing($0.id) } ?? .new)
+        }
+        guard saveCollection(disc, cataloging: true), let id = disc.itemID else { return }
+        if model.ejectAfterCataloging {
+            model.showShelf()
+            model.showItem(id: id)
+            eject(disc)
+        }
     }
 
     // MARK: Ripping
@@ -275,8 +423,7 @@ final class CDController {
         let importer = CDImporter(tools: model.tools)
         let volume = disc.volume
         let cover = disc.cover
-        saveOwnership(disc)
-        disc.ownershipSaved = true
+        guard saveCollection(disc, cataloging: false) else { return }
         disc.isRipping = true
         disc.task = Task { [weak self] in
             let targets = disc.rows.filter { $0.selected && !$0.status.isFinished }.map(\.id)
@@ -319,6 +466,7 @@ final class CDController {
                     }
                     if let i = disc.rows.firstIndex(where: { $0.id == number }) { disc.rows[i].status = .done }
                     disc.libraryTracks[number] = track
+                    self?.linkRip(disc, track: track)
                     // The disc is saved with the track right away, so it can be checked later if checking now fails.
                     self?.model.saveRipChecks([RipCheck(trackId: track.id, toc: volume.toc, discTrack: number, result: .unchecked)])
                     self?.model.reloadLibrary()
@@ -546,7 +694,10 @@ final class CDController {
             }
             disc.isRipping = false
             disc.statusLine = ""
-            if !files.isEmpty { self?.model.importURLs(files) }
+            guard let self, !files.isEmpty else { return }
+            // The files are the rip of the CD picked on this page: the Import page links them to it (D4).
+            if disc.release != nil, self.saveCollection(disc, cataloging: false), let id = disc.itemID { self.model.importLinkItemID = id }
+            self.model.importURLs(files)
         }
     }
 }

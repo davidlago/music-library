@@ -13,6 +13,8 @@ struct SyncContext {
     /// Every track in the library.
     var library: [Track]
     var tracks: (ExportItem) -> [Track]
+    /// What you own, for each phone's Collection on iPhone.
+    var collection: MusicCollection
 }
 
 /// Wi-Fi sync to the iPhone app: phones nearby, pairing, what to keep on the phone (its own selection, apart from the
@@ -40,6 +42,7 @@ final class SyncStore {
         static let phones = "iPhonePairedPhones"
         static let macID = "syncMacID"
         static func key(_ phoneID: String) -> String { "syncKey.\(phoneID)" }
+        static func collectionScope(_ phoneID: String) -> String { "iPhoneCollectionScope.\(phoneID)" }
     }
 
     private(set) var selection: SyncSelection {
@@ -51,6 +54,9 @@ final class SyncStore {
             if Set(phones.map(\.id)) != Set(oldValue.map(\.id)) { updateListeners() }
         }
     }
+    /// Collection on iPhone, per phone: the digital copies of what you own that go to it on top of the list (never
+    /// sent to the phone as a setting; only the songs are).
+    private(set) var collectionScopes: [String: CollectionSyncScope] = [:]
     private(set) var nearby: [SyncPeer] = []
     private(set) var activity: Activity = .idle
     private(set) var lastError: String?
@@ -74,7 +80,14 @@ final class SyncStore {
         let defaults = UserDefaults.standard
         selection = defaults.data(forKey: Keys.selection).flatMap { try? JSONDecoder().decode(SyncSelection.self, from: $0) }
             ?? SyncSelection(items: defaults.data(forKey: Keys.list).flatMap { try? JSONDecoder().decode([ExportItem].self, from: $0) } ?? [])
-        phones = defaults.data(forKey: Keys.phones).flatMap { try? JSONDecoder().decode([PairedPhone].self, from: $0) } ?? []
+        let paired = defaults.data(forKey: Keys.phones).flatMap { try? JSONDecoder().decode([PairedPhone].self, from: $0) } ?? []
+        phones = paired
+        var scopes: [String: CollectionSyncScope] = [:]
+        for phone in paired {
+            if let scope = defaults.string(forKey: Keys.collectionScope(phone.id)).flatMap(CollectionSyncScope.init(rawValue:)) {
+                scopes[phone.id] = scope
+            }
+        }
         let id = defaults.string(forKey: Keys.macID) ?? {
             let new = UUID().uuidString
             defaults.set(new, forKey: Keys.macID)
@@ -82,6 +95,7 @@ final class SyncStore {
         }()
         let name = SCDynamicStoreCopyComputerName(nil, nil) as String? ?? "Mac"
         identity = SyncIdentity(deviceID: id, deviceName: name, appVersion: AppInfo.version)
+        collectionScopes = scopes
     }
 
     var isBusy: Bool { activity != .idle }
@@ -110,19 +124,42 @@ final class SyncStore {
     /// Phones nearby showing a pairing code.
     var pairingPeers: [SyncPeer] { nearby.filter(\.isPairing) }
 
+    // MARK: Collection on iPhone
+
+    func collectionScope(for phone: PairedPhone) -> CollectionSyncScope { collectionScopes[phone.id] ?? .off }
+
+    func setCollectionScope(_ scope: CollectionSyncScope, for phone: PairedPhone) {
+        collectionScopes[phone.id] = scope
+        UserDefaults.standard.set(scope.rawValue, forKey: Keys.collectionScope(phone.id))
+    }
+
+    /// The albums a phone's Collection on iPhone puts on it, as include rules before the list's own.
+    func implicit(for phoneID: String, _ context: SyncContext) -> [ExportItem] {
+        context.collection.syncItems(collectionScopes[phoneID] ?? .off)
+    }
+
+    /// What every paired phone's scope adds: when the list is tidied, a Remove from iPhone stays while any phone's
+    /// scope would put those songs back (the list is shared by the phones).
+    private func implicitForAll(_ context: SyncContext) -> [ExportItem] {
+        var seen = Set<ExportItem>()
+        return Set(collectionScopes.values).sorted { $0.rawValue < $1.rawValue }
+            .flatMap { context.collection.syncItems($0) }.filter { seen.insert($0).inserted }
+    }
+
     // MARK: Selection
 
     /// Puts the items on the phone at the next sync, even where a later rule kept them off.
     func add(_ items: [ExportItem]) {
         guard let context = context() else { return }
-        for item in items { selection.apply(item, include: true) { Set(context.tracks($0).map(\.id)) } }
+        let implicit = implicitForAll(context)
+        for item in items { selection.apply(item, include: true, tracks: { Set(context.tracks($0).map(\.id)) }, implicit: implicit) }
     }
 
     /// Drops albums, artists and songs that left the library from the list (they'd stay there with no songs).
     func dropMissing() {
         guard let context = context(), !context.library.isEmpty else { return }
         var pruned = selection
-        pruned.dropMissing { Set(context.tracks($0).map(\.id)) }
+        pruned.dropMissing(tracks: { Set(context.tracks($0).map(\.id)) }, implicit: implicitForAll(context))
         if pruned != selection { selection = pruned }
     }
 
@@ -134,13 +171,16 @@ final class SyncStore {
         return selection.contains(item, tracks: context.tracks)
     }
 
-    /// Everything the selection puts on the phone, each once.
-    func tracks(_ context: SyncContext) -> [Track] { selection.resolve(context.tracks) }
+    /// Everything the selection puts on the phone, each once, with what its Collection on iPhone adds first.
+    func tracks(_ context: SyncContext, phoneID: String) -> [Track] {
+        selection.resolve(context.tracks, implicit: implicit(for: phoneID, context))
+    }
 
     /// Applies what the phone asked for, in order; on a phone's first sync started from the phone, what's already on
     /// it is added to the selection first (so nothing it has is removed without being asked).
-    private func applyRequests(_ manifest: SyncManifest, adopting: Bool) -> SyncTracks {
+    private func applyRequests(_ manifest: SyncManifest, adopting: Bool, phoneID: String) -> SyncTracks {
         guard let context = context() else { return SyncTracks(tracks: []) }
+        let implicit = implicitForAll(context)
         let ids: (ExportItem) -> Set<Int64> = { Set(context.tracks($0).map(\.id)) }
         if adopting {
             let paths = Set(manifest.files.map(\.path))
@@ -151,17 +191,17 @@ final class SyncStore {
                 let all = context.tracks(album)
                 if all.allSatisfy({ paths.contains($0.path) }) {
                     if albums.insert(SearchIndex.albumKey(album: t.album, artist: t.effectiveAlbumArtist)).inserted {
-                        selection.apply(album, include: true, tracks: ids)
+                        selection.apply(album, include: true, tracks: ids, implicit: implicit)
                     }
                 } else {
-                    selection.apply(.track(t.id), include: true, tracks: ids)
+                    selection.apply(.track(t.id), include: true, tracks: ids, implicit: implicit)
                 }
             }
         }
         for request in manifest.requests.sorted(by: { $0.at < $1.at }) {
-            selection.apply(request.item, include: request.include, tracks: ids)
+            selection.apply(request.item, include: request.include, tracks: ids, implicit: implicit)
         }
-        return SyncTracks(tracks: tracks(context), library: context.library)
+        return SyncTracks(tracks: tracks(context, phoneID: phoneID), library: context.library)
     }
 
     // MARK: Pairing
@@ -190,6 +230,8 @@ final class SyncStore {
 
     func unpair(_ phone: PairedPhone) {
         keychain.remove(Keys.key(phone.id))
+        collectionScopes[phone.id] = nil
+        UserDefaults.standard.removeObject(forKey: Keys.collectionScope(phone.id))
         phones.removeAll { $0.id == phone.id }
     }
 
@@ -275,7 +317,7 @@ final class SyncStore {
             do {
                 let (_, summary) = try await SyncMacSession.sync(
                     connection, identity: identity,
-                    selection: { manifest in await self.applyRequests(manifest, adopting: fromPhone && firstSync) },
+                    selection: { manifest in await self.applyRequests(manifest, adopting: fromPhone && firstSync, phoneID: phone.id) },
                     libraryRoot: context.libraryRoot, database: context.database, scratch: scratch,
                     lastFM: context.lastFM, concerts: context.concerts,
                     approveDeletes: { count in firstSync ? (fromPhone ? false : await self.askToDelete(count)) : true },
