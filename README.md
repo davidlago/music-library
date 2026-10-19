@@ -76,9 +76,10 @@
 - **Insights.** Three panes: **Owned** (your CDs, records and downloads: how much is digitized, your label series with
   their free numbers and duplicates, how you own it by medium, money spent over time, cost per play and per hour, best
   value, what's still in the wrapper, artists, genres, decades and record labels), your **Digital Collection** (by
-  decade, genre, artist, audio quality, growth, track length and most-credited people), and your **Listening** (top
-  songs, artists and albums, activity over time, when you listen, the genres and eras you play, skips, streaks and
-  favorites to rediscover) over 7 days, 30 days, 12 months or all time. Everything is clickable.
+  decade, genre, artist, audio quality, growth, track length and most-credited people), and your **Listening**, laid
+  out like a listening report (plays against the span before, your top artists, albums and songs with their photos and
+  covers, what was new to you, a listening clock, the decades and genres you play, skips, streaks and favorites to
+  rediscover) over 7 days, 30 days, 12 months or all time. Everything is clickable.
 - **Fix missing covers.** Change an album's cover from its page: pick one from MusicBrainz's Cover Art Archive, or use
   an image file, a picture dragged from the web or one you copied. It can be embedded in the album's files too. A new
   cover for a CD or record can go to its album in your digital collection as well, and an album's new cover reaches the
@@ -258,7 +259,7 @@ play.
 
 ![Insights, Digital Collection pane: totals, a timeline by decade, genres, top artists and audio quality](docs/screenshots/insights.png)
 
-![Insights, Listening pane for the past 7 days: listening time, plays, streaks, activity over time and top songs, artists and albums](docs/screenshots/listening.png)
+![Insights, Listening pane for the past 7 days: 125 plays over a blurred photo of the top artist with each day next to the week before, and Top Charts with Faith Hill, Breathe and All I've Ever Wanted as the top artist, album and song](docs/screenshots/listening.png)
 
 ### Local Library CDs
 
