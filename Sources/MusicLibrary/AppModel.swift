@@ -18,12 +18,24 @@ enum CollectionSheet: Identifiable {
     case add(medium: CollectionMedium?, prefill: CollectionPrefill?)
     case findByLabel
     case addLibraryAlbums
+    /// Gaps and duplicates in the label series.
+    case labelCheck
+    /// Link to Library Album… for the item with this id.
+    case link(itemID: String)
+    /// Change Cover… for the item with this id, optionally with an image dropped on its cover.
+    case cover(itemID: String, request: CoverSheetRequest)
+    /// Change Edition… for the item with this id: the edition picker, which replaces only its release details.
+    case changeEdition(itemID: String)
 
     var id: String {
         switch self {
         case .add: "add"
         case .findByLabel: "find"
         case .addLibraryAlbums: "bulk"
+        case .labelCheck: "labels"
+        case .link(let id): "link-\(id)"
+        case .cover(let id, let request): "cover-\(id)-\(request.id)"
+        case .changeEdition(let id): "edition-\(id)"
         }
     }
 }
@@ -62,6 +74,8 @@ final class AppModel {
         static let matchRate = "matchOutputRate"
         static let matchBitDepth = "matchOutputBitDepth"
         static let ejectAfterRip = "ejectAfterRip"
+        static let askCDOwnership = "collectionAskOnInsert"
+        static let ejectAfterCataloging = "collectionEjectAfterCataloging"
         static let recentSearches = "recentSearches"
         static let theme = "theme"
         static let dnaDepth = "musicDNADepth"
@@ -98,6 +112,8 @@ final class AppModel {
     var shelfQuery = ""
     /// The collection sheet showing, if any (Add to Collection…, Find by Label…, Add Library Albums…).
     var collectionSheet: CollectionSheet?
+    /// The item Remove from Collection… asks about (`collectionRemovalConfirmation`).
+    var pendingItemRemoval: CollectionItem?
     /// The queue in the window's inspector.
     var showsQueue = UserDefaults.standard.bool(forKey: Keys.showsQueue) {
         didSet { UserDefaults.standard.set(showsQueue, forKey: Keys.showsQueue) }
@@ -221,6 +237,10 @@ final class AppModel {
     var acoustIDKey: String { didSet { KeychainStore.app.set(acoustIDKey, for: Keys.acoustID) } }
     var autoMatch: Bool { didSet { UserDefaults.standard.set(autoMatch, forKey: Keys.autoMatch) } }
     var ejectAfterRip: Bool { didSet { UserDefaults.standard.set(ejectAfterRip, forKey: Keys.ejectAfterRip) } }
+    /// Settings ▸ Collection: ask whether an inserted CD with no item is yours, instead of adding it by default.
+    var askCDOwnership: Bool { didSet { UserDefaults.standard.set(askCDOwnership, forKey: Keys.askCDOwnership) } }
+    /// Settings ▸ Collection: eject a CD once Catalog Without Ripping has saved it.
+    var ejectAfterCataloging: Bool { didSet { UserDefaults.standard.set(ejectAfterCataloging, forKey: Keys.ejectAfterCataloging) } }
     var matchOutputRate: Bool {
         didSet {
             UserDefaults.standard.set(matchOutputRate, forKey: Keys.matchRate)
@@ -279,6 +299,9 @@ final class AppModel {
         exportPlaylistFiles = defaults.object(forKey: Keys.exportPlaylistFiles) == nil ? true : defaults.bool(forKey: Keys.exportPlaylistFiles)
         exportDestination = defaults.string(forKey: Keys.exportDestination).map { URL(fileURLWithPath: $0, isDirectory: true) }
         ejectAfterRip = defaults.object(forKey: Keys.ejectAfterRip) == nil ? true : defaults.bool(forKey: Keys.ejectAfterRip)
+        askCDOwnership = defaults.object(forKey: Keys.askCDOwnership) == nil ? true : defaults.bool(forKey: Keys.askCDOwnership)
+        ejectAfterCataloging = defaults.object(forKey: Keys.ejectAfterCataloging) == nil ? true
+            : defaults.bool(forKey: Keys.ejectAfterCataloging)
         matchOutputRate = defaults.object(forKey: Keys.matchRate) == nil ? true : defaults.bool(forKey: Keys.matchRate)
         matchOutputBitDepth = defaults.object(forKey: Keys.matchBitDepth) == nil ? true : defaults.bool(forKey: Keys.matchBitDepth)
         player = Player(root: root, matcher: outputMatcher)
@@ -834,6 +857,103 @@ final class AppModel {
 
     /// Find by Label (⌘L).
     func findByLabel() { collectionSheet = .findByLabel }
+
+    /// Changes one stored item as it is saved now (not as some view last saw it), so only what `change` sets is
+    /// written. Nothing happens for an item that's gone, read-only, or unchanged. Returns the item as saved.
+    @discardableResult
+    func changeItem(id: String, cover jpeg: Data? = nil, _ change: (inout CollectionItem) -> Void) -> CollectionItem? {
+        guard let current = item(id: id), current.isEditable else { return nil }
+        var item = current
+        change(&item)
+        guard item != current || jpeg != nil else { return current }
+        return saveItem(item, cover: jpeg)
+    }
+
+    /// Asks before removing an item (`collectionRemovalConfirmation`).
+    func confirmItemRemoval(_ item: CollectionItem) {
+        guard item.isEditable else { return }
+        pendingItemRemoval = item
+    }
+
+    /// The library album an item's digital copy is, when its album key has songs.
+    func linkedAlbum(for item: CollectionItem) -> AlbumSummary? {
+        collection.libraryTracks(item).isEmpty ? nil : album(forKey: item.albumKey)
+    }
+
+    /// Plays an item's songs in album order (or shuffled).
+    func play(item: CollectionItem, shuffled: Bool = false) {
+        let songs = collection.libraryTracks(item)
+        guard !songs.isEmpty else { return }
+        player.play(queue: shuffled ? songs.shuffled() : songs, startAt: 0, source: item.album)
+    }
+
+    /// The disc in a drive that is this CD (by release, barcode or album key), if any.
+    func discInDrive(for item: CollectionItem) -> CDDisc? {
+        guard item.medium == .cd else { return nil }
+        return cd.discs.first { disc in
+            guard let release = disc.release else { return false }
+            if let id = item.releaseID { return release.id == id }
+            if let code = item.barcode, !release.barcode.isEmpty {
+                return release.barcode.filter(\.isNumber).drop { $0 == "0" } == code.drop { $0 == "0" }
+            }
+            return disc.albumKey == item.albumKey
+        }
+    }
+
+    /// The album key an item can be unlinked to: its own title and artist's, unless songs are under that key too
+    /// (then it can only be linked to another album).
+    func unlinkedKey(for item: CollectionItem) -> String? {
+        let own = SearchIndex.albumKey(album: item.album, artist: item.artist)
+        return tracks(ofAlbumKey: own).isEmpty ? own : nil
+    }
+
+    /// Whether Unlink can do anything: the item is linked, and its link can be dropped (see `unlink`).
+    func canUnlink(_ item: CollectionItem) -> Bool {
+        guard item.isEditable else { return false }
+        if collection.libraryTracks(item).isEmpty { return item.digitalSource != nil }
+        return unlinkedKey(for: item) != nil
+    }
+
+    /// Unlinks an item from its digital copy. A copy that left the library just stops being linked (a rip under the
+    /// same key links it again); one whose songs are there moves to its own title and artist's key, since songs under
+    /// its key are always its digital copy. The item's other details stay.
+    func unlink(itemID: String) {
+        guard let item = item(id: itemID), canUnlink(item) else { return }
+        let key = collection.libraryTracks(item).isEmpty ? item.albumKey : unlinkedKey(for: item)
+        guard let key else { return }
+        changeItem(id: itemID) {
+            $0.albumKey = key
+            $0.digitalSource = nil
+        }
+    }
+
+    /// Opens an artist's page, also for an artist you only have items by.
+    func showArtist(named name: String) {
+        nowPlayingExpanded = false
+        if let artist = artistSummary(named: name) {
+            navigationPath.append(artist)
+        } else {
+            navigationPath.append(ArtistRoute(name: name))
+        }
+    }
+
+    /// Adds a copy of a library album you own (linked to it) with the next label in its series. Returns it as saved.
+    @discardableResult
+    func addCopy(of album: AlbumSummary, medium: CollectionMedium) -> CollectionItem? {
+        let number = medium.series.map { nextNumber(in: $0) }
+        let item = CollectionDraft.item(album: album, tracks: tracks(of: album), medium: medium, sticker: number)
+        return saveItem(item)
+    }
+
+    /// The item the Import page's files are the digital copy of, preset by Import a Transfer… on an item's page.
+    var importLinkItemID: String?
+
+    /// Import Files… / Import a Transfer… for an item: chooses the files, with the item preset as what they're the
+    /// digital copy of.
+    func importFiles(for item: CollectionItem) {
+        importLinkItemID = item.id
+        chooseFilesToImport()
+    }
 
     /// Moves the items of an album whose album or album artist tags changed to its new key.
     func rekeyCollection(from oldKey: String, to newKey: String) {

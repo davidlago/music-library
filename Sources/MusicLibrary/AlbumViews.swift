@@ -453,6 +453,8 @@ struct AlbumTrackRow: View {
     let row: AlbumTracklist.Row
     let albumArtist: String
     let total: PlayTotal?
+    /// A record's side and track ("A1", "B2") where the release prints them, instead of the track number.
+    var showsPositions = false
     let play: () -> Void
     @State private var hovering = false
 
@@ -469,7 +471,10 @@ struct AlbumTrackRow: View {
             ZStack {
                 if hovering { Image(systemName: "play.fill").font(.caption) }
                 else if isCurrent { Image(systemName: "speaker.wave.2.fill").font(.caption).foregroundStyle(theme.accent) }
-                else { Text(track.trackNo.map(String.init) ?? entry.map { String($0.number) } ?? "").monospacedDigit().foregroundStyle(.subtext) }
+                else {
+                    Text((showsPositions ? entry?.position : nil) ?? track.trackNo.map(String.init) ?? entry.map { String($0.number) } ?? "")
+                        .monospacedDigit().foregroundStyle(.subtext)
+                }
             }
             .frame(width: 24)
             VStack(alignment: .leading, spacing: 1) {
@@ -510,7 +515,7 @@ struct AlbumTrackRow: View {
 
     private func missing(_ entry: TracklistEntry) -> some View {
         HStack(spacing: 12) {
-            Text(String(entry.number)).monospacedDigit().frame(width: 24)
+            Text(showsPositions ? entry.displayPosition : String(entry.number)).monospacedDigit().frame(width: 24)
             Text(entry.title).lineLimit(1)
             Spacer()
             Text("Not in library").font(.caption2)

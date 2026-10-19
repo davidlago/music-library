@@ -57,6 +57,7 @@ struct MainWindow: View {
                     DetailRouter()
                         .navigationDestination(for: AlbumSummary.self) { AlbumDetail(album: $0) }
                         .navigationDestination(for: ArtistSummary.self) { ArtistDetail(artist: $0) }
+                        .navigationDestination(for: ArtistRoute.self) { ArtistDetail(name: $0.name) }
                         .navigationDestination(for: CatalogItem.self) { CatalogDetail(item: $0) }
                         .navigationDestination(for: CollectionItemRoute.self) { CollectionItemDetail(id: $0.id) }
                 }
@@ -93,9 +94,14 @@ struct MainWindow: View {
             case .add(let medium, let prefill): AddToCollectionSheet(medium: medium, prefill: prefill).themedSheet()
             case .findByLabel: FindByLabelPanel().themedSheet()
             case .addLibraryAlbums: BulkAddSheet().themedSheet()
+            case .labelCheck: LabelCheckSheet().themedSheet()
+            case .link(let id): LinkAlbumPicker(itemID: id).themedSheet()
+            case .cover(let id, let request): CollectionCoverSheet(itemID: id, request: request).themedSheet()
+            case .changeEdition(let id): ChangeEditionSheet(itemID: id).themedSheet()
             }
         }
         .removeFromLibraryConfirmation(model)
+        .collectionRemovalConfirmation(model)
     }
 }
 

@@ -73,6 +73,12 @@ struct GeneralSettings: View {
             Section("CD ripping") {
                 Toggle("Eject CD after ripping", isOn: $model.ejectAfterRip)
             }
+            Section("Collection") {
+                Toggle("Ask whether a CD is yours when it's inserted", isOn: $model.askCDOwnership)
+                    .help("Off: a CD that isn't in your collection yet is added to it when you rip it, unless you say otherwise")
+                Toggle("Eject after cataloging", isOn: $model.ejectAfterCataloging)
+                    .help("Eject a CD once Catalog Without Ripping has added it to your collection")
+            }
             Section("Tools") {
                 toolRow("ffmpeg", url: model.tools.ffmpeg, hint: "Install with `brew install ffmpeg`")
                 toolRow("ffprobe", url: model.tools.ffprobe, hint: "Installed together with ffmpeg")
