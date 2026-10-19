@@ -48,16 +48,27 @@ public struct SyncSelection: Codable, Equatable, Sendable {
 
     /// The item is on the list and nothing after it takes it off again, or all its songs are on the phone anyway.
     public func contains(_ item: ExportItem, tracks: (ExportItem) -> [Track]) -> Bool {
+        contains(item, tracks: tracks, implicit: [])
+    }
+
+    /// `contains`, with `implicit` items added before the rules (see `resolve(_:implicit:)`).
+    public func contains(_ item: ExportItem, tracks: (ExportItem) -> [Track], implicit: [ExportItem]) -> Bool {
         let ids = Set(tracks(item).map(\.id))
         if ids.isEmpty { return rules.last { $0.item == item }?.include == true }
-        return ids.isSubset(of: Set(resolve(tracks).map(\.id)))
+        return ids.isSubset(of: Set(resolve(tracks, implicit: implicit).map(\.id)))
     }
 
     /// The songs on the phone, each once, in the order the rules first add them.
     public func resolve(_ tracks: (ExportItem) -> [Track]) -> [Track] {
+        resolve(tracks, implicit: [])
+    }
+
+    /// The songs on the phone when `implicit` items (the phone's Collection on iPhone scope) are added before the
+    /// rules: the user's own rules come later, so they decide, and Remove from iPhone still wins.
+    public func resolve(_ tracks: (ExportItem) -> [Track], implicit: [ExportItem]) -> [Track] {
         var state: [Int64: Bool] = [:]
         var order: [Track] = []
-        for rule in rules {
+        for rule in Self.rules(implicit) + rules {
             for t in tracks(rule.item) {
                 if rule.include, state[t.id] == nil { order.append(t) }
                 state[t.id] = rule.include
@@ -69,9 +80,15 @@ public struct SyncSelection: Codable, Equatable, Sendable {
     /// Puts the item's songs on the phone (`include`) or takes them off, then drops rules that no longer decide
     /// anything. `tracks` gives each item's songs as they are now.
     public mutating func apply(_ item: ExportItem, include: Bool, tracks: (ExportItem) -> Set<Int64>) {
+        apply(item, include: include, tracks: tracks, implicit: [])
+    }
+
+    /// `apply` for a phone with `implicit` items added before the rules: taking off songs only those add is kept,
+    /// and adding songs they already add is kept too, so the user's choice outlives the scope.
+    public mutating func apply(_ item: ExportItem, include: Bool, tracks: (ExportItem) -> Set<Int64>, implicit: [ExportItem]) {
         rules.removeAll { $0.item == item }
         rules.append(Rule(item: item, include: include))
-        compact(tracks)
+        compact(tracks, implicit: implicit)
     }
 
     /// Drops what no longer decides anything, like albums that left the library (see `compact`). Call it when the
@@ -80,10 +97,18 @@ public struct SyncSelection: Codable, Equatable, Sendable {
         compact(tracks)
     }
 
+    /// `dropMissing` for a phone with `implicit` items added before the rules.
+    public mutating func dropMissing(tracks: (ExportItem) -> Set<Int64>, implicit: [ExportItem]) {
+        compact(tracks, implicit: implicit)
+    }
+
     /// Removes rules that make no difference: ones whose songs later rules all decide, additions of songs already
     /// added, exclusions of songs no earlier rule adds, and albums, artists and songs no longer in the library.
     /// Additions of a playlist or Liked Songs with no songs right now are kept (`ExportItem.staysWhenEmpty`).
-    mutating func compact(_ tracks: (ExportItem) -> Set<Int64>) {
+    ///
+    /// `implicit` items count as added before every rule when deciding whether an exclusion matters, but never make
+    /// one of the user's additions redundant: turning the scope off must not lose albums the user added.
+    mutating func compact(_ tracks: (ExportItem) -> Set<Int64>, implicit: [ExportItem] = []) {
         let sets = rules.map { tracks($0.item) }
         var keep = rules.indices.map { !sets[$0].isEmpty || rules[$0].item.staysWhenEmpty }
         var decidedLater = Set<Int64>()
@@ -92,19 +117,24 @@ public struct SyncSelection: Codable, Equatable, Sendable {
             if !ids.isEmpty, ids.isSubset(of: decidedLater) { keep[i] = false }
             decidedLater.formUnion(ids)
         }
-        var added = Set<Int64>()
+        var added = implicit.reduce(into: Set<Int64>()) { $0.formUnion(tracks($1)) }
+        var addedByRules = Set<Int64>()
         for i in rules.indices where keep[i] {
             if rules[i].include {
-                if !sets[i].isEmpty, sets[i].isSubset(of: added) { keep[i] = false }
+                if !sets[i].isEmpty, sets[i].isSubset(of: addedByRules) { keep[i] = false }
                 added.formUnion(sets[i])
+                addedByRules.formUnion(sets[i])
             } else if sets[i].isDisjoint(with: added) {
                 keep[i] = false
             } else {
                 added.subtract(sets[i])
+                addedByRules.subtract(sets[i])
             }
         }
         rules = rules.indices.filter { keep[$0] }.map { rules[$0] }
     }
+
+    private static func rules(_ implicit: [ExportItem]) -> [Rule] { implicit.map { Rule(item: $0, include: true) } }
 }
 
 /// A Download or Remove from iPhone made on the phone, waiting to reach the Mac (which changes its selection, then

@@ -20,11 +20,15 @@ public struct Glance: Codable, Hashable, Sendable {
     public var nowPlaying: NowPlaying?
     /// Songs played a lot that haven't been played in months, most played first.
     public var rediscover: [Ranked<Song>]
+    /// The physical collection (CDs, records and album downloads, trackless ones included). Nil from a phone before
+    /// the collection, or one built from older data: show `owned` instead.
+    public var collection: Collection?
 
     public init(generatedAt: Date, currencyCode: String, library: LibraryCounts, week: Listening, month: Listening,
-                owned: Owned, nowPlaying: NowPlaying?, rediscover: [Ranked<Song>]) {
+                owned: Owned, nowPlaying: NowPlaying?, rediscover: [Ranked<Song>], collection: Collection? = nil) {
         self.generatedAt = generatedAt; self.currencyCode = currencyCode; self.library = library
         self.week = week; self.month = month; self.owned = owned; self.nowPlaying = nowPlaying; self.rediscover = rediscover
+        self.collection = collection
     }
 
     /// An album, by `SearchIndex.albumKey`.
@@ -134,18 +138,22 @@ public struct Glance: Codable, Hashable, Sendable {
         }
     }
 
+    /// Library albums you own. Its meaning is fixed, because older watches read it: the counts and `recent` cover
+    /// library albums with songs only, one per album; the spending and "bought" totals cover every copy you own.
     public struct Owned: Codable, Hashable, Sendable {
         public struct Purchase: Codable, Hashable, Sendable, Identifiable {
-            public var id: String { album.key }
+            public var id: String { itemID ?? album.key }
             public var album: Album
             /// "yyyy-MM-dd", a calendar day with no time zone.
             public var purchasedOn: String?
             public var price: Decimal?
             /// All-time plays of its songs.
             public var plays: Int
+            /// The collection item whose date and price these are; nil from older phones.
+            public var itemID: String?
 
-            public init(album: Album, purchasedOn: String?, price: Decimal?, plays: Int) {
-                self.album = album; self.purchasedOn = purchasedOn; self.price = price; self.plays = plays
+            public init(album: Album, purchasedOn: String?, price: Decimal?, plays: Int, itemID: String? = nil) {
+                self.album = album; self.purchasedOn = purchasedOn; self.price = price; self.plays = plays; self.itemID = itemID
             }
 
             /// Noon on the purchase day in `calendar`, so it shows as the same day in every time zone.
@@ -168,6 +176,69 @@ public struct Glance: Codable, Hashable, Sendable {
                     totalSpent: Decimal = 0, recent: [Purchase] = []) {
             self.ownedCount = ownedCount; self.libraryAlbumCount = libraryAlbumCount; self.boughtThisYear = boughtThisYear
             self.spentThisYear = spentThisYear; self.totalSpent = totalSpent; self.recent = recent
+        }
+    }
+
+    /// The physical collection. Every field is optional, so newer phones can leave some out and older ones none in.
+    public struct Collection: Codable, Hashable, Sendable {
+        public var items: Int?
+        public var cds: Int?
+        public var vinyl: Int?
+        public var downloads: Int?
+        /// CDs with no digital copy.
+        public var toRip: Int?
+        /// Records with no digital copy.
+        public var vinylToDigitize: Int?
+        /// The next free label number of each series.
+        public var nextCD: Int?
+        public var nextVinyl: Int?
+        /// Newest first (by purchase day, else when added), any medium, trackless ones included.
+        public var recent: [Item]?
+        /// CDs with no digital copy, oldest bought first.
+        public var toRipList: [Item]?
+
+        public init(items: Int? = nil, cds: Int? = nil, vinyl: Int? = nil, downloads: Int? = nil, toRip: Int? = nil,
+                    vinylToDigitize: Int? = nil, nextCD: Int? = nil, nextVinyl: Int? = nil, recent: [Item]? = nil,
+                    toRipList: [Item]? = nil) {
+            self.items = items; self.cds = cds; self.vinyl = vinyl; self.downloads = downloads; self.toRip = toRip
+            self.vinylToDigitize = vinylToDigitize; self.nextCD = nextCD; self.nextVinyl = nextVinyl
+            self.recent = recent; self.toRipList = toRipList
+        }
+
+        /// A thing you own: a CD, a record or a download.
+        public struct Item: Codable, Hashable, Sendable, Identifiable {
+            /// The collection item's id.
+            public var id: String
+            /// `SearchIndex.albumKey` of its digital copy (which may not exist).
+            public var albumKey: String
+            public var title: String
+            public var artist: String
+            public var year: Int?
+            /// "cd", "vinyl", "download", or a medium a newer version knows: a string, never an enum, so a new
+            /// medium can't make the whole summary unreadable.
+            public var medium: String
+            /// Its label number, in its medium's series.
+            public var sticker: Int?
+            /// Its music is in the library.
+            public var digitized: Bool?
+            /// Some of its songs are on the iPhone.
+            public var playable: Bool?
+            /// File name of its cover thumbnail: its own cover, else its album's.
+            public var cover: String?
+            /// "yyyy-MM-dd", a calendar day with no time zone.
+            public var purchasedOn: String?
+            public var price: Decimal?
+
+            public init(id: String, albumKey: String, title: String, artist: String, year: Int? = nil, medium: String,
+                        sticker: Int? = nil, digitized: Bool? = nil, playable: Bool? = nil, cover: String? = nil,
+                        purchasedOn: String? = nil, price: Decimal? = nil) {
+                self.id = id; self.albumKey = albumKey; self.title = title; self.artist = artist; self.year = year
+                self.medium = medium; self.sticker = sticker; self.digitized = digitized; self.playable = playable
+                self.cover = cover; self.purchasedOn = purchasedOn; self.price = price
+            }
+
+            /// "CD #12", "Vinyl #12"; nil without a label.
+            public var stickerText: String? { sticker.map { GlanceFormat.sticker(medium: medium, number: $0) } }
         }
     }
 
@@ -247,10 +318,117 @@ public struct Glance: Codable, Hashable, Sendable {
             listening.topAlbums.forEach { add($0.item.cover) }
         }
         owned.recent.forEach { add($0.album.cover) }
+        collection?.recent?.forEach { add($0.cover) }
+        collection?.toRipList?.forEach { add($0.cover) }
         add(nowPlaying?.song.cover)
         add(nowPlaying?.next?.cover)
         rediscover.forEach { add($0.item.cover) }
         return names
+    }
+}
+
+// MARK: Shelf index
+
+/// Every labeled CD and record, for finding one by its label on the watch while the iPhone is away. Too big for the
+/// application context (about 64 KB), so the iPhone sends it as a file, which the watch keeps under a fixed name.
+/// Keys are one letter to keep it small (about 100 bytes an item).
+public struct GlanceShelf: Codable, Hashable, Sendable {
+    public static let currentVersion = 1
+    public static let fileName = "shelf.json"
+    public static let maxBytes = 2_000_000
+    public static let maxEntries = 20_000
+    /// Titles and artists are cut to this many characters.
+    public static let maxText = 80
+
+    public var version = GlanceShelf.currentVersion
+    public var generatedAt: Date
+    /// CDs then records, each by number (duplicates next to each other).
+    public var entries: [Entry]
+
+    public init(generatedAt: Date, entries: [Entry]) {
+        self.generatedAt = generatedAt
+        self.entries = entries.sorted(by: Self.shelfOrder)
+    }
+
+    public struct Entry: Codable, Hashable, Sendable, Identifiable {
+        /// The collection item's id.
+        public var i: String
+        /// The series: "cd" or "vinyl".
+        public var s: String
+        /// The label number.
+        public var n: Int
+        public var t: String
+        public var a: String
+        public var y: Int?
+        /// Its music is in the library.
+        public var d: Bool?
+        /// Its cover thumbnail's name.
+        public var c: String?
+        public var id: String { i }
+
+        public init(id: String, series: String, number: Int, title: String, artist: String, year: Int? = nil,
+                    digitized: Bool? = nil, cover: String? = nil) {
+            i = id; s = series; n = number
+            t = String(title.prefix(GlanceShelf.maxText)); a = String(artist.prefix(GlanceShelf.maxText))
+            y = year; d = digitized; c = cover
+        }
+
+        /// "CD #12", "Vinyl #12".
+        public var stickerText: String { GlanceFormat.sticker(medium: s, number: n) }
+    }
+
+    /// The series this version knows, in shelf order.
+    public static let series = ["cd", "vinyl"]
+
+    static func shelfOrder(_ x: Entry, _ y: Entry) -> Bool {
+        let sx = series.firstIndex(of: x.s) ?? series.count, sy = series.firstIndex(of: y.s) ?? series.count
+        if sx != sy { return sx < sy }
+        return x.n != y.n ? x.n < y.n : x.i < y.i
+    }
+
+    /// The items with this label (more than one is a duplicate).
+    public func entries(series: String, number: Int) -> [Entry] {
+        entries.filter { $0.s == series && $0.n == number }
+    }
+
+    /// The labeled items just before and after the number in its series, whether or not the number is used.
+    public func neighbors(series: String, number: Int) -> (previous: Entry?, next: Entry?) {
+        var previous: Entry?, next: Entry?
+        for e in entries where e.s == series {
+            if number > e.n, e.n > (previous?.n ?? Int.min) { previous = e }
+            if e.n > number, (next?.n ?? Int.max) > e.n { next = e }
+        }
+        return (previous, next)
+    }
+
+    /// A stable hash of the entries (not of when the index was made), so an unchanged shelf isn't sent again.
+    public var contentHash: String {
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        func mix(_ s: String) {
+            for byte in s.utf8 {
+                hash ^= UInt64(byte)
+                hash = hash &* 0x0000_0100_0000_01b3
+            }
+            hash ^= 0x1f
+            hash = hash &* 0x0000_0100_0000_01b3
+        }
+        for e in entries {
+            for field in [e.i, e.s, String(e.n), e.t, e.a, e.y.map(String.init) ?? "", e.d.map { $0 ? "1" : "0" } ?? "", e.c ?? ""] {
+                mix(field)
+            }
+        }
+        let hex = String(hash, radix: 16)
+        return String(repeating: "0", count: 16 - hex.count) + hex
+    }
+
+    /// Every cover the index refers to.
+    public var coverNames: Set<String> { Set(entries.compactMap(\.c)) }
+
+    /// An entry this version can show: a known series, a label in range, a plain id and one of our cover names.
+    static func isValid(_ e: Entry) -> Bool {
+        series.contains(e.s) && (1...9_999_999).contains(e.n)
+            && (1...64).contains(e.i.count) && e.i.unicodeScalars.allSatisfy { ("a"..."z").contains($0) || ("0"..."9").contains($0) || $0 == "-" }
+            && (e.c.map(Glance.isCoverName) ?? true)
     }
 }
 
@@ -303,12 +481,73 @@ public struct GlanceStore: Sendable {
         try data.write(to: url, options: .atomic)
     }
 
-    /// Deletes the covers the summary no longer shows.
+    /// Deletes the covers the summary no longer shows, except the shelf covers looked up most recently
+    /// (`rememberShelfCover`).
     public func pruneCovers(keeping names: Set<String>) {
+        let keep = names.union(shelfCovers)
         let files = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-        for file in files where Glance.isCoverName(file) && !names.contains(file) {
+        for file in files where Glance.isCoverName(file) && !keep.contains(file) {
             try? FileManager.default.removeItem(at: directory.appendingPathComponent(file))
         }
+    }
+
+    // MARK: Shelf
+
+    static let shelfCoversFileName = "shelf-covers.json"
+    /// How many covers of items looked up on the shelf are kept beyond the summary's own.
+    public static let shelfCoverLimit = 40
+
+    public var shelfURL: URL { directory.appendingPathComponent(GlanceShelf.fileName) }
+
+    public func readShelf() -> GlanceShelf? {
+        guard let data = try? Data(contentsOf: shelfURL) else { return nil }
+        return Self.decodeShelf(data)
+    }
+
+    /// Saves the index under its fixed name (atomically). Throws when it's over `GlanceShelf.maxBytes`.
+    public func writeShelf(_ shelf: GlanceShelf) throws {
+        let data = try Self.encodeShelf(shelf)
+        guard data.count <= GlanceShelf.maxBytes else { throw CocoaError(.fileWriteOutOfSpace) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try data.write(to: shelfURL, options: .atomic)
+    }
+
+    public static func encodeShelf(_ shelf: GlanceShelf) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        return try encoder.encode(shelf)
+    }
+
+    /// Nil for anything over `maxBytes` or `maxEntries` or of another version. The file comes from the other device:
+    /// entries of an unknown series, with a label out of range, an unusual id or a cover name that isn't ours are
+    /// dropped, and the rest are put in shelf order.
+    public static func decodeShelf(_ data: Data) -> GlanceShelf? {
+        guard data.count <= GlanceShelf.maxBytes else { return nil }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+        guard let shelf = try? decoder.decode(GlanceShelf.self, from: data), shelf.version == GlanceShelf.currentVersion,
+              shelf.entries.count <= GlanceShelf.maxEntries else { return nil }
+        let entries = shelf.entries.filter(GlanceShelf.isValid).map {
+            GlanceShelf.Entry(id: $0.i, series: $0.s, number: $0.n, title: $0.t, artist: $0.a, year: $0.y, digitized: $0.d, cover: $0.c)
+        }
+        return GlanceShelf(generatedAt: shelf.generatedAt, entries: entries)
+    }
+
+    /// The shelf covers looked up most recently, newest first, which `pruneCovers` keeps.
+    public var shelfCovers: [String] {
+        guard let data = try? Data(contentsOf: directory.appendingPathComponent(Self.shelfCoversFileName)),
+              let names = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+        return Array(names.filter(Glance.isCoverName).prefix(Self.shelfCoverLimit))
+    }
+
+    /// Notes that a shelf item's cover was shown, so it stays (up to `shelfCoverLimit` of them) when the summary
+    /// changes.
+    public func rememberShelfCover(_ name: String) {
+        guard Glance.isCoverName(name) else { return }
+        let names = Array(([name] + shelfCovers.filter { $0 != name }).prefix(Self.shelfCoverLimit))
+        guard let data = try? JSONEncoder().encode(names) else { return }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? data.write(to: directory.appendingPathComponent(Self.shelfCoversFileName), options: .atomic)
     }
 
     public static func encode(_ glance: Glance) throws -> Data {

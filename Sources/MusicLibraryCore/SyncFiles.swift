@@ -5,11 +5,11 @@ import Foundation
 
 /// What a sync sends to the phone and removes from it, from the selection's tracks and the phone's manifest.
 /// The phone mirrors the selection: files it has under the managed folders that aren't wanted are deleted, and a
-/// wanted file whose size differs (retagged, a new cover) is sent again. Every album's cover and every artist photo
-/// go too, so the whole library can be browsed on the phone.
+/// wanted file whose size differs (retagged, a new cover) is sent again. Every album's cover, every collection
+/// item's own cover and every artist photo go too, so the whole library and collection can be browsed on the phone.
 public struct SyncPlan: Equatable, Sendable {
     /// Paths relative to the library root, in send order: tracks (with their album covers), the other albums'
-    /// covers, then artist photos.
+    /// covers, collection covers, then artist photos.
     public var sends: [SyncFileEntry] = []
     public var deletes: [String] = []
     /// Selected tracks whose files are missing from the Mac's library; they're skipped.
@@ -18,8 +18,10 @@ public struct SyncPlan: Equatable, Sendable {
     public var bytes: Int64 { sends.reduce(0) { $0 + $1.size } }
     public var summary: SyncPlanSummary { SyncPlanSummary(files: sends.count, bytes: bytes, deletes: deletes.count) }
 
-    /// `library` is every track in the library, for the covers.
-    public init(tracks: [Track], library: [Track] = [], libraryRoot: URL, phone: [SyncFileEntry]) {
+    /// `library` is every track in the library, for the covers; `collectionCovers` the items' own covers
+    /// (`Database.collectionCoverPaths`), wanted whatever the selection is. Only those in `CollectionCovers.folder`
+    /// with an allowed name are used.
+    public init(tracks: [Track], library: [Track] = [], collectionCovers: [String] = [], libraryRoot: URL, phone: [SyncFileEntry]) {
         var onPhone: [String: Int64] = [:]
         // The manifest comes from the phone: entries that aren't plain paths inside the managed folders are ignored.
         for entry in phone where SyncPlan.isManaged(entry.path) { onPhone[entry.path] = entry.size }
@@ -49,6 +51,9 @@ public struct SyncPlan: Equatable, Sendable {
             wantCover(of: t)
         }
         for t in library { wantCover(of: t) }
+        for path in collectionCovers.sorted() where SyncPlan.isCollectionCover(path) {
+            if let size = sourceSize(path) { want(path, size: size) }
+        }
         let images = LibraryExporter.artistImageFolder
         let names = (try? FileManager.default.contentsOfDirectory(atPath: libraryRoot.appendingPathComponent(images).path)) ?? []
         for name in names.sorted() where !name.hasPrefix(".") {
@@ -56,6 +61,12 @@ public struct SyncPlan: Equatable, Sendable {
             if let size = sourceSize(path) { want(path, size: size) }
         }
         deletes = onPhone.keys.filter { !wanted.contains($0) }.sorted()
+    }
+
+    /// "Music/Collection Covers/<allowed name>".
+    static func isCollectionCover(_ path: String) -> Bool {
+        let prefix = CollectionCovers.folder + "/"
+        return path.hasPrefix(prefix) && CollectionCovers.isFileName(String(path.dropFirst(prefix.count))) && isManaged(path)
     }
 
     /// A plain relative path inside one of the folders sync manages.

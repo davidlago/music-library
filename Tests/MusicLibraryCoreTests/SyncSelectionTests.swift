@@ -92,6 +92,55 @@ import Testing
         #expect(copy == s)
     }
 
+    // MARK: Collection on iPhone
+
+    /// The scope's albums come before the user's rules: a Remove from iPhone still wins, and the user's own additions
+    /// outlive the scope.
+    @Test func implicitRulesComeFirst() {
+        let x = ExportItem.album(album: "X", artist: "A"), z = ExportItem.album(album: "Z", artist: "B")
+        var s = SyncSelection(items: [.album(album: "Y", artist: "A")])
+        #expect(s.resolve(tracks, implicit: [x, z]).map(\.id) == [1, 2, 4, 3])
+        #expect(s.contains(z, tracks: tracks, implicit: [z]) && !s.contains(z, tracks: tracks))
+
+        // Remove from iPhone: kept while only the scope adds the album, and it wins.
+        s.apply(z, include: false, tracks: ids, implicit: [x, z])
+        #expect(s.rules.map(\.include) == [true, false])
+        #expect(s.resolve(tracks, implicit: [x, z]).map(\.id) == [1, 2, 3])
+        #expect(!s.contains(z, tracks: tracks, implicit: [x, z]))
+        // The plain apply would have dropped it: nothing of the user's adds Z.
+        var plain = SyncSelection(items: [.album(album: "Y", artist: "A")])
+        plain.apply(z, include: false, tracks: ids)
+        #expect(plain.rules.count == 1)
+
+        // Adding an album the scope already adds is kept, so turning the scope off doesn't lose it.
+        s.apply(x, include: true, tracks: ids, implicit: [x, z])
+        #expect(s.rules.map(\.item) == [.album(album: "Y", artist: "A"), z, x])
+        s.dropMissing(tracks: ids, implicit: [x, z])
+        #expect(s.rules.map(\.item) == [.album(album: "Y", artist: "A"), z, x])
+        #expect(s.resolve(tracks, implicit: []).map(\.id) == [3, 1, 2])
+        // With the scope off, the exclusion no longer decides anything and goes; the additions stay.
+        s.dropMissing(tracks: ids, implicit: [])
+        #expect(s.rules.map(\.item) == [.album(album: "Y", artist: "A"), x])
+        #expect(s.rules.allSatisfy { $0.include })
+    }
+
+    @Test func implicitRulesStillCompact() {
+        let x = ExportItem.album(album: "X", artist: "A")
+        // A user song inside a later user album is still redundant; an exclusion of a song nothing adds still goes.
+        var s = SyncSelection(items: [.track(1)])
+        s.apply(.artist("A"), include: true, tracks: ids, implicit: [x])
+        #expect(s.rules.map(\.item) == [.artist("A")])
+        s.apply(.track(4), include: false, tracks: ids, implicit: [x])
+        #expect(s.rules.map(\.item) == [.artist("A")])
+        // Excluding part of the scope's album keeps the rest of it.
+        var t = SyncSelection()
+        t.apply(.track(2), include: false, tracks: ids, implicit: [x])
+        #expect(t.resolve(tracks, implicit: [x]).map(\.id) == [1])
+        #expect(t.rules == [SyncSelection.Rule(item: .track(2), include: false)])
+        // Without implicit items, the overloads behave as before.
+        #expect(t.resolve(tracks, implicit: []).map(\.id) == resolved(t))
+    }
+
     @Test func requestQueueKeepsTheLatestPerItem() throws {
         let url = try TestSupport.tempDir().appendingPathComponent("requests.json")
         let queue = SyncRequestQueue(url: url)
