@@ -150,7 +150,7 @@ public struct LibrarySnapshot: Sendable {
     static func collectionItems(_ db: Database) -> CollectionRead {
         guard var read = try? db.collectionItems() else { return CollectionRead(items: [], unreadable: 0, hadTable: false) }
         if read.hadTable, let legacy = try? db.legacyOwnershipRows() {
-            read.items = CollectionLegacy.reconcile(items: read.items, legacy: legacy).items
+            read.items = Database.inReadOrder(CollectionLegacy.reconcile(items: read.items, legacy: legacy).items)
         }
         return read
     }

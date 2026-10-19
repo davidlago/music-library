@@ -55,12 +55,22 @@ extension Database {
     public func collectionItems() throws -> CollectionRead {
         let present = try columns(of: "collection_items")
         guard !present.isEmpty else {
-            return CollectionRead(items: CollectionLegacy.reconcile(items: [], legacy: try legacyOwnershipRows()).items,
-                                  unreadable: 0, hadTable: false)
+            let items = CollectionLegacy.reconcile(items: [], legacy: try legacyOwnershipRows()).items
+            return CollectionRead(items: Self.inReadOrder(items), unreadable: 0, hadTable: false)
         }
         let select = Self.collectionColumns.map { present.contains($0) ? $0 : "NULL" }.joined(separator: ",")
         let rows = try query("SELECT \(select) FROM collection_items ORDER BY created_at, id", map: Self.collectionItem)
         return CollectionRead(items: rows.compactMap { $0 }, unreadable: rows.filter { $0 == nil }.count, hadTable: true)
+    }
+
+    /// Items in the order `collection_items` is read in (`created_at`, then `id`), for items made in memory: lists
+    /// sorted by label keep ties (a repeated number) in the order they come in, so a phone reading an older copy must
+    /// see them in the Mac's order.
+    static func inReadOrder(_ items: [CollectionItem]) -> [CollectionItem] {
+        items.sorted { a, b in
+            if a.createdAt != b.createdAt { return a.createdAt < b.createdAt }
+            return a.id.utf8.lexicographicallyPrecedes(b.id.utf8)  // SQLite's BINARY collation
+        }
     }
 
     private static func collectionItem(_ r: Row) -> CollectionItem? {
