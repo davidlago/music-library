@@ -4,27 +4,40 @@ import SwiftUI
 
 // MARK: Pane
 
-/// The Owned pane of Insights: the albums you own, what you paid for them and how much you play them.
-struct OwnedContent: View {
-    let stats: OwnershipStats
+/// The Collection pane of Insights (`CollectionStats`): everything you own, CDs, records and downloads, with or
+/// without music in the library: how much of it is digitized, your label series, what you paid and how much you
+/// play it. Rows open the item; drill-downs open the Shelf with a collection query, never a song search.
+struct CollectionContent: View {
+    @Environment(AppModel.self) private var model
+    let stats: CollectionStats
 
     var body: some View {
-        if stats.ownedCount == 0 {
-            ContentUnavailableView("No Owned Albums Yet", systemImage: "bag",
-                                   description: Text("Open an album and switch on “I own this album” under Your Copy, or answer “Do you own this CD?” when you rip one. Add when you bought it and what you paid, and this page fills in."))
+        if stats.itemCount == 0 {
+            VStack(spacing: 14) {
+                ContentUnavailableView("Nothing Owned Yet", systemImage: "books.vertical",
+                                       description: Text("Add the CDs, records and downloads you own: by barcode or by name, from an album page, or when you rip a CD. Add when you bought them and what you paid, and this page fills in."))
+                HStack {
+                    Button("Add to Physical Collection…") { model.addToCollection() }
+                    Button("Add Albums You Own from Your Digital Collection…") { model.collectionSheet = .addLibraryAlbums }
+                        .disabled(model.albums.isEmpty)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    OwnedTiles(stats: stats)
-                    if !stats.timeline.isEmpty { SpendingCard(stats: stats) }
+                    CollectionTiles(stats: stats)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 400), spacing: 18, alignment: .top)], alignment: .leading, spacing: 18) {
-                        OwnedFormatsCard(stats: stats)
-                        OwnedAlbumsCard(stats: stats)
-                        OwnedArtistsCard(stats: stats)
-                        if !stats.genres.isEmpty { OwnedBreakdownCard(title: "Genres", subtitle: "Albums can carry several", items: stats.genres, stats: stats) { SearchFilterKey.token("genre", $0.name) } }
-                        if !stats.decades.isEmpty { OwnedBreakdownCard(title: "Release Eras", subtitle: "When the music you own came out", items: stats.decades, stats: stats, sortByCount: false) { "decade:\($0.name)" } }
+                        ShelvesCard(stats: stats)
+                        HowYouOwnItCard(stats: stats)
                     }
-                    OwnedFactsCard(stats: stats)
+                    if !stats.timeline.isEmpty { CollectionSpendingCard(stats: stats) }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 400), spacing: 18, alignment: .top)], alignment: .leading, spacing: 18) {
+                        CollectionListsCard(stats: stats)
+                        CollectionArtistsCard(stats: stats)
+                        CollectionBreakdownCard(stats: stats)
+                    }
+                    CollectionFactsCard(stats: stats)
                 }
                 .padding(20)
             }
@@ -32,46 +45,321 @@ struct OwnedContent: View {
     }
 }
 
-private func albumQuery(_ a: OwnershipStats.OwnedAlbum) -> String {
-    SearchFilterKey.token("album", a.album) + " " + SearchFilterKey.token("albumartist", a.artist)
-}
-
-private func albumCount(_ n: Int) -> String { n == 1 ? "1 album" : "\(n.formatted()) albums" }
+func itemCount(_ n: Int) -> String { n == 1 ? "1 item" : "\(n.formatted()) items" }
 
 private func dayLabel(_ d: PurchaseDay) -> String { d.date().formatted(date: .abbreviated, time: .omitted) }
 
+/// The colours of the media and of the digital states, from the theme's ordinal ramp.
+private extension ThemeColors {
+    func color(_ medium: CollectionMedium) -> Color {
+        switch medium {
+        case .cd: tier(.hiRes)
+        case .vinyl: tier(.cd)
+        case .download: tier(.lossyHigh)
+        case .other: tier(.lossy)
+        }
+    }
+}
+
+private extension CollectionMedium {
+    /// "CDs", "Vinyl", "Downloads".
+    var plural: String {
+        switch self {
+        case .cd: "CDs"
+        case .vinyl: "Vinyl"
+        case .download: "Downloads"
+        case .other: "Other"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .cd: "opticaldisc"
+        case .vinyl: "record.circle"
+        case .download: "arrow.down.circle"
+        case .other: "shippingbox"
+        }
+    }
+
+    /// The Shelf query of this medium.
+    var query: String { "own:\(rawValue)" }
+}
+
 // MARK: Tiles
 
-struct OwnedTiles: View {
-    let stats: OwnershipStats
+struct CollectionTiles: View {
+    @Environment(AppModel.self) private var model
+    let stats: CollectionStats
 
     var body: some View {
-        let hasPrices = stats.pricedCount > 0
+        let year = Calendar.current.component(.year, from: Date()).formatted(.number.grouping(.never))
         TileGrid {
-            InsightTile(value: stats.ownedCount.formatted(), label: stats.ownedCount == 1 ? "Album owned" : "Albums owned", icon: "bag",
-                        detail: "\(stats.ownedFraction.formatted(.percent.precision(.fractionLength(0)))) of your \(albumCount(stats.libraryAlbumCount))")
-            InsightTile(value: hasPrices ? formatMoney(stats.totalSpent) : "—", label: "Spent", icon: "creditcard",
-                        detail: hasPrices ? "on \(stats.pricedCount.formatted()) of \(albumCount(stats.ownedCount))" : "add prices on album pages")
-            InsightTile(value: stats.averagePrice.map { formatMoney($0) } ?? "—", label: "Average price", icon: "tag",
-                        detail: stats.medianPrice.map { "median \(formatMoney($0))" })
-            InsightTile(value: formatMoney(stats.spentThisYear), label: "Spent this year", icon: "calendar",
-                        detail: "\(albumCount(stats.boughtThisYear)) bought in \(Calendar.current.component(.year, from: Date()).formatted(.number.grouping(.never)))")
-            InsightTile(value: stats.costPerHour.map { formatMoney($0) } ?? "—", label: "Per hour of music", icon: "clock",
-                        detail: stats.pricedDuration > 0 ? "\(formatLongDuration(stats.pricedDuration)) paid for" : nil)
-            InsightTile(value: stats.costPerPlay.map { formatMoney($0) } ?? "—", label: "Per play", icon: "play.circle",
-                        detail: hasPrices ? "\(playCount(stats.pricedPlays)) of albums you paid for" : nil)
+            tile(.all) {
+                InsightTile(value: stats.itemCount.formatted(), label: stats.itemCount == 1 ? "Item" : "Items", icon: "books.vertical",
+                            detail: mediaLine)
+            }
+            DigitizedTile(stats: stats)
+            tile(.toDigitize) {
+                InsightTile(value: stats.toDigitizeCount.formatted(), label: "To digitize", icon: "waveform.slash",
+                            detail: digitizeLine)
+            }
+            InsightTile(value: stats.pricedCount > 0 ? formatMoney(stats.totalSpent) : "—", label: "Spent", icon: "creditcard",
+                        detail: stats.pricedCount > 0 ? "on \(stats.pricedCount.formatted()) of \(itemCount(stats.itemCount))" : "add prices on item pages")
+            InsightTile(value: formatMoney(stats.spentThisYear), label: "This year", icon: "calendar",
+                        detail: "\(itemCount(stats.boughtThisYear)) bought in \(year)")
+            if let perPlay = stats.costPerPlay {
+                InsightTile(value: formatMoney(perPlay), label: "Per play", icon: "play.circle",
+                            detail: stats.costPerHour.map { "\(formatMoney($0)) an hour" })
+            }
         }
+    }
+
+    /// A tile that opens the Shelf (or one of its scopes).
+    private func tile<Content: View>(_ scope: CollectionScope, @ViewBuilder content: () -> Content) -> some View {
+        Button { model.showShelf(scope: scope) } label: { content().contentShape(Rectangle()) }
+            .buttonStyle(.plain)
+            .help("Open \(scope.title)")
+    }
+
+    /// "312 CDs · 48 vinyl · 97 downloads".
+    private var mediaLine: String {
+        var parts: [String] = []
+        if stats.cdCount > 0 { parts.append("\(stats.cdCount.formatted()) CD\(stats.cdCount == 1 ? "" : "s")") }
+        if stats.vinylCount > 0 { parts.append("\(stats.vinylCount.formatted()) vinyl") }
+        if stats.downloadCount > 0 { parts.append("\(stats.downloadCount.formatted()) download\(stats.downloadCount == 1 ? "" : "s")") }
+        if stats.otherCount > 0 { parts.append("\(stats.otherCount.formatted()) other") }
+        return parts.joined(separator: " · ")
+    }
+
+    private var digitizeLine: String? {
+        var parts: [String] = []
+        if stats.toRipCount > 0 { parts.append("\(stats.toRipCount.formatted()) CD\(stats.toRipCount == 1 ? "" : "s") to rip") }
+        if stats.vinylToDigitizeCount > 0 { parts.append("\(stats.vinylToDigitizeCount.formatted()) record\(stats.vinylToDigitizeCount == 1 ? "" : "s")") }
+        return parts.isEmpty ? (stats.physicalCount > 0 ? "all digitized" : nil) : parts.joined(separator: " · ")
+    }
+}
+
+/// The share of your CDs and records with a digital copy, as a ring.
+struct DigitizedTile: View {
+    @Environment(\.theme) private var theme
+    let stats: CollectionStats
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().stroke(theme.track, lineWidth: 7)
+                Circle().trim(from: 0, to: stats.digitizedShare)
+                    .stroke(theme.series, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+            .frame(width: 46, height: 46)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(stats.digitizedShare.formatted(.percent.precision(.fractionLength(0))))
+                    .font(.system(size: 26, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.6)
+                Text("Digitized").font(.caption).foregroundStyle(.subtext)
+                Text("of \(stats.physicalCount.formatted()) CDs and records").font(.caption2).foregroundStyle(.subtext).lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12).fill(theme.card))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: Shelves
+
+/// Your label series: the range used, how many are labeled, the next number, free numbers and duplicates, with Label
+/// Check and a field to find a label.
+struct ShelvesCard: View {
+    @Environment(AppModel.self) private var model
+    let stats: CollectionStats
+    @State private var find = ""
+
+    var body: some View {
+        InsightCard(title: "Your Shelves", subtitle: "CDs and records each have their own label numbers") {
+            Button("Label Check") { model.collectionSheet = .labelCheck }
+                .buttonStyle(.link).font(.caption)
+                .help("Free numbers and numbers used twice, in each series")
+        } content: {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(stats.series) { s in row(s) }
+                HStack(spacing: 6) {
+                    Image(systemName: "number.square").foregroundStyle(.subtext)
+                    TextField("Find a label", text: $find, prompt: Text("Find a label: cd 12, vinyl 7"))
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit(go)
+                }
+                .font(.callout)
+            }
+        }
+    }
+
+    private func row(_ s: CollectionStats.SeriesStats) -> some View {
+        let duplicates = s.duplicates.count
+        return HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(s.series.name).font(.callout.weight(.semibold)).frame(width: 46, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(s.highest.map { "\(s.series.name) #1–#\($0) · \(s.labeled.formatted()) labeled" } ?? "No labels yet")
+                    .monospacedDigit()
+                Text(detail(s, duplicates: duplicates)).font(.caption).foregroundStyle(duplicates > 0 ? AnyShapeStyle(.orange) : AnyShapeStyle(.subtext))
+            }
+            Spacer(minLength: 8)
+            Button("Next \(s.series.name) #\(s.next)") { model.addToCollection(medium: s.series.medium) }
+                .buttonStyle(.link).font(.caption).monospacedDigit()
+                .help("Add a \(s.series == .cd ? "CD" : "record") with the next label")
+        }
+        .font(.callout)
+    }
+
+    private func detail(_ s: CollectionStats.SeriesStats, duplicates: Int) -> String {
+        var parts: [String] = []
+        if s.gapCount > 0 { parts.append("\(s.gapCount.formatted()) free") }
+        if duplicates > 0 { parts.append(duplicates == 1 ? "1 duplicate" : "\(duplicates) duplicates") }
+        if s.unlabeled > 0 { parts.append("\(s.unlabeled.formatted()) without a label") }
+        return parts.isEmpty ? "No gaps" : parts.joined(separator: " · ")
+    }
+
+    /// Opens the item at the label typed (a bare number in either series, CDs first, as the search does), else Find
+    /// by Label on that label, which says it's free and shows its neighbors.
+    private func go() {
+        guard let form = Sticker.parse(find), let sticker = Sticker(series: form.series ?? .cd, number: form.number) else { return }
+        let items = form.series == nil ? model.collection.items(number: form.number) : model.collection.items(at: sticker)
+        if let item = items.first {
+            model.showItem(id: item.id)
+        } else {
+            model.findByLabel(sticker)
+        }
+        find = ""
+    }
+}
+
+// MARK: How you own it
+
+/// A bar per medium, split by digital state (digitized, partly, from another copy, waiting), plus the library
+/// albums not in your collection.
+struct HowYouOwnItCard: View {
+    @Environment(\.theme) private var theme
+    @Environment(AppModel.self) private var model
+    let stats: CollectionStats
+
+    private struct Part: Identifiable {
+        var id: String { name }
+        var name: String
+        var count: Int
+        var color: Color
+        var query: String
+    }
+
+    var body: some View {
+        InsightCard(title: "How You Own It", subtitle: "Each medium, and how much of it is in your digital collection") {
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(stats.media) { share in
+                    Button { model.showShelf(query: share.medium.query) } label: { mediumRow(share) }
+                        .buttonStyle(.plain)
+                        .help(share.medium.isPhysical ? "Show your \(share.medium.plural.lowercased()) on the Shelf" : "Show your downloads")
+                }
+                legend
+                if stats.notInCollection > 0 {
+                    Button { showNotInCollection() } label: {
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Image(systemName: "arrow.left.arrow.right").foregroundStyle(theme.neutral).frame(width: 18)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Not owned")
+                                Text("Albums in your digital collection with no copy you own: borrowed, or not added yet").font(.caption).foregroundStyle(.subtext)
+                            }
+                            Spacer(minLength: 8)
+                            Text(stats.notInCollection == 1 ? "1 album" : "\(stats.notInCollection.formatted()) albums").monospacedDigit()
+                        }
+                        .font(.callout)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Show these albums")
+                }
+            }
+        }
+    }
+
+    private func parts(_ s: CollectionStats.MediumShare) -> [Part] {
+        // Each segment opens exactly the items it counts.
+        func part(_ name: String, _ p: CollectionStats.MediumShare.Part, _ color: Color) -> Part {
+            Part(name: name, count: s.count(p), color: color, query: s.query(p))
+        }
+        return [
+            part("Digitized", .digitized, theme.tier(.hiRes)),
+            part("Partly", .partial, theme.tier(.cd)),
+            part("From another copy", .otherCopy, theme.tier(.lossyHigh)),
+            part("To digitize", .toDigitize, theme.neutral),
+        ].filter { $0.count > 0 }
+    }
+
+    /// A segment's share of a bar `width` wide that holds `segments` of them 2 points apart, at least 3 points.
+    private static func segmentWidth(_ count: Int, of total: Int, segments: Int, in width: CGFloat) -> CGFloat {
+        let available = width - CGFloat(segments - 1) * 2
+        return max(3, available * CGFloat(count) / CGFloat(total))
+    }
+
+    private func mediumRow(_ share: CollectionStats.MediumShare) -> some View {
+        let segments = parts(share)
+        let total = max(segments.reduce(0) { $0 + $1.count }, 1)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Image(systemName: share.medium.symbol).foregroundStyle(theme.color(share.medium)).frame(width: 18)
+                Text(share.medium.plural)
+                Spacer(minLength: 8)
+                Text(itemCount(share.items)).monospacedDigit()
+                if share.spent > 0 { Text(formatMoney(share.spent, whole: true)).foregroundStyle(.subtext).monospacedDigit() }
+            }
+            GeometryReader { geo in
+                HStack(spacing: 2) {
+                    ForEach(segments) { p in
+                        Rectangle().fill(p.color)
+                            .frame(width: Self.segmentWidth(p.count, of: total, segments: segments.count, in: geo.size.width))
+                            .help("\(p.name): \(itemCount(p.count))")
+                            .onTapGesture { model.showShelf(query: p.query) }
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+            .frame(height: 10)
+            .padding(.leading, 28)
+        }
+        .font(.callout)
+        .contentShape(Rectangle())
+    }
+
+    private var legend: some View {
+        HStack(spacing: 12) {
+            ForEach([("Digitized", theme.tier(.hiRes)), ("Partly", theme.tier(.cd)), ("From another copy", theme.tier(.lossyHigh)),
+                     ("To digitize", theme.neutral)], id: \.0) { name, color in
+                HStack(spacing: 4) {
+                    RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 10, height: 10)
+                    Text(name)
+                }
+            }
+        }
+        .font(.caption2).foregroundStyle(.subtext)
+        .padding(.leading, 28)
+    }
+
+    /// The Albums page, showing the albums not in your collection.
+    private func showNotInCollection() {
+        UserDefaults.standard.set(AlbumsCollectionFilter.notInCollection.rawValue, forKey: "albumsCollectionFilter")
+        model.sidebar = .albums
     }
 }
 
 // MARK: Spending over time
 
-struct SpendingCard: View {
+struct CollectionSpendingCard: View {
     @Environment(\.theme) private var theme
-    let stats: OwnershipStats
-    enum Measure: String, CaseIterable { case spent = "Spent", albums = "Albums", total = "Running Total" }
+    let stats: CollectionStats
+    enum Measure: String, CaseIterable { case spent = "Spent", items = "Items" }
     @State private var measure = Measure.spent
-    @State private var hovered: OwnershipStats.Period?
+    @State private var hovered: CollectionStats.Period?
 
     var body: some View {
         InsightCard(title: "Spending Over Time", subtitle: subtitle) {
@@ -81,10 +369,12 @@ struct SpendingCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 Group {
                     if let h = hovered {
-                        Text("\(label(h.start)) · \(formatMoney(h.spent)) on \(albumCount(h.albums)) · \(formatMoney(h.cumulative)) in all")
+                        Text("\(label(h.start.date())) · \(formatMoney(h.spent)) on \(itemCount(h.items)) · \(formatMoney(h.cumulative)) in all")
                             .foregroundStyle(.primary)
                     } else {
-                        Text("Albums with a purchase date, by \(stats.granularity.rawValue) · hover for details").foregroundStyle(.subtext)
+                        Text(measure == .spent
+                             ? "Items with a purchase date, by \(stats.granularity.rawValue), by medium; the line is the running total (right axis) · hover for details"
+                             : "Items with a purchase date, by \(stats.granularity.rawValue) · hover for details").foregroundStyle(.subtext)
                     }
                 }
                 .font(.caption).monospacedDigit()
@@ -95,38 +385,67 @@ struct SpendingCard: View {
 
     private var unit: Calendar.Component { stats.granularity == .month ? .month : .year }
 
+    /// The media that have spending, in the usual order.
+    private var media: [CollectionMedium] {
+        let keys = Set(stats.timeline.flatMap(\.spentByMedium.keys))
+        return keys.compactMap(CollectionMedium.init(rawValue:)).sorted()
+    }
+
+    /// The running total is drawn over the bars on their scale: the highest total meets the tallest bar, and the
+    /// right axis reads it back in money.
+    private var totalScale: Double {
+        let tallest = stats.timeline.map(\.spent.doubleValue).max() ?? 0
+        let total = stats.timeline.last?.cumulative.doubleValue ?? 0
+        return tallest > 0 && total > 0 ? tallest / total : 0
+    }
+
     @ViewBuilder
     private var chart: some View {
+        let media = self.media
+        let scale = totalScale
         Chart {
             ForEach(stats.timeline) { p in
+                let faded = hovered != nil && hovered != p
                 switch measure {
                 case .spent:
-                    BarMark(x: .value("Period", p.start, unit: unit), y: .value("Spent", p.spent.doubleValue))
-                        .foregroundStyle(theme.series.opacity(hovered == nil || hovered == p ? 1 : 0.35))
+                    ForEach(media, id: \.self) { m in
+                        BarMark(x: .value("Period", p.start.date(), unit: unit), y: .value("Spent", (p.spentByMedium[m.rawValue] ?? 0).doubleValue))
+                            .foregroundStyle(by: .value("Medium", m.plural))
+                            .opacity(faded ? 0.35 : 1)
+                    }
+                    if scale > 0 {
+                        LineMark(x: .value("Period", p.start.date(), unit: unit), y: .value("Running total", p.cumulative.doubleValue * scale),
+                                 series: .value("Line", "Running total"))
+                            .interpolationMethod(.monotone)
+                            .lineStyle(StrokeStyle(lineWidth: 2))
+                            .foregroundStyle(theme.accent)
+                    }
+                case .items:
+                    BarMark(x: .value("Period", p.start.date(), unit: unit), y: .value("Items", p.items))
+                        .foregroundStyle(theme.series.opacity(faded ? 0.35 : 1))
                         .cornerRadius(2)
-                case .albums:
-                    BarMark(x: .value("Period", p.start, unit: unit), y: .value("Albums", p.albums))
-                        .foregroundStyle(theme.series.opacity(hovered == nil || hovered == p ? 1 : 0.35))
-                        .cornerRadius(2)
-                case .total:
-                    AreaMark(x: .value("Period", p.start, unit: unit), y: .value("Total", p.cumulative.doubleValue))
-                        .interpolationMethod(.stepEnd)
-                        .foregroundStyle(LinearGradient(colors: [theme.series.opacity(0.28), theme.series.opacity(0.03)], startPoint: .top, endPoint: .bottom))
-                    LineMark(x: .value("Period", p.start, unit: unit), y: .value("Total", p.cumulative.doubleValue))
-                        .interpolationMethod(.stepEnd)
-                        .lineStyle(StrokeStyle(lineWidth: 2))
-                        .foregroundStyle(theme.series)
                 }
             }
         }
+        .chartForegroundStyleScale(domain: media.map(\.plural), range: media.map { theme.color($0) })
+        .chartLegend(measure == .spent && media.count > 1 ? .visible : .hidden)
         .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                 AxisValueLabel {
-                    if measure == .albums {
+                    if measure == .items {
                         if let v = value.as(Int.self) { Text(v.formatted()) }
                     } else if let v = value.as(Double.self) {
                         Text(formatMoney(Decimal(v), whole: true))
+                    }
+                }
+            }
+            if measure == .spent, scale > 0, let total = stats.timeline.last?.cumulative.doubleValue {
+                AxisMarks(position: .trailing, values: [0, total / 2, total].map { $0 * scale }) { value in
+                    AxisValueLabel {
+                        if let v = value.as(Double.self) {
+                            Text(formatMoney(Decimal(v / scale), whole: true)).foregroundStyle(theme.accent)
+                        }
                     }
                 }
             }
@@ -137,7 +456,7 @@ struct SpendingCard: View {
                     .onContinuousHover { phase in
                         guard case .active(let p) = phase, let frame = proxy.plotFrame,
                               let date = proxy.value(atX: p.x - geo[frame].origin.x, as: Date.self) else { hovered = nil; return }
-                        hovered = stats.timeline.last { $0.start <= date } ?? stats.timeline.first
+                        hovered = stats.timeline.last { $0.start.date() <= date } ?? stats.timeline.first
                     }
             }
         }
@@ -145,8 +464,10 @@ struct SpendingCard: View {
 
     private var subtitle: String {
         var parts: [String] = []
-        if let first = stats.timeline.first?.start { parts.append("Since \(label(first))") }
-        if let b = stats.busiestPeriod, b.spent > 0 { parts.append("biggest \(stats.granularity.rawValue): \(label(b.start)), \(formatMoney(b.spent))") }
+        if let first = stats.timeline.first?.start { parts.append("Since \(label(first.date()))") }
+        if let busiest = stats.timeline.max(by: { $0.spent < $1.spent }), busiest.spent > 0 {
+            parts.append("biggest \(stats.granularity.rawValue): \(label(busiest.start.date())), \(formatMoney(busiest.spent))")
+        }
         return parts.joined(separator: " · ")
     }
 
@@ -155,29 +476,44 @@ struct SpendingCard: View {
     }
 }
 
-// MARK: Album lists
+// MARK: Lists
 
-struct OwnedAlbumsCard: View {
+/// Shelves of items: recently added, waiting to be digitized, priciest, best value, still in the wrapper, needing
+/// details, and by label (CDs or records; rows always name the series).
+struct CollectionListsCard: View {
     @Environment(\.theme) private var theme
     @Environment(AppModel.self) private var model
-    let stats: OwnershipStats
-    enum Shelf: String, CaseIterable { case recent = "Recent", priciest = "Priciest", value = "Best Value", unplayed = "Unplayed", labeled = "By Label", missing = "Needs Details" }
-    @State private var list = Shelf.recent
+    let stats: CollectionStats
+    enum ShelfList: String, CaseIterable {
+        case recent = "Recently Added", toDigitize = "To Digitize", priciest = "Priciest", value = "Best Value"
+        case wrapper = "Still in the Wrapper", details = "Needs Details", label = "By Label"
+    }
+    @State private var list = ShelfList.recent
+    @State private var series = StickerSeries.cd
     @State private var expanded = false
     @State private var hovered: String?
 
     var body: some View {
-        let available = Shelf.allCases.filter { !albums($0).isEmpty }
+        let available = ShelfList.allCases.filter { !rows($0).isEmpty || ($0 == .label && !stats.byLabel.isEmpty) }
         let current = available.contains(list) ? list : (available.first ?? .recent)
-        let rows = albums(current)
-        InsightCard(title: "Your Albums", subtitle: subtitle(current)) {
-            Picker("", selection: $list) { ForEach(available, id: \.self) { Text($0.rawValue) } }
-                .labelsHidden().fixedSize()
+        let shown = rows(current)
+        InsightCard(title: "Your Shelves, Sorted", subtitle: subtitle(current)) {
+            HStack(spacing: 6) {
+                if current == .label {
+                    Picker("", selection: $series) { ForEach(StickerSeries.allCases, id: \.self) { Text($0.name).tag($0) } }
+                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                }
+                Picker("", selection: $list) { ForEach(available, id: \.self) { Text($0.rawValue) } }
+                    .labelsHidden().fixedSize()
+            }
         } content: {
             VStack(alignment: .leading, spacing: 2) {
-                ForEach(rows.prefix(expanded ? 50 : 8)) { a in row(a, current) }
-                if rows.count > 8 {
-                    Button(expanded ? "Show less" : "Show all \(min(rows.count, 50))\(rows.count > 50 ? " of \(rows.count)" : "")") {
+                if shown.isEmpty {
+                    Text(current == .label ? "No \(series.name) labels yet." : "Nothing here.").font(.callout).foregroundStyle(.subtext)
+                }
+                ForEach(shown.prefix(expanded ? 50 : 8)) { r in row(r, current) }
+                if shown.count > 8 {
+                    Button(expanded ? "Show less" : "Show all \(min(shown.count, 50))\(shown.count > 50 ? " of \(shown.count)" : "")") {
                         withAnimation(.snappy) { expanded.toggle() }
                     }
                     .buttonStyle(.link).font(.caption).padding(.top, 4).padding(.leading, 6)
@@ -185,249 +521,226 @@ struct OwnedAlbumsCard: View {
             }
         }
         .onChange(of: list) { expanded = false }
+        .onChange(of: series) { expanded = false }
     }
 
-    private func albums(_ list: Shelf) -> [OwnershipStats.OwnedAlbum] {
+    private func rows(_ list: ShelfList) -> [CollectionStats.ItemRow] {
         switch list {
-        case .recent: stats.albums
-        case .priciest: stats.albums.filter { $0.price != nil }.sorted { $0.price! > $1.price! }
+        case .recent: stats.recentlyAdded
+        case .toDigitize: stats.toDigitize
+        case .priciest: stats.priciestList
         case .value: stats.bestValue
-        case .unplayed: stats.unplayed
-        case .labeled: stats.labeled
-        case .missing: stats.missingDetails
+        case .wrapper: stats.stillInWrapper
+        case .details: stats.needsDetails
+        case .label: stats.byLabel[series] ?? []
         }
     }
 
-    private func subtitle(_ list: Shelf) -> String {
+    private func subtitle(_ list: ShelfList) -> String {
         switch list {
-        case .recent: "Newest purchases first"
+        case .recent: "Newest first"
+        case .toDigitize: "CDs and records with no digital copy, longest waiting first"
         case .priciest: "What you paid most for"
         case .value: "Lowest cost per play"
-        case .unplayed: "Owned but never played here"
-        case .labeled: "In the order of their label numbers"
-        case .missing: "Owned, without a purchase date or price"
+        case .wrapper: "In your digital collection, never played here"
+        case .details: "Without a purchase date, a price or a label"
+        case .label: "In the order of their labels"
         }
     }
 
-    private func row(_ a: OwnershipStats.OwnedAlbum, _ list: Shelf) -> some View {
-        let summary = model.album(forKey: a.id)
-        return Button { if let summary { model.navigationPath.append(summary) } } label: {
+    private func row(_ r: CollectionStats.ItemRow, _ list: ShelfList) -> some View {
+        let item = r.item
+        return Button { model.showItem(id: item.id) } label: {
             HStack(spacing: 10) {
-                CoverThumb(url: summary.flatMap(model.coverURL(forAlbum:)), size: 34, revision: model.coverRevision)
+                CopyArt(mark: model.collection.mark(item: item), url: model.coverURL(for: item), width: 38, revision: model.coverRevision,
+                        title: item.album)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(a.album).lineLimit(1)
-                    Text(a.artist).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                    Text(item.album.isEmpty ? "Unknown Album" : item.album).lineLimit(1)
+                    Text(item.artist).font(.caption).foregroundStyle(.subtext).lineLimit(1)
                 }
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 1) {
-                    Text(primary(a, list)).monospacedDigit()
-                    if let s = secondary(a, list) { Text(s).font(.caption).foregroundStyle(.subtext).monospacedDigit() }
+                    primary(r, list)
+                    if let s = secondary(r, list) { Text(s).font(.caption).foregroundStyle(.subtext).monospacedDigit() }
                 }
                 .lineLimit(1)
             }
             .font(.callout)
             .padding(.vertical, 3).padding(.horizontal, 6)
-            .background(RoundedRectangle(cornerRadius: 5).fill(hovered == a.id ? theme.fill : .clear))
+            .background(RoundedRectangle(cornerRadius: 5).fill(hovered == item.id ? theme.fill : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovered = $0 ? a.id : (hovered == a.id ? nil : hovered) }
-        .help("Open \(a.album)")
+        .onHover { hovered = $0 ? item.id : (hovered == item.id ? nil : hovered) }
+        .help("Open \(item.album)")
     }
 
-    private func primary(_ a: OwnershipStats.OwnedAlbum, _ list: Shelf) -> String {
+    @ViewBuilder
+    private func primary(_ r: CollectionStats.ItemRow, _ list: ShelfList) -> some View {
+        let item = r.item
         switch list {
-        case .value: a.pricePerPlay.map { "\(formatMoney($0)) a play" } ?? ""
-        case .labeled: a.labelNumber.map { "#\($0)" } ?? ""
-        case .missing:
-            a.purchasedOn == nil && a.price == nil ? "No date or price" : (a.purchasedOn == nil ? "No date" : "No price")
-        default: a.price.map { formatMoney($0) } ?? "—"
-        }
-    }
-
-    private func secondary(_ a: OwnershipStats.OwnedAlbum, _ list: Shelf) -> String? {
-        switch list {
-        case .value: return "\(playCount(a.plays)) · \(a.price.map { formatMoney($0) } ?? "")"
-        case .missing: return a.labelNumber.map { "#\($0)" }
-        case .labeled: return [a.price.map { formatMoney($0) }, a.purchasedOn.map(dayLabel)].compactMap { $0 }.joined(separator: " · ")
+        case .label:
+            if let s = item.sticker { StickerPill(sticker: s, size: 10) }
+        case .value:
+            Text(r.pricePerPlay.map { "\(formatMoney($0)) a play" } ?? "").monospacedDigit()
+        case .details:
+            Text(missing(item))
+        case .toDigitize:
+            DigitalStatusLabel(state: r.state, medium: item.medium)
         default:
-            let parts = [a.labelNumber.map { "#\($0)" } ?? (a.format == .digital ? "Download" : nil), a.purchasedOn.map(dayLabel)].compactMap { $0 }
-            return parts.isEmpty ? nil : parts.joined(separator: " · ")
-        }
-    }
-}
-
-// MARK: Formats
-
-/// How you own your music: CDs, downloads, and the albums you borrowed, as a bar of the whole library and a row each.
-struct OwnedFormatsCard: View {
-    @Environment(\.theme) private var theme
-    let stats: OwnershipStats
-
-    private struct Part: Identifiable {
-        var id: String { name }
-        var name: String
-        var icon: String
-        var albums: Int
-        var color: Color
-        var detail: String
-    }
-
-    var body: some View {
-        let parts = parts
-        let total = max(parts.reduce(0) { $0 + $1.albums }, 1)
-        InsightCard(title: "How You Own It", subtitle: "CDs, downloads and borrowed albums, of your \(albumCount(stats.libraryAlbumCount))") {
-            VStack(alignment: .leading, spacing: 12) {
-                GeometryReader { geo in
-                    HStack(spacing: 2) {
-                        ForEach(parts) { p in
-                            Rectangle().fill(p.color)
-                                .frame(width: max(3, (geo.size.width - CGFloat(parts.count - 1) * 2) * CGFloat(p.albums) / CGFloat(total)))
-                                .help("\(p.name): \(albumCount(p.albums))")
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                }
-                .frame(height: 12)
-                ForEach(parts) { p in
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Image(systemName: p.icon).foregroundStyle(p.color).frame(width: 18)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(p.name)
-                            Text(p.detail).font(.caption).foregroundStyle(.subtext)
-                        }
-                        Spacer(minLength: 8)
-                        VStack(alignment: .trailing, spacing: 1) {
-                            Text(albumCount(p.albums)).monospacedDigit()
-                            Text((Double(p.albums) / Double(total)).formatted(.percent.precision(.fractionLength(0))))
-                                .font(.caption).foregroundStyle(.subtext).monospacedDigit()
-                        }
-                    }
-                    .font(.callout)
-                }
-            }
+            Text(item.price.map { formatMoney($0) } ?? "—").monospacedDigit()
         }
     }
 
-    private var parts: [Part] {
-        var out: [Part] = []
-        for f in stats.formats {
-            var bits: [String] = []
-            if f.spent > 0 { bits.append("\(formatMoney(f.spent)) spent") }
-            if let avg = f.averagePrice, f.pricedAlbums > 1 { bits.append("\(formatMoney(avg)) on average") }
-            switch f.format {
-            case .cd:
-                if f.labeled > 0 { bits.append(f.labeled == f.albums ? "all labeled" : "\(f.labeled) labeled") }
-                out.append(Part(name: "CDs", icon: "opticaldisc", albums: f.albums, color: theme.series, detail: bits.joined(separator: " · ")))
-            case .digital:
-                if f.partial > 0 { bits.append(f.partial == 1 ? "1 only partly" : "\(f.partial) only partly") }
-                out.append(Part(name: "Downloads", icon: "dollarsign.circle", albums: f.albums, color: theme.series.opacity(0.55),
-                                detail: bits.joined(separator: " · ")))
-            }
+    private func secondary(_ r: CollectionStats.ItemRow, _ list: ShelfList) -> String? {
+        let item = r.item
+        let label = item.sticker?.text ?? (item.medium.isPhysical ? item.medium.name : "Download")
+        switch list {
+        case .value: return "\(playCount(r.plays)) · \(item.price.map { formatMoney($0) } ?? "")"
+        case .label: return [item.price.map { formatMoney($0) }, item.purchasedOn.map(dayLabel)].compactMap { $0 }.joined(separator: " · ")
+        case .wrapper, .toDigitize: return [label, item.purchasedOn.map(dayLabel)].compactMap { $0 }.joined(separator: " · ")
+        default: return [label, item.purchasedOn.map(dayLabel)].compactMap { $0 }.joined(separator: " · ")
         }
-        if stats.borrowedCount > 0 {
-            out.append(Part(name: "Borrowed", icon: "arrow.left.arrow.right", albums: stats.borrowedCount, color: theme.neutral,
-                            detail: "From a library or a friend; not yours"))
-        }
-        return out
+    }
+
+    /// "No date or price", "No label".
+    private func missing(_ item: CollectionItem) -> String {
+        var parts: [String] = []
+        if item.purchasedOn == nil { parts.append("date") }
+        if item.price == nil { parts.append("price") }
+        if item.medium.series != nil, item.stickerNumber == nil { parts.append("label") }
+        guard let first = parts.first else { return "" }
+        return "No " + (parts.count == 1 ? first : parts.dropLast().joined(separator: ", ") + " or " + parts.last!)
     }
 }
 
 // MARK: Breakdowns
 
-struct OwnedArtistsCard: View {
-    let stats: OwnershipStats
-    enum Measure: String, CaseIterable { case spent = "Spent", albums = "Albums" }
+struct CollectionArtistsCard: View {
+    let stats: CollectionStats
+    enum Measure: String, CaseIterable { case spent = "Spent", items = "Items" }
     @State private var measure: Measure?
 
     var body: some View {
-        let m = measure ?? (stats.pricedCount > 0 ? .spent : .albums)
-        InsightCard(title: "Top Artists", subtitle: "By what you've spent on them, or albums owned") {
+        let m = measure ?? (stats.pricedCount > 0 ? .spent : .items)
+        InsightCard(title: "Artists", subtitle: "By what you've spent on them, or items owned") {
             Picker("", selection: Binding(get: { m }, set: { measure = $0 })) { ForEach(Measure.allCases, id: \.self) { Text($0.rawValue) } }
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
         } content: {
-            RankedBars(items: items(m), initialCount: 6).id(m)
-        }
-    }
-
-    private func items(_ m: Measure) -> [RankedItem] {
-        let sorted = m == .spent ? stats.artists : stats.artists.sorted { $0.albums != $1.albums ? $0.albums > $1.albums : $0.spent > $1.spent }
-        return sorted.map { s in
-            RankedItem(name: s.name, value: m == .spent ? s.spent.doubleValue : Double(s.albums),
-                       detail: m == .spent ? formatMoney(s.spent) : albumCount(s.albums),
-                       query: s.name == "Unknown Artist" ? nil : SearchFilterKey.token("albumartist", s.name),
-                       subtitle: m == .spent ? albumCount(s.albums) : (s.spent > 0 ? formatMoney(s.spent) : nil))
+            RankedBars(items: CollectionBreakdownCard.ranked(stats.artists, by: m == .spent, key: "artist"), initialCount: 6).id(m)
         }
     }
 }
 
-/// Owned albums by genre or decade, with what they cost.
-struct OwnedBreakdownCard: View {
-    let title: String
-    let subtitle: String
-    let items: [OwnershipStats.Spend]
-    let stats: OwnershipStats
-    var sortByCount = true
-    let query: (OwnershipStats.Spend) -> String
+/// Genres, decades or record labels of what you own, with what they cost.
+struct CollectionBreakdownCard: View {
+    let stats: CollectionStats
+    enum Kind: String, CaseIterable { case genres = "Genres", decades = "Decades", labels = "Record Labels" }
+    @State private var kind = Kind.genres
 
     var body: some View {
-        let sorted = sortByCount ? items.sorted { $0.albums != $1.albums ? $0.albums > $1.albums : $0.spent > $1.spent } : items
-        InsightCard(title: title, subtitle: subtitle) {
-            RankedBars(items: sorted.map { s in
-                RankedItem(name: s.name, value: Double(s.albums),
-                           detail: albumCount(s.albums) + (s.spent > 0 ? " · \(formatMoney(s.spent, whole: true))" : ""),
-                           query: query(s))
-            }, initialCount: 6)
+        let available = Kind.allCases.filter { !breakdowns($0).isEmpty }
+        let current = available.contains(kind) ? kind : (available.first ?? .genres)
+        InsightCard(title: current.rawValue, subtitle: subtitle(current)) {
+            Picker("", selection: $kind) { ForEach(available, id: \.self) { Text($0.rawValue) } }
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
+        } content: {
+            let list = breakdowns(current)
+            RankedBars(items: Self.ranked(list, by: false, key: current == .decades ? "decade" : current == .labels ? "label" : "genre"),
+                       initialCount: 6)
+                .id(current)
+        }
+    }
+
+    private func breakdowns(_ kind: Kind) -> [CollectionStats.Breakdown] {
+        switch kind {
+        case .genres: stats.genres
+        case .decades: stats.decades
+        case .labels: stats.recordLabels
+        }
+    }
+
+    private func subtitle(_ kind: Kind) -> String {
+        switch kind {
+        case .genres: "An item can carry several"
+        case .decades: "When the music you own came out"
+        case .labels: "Who put out what you own"
+        }
+    }
+
+    /// Rows that open the Shelf filtered by `key` (`artist:`, `genre:`, `decade:`, `label:`).
+    static func ranked(_ list: [CollectionStats.Breakdown], by spent: Bool, key: String) -> [RankedItem] {
+        let sorted = spent ? list : (key == "decade" ? list : list.sorted { $0.items != $1.items ? $0.items > $1.items : $0.spent > $1.spent })
+        return sorted.map { b in
+            RankedItem(name: b.name, value: spent ? b.spent.doubleValue : Double(b.items),
+                       detail: spent ? formatMoney(b.spent) : itemCount(b.items) + (b.spent > 0 ? " · \(formatMoney(b.spent, whole: true))" : ""),
+                       subtitle: spent ? itemCount(b.items) : nil,
+                       shelfQuery: key == "decade" ? "decade:\(b.name)" : SearchFilterKey.token(key, b.name))
         }
     }
 }
 
 // MARK: Facts
 
-struct OwnedFactsCard: View {
-    let stats: OwnershipStats
+struct CollectionFactsCard: View {
+    let stats: CollectionStats
 
     var body: some View {
         let facts = facts
         if !facts.isEmpty { InsightCard(title: "Fun Facts") { FactsGrid(facts: facts) } }
     }
 
+    private func line(_ item: CollectionItem) -> String {
+        [item.sticker?.text, item.album, item.artist].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    /// "8 of 12 albums" when only some have a known length, else "12 albums".
+    private var runtimeAlbumsText: String {
+        func albums(_ n: Int) -> String { n == 1 ? "1 album" : "\(n.formatted()) albums" }
+        let n = stats.runtimeAlbums, total = stats.albumsOwned
+        return n < total ? "\(n.formatted()) of \(albums(total))" : albums(total)
+    }
+
     private var facts: [FunFact] {
         var out: [FunFact] = []
-        if let a = stats.mostExpensive, let p = a.price {
-            out.append(FunFact(icon: "crown", title: "Priciest album", value: formatMoney(p), detail: "\(a.album) — \(a.artist)", query: albumQuery(a)))
+        if let item = stats.oldestRelease, let y = item.year {
+            out.append(FunFact(icon: "clock.arrow.circlepath", title: "Oldest release you own", value: String(y), detail: line(item), itemID: item.id))
         }
-        if let a = stats.cheapest, let p = a.price {
-            out.append(FunFact(icon: "tag", title: p == 0 ? "Got it for free" : "Best bargain", value: formatMoney(p),
-                               detail: "\(a.album) — \(a.artist)", query: albumQuery(a)))
+        if let item = stats.newestAddition {
+            out.append(FunFact(icon: "sparkles", title: "Newest addition", value: item.createdAt.formatted(.relative(presentation: .named)),
+                               detail: line(item), itemID: item.id))
         }
-        if let a = stats.bestValue.first, let per = a.pricePerPlay {
-            out.append(FunFact(icon: "star", title: "Best value", value: "\(formatMoney(per)) a play",
-                               detail: "\(a.album) — \(playCount(a.plays)) for \(formatMoney(a.price ?? 0))", query: albumQuery(a)))
+        if let most = stats.mostCopies {
+            out.append(FunFact(icon: "square.on.square", title: "Most copies of one album", value: "\(most.copies) copies",
+                               detail: "\(most.item.album) — \(most.item.artist)",
+                               shelfQuery: SearchFilterKey.token("album", most.item.album) + " copies:>1"))
         }
-        if let a = stats.mostPlayed {
-            out.append(FunFact(icon: "flame", title: "Most played album you own", value: playCount(a.plays),
-                               detail: "\(a.album) — \(a.artist)", query: albumQuery(a)))
+        if let box = stats.biggestBox, let discs = box.discCount {
+            out.append(FunFact(icon: "shippingbox", title: "Biggest box", value: "\(discs) discs", detail: line(box), itemID: box.id))
         }
-        if let a = stats.firstPurchase, let d = a.purchasedOn {
-            out.append(FunFact(icon: "clock.arrow.circlepath", title: "Longest owned", value: d.date().formatted(.dateTime.year()),
-                               detail: "\(a.album) — since \(dayLabel(d))", query: albumQuery(a)))
+        if let r = stats.priciest, let p = r.item.price {
+            out.append(FunFact(icon: "crown", title: "Priciest", value: formatMoney(p), detail: line(r.item), itemID: r.item.id))
         }
-        if let a = stats.latestPurchase, let d = a.purchasedOn {
-            out.append(FunFact(icon: "sparkles", title: "Latest purchase", value: d.date().formatted(.relative(presentation: .named)),
-                               detail: "\(a.album) — \(a.artist)", query: albumQuery(a)))
+        if let r = stats.cheapest, let p = r.item.price {
+            out.append(FunFact(icon: "tag", title: p == 0 ? "Got it for free" : "Best bargain", value: formatMoney(p), detail: line(r.item),
+                               itemID: r.item.id))
         }
-        if !stats.unplayed.isEmpty {
-            out.append(FunFact(icon: "shippingbox", title: "Still in the wrapper", value: stats.unplayed.count.formatted(),
-                               detail: "owned album\(stats.unplayed.count == 1 ? "" : "s") you haven't played here yet"))
+        if stats.runtime > 0 {
+            out.append(FunFact(icon: "infinity", title: "Everything you own, back to back", value: formatLongDuration(stats.runtime),
+                               detail: "across \(runtimeAlbumsText) you own"))
         }
-        if stats.ownedDuration > 0 {
-            out.append(FunFact(icon: "infinity", title: "Your collection, back to back", value: formatLongDuration(stats.ownedDuration),
-                               detail: "across \(albumCount(stats.ownedCount)) you own"))
+        if stats.waitingForTurntable > 0 {
+            out.append(FunFact(icon: "record.circle", title: "Waiting for a turntable", value: stats.waitingForTurntable.formatted(),
+                               detail: "record\(stats.waitingForTurntable == 1 ? "" : "s") not digitized yet",
+                               shelfQuery: "own:vinyl ripped:no"))
         }
-        if !stats.missingDetails.isEmpty {
-            out.append(FunFact(icon: "pencil", title: "Needs details", value: stats.missingDetails.count.formatted(),
-                               detail: "owned album\(stats.missingDetails.count == 1 ? " is" : "s are") missing a date or price"))
+        if !stats.stillInWrapper.isEmpty {
+            out.append(FunFact(icon: "gift", title: "Still in the wrapper", value: stats.stillInWrapper.count.formatted(),
+                               detail: "item\(stats.stillInWrapper.count == 1 ? "" : "s") in your digital collection you haven't played here yet"))
+        }
+        if !stats.needsDetails.isEmpty {
+            out.append(FunFact(icon: "pencil", title: "Needs details", value: stats.needsDetails.count.formatted(),
+                               detail: "item\(stats.needsDetails.count == 1 ? " is" : "s are") missing a date, a price or a label"))
         }
         return out
     }

@@ -1,6 +1,7 @@
 // Makes the iPhone app's sample library (`scripts/make-sample-library.sh`): original songs synthesized here, covers
-// and artist pictures drawn here, imported with the app's own `ImportService`, plus a listening history, likes,
-// owned albums, playlists and artist and album info. Every artist, album and song is fictional.
+// and artist pictures drawn here, imported with the app's own `ImportService`, plus a listening history, likes, a
+// collection (labeled CDs and records, some never ripped, and a download), playlists and artist and album info. Every
+// artist, album and song is fictional.
 //
 //     swift run -c release SampleLibraryMaker <output folder>
 #if os(macOS)
@@ -34,6 +35,28 @@ func log(_ s: String) { print(s) }
 // MARK: Songs
 
 var tracksByAlbum: [String: [Track]] = [:]
+var collection: [CollectionItem] = []
+
+/// A collection item for an owned copy, added to the collection when it was bought (or when the album joined the
+/// library, for one bought on a day not recorded).
+func collectionItem(_ copy: SampleCatalog.Copy, title: String, artist: String, year: Int, label: String,
+                    trackCount: Int, addedDaysAgo: Int?) -> CollectionItem {
+    let bought = copy.daysAgo.map { now.addingTimeInterval(-Double($0) * day) }
+    let added = bought ?? addedDaysAgo.map { now.addingTimeInterval(-Double($0) * day) } ?? now
+    var item = CollectionItem(medium: copy.medium, album: title, artist: artist, now: added)
+    item.stickerNumber = copy.sticker
+    item.year = year
+    item.recordLabel = label
+    item.catalogNumber = copy.catalogNumber
+    item.country = SampleCatalog.artists.first { $0.name == artist }?.country
+    item.formatDetail = copy.formatDetail
+    item.discCount = copy.medium == .download ? nil : 1
+    item.trackCount = trackCount
+    item.purchasedOn = bought.map { PurchaseDay($0, calendar: calendar) }
+    item.price = copy.price.flatMap { Decimal(string: $0, locale: Locale(identifier: "en_US_POSIX")) }
+    return item
+}
+
 do {
     let db = try LibraryLocation.openDatabase(root: root)
     let importer = ImportService(root: root, database: db, tools: tools)
@@ -57,7 +80,9 @@ do {
             extended.releaseStatus = "Official"
             extended.releaseCountry = SampleCatalog.artists.first { $0.name == album.artist }?.country ?? ""
             extended.releaseDate = String(format: "%04d-%02d-%02d", album.year, album.month, 1 + (album.title.count * 7) % 27)
-            extended.mediaFormat = "Digital Media"
+            // The release the files came from: the CD or record they were ripped from, when you own one.
+            extended.mediaFormat = album.owned == nil || album.medium == .download ? "Digital Media"
+                : album.medium == .vinyl ? "12\" Vinyl" : "CD"
             extended.producer = album.producer
             extended.mixer = album.mixer
             extended.credits = (album.personnel + song.extra).map { Credit(role: $0.0, name: $0.1, scope: .recording) }
@@ -96,12 +121,51 @@ do {
         try db.saveAlbumInfo(key: key, info)
 
         if let owned = album.owned {
-            let purchase = AlbumPurchase(album: album.title, artist: album.artist,
-                                         purchasedOn: owned.daysAgo.map { PurchaseDay(now.addingTimeInterval(-Double($0) * day), calendar: calendar) },
-                                         price: owned.price.flatMap { Decimal(string: $0, locale: Locale(identifier: "en_US_POSIX")) })
-            try db.saveAlbumPurchase(key: key, purchase, at: now)
+            let format = album.medium == .vinyl ? "12\" Vinyl" : album.medium == .download ? "Digital Media" : "CD"
+            let own = SampleCatalog.Copy(medium: album.medium, sticker: album.sticker, daysAgo: owned.daysAgo, price: owned.price,
+                                         formatDetail: format, catalogNumber: album.catalogNumber)
+            var item = collectionItem(own, title: album.title, artist: album.artist, year: album.year, label: album.label,
+                                      trackCount: imported.count, addedDaysAgo: album.addedDaysAgo)
+            item.digitalSource = album.medium == .download ? .download : .rip
+            collection.append(item)
+            for copy in album.otherCopies {
+                var other = collectionItem(copy, title: album.title, artist: album.artist, year: album.year, label: album.label,
+                                           trackCount: imported.count, addedDaysAgo: album.addedDaysAgo)
+                other.digitalSource = .same
+                collection.append(other)
+            }
         }
     }
+
+    // MARK: Collection
+
+    // Records and CDs with no songs: their own covers and, in their album info, their track lists.
+    for shelfItem in SampleCatalog.shelf {
+        log("\(shelfItem.artist) – \(shelfItem.title) (\(shelfItem.copy.medium.name))")
+        var item = collectionItem(shelfItem.copy, title: shelfItem.title, artist: shelfItem.artist, year: shelfItem.year,
+                                  label: shelfItem.label, trackCount: shelfItem.tracks.count, addedDaysAgo: nil)
+        let lettering = Artwork.Lettering(title: shelfItem.title, artist: shelfItem.artist, font: shelfItem.fonts.title,
+                                          artistFont: shelfItem.fonts.artist, color: shelfItem.letteringColor, top: shelfItem.letteringTop)
+        let cover = Artwork.cover(style: shelfItem.cover, palette: shelfItem.palette, lettering: lettering, seed: shelfItem.title)
+        item.coverFile = try CollectionCovers.write(cover, itemID: item.id, root: root)
+        collection.append(item)
+
+        var info = AlbumInfo(title: shelfItem.title)
+        info.primaryType = shelfItem.type == "Live" ? "Album" : shelfItem.type
+        if shelfItem.type == "Live" { info.secondaryTypes = ["Live"] }
+        info.firstReleaseDate = String(shelfItem.year)
+        info.genres = [shelfItem.genre.lowercased()]
+        info.description = shelfItem.description
+        info.descriptionSource = "the sample library"
+        info.tracklist = shelfItem.tracks.enumerated().map { i, t in
+            TracklistEntry(disc: 1, number: i + 1, title: t.1, artist: shelfItem.artist, position: t.0)
+        }
+        info.fetchedAt = now
+        try db.saveAlbumInfo(key: item.albumKey, info)
+    }
+    // Through the collection API, so `album_ownership` gets its projection (CDs and the download) for older phones.
+    try db.saveCollectionItems(collection, at: now)
+    log("\(collection.count) items in the collection")
 
     // MARK: Artists
 

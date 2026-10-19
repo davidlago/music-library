@@ -1,8 +1,11 @@
 import CoreGraphics
 import Foundation
 
-/// Who worked with whom, from the library's credits: everyone credited on a track (players, singers,
-/// producers, engineers, writers…) plus the track's artists, linked when they appear on the same track.
+/// Who worked with whom, from the credits of both collections: everyone credited on a track (players, singers,
+/// producers, engineers, writers…) plus the track's artists, linked when they appear on the same track. The digital
+/// collection's tracks come with their tags; a CD or record with no digital copy adds its release's songs as
+/// `PhysicalSong`s, from the MusicBrainz credits cached with its album info, so a player you only have on vinyl links
+/// to the same people in your digital collection.
 public struct CollaborationGraph: Sendable {
     public enum Category: String, CaseIterable, Sendable {
         case performance = "Performance", writing = "Writing", production = "Production"
@@ -14,17 +17,19 @@ public struct CollaborationGraph: Sendable {
         /// Role labels, most frequent first ("piano", "composer", "artist"…).
         public var roles: [String]
         public var category: Category
+        /// Songs they're on, in both collections (`PhysicalSong`s included).
         public var trackCount: Int
         /// Number of distinct collaborators.
         public var degree: Int
     }
 
     public private(set) var people: [Person] = []
-    /// Sorted track IDs per person.
+    /// Sorted track IDs per person (negative ones are `PhysicalSong`s).
     private var tracksOf: [[Int64]] = []
     /// Collaborator → number of shared tracks, per person.
     private var neighbors: [[Int: Int]] = []
     private var byName: [String: Int] = [:]
+    private var physicalSongs: [Int64: PhysicalSong] = [:]
 
     public static let empty = CollaborationGraph(tracks: [])
 
@@ -39,7 +44,50 @@ public struct CollaborationGraph: Sendable {
     /// MusicBrainz special-purpose artists and placeholders that aren't people.
     static let excluded: Set<String> = ["various artists", "unknown", "anonymous", "no artist", "traditional", "data", "dialogue"]
 
-    public init(tracks: [Track]) {
+    /// A song known only from an item of the physical collection with no digital copy: its people come from the
+    /// release's MusicBrainz credits (`AlbumInfo`). Its `id` is negative, so it never clashes with a track's.
+    public struct PhysicalSong: Hashable, Sendable {
+        public var id: Int64
+        /// The collection item it's on (the first copy, when you own several with no digital copy).
+        public var itemID: String
+        public var title: String
+        /// The song's artist credit ("Miles Davis feat. John Coltrane"), or the album's artist.
+        public var artist: String
+        public var artistMBID: String?
+        public var credits: [Credit]
+
+        public init(id: Int64, itemID: String, title: String, artist: String, artistMBID: String? = nil, credits: [Credit]) {
+            self.id = id; self.itemID = itemID; self.title = title; self.artist = artist
+            self.artistMBID = artistMBID; self.credits = credits
+        }
+    }
+
+    /// The songs of physical items with no digital copy (CDs not ripped, records not digitized, or ones whose tracks
+    /// left the library), once per album key: each song of the release's track list with its own credits plus the
+    /// release's, or the whole album as one song when no track list is cached. Items whose album has tracks in the
+    /// library are already in the graph through them.
+    public static func physicalSongs(collection: MusicCollection, albumInfos: [String: AlbumInfo]) -> [PhysicalSong] {
+        var seen = Set<String>()
+        var out: [PhysicalSong] = []
+        let items = collection.items.filter { $0.medium.isPhysical && !collection.digitalState($0).hasMusic }
+            .sorted { ($0.albumKey, $0.id) < ($1.albumKey, $1.id) }
+        for item in items where seen.insert(item.albumKey).inserted {
+            let info = albumInfos[item.albumKey]
+            let releaseCredits = info?.releaseCredits ?? []
+            func song(_ title: String, _ artist: String, _ credits: [Credit]) {
+                out.append(PhysicalSong(id: -Int64(out.count + 1), itemID: item.id, title: title,
+                                        artist: artist.isEmpty ? item.artist : artist, credits: credits + releaseCredits))
+            }
+            if let tracklist = info?.tracklist, !tracklist.isEmpty {
+                for entry in tracklist { song(entry.title, entry.artist, entry.credits ?? []) }
+            } else {
+                song(item.album, item.artist, [])
+            }
+        }
+        return out
+    }
+
+    public init(tracks: [Track], physical: [PhysicalSong] = []) {
         var names: [[String: Int]] = []          // spelling counts per person
         var roleCounts: [[String: Int]] = []
         var trackSets: [Set<Int64>] = []
@@ -63,31 +111,19 @@ public struct CollaborationGraph: Sendable {
         }
 
         var adjacency: [[Int: Int]] = []
-        for t in tracks {
+        /// Adds one song: `fill` names its people with `add`.
+        func song(_ id: Int64, _ fill: ((String, String?, String) -> Void) -> Void) {
             var onTrack: [Int: Set<String>] = [:]
-            func add(_ name: String, mbid: String? = nil, role: String) {
+            fill { name, mbid, role in
                 guard let id = node(name, mbid: mbid) else { return }
                 names[id][name.trimmingCharacters(in: .whitespaces), default: 0] += 1
                 onTrack[id, default: []].insert(role)
             }
-            let m = t.metadata, x = m.extended
-            for a in Self.splitArtists(m.artist) { add(a, mbid: x.mbArtistIds.count == 1 ? x.mbArtistIds[0] : nil, role: "artist") }
-            for c in x.credits where !Self.nonMusicalRoles.contains(c.role.lowercased()) {
-                for role in CreditFormatter.label(c) { add(c.name, mbid: c.artistId, role: role) }
-            }
-            let fields: [(String, String)] = [
-                (m.composer, "composer"), (x.lyricist, "lyricist"), (x.writer, "writer"), (x.arranger, "arranger"),
-                (x.conductor, "conductor"), (x.producer, "producer"), (x.engineer, "engineer"), (x.mixer, "mixer"),
-                (x.remixer, "remixer"),
-            ]
-            for (value, role) in fields { for name in Self.splitNames(value) { add(name, role: role) } }
-            for p in x.performers { add(Self.stripParenthetical(p), role: "performer") }
-
             while adjacency.count < names.count { adjacency.append([:]) }
             let ids = Array(onTrack.keys)
-            for id in ids {
-                trackSets[id].insert(t.id)
-                for role in onTrack[id]! { roleCounts[id][role, default: 0] += 1 }
+            for person in ids {
+                trackSets[person].insert(id)
+                for role in onTrack[person]! { roleCounts[person][role, default: 0] += 1 }
             }
             for i in ids.indices {
                 for j in ids.indices where j > i {
@@ -96,8 +132,40 @@ public struct CollaborationGraph: Sendable {
                 }
             }
         }
+        /// Album info's credits come from a cache that may have been written elsewhere, so their IDs are checked;
+        /// tracks' were checked when their tags were read.
+        func credits(_ list: [Credit], checked: Bool, _ add: (String, String?, String) -> Void) {
+            for c in list where !Self.nonMusicalRoles.contains(c.role.lowercased()) {
+                for role in CreditFormatter.label(c) { add(c.name, checked ? MBID.validated(c.artistId) : c.artistId, role) }
+            }
+        }
+
+        for t in tracks {
+            song(t.id) { add in
+                let m = t.metadata, x = m.extended
+                for a in Self.splitArtists(m.artist) { add(a, x.mbArtistIds.count == 1 ? x.mbArtistIds[0] : nil, "artist") }
+                credits(x.credits, checked: false, add)
+                let fields: [(String, String)] = [
+                    (m.composer, "composer"), (x.lyricist, "lyricist"), (x.writer, "writer"), (x.arranger, "arranger"),
+                    (x.conductor, "conductor"), (x.producer, "producer"), (x.engineer, "engineer"), (x.mixer, "mixer"),
+                    (x.remixer, "remixer"),
+                ]
+                for (value, role) in fields { for name in Self.splitNames(value) { add(name, nil, role) } }
+                for p in x.performers { add(Self.stripParenthetical(p), nil, "performer") }
+            }
+        }
+        var physicalByID: [Int64: PhysicalSong] = [:]
+        for p in physical where p.id < 0 && physicalByID[p.id] == nil {
+            physicalByID[p.id] = p
+            song(p.id) { add in
+                let artists = Self.splitArtists(p.artist)
+                for a in artists { add(a, artists.count == 1 ? MBID.validated(p.artistMBID) : nil, "artist") }
+                credits(p.credits, checked: true, add)
+            }
+        }
         while adjacency.count < names.count { adjacency.append([:]) }
 
+        physicalSongs = physicalByID
         neighbors = adjacency
         tracksOf = trackSets.map { $0.sorted() }
         people = names.indices.map { id in
@@ -107,6 +175,9 @@ public struct CollaborationGraph: Sendable {
                           trackCount: trackSets[id].count, degree: adjacency[id].count)
         }
     }
+
+    /// The physical song behind a negative id from `tracks(of:)`/`sharedTracks`, if it is one.
+    public func physicalSong(_ id: Int64) -> PhysicalSong? { physicalSongs[id] }
 
     // MARK: Names and roles
 

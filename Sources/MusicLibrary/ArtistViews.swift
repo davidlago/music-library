@@ -43,7 +43,7 @@ struct ArtistsView: View {
     }
 
     var body: some View {
-        let shown = sorted(filtered(model.artists))
+        let shown = sorted(filtered(model.allArtists))
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header(shownCount: shown.count)
@@ -66,7 +66,7 @@ struct ArtistsView: View {
             .padding(20)
         }
         .overlay {
-            if model.artists.isEmpty {
+            if model.allArtists.isEmpty {
                 ContentUnavailableView("No Artists", systemImage: "music.mic")
             } else if shown.isEmpty {
                 ContentUnavailableView.search(text: filter)
@@ -74,7 +74,7 @@ struct ArtistsView: View {
         }
         .sheet(item: $photoArtist) { ArtistPhotoSheet(name: $0.name, request: CoverSheetRequest()).themedSheet() }
         .navigationTitle("Artists")
-        .navigationSubtitle(filter.isEmpty ? "\(model.artists.count) artists" : "\(shown.count) of \(model.artists.count) artists")
+        .navigationSubtitle(filter.isEmpty ? "\(model.allArtists.count) artists" : "\(shown.count) of \(model.allArtists.count) artists")
     }
 
     private func header(shownCount: Int) -> some View {
@@ -140,7 +140,9 @@ struct ArtistCard: View {
                 .padding(.bottom, 4)
             Text(artist.name.isEmpty ? "Unknown Artist" : artist.name)
                 .font(.headline).lineLimit(1)
-            Text("\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") · \(songCount(artist.trackCount))")
+            // An artist you only own on CD or vinyl has albums but no songs.
+            Text(artist.trackCount == 0 ? "\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") you own"
+                                        : "\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") · \(songCount(artist.trackCount))")
                 .font(.caption).foregroundStyle(.subtext).lineLimit(1)
             if listened >= 1 {
                 Label(formatListened(listened), systemImage: "headphones")
@@ -179,32 +181,44 @@ struct SyncStatus: View {
 
 // MARK: Detail
 
+/// An artist's page by name: for an artist you only have items by (no songs, so no `ArtistSummary`).
+struct ArtistRoute: Hashable {
+    var name: String
+}
+
+/// An artist's page: their songs and albums in the library, and the items in your collection by them (records
+/// never digitized included). The page stays open while either is left.
 struct ArtistDetail: View {
     @Environment(AppModel.self) private var model
     @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
-    let artist: ArtistSummary
+    let artistName: String
     @State private var tracks: [Track] = []
     @State private var albums: [AlbumSummary] = []
+    @State private var items: [CollectionItem] = []
     @State private var bioExpanded = false
     @State private var showAllSongs = false
     @State private var photoSheet: CoverSheetRequest?
     @State private var hoveringPhoto = false
     @State private var photoDropTargeted = false
 
-    private var name: String { artist.name.isEmpty ? "Unknown Artist" : artist.name }
+    init(artist: ArtistSummary) { artistName = artist.name }
+    init(name: String) { artistName = name }
+
+    private var name: String { artistName.isEmpty ? "Unknown Artist" : artistName }
 
     var body: some View {
-        let info = model.artistInfo.info(for: artist.name)
+        let info = model.artistInfo.info(for: artistName)
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 hero(info)
                 statTiles(info)
                 if let bio = info?.bio { about(bio, info!) }
                 if let links = info?.links.filter(\.url.isWebLink), !links.isEmpty { linksSection(links) }
-                ArtistConcertsSection(artist: artist.name, mbid: info?.mbid)
+                ArtistConcertsSection(artist: artistName, mbid: info?.mbid)
+                if items.contains(where: \.medium.isPhysical) { collectionSection }
                 if !albums.isEmpty { albumsSection }
-                songsSection
+                if !tracks.isEmpty { songsSection }
             }
             .padding(24)
             .frame(maxWidth: 1100, alignment: .leading)
@@ -212,32 +226,62 @@ struct ArtistDetail: View {
         }
         .navigationTitle(name)
         .toolbar {
-            ToolbarItem { AddToExportListButton([.artist(artist.name)]) }
+            ToolbarItem { AddToExportListButton([.artist(artistName)]) }
             ToolbarItem {
                 Button { photoSheet = CoverSheetRequest() } label: { Label("Change Photo…", systemImage: "person.crop.circle") }
-                    .disabled(artist.name.isEmpty)
+                    .disabled(artistName.isEmpty)
                     .help("Search for or upload a photo of \(name)")
             }
             ToolbarItem {
-                Button { model.refreshArtistInfo([artist.name]) } label: {
+                Button { model.refreshArtistInfo([artistName]) } label: {
                     Label("Update Artist Info", systemImage: "arrow.clockwise")
                 }
-                .disabled(model.artistInfo.isFetching(artist.name))
+                .disabled(model.artistInfo.isFetching(artistName))
                 .help("Download the latest photo, bio and links")
             }
         }
-        .sheet(item: $photoSheet) { ArtistPhotoSheet(name: artist.name, request: $0).themedSheet() }
+        .sheet(item: $photoSheet) { ArtistPhotoSheet(name: artistName, request: $0).themedSheet() }
         .onAppear(perform: load)
         .onChange(of: model.libraryVersion) {
             load()
-            // All of the artist's songs were removed from the library.
-            if tracks.isEmpty { dismiss() }
+            // All of the artist's songs were removed from the library, and nothing by them is in the collection.
+            if tracks.isEmpty, items.isEmpty { dismiss() }
+        }
+        .onChange(of: model.collectionVersion) {
+            items = model.collection.items(artist: artistName)
+            if tracks.isEmpty, items.isEmpty { dismiss() }
         }
     }
 
     private func load() {
-        tracks = model.tracks(ofArtist: artist.name)
-        albums = model.albums(forArtist: artist.name)
+        tracks = model.tracks(ofArtist: artistName)
+        albums = model.albums(forArtist: artistName)
+        items = model.collection.items(artist: artistName)
+    }
+
+    /// The artist's CDs and records you own, with or without songs in the digital collection. Downloads are digital:
+    /// they're among the albums below.
+    private var collectionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                SectionHeader(title: "In Your Physical Collection")
+                Spacer()
+                Button("Show on Shelf") { model.showShelf(query: SearchFilterKey.token("artist", artistName), scope: .all) }
+                    .buttonStyle(.link)
+                    .help("Open the Shelf with only \(name)'s CDs and records")
+            }
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: 18) {
+                    ForEach(items.filter(\.medium.isPhysical)) { item in
+                        NavigationLink(value: CollectionItemRoute(id: item.id)) { CollectionCell(item: item, width: 140) }
+                            .buttonStyle(.plain)
+                            .contextMenu { CollectionItemMenu(model: model, item: item) }
+                    }
+                }
+                .padding(.bottom, 8)
+            }
+            .scrollIndicators(.automatic)
+        }
     }
 
     // MARK: Sections
@@ -263,11 +307,11 @@ struct ArtistDetail: View {
                                         .background(Capsule().fill(theme.fill))
                                 }
                                 .buttonStyle(.plain)
-                                .help("Search your library for \(g)")
+                                .help("Search your digital collection for \(g)")
                             }
                         }
                     }
-                } else if model.artistInfo.isFetching(artist.name) {
+                } else if model.artistInfo.isFetching(artistName) {
                     Label("Looking up artist info…", systemImage: "arrow.down.circle").font(.callout).foregroundStyle(.subtext)
                 }
                 HStack(spacing: 10) {
@@ -275,8 +319,8 @@ struct ArtistDetail: View {
                         .buttonStyle(.borderedProminent)
                     Button { play(tracks.shuffled(), at: 0) } label: { Label("Shuffle", systemImage: "shuffle") }
                         .buttonStyle(.bordered)
-                    if model.collaborations.person(named: artist.name) != nil {
-                        Button { model.showMusicDNA(artist.name) } label: {
+                    if model.collaborations.person(named: artistName) != nil {
+                        Button { model.showMusicDNA(artistName) } label: {
                             Label("Music DNA", systemImage: "point.3.connected.trianglepath.dotted")
                         }
                         .buttonStyle(.bordered)
@@ -298,7 +342,7 @@ struct ArtistDetail: View {
         .background {
             ZStack {
                 theme.card
-                ArtistBackdrop(name: artist.name)
+                ArtistBackdrop(name: artistName)
             }
             .clipShape(RoundedRectangle(cornerRadius: 18))
         }
@@ -308,8 +352,8 @@ struct ArtistDetail: View {
     /// The photo, with "Change Photo…" on hover; dropping an image on it opens the photo sheet with that image.
     private func photo(size: CGFloat) -> some View {
         ZStack(alignment: .bottom) {
-            ArtistPhoto(name: artist.name, size: size)
-            if hoveringPhoto, !artist.name.isEmpty {
+            ArtistPhoto(name: artistName, size: size)
+            if hoveringPhoto, !artistName.isEmpty {
                 Button { photoSheet = CoverSheetRequest() } label: { Label("Change Photo…", systemImage: "photo") }
                     .controlSize(.small)
                     .padding(.bottom, 14)
@@ -319,10 +363,10 @@ struct ArtistDetail: View {
         .shadow(color: .black.opacity(0.25), radius: 16, y: 6)
         .onHover { hoveringPhoto = $0 }
         .contextMenu {
-            Button("Change Photo…") { photoSheet = CoverSheetRequest() }.disabled(artist.name.isEmpty)
+            Button("Change Photo…") { photoSheet = CoverSheetRequest() }.disabled(artistName.isEmpty)
         }
         .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first, url.isFileURL, !artist.name.isEmpty else { return false }
+            guard let url = urls.first, url.isFileURL, !artistName.isEmpty else { return false }
             let data = try? Data(contentsOf: url)
             guard let data, NSImage(data: data) != nil else { return false }
             photoSheet = CoverSheetRequest(image: data, source: url.lastPathComponent)
@@ -331,12 +375,15 @@ struct ArtistDetail: View {
     }
 
     private func statTiles(_ info: ArtistInfo?) -> some View {
-        let p = model.artistPlayTotals[ArtistInfoStore.key(artist.name)] ?? PlayTotal()
+        let p = model.artistPlayTotals[ArtistInfoStore.key(artistName)] ?? PlayTotal()
         let total = tracks.reduce(0) { $0 + $1.duration }
         return LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 12)], spacing: 12) {
             StatTile(value: tracks.count.formatted(), label: tracks.count == 1 ? "Song" : "Songs", icon: "music.note")
             StatTile(value: albums.count.formatted(), label: albums.count == 1 ? "Album" : "Albums", icon: "square.stack")
-            StatTile(value: formatLongDuration(total), label: "In your library", icon: "clock")
+            if !items.isEmpty {
+                StatTile(value: items.count.formatted(), label: items.count == 1 ? "Copy you own" : "Copies you own", icon: "books.vertical")
+            }
+            StatTile(value: formatLongDuration(total), label: "In your digital collection", icon: "clock")
             StatTile(value: formatListened(p.listened), label: "Time listened", icon: "headphones")
             StatTile(value: p.plays.formatted(), label: p.plays == 1 ? "Play" : "Plays", icon: "play.circle")
             StatTile(value: p.lastPlayed.map { $0.formatted(.relative(presentation: .named)) } ?? "Never",
@@ -368,7 +415,7 @@ struct ArtistDetail: View {
                         Text("From \(source)").font(.caption).foregroundStyle(.subtext)
                     }
                 }
-                if let credit = model.artistInfo.photoCredit(for: artist.name) {
+                if let credit = model.artistInfo.photoCredit(for: artistName) {
                     if let url = credit.url?.webLink {
                         Link("Photo: \(credit.label)", destination: url).font(.caption)
                     } else {
@@ -399,13 +446,13 @@ struct ArtistDetail: View {
 
     private var albumsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Albums in Your Library")
+            SectionHeader(title: "In Your Digital Collection")
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 18)], alignment: .leading, spacing: 18) {
                 ForEach(albums) { a in
                     NavigationLink(value: a) {
                         VStack(alignment: .leading, spacing: 4) {
                             CoverThumb(url: model.coverURL(forAlbum: a), size: 140, revision: model.coverRevision,
-                                       ownership: OwnershipMark(model.purchase(for: a)))
+                                       mark: model.copyMark(for: a))
                             Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.callout.weight(.medium)).lineLimit(1)
                             Text([a.year.map(String.init), songCount(a.trackCount)].compactMap { $0 }.joined(separator: " · "))
                                 .font(.caption).foregroundStyle(.subtext)

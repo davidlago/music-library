@@ -194,7 +194,8 @@ public enum SyncMacSession {
             if let concerts { try await connection.send(.concerts(concerts)) }
 
             let selected = await selection(manifest)
-            var plan = SyncPlan(tracks: selected.tracks, library: selected.library, libraryRoot: libraryRoot, phone: manifest.files)
+            var plan = SyncPlan(tracks: selected.tracks, library: selected.library, collectionCovers: try database.collectionCoverPaths(),
+                                libraryRoot: libraryRoot, phone: manifest.files)
             if !plan.deletes.isEmpty, await !approveDeletes(plan.deletes.count) { plan.deletes = [] }
             let onPhone = Dictionary(manifest.files.map { ($0.path, $0.size) }, uniquingKeysWith: { a, _ in a })
             let freed = plan.deletes.reduce(Int64(0)) { $0 + (onPhone[$1] ?? 0) } + plan.sends.reduce(Int64(0)) { $0 + (onPhone[$1.path] ?? 0) }

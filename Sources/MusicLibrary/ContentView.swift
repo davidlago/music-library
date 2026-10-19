@@ -57,7 +57,9 @@ struct MainWindow: View {
                     DetailRouter()
                         .navigationDestination(for: AlbumSummary.self) { AlbumDetail(album: $0) }
                         .navigationDestination(for: ArtistSummary.self) { ArtistDetail(artist: $0) }
+                        .navigationDestination(for: ArtistRoute.self) { ArtistDetail(name: $0.name) }
                         .navigationDestination(for: CatalogItem.self) { CatalogDetail(item: $0) }
+                        .navigationDestination(for: CollectionItemRoute.self) { CollectionItemDetail(id: $0.id) }
                 }
             }
             .background(theme.isThemed ? theme.background : Color.clear)
@@ -87,7 +89,19 @@ struct MainWindow: View {
             ExportSheet().themedSheet()
         }
         .sheet(item: $model.smartPlaylistDraft) { SmartPlaylistEditor(draft: $0).themedSheet() }
+        .sheet(item: $model.collectionSheet) { sheet in
+            switch sheet {
+            case .add(let medium, let prefill): AddToCollectionSheet(medium: medium, prefill: prefill).themedSheet()
+            case .findByLabel(let sticker): FindByLabelPanel(initial: sticker).themedSheet()
+            case .addLibraryAlbums: BulkAddSheet().themedSheet()
+            case .labelCheck: LabelCheckSheet().themedSheet()
+            case .link(let id): LinkAlbumPicker(itemID: id).themedSheet()
+            case .cover(let id, let request): CollectionCoverSheet(itemID: id, request: request).themedSheet()
+            case .changeEdition(let id): ChangeEditionSheet(itemID: id).themedSheet()
+            }
+        }
         .removeFromLibraryConfirmation(model)
+        .collectionRemovalConfirmation(model)
     }
 }
 
@@ -110,10 +124,26 @@ struct SidebarView: View {
     var body: some View {
         @Bindable var model = model
         List(selection: $model.sidebar) {
-            Section("Library") {
+            Section("Physical Collection") {
+                // Downloads are listed with the digital collection below.
+                ForEach(CollectionScope.allCases.filter { $0 != .downloads }, id: \.self) { scope in
+                    let count = model.collection.count(scope)
+                    // To Digitize only while something is waiting (or it's the page showing).
+                    if scope != .toDigitize || count > 0 || model.sidebar == .collection(.toDigitize) {
+                        Label(scope.title, systemImage: scope.symbol).sidebarBadge(count).tag(SidebarItem.collection(scope))
+                    }
+                }
+            }
+            Section("Digital Collection") {
                 Label("Songs", systemImage: "music.note").sidebarBadge(model.tracks.count).tag(SidebarItem.songs)
                 Label("Albums", systemImage: "square.stack").sidebarBadge(model.albums.count).tag(SidebarItem.albums)
-                Label("Artists", systemImage: "music.mic").sidebarBadge(model.artists.count).tag(SidebarItem.artists)
+                Label(CollectionScope.downloads.title, systemImage: CollectionScope.downloads.symbol)
+                    .sidebarBadge(model.collection.count(.downloads))
+                    .tag(SidebarItem.collection(.downloads))
+            }
+            Section("Explore") {
+                // Artists from both collections, so they're with Insights, Music DNA and Concerts.
+                Label("Artists", systemImage: "music.mic").sidebarBadge(model.allArtists.count).tag(SidebarItem.artists)
                 Label("Insights", systemImage: "chart.bar.xaxis").tag(SidebarItem.insights)
                 Label("Music DNA", systemImage: "point.3.connected.trianglepath.dotted").tag(SidebarItem.musicDNA)
                 Label("Concerts", systemImage: "ticket").tag(SidebarItem.concerts)
@@ -128,8 +158,8 @@ struct SidebarView: View {
                         .tag(SidebarItem.cd(disc.id))
                 }
             }
-            Section("Library Catalog") {
-                Label("Library CDs", systemImage: "building.columns").tag(SidebarItem.catalog)
+            Section("Local Library") {
+                Label("Local Library CDs", systemImage: "building.columns").tag(SidebarItem.catalog)
                 Label("My Checkouts", systemImage: "books.vertical")
                     .sidebarBadge(model.catalog.cdCheckouts.count)
                     .tag(SidebarItem.catalogCheckouts)
@@ -240,6 +270,7 @@ struct DetailRouter: View {
     @ViewBuilder
     private var destination: some View {
         switch model.sidebar ?? .songs {
+        case .collection(let scope): CollectionView(scope: scope).id(scope)
         case .songs: SongsView()
         case .insights: InsightsView()
         case .musicDNA: MusicDNAView()
@@ -272,6 +303,19 @@ struct DetailRouter: View {
             } else {
                 ContentUnavailableView("Playlist not found", systemImage: "gearshape")
             }
+        }
+    }
+}
+
+extension CollectionScope {
+    /// The scope's sidebar icon.
+    var symbol: String {
+        switch self {
+        case .all: "books.vertical"
+        case .cds: "opticaldisc"
+        case .vinyl: "record.circle"
+        case .downloads: "arrow.down.circle"
+        case .toDigitize: "waveform.slash"
         }
     }
 }

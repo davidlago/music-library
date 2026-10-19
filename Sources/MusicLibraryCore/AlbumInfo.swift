@@ -20,6 +20,10 @@ public struct AlbumInfo: Codable, Hashable, Sendable {
     public var descriptionURL: URL?
     public var links: [ArtistLink] = []
     public var tracklist: [TracklistEntry] = []
+    /// The release's own credits (players, producers, engineers… on the whole release), from the same MusicBrainz
+    /// lookup as the track list. Nil in info cached before they were kept. Music DNA reads them for copies with no
+    /// tracks in the library.
+    public var releaseCredits: [Credit]?
     public var lastfmListeners: Int?
     public var lastfmUserPlaycount: Int?
     public var fetchedAt: Date = Date()
@@ -47,10 +51,29 @@ public struct TracklistEntry: Codable, Hashable, Sendable, Identifiable {
     public var artist: String
     public var duration: Double?
     public var recordingId: String
+    /// The position printed on the release when it isn't just the track number: a record's side and track ("A1",
+    /// "B2"). Nil in info cached before positions were kept, and for plain numbers.
+    public var position: String?
+    /// The recording's and its work's credits (performers, writers…). Nil in info cached before they were kept.
+    public var credits: [Credit]?
 
-    public init(disc: Int, number: Int, title: String, artist: String = "", duration: Double? = nil, recordingId: String = "") {
+    public init(disc: Int, number: Int, title: String, artist: String = "", duration: Double? = nil, recordingId: String = "",
+                position: String? = nil, credits: [Credit]? = nil) {
         self.disc = disc; self.number = number; self.title = title; self.artist = artist
         self.duration = duration; self.recordingId = recordingId
+        self.position = Self.position(position, number: number)
+        self.credits = credits.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// "A1" for a record's track, else the track number.
+    public var displayPosition: String { position ?? String(number) }
+
+    /// The printed position, unless it's empty, the plain track number or too long to be one (it's from the network).
+    static func position(_ raw: String?, number: Int) -> String? {
+        guard let p = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !p.isEmpty, p.count <= 12, p != String(number) else {
+            return nil
+        }
+        return p
     }
 }
 
@@ -188,8 +211,10 @@ extension AlbumInfo {
         if let release {
             info.tracklist = release.tracks.map {
                 TracklistEntry(disc: $0.discNo, number: $0.trackNo, title: $0.title, artist: $0.artist,
-                               duration: $0.durationSeconds, recordingId: $0.recordingId)
+                               duration: $0.durationSeconds, recordingId: $0.recordingId, position: $0.numberLabel,
+                               credits: $0.credits)
             }
+            info.releaseCredits = release.credits.isEmpty ? nil : release.credits
         }
         if let wikipedia {
             info.description = wikipedia.extract

@@ -21,7 +21,7 @@ struct CDView: View {
             }
             lookupStatus
             if disc.lookup == .matched { wrongAlbumSection }
-            if disc.release != nil { CDOwnershipPanel(disc: disc) }
+            if disc.release != nil { CDCollectionPanel(disc: disc) }
             trackList
             Divider()
             footer.padding(12)
@@ -31,14 +31,7 @@ struct CDView: View {
         .onChange(of: disc.lookup) { _, new in
             if new == .matched { showWrongAlbum = !hasExactMatch }
         }
-        .onChange(of: disc.owned) {
-            model.cd.suggestLabel(disc)
-            if disc.ownershipSaved { model.cd.saveOwnership(disc) }
-        }
-        .onChange(of: disc.purchasedOn) { if disc.ownershipSaved { model.cd.saveOwnership(disc) } }
-        .onChange(of: disc.price) { if disc.ownershipSaved { model.cd.saveOwnership(disc) } }
-        .onChange(of: disc.labelNumber) { if disc.ownershipSaved { model.cd.saveOwnership(disc) } }
-        .sheet(isPresented: $askOwnership) { CDOwnershipSheet(disc: disc) { model.cd.rip(disc) }.themedSheet() }
+        .sheet(isPresented: $askOwnership) { CDCollectionSheet(disc: disc) { model.cd.rip(disc) }.themedSheet() }
     }
 
     @ViewBuilder
@@ -240,10 +233,17 @@ struct CDView: View {
         case .queued:
             Label("Sent to Import", systemImage: "tray.and.arrow.down").font(.caption).foregroundStyle(.subtext)
         case .inLibrary:
-            Text("In library").font(.caption).foregroundStyle(.subtext)
+            Text("In digital collection" + (ripped.map { " · \($0.text) · ripped" } ?? "")).font(.caption).foregroundStyle(.subtext)
         case .failed(let message):
             Text(message).font(.caption).foregroundStyle(.red).lineLimit(1).help(message)
         }
+    }
+
+    /// The label of the CD item this disc is, when it's ripped: shown next to the tracks already in the library.
+    private var ripped: Sticker? {
+        guard case .existing(let id)? = disc.collectionChoice, let item = model.item(id: id),
+              model.collection.digitalState(item).hasMusic else { return nil }
+        return item.sticker
     }
 
     // MARK: Footer
@@ -302,15 +302,19 @@ struct CDView: View {
                 if !disc.libraryTracks.isEmpty {
                     Button("Check with AccurateRip") { Task { await model.cd.checkRips(disc) } }
                         .disabled(disc.isChecking || !model.ffmpegAvailable)
-                        .help("Compare the library's rips of this disc with other people's rips in AccurateRip")
+                        .help("Compare your rips of this disc with other people's rips in AccurateRip")
                 }
                 if disc.release == nil {
                     Button("Rip to Import Queue") { model.cd.ripToImportQueue(disc) }
                         .disabled(disc.selectedCount == 0 || !model.ffmpegAvailable || disc.lookup == .looking)
                         .help("Rip the checked tracks to FLAC and match them in the Import queue")
                 }
+                Button("Catalog Without Ripping") { model.cd.catalog(disc) }
+                    .disabled(disc.release == nil)
+                    .help(model.ejectAfterCataloging ? "Save this CD in your physical collection without ripping it, then eject it"
+                          : "Save this CD in your physical collection without ripping it")
                 Button("Rip \(disc.selectedCount) Track\(disc.selectedCount == 1 ? "" : "s")") {
-                    if disc.owned == nil { askOwnership = true } else { model.cd.rip(disc) }
+                    if disc.collectionChoice == nil { askOwnership = true } else { model.cd.rip(disc) }
                 }
                     .buttonStyle(.borderedProminent)
                     .disabled(disc.release == nil || disc.selectedCount == 0 || !model.ffmpegAvailable)

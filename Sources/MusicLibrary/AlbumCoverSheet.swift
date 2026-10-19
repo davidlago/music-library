@@ -223,7 +223,7 @@ struct AlbumCoverSheet: View {
                 Text("Updating files… \(progress.done) of \(progress.total)").font(.callout).foregroundStyle(.subtext)
             } else if embeddableCount > 0 {
                 Toggle("Also embed it in the album’s \(embeddableCount == 1 ? "file" : "\(embeddableCount) files")", isOn: $embed)
-                    .help("Writes the cover into the library copies of the album's mp3, flac and m4a files, so other players and exported copies show it too")
+                    .help("Writes the cover into the album's mp3, flac and m4a files in your digital collection, so other players and exported copies show it too")
             }
             Spacer()
             Button("Cancel", role: .cancel) { dismiss() }

@@ -5,7 +5,7 @@ import WidgetKit
 // iPhone only.
 #if os(iOS)
 
-/// The library at a glance: how big it is, how much of it is on the iPhone, and what came in last.
+/// The digital collection at a glance: how big it is, how much of it is on the iPhone, and what came in last.
 struct LibraryWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: GlanceWidgetKind.library.rawValue, provider: GlanceProvider()) { entry in
@@ -13,8 +13,8 @@ struct LibraryWidget: Widget {
                 .widgetURL(GlanceLink.insights(.library).url)
                 .widgetBackground()
         }
-        .configurationDisplayName("Library")
-        .description("Your library's size, what's on this iPhone and what you added last.")
+        .configurationDisplayName("Digital Collection")
+        .description("Your digital collection's size, what's on this iPhone and what you added last.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
@@ -42,7 +42,7 @@ struct LibraryWidgetView: View {
 
     private func counts(_ l: Glance.LibraryCounts) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            WidgetHeader(title: "Library", systemImage: "square.stack", tint: Self.tint)
+            WidgetHeader(title: "Digital", systemImage: "square.stack", tint: Self.tint)
             Spacer(minLength: 0)
             VStack(alignment: .leading, spacing: 0) {
                 Text(l.albums.formatted())

@@ -32,9 +32,9 @@ final class LibraryCatalogStore {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .all: "In Library or Not"
-            case .notOwned: "Not in My Library"
-            case .owned: "In My Library"
+            case .all: "In Digital Collection or Not"
+            case .notOwned: "Not in My Digital Collection"
+            case .owned: "In My Digital Collection"
             }
         }
     }
@@ -155,6 +155,22 @@ final class LibraryCatalogStore {
     var ownership = CatalogOwnership.empty {
         didSet { refreshOwned() }
     }
+    /// Your collection, to say which catalog titles you have a copy of (the badges, I Own This and `own:`): set with
+    /// each rebuild of the collection.
+    var collection = MusicCollection.empty {
+        didSet {
+            collectionMatcher = CatalogCollectionMatcher(collection.items)
+            // Matching every downloaded title again is slow: only when what it goes by changed (not on each edit of
+            // a price or a note).
+            let keys = collection.items.map(CatalogMatchKey.init)
+            guard keys != collectionMatchKeys else { return }
+            collectionMatchKeys = keys
+            refreshOwned()
+        }
+    }
+    private(set) var collectionMatcher = CatalogCollectionMatcher([])
+    /// What the matching of catalog titles to your copies went by when the owned badges were last worked out.
+    @ObservationIgnored private var collectionMatchKeys: [CatalogMatchKey] = []
 
     // MARK: Downloaded catalog
 
@@ -186,6 +202,8 @@ final class LibraryCatalogStore {
     var records: [String: CatalogRecord] = [:]
     var index = CatalogIndex.empty
     var ownedIds: Set<String> = []
+    /// The media of your copies of each downloaded title, by record (`own:`).
+    var collectionMedia: [String: Set<String>] = [:]
     var downloadProgress: DownloadProgress?
     var downloadError: String?
 
@@ -315,7 +333,7 @@ final class LibraryCatalogStore {
     }
 
     private func loadNextPage(untilVisible target: Int = 1, pagesLeft: Int = 1) {
-        guard siteURL != nil else { error = "Enter the library catalog's address in Settings."; return }
+        guard siteURL != nil else { error = "Enter the local library catalog's address in Settings."; return }
         let generation = searchGeneration
         let page = loadedPages + 1
         let path = query.path(page: page)
@@ -397,6 +415,23 @@ final class LibraryCatalogStore {
     func ownedAlbum(_ item: CatalogItem) -> AlbumSummary? { ownership.album(for: item, details: details[item.id]) }
 
     func ownedAlbum(_ checkout: CatalogCheckout) -> AlbumSummary? { ownership.album(for: checkout) }
+
+    /// The copies in your collection of a catalog title: by its MusicBrainz release group once looked up, else by
+    /// title and a compatible artist (the rules `CatalogOwnership` uses for library albums).
+    func collectionCopies(_ item: CatalogItem) -> [CollectionItem] {
+        let d = details[item.id]
+        return collectionMatcher.items(releaseID: d?.releaseId, releaseGroupID: d?.releaseGroupId, title: item.title,
+                                       subtitle: item.subtitle, artists: [item.artist, d?.mbArtist].compactMap { $0 }, alsoTitle: d?.mbTitle)
+    }
+
+    /// What Add to Collection… starts from for a catalog title (I Own This): its release when looked up, else its
+    /// title and artist, and the barcode of an edition.
+    func prefill(_ item: CatalogItem) -> CollectionPrefill {
+        let d = details[item.id]
+        let barcode = d?.barcode ?? d?.editions.lazy.compactMap(\.upc).first
+        return CollectionPrefill(album: d?.mbTitle ?? item.displayTitle, artist: d?.mbArtist ?? item.artist, releaseID: d?.releaseId,
+                                 releaseGroupID: d?.releaseGroupId, barcode: barcode, catalogNumber: d?.catalogNumber)
+    }
 
     // MARK: Account
 
@@ -736,4 +771,96 @@ final class LibraryCatalogStore {
     }
 
     func webURL(_ path: String) -> URL? { client.url(for: path) }
+}
+
+/// What `CatalogCollectionMatcher` and the media of your copies (`collectionMedia`) use of an item.
+struct CatalogMatchKey: Equatable {
+    var id: String
+    var releaseID: String?
+    var releaseGroupID: String?
+    var album: String
+    var artist: String
+    var medium: CollectionMedium
+
+    init(_ item: CollectionItem) {
+        id = item.id; releaseID = item.releaseID; releaseGroupID = item.releaseGroupID
+        album = item.album; artist = item.artist; medium = item.medium
+    }
+}
+
+/// Finds the items in your collection a catalog title or a shop's CD may be: by release, by release group, else by
+/// normalized title (with and without a trailing "(Deluxe Edition)" or ": subtitle") and a compatible artist, as
+/// `CatalogOwnership` matches library albums.
+struct CatalogCollectionMatcher {
+    private var byRelease: [String: [CollectionItem]] = [:]
+    private var byGroup: [String: [CollectionItem]] = [:]
+    private var byTitle: [String: [(item: CollectionItem, artist: Set<String>)]] = [:]
+
+    init(_ items: [CollectionItem]) {
+        for item in items {
+            if let id = item.releaseID { byRelease[id, default: []].append(item) }
+            if let id = item.releaseGroupID { byGroup[id, default: []].append(item) }
+            let tokens = Self.tokens(item.artist)
+            for form in Set(Self.forms(item.album)) { byTitle[form, default: []].append((item, tokens)) }
+        }
+    }
+
+    /// The release's copies first (the same edition), then the release group's, else the ones titled like it.
+    func items(releaseID: String?, releaseGroupID: String?, title: String, subtitle: String? = nil, artists: [String],
+               alsoTitle: String? = nil) -> [CollectionItem] {
+        var out: [CollectionItem] = []
+        var seen = Set<String>()
+        func add(_ list: [CollectionItem]) { for item in list where seen.insert(item.id).inserted { out.append(item) } }
+        if let releaseID { add(byRelease[releaseID] ?? []) }
+        if let releaseGroupID { add(byGroup[releaseGroupID] ?? []) }
+        if !out.isEmpty { return out }
+        add(byName(title: title, subtitle: subtitle, artists: artists))
+        if out.isEmpty, let alsoTitle { add(byName(title: alsoTitle, subtitle: nil, artists: artists)) }
+        return out
+    }
+
+    private func byName(title: String, subtitle: String?, artists: [String]) -> [CollectionItem] {
+        let wanted = artists.map(Self.tokens).filter { !$0.isEmpty }
+        var keys: [(key: String, exact: Bool)] = []
+        let main = CatalogText.key(title)
+        if let subtitle, !subtitle.isEmpty {
+            keys.append((CatalogText.key("\(title) \(subtitle)"), true))
+            // "Anthology: 4" is not "Anthology"; "Abbey Road: remastered" is.
+            if !Self.isNumbering(subtitle) { keys.append((main, false)) }
+        } else {
+            keys.append((main, true))
+        }
+        for (key, exact) in keys where !key.isEmpty {
+            let found = (byTitle[key] ?? []).filter { entry in
+                wanted.isEmpty ? exact : wanted.contains { Self.compatible($0, entry.artist) }
+            }
+            if !found.isEmpty { return found.map(\.item) }
+        }
+        return []
+    }
+
+    static func forms(_ album: String) -> [String] {
+        var forms = [CatalogText.key(album)]
+        var s = album.trimmingCharacters(in: .whitespaces)
+        while let r = s.range(of: #"\s*[\(\[][^\)\]]*[\)\]]\s*$"#, options: .regularExpression), r.lowerBound > s.startIndex {
+            s.removeSubrange(r)
+            forms.append(CatalogText.key(s))
+        }
+        for separator in [": ", " - "] {
+            if let r = s.range(of: separator), r.lowerBound > s.startIndex { forms.append(CatalogText.key(String(s[..<r.lowerBound]))) }
+        }
+        return forms.filter { !$0.isEmpty }
+    }
+
+    static func isNumbering(_ subtitle: String) -> Bool {
+        CatalogText.key(subtitle).range(of: #"^((vol|volume|part|pt|no|disc|book|chapter) )?(\d+|[ivx]+)$"#, options: .regularExpression) != nil
+    }
+
+    static func tokens(_ name: String) -> Set<String> { Set(CatalogText.key(name).split(separator: " ").map(String.init)) }
+
+    /// "Beatles" and "The Beatles", "Bob Marley" and "Bob Marley & The Wailers".
+    static func compatible(_ a: Set<String>, _ b: Set<String>) -> Bool {
+        guard !a.isEmpty, !b.isEmpty else { return false }
+        return a == b || a.isSubset(of: b) || b.isSubset(of: a)
+    }
 }

@@ -300,6 +300,7 @@ p { margin: 0; }
 /* Devices */
 
 .device-shots { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.device-shots .shot.span { grid-column: 1 / -1; }
 
 /* Themes */
 

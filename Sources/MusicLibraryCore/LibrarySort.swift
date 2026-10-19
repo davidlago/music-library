@@ -124,3 +124,68 @@ public enum SongSort: String, CaseIterable, Identifiable, Sendable {
         }
     }
 }
+
+/// The orders of the collection's shelves on the Mac and iPhone (saved per scope as `collectionSort.<scope>`).
+public enum CollectionSort: String, CaseIterable, Identifiable, Sendable {
+    case sticker, artist, title, year, bought, price, added
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .sticker: "Label"
+        case .artist: "Artist"
+        case .title: "Title"
+        case .year: "Release Year"
+        case .bought: "Date Bought"
+        case .price: "Price"
+        case .added: "Date Added"
+        }
+    }
+
+    /// `items` in this order. `sticker` puts CDs before records, each by number, and unlabeled items last by artist
+    /// and title; `year`, `bought`, `price` and `added` are newest (or priciest) first. Empty values always go last, and
+    /// ties keep the order the items came in.
+    public func sorted(_ items: [CollectionItem]) -> [CollectionItem] {
+        items.enumerated().sorted { x, y in before(x.element, y.element) ?? (x.offset < y.offset) }.map(\.element)
+    }
+
+    /// Whether `a` goes before `b`, or nil when they tie.
+    private func before(_ a: CollectionItem, _ b: CollectionItem) -> Bool? {
+        switch self {
+        case .sticker:
+            switch (a.sticker, b.sticker) {
+            case let (x?, y?): return x == y ? nil : x < y
+            case (_?, nil): return true
+            case (nil, _?): return false
+            case (nil, nil): return Self.text(a.artist, b.artist) ?? Self.text(a.album, b.album)
+            }
+        case .artist: return Self.text(a.artist, b.artist)
+        case .title: return Self.text(a.album, b.album)
+        case .year: return Self.descending(a.year, b.year)
+        case .bought: return Self.descending(a.purchasedOn, b.purchasedOn)
+        case .price: return Self.descending(a.price, b.price)
+        case .added: return Self.descending(a.createdAt, b.createdAt)
+        }
+    }
+
+    private static func text(_ a: String, _ b: String) -> Bool? {
+        switch (a.isEmpty, b.isEmpty) {
+        case (true, true): return nil
+        case (true, false): return false
+        case (false, true): return true
+        case (false, false):
+            let order = a.compare(b, options: [.caseInsensitive, .numeric, .widthInsensitive], locale: .current)
+            return order == .orderedSame ? nil : order == .orderedAscending
+        }
+    }
+
+    private static func descending<T: Comparable>(_ a: T?, _ b: T?) -> Bool? {
+        switch (a, b) {
+        case (nil, nil): nil
+        case (nil, _): false
+        case (_, nil): true
+        case let (a?, b?): a == b ? nil : a > b
+        }
+    }
+}

@@ -30,7 +30,7 @@ struct LiveCatalogView: View {
                 if catalog.hasDownloads {
                     HStack {
                         Image(systemName: "globe").foregroundStyle(.subtext)
-                        Text("Searching every library in the network live on the library's website.").font(.callout)
+                        Text("Searching every library in the network live on the local library's website.").font(.callout)
                         Spacer()
                         Button("Back to Downloaded CDs") { catalog.liveMode = false }
                     }
@@ -57,7 +57,7 @@ struct LiveCatalogView: View {
             .padding(20)
         }
         .overlay { emptyState(shown: shown.count) }
-        .navigationTitle("Library CDs")
+        .navigationTitle("Local Library CDs")
         .navigationSubtitle(subtitle)
         .toolbar {
             ToolbarItem {
@@ -148,7 +148,7 @@ struct CatalogFilterBar: View {
                     ForEach(LibraryCatalogStore.OwnershipFilter.allCases) { Text($0.label).tag($0) }
                 }
                 .labelsHidden().fixedSize()
-                .help("Compare with the albums in your music library")
+                .help("Compare with the albums in your digital collection")
                 Picker("Sort by", selection: $catalog.query.sort) {
                     ForEach(CatalogSort.allCases) { Text($0.label).tag($0) }
                 }
@@ -172,7 +172,7 @@ struct CatalogFilterBar: View {
         let catalog = model.catalog
         return Menu {
             if !catalog.homeLibrary.isEmpty {
-                Button("Only \(catalog.homeLibrary) (My Library)") { catalog.query.libraries = [catalog.homeLibrary]; clearStaleAvailability() }
+                Button("Only \(catalog.homeLibrary) (My Local Library)") { catalog.query.libraries = [catalog.homeLibrary]; clearStaleAvailability() }
             }
             Button("All Libraries in the Network") { catalog.query.libraries = [] }
             Divider()
@@ -229,7 +229,7 @@ struct LookupStatus: View {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
                 if let until = catalog.client.cooldownUntil, until > Date() {
-                    Text("Album details paused until \(until.formatted(date: .omitted, time: .shortened)) (the library asked for a break) · \(catalog.lookupRemaining) left")
+                    Text("Album details paused until \(until.formatted(date: .omitted, time: .shortened)) (the local library's website asked for a break) · \(catalog.lookupRemaining) left")
                         .font(.caption).foregroundStyle(.subtext)
                 } else {
                     Text("Looking up album details… \(catalog.lookupRemaining) left").font(.caption).foregroundStyle(.subtext)
@@ -287,7 +287,7 @@ struct CatalogCard: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.title2).symbolRenderingMode(.palette).foregroundStyle(.white, theme.accent)
                         .shadow(radius: 2).padding(6)
-                        .help("In your library")
+                        .help("In your digital collection")
                 }
                 if catalog.isOnList(item) {
                     Image(systemName: "bookmark.fill")
@@ -304,6 +304,8 @@ struct CatalogCard: View {
                 CatalogStatusBadge(availability: item.availability, text: item.statusText, library: catalog.siteLibrary)
                 if let year = details?.year ?? item.year { Text(String(year)).font(.caption).foregroundStyle(.subtext) }
             }
+            let copies = catalog.collectionCopies(item)
+            if !copies.isEmpty { CollectionCopyNote(copies: copies, compact: true) }
         }
         .frame(width: 150, alignment: .leading)
         .contentShape(Rectangle())
@@ -354,10 +356,14 @@ struct CatalogItemMenu: View {
 
     var body: some View {
         if let album = model.catalog.ownedAlbum(item) {
-            Button("Show in My Library") { model.navigationPath.append(album) }
+            Button("Show in Digital Collection") { model.navigationPath.append(album) }
         }
+        if let copy = model.catalog.collectionCopies(item).first {
+            Button("Show Your Copy") { model.showItem(id: copy.id) }
+        }
+        Button("I Own This…") { model.addToCollection(medium: .cd, prefill: model.catalog.prefill(item)) }
         if let url = model.catalog.webURL(item.pagePath) {
-            Link("Open in Library Catalog", destination: url)
+            Link("Open in Local Library Catalog", destination: url)
         }
         CatalogListButton(item: item)
         Divider()
@@ -490,23 +496,32 @@ struct CatalogDetail: View {
             }
             HStack(spacing: 10) {
                 if let owned {
-                    Button { model.navigationPath.append(owned) } label: { Label("In Your Library", systemImage: "checkmark.circle.fill") }
+                    Button { model.navigationPath.append(owned) } label: { Label("In Your Digital Collection", systemImage: "checkmark.circle.fill") }
                         .buttonStyle(.borderedProminent)
-                        .help("Open \(owned.album) in your library")
+                        .help("Open \(owned.album) in your digital collection")
                 } else {
-                    Label("Not in your library", systemImage: "circle.dashed")
+                    // Short, so the buttons beside it keep their full titles.
+                    Label("No digital copy", systemImage: "circle.dashed")
                         .foregroundStyle(.subtext)
+                        .fixedSize()
                         .padding(.trailing, 6)
+                        .help("This CD isn't in your digital collection")
                 }
                 CatalogListButton(item: item).buttonStyle(.bordered)
                 if let url = catalog.webURL(item.pagePath) {
                     Link(destination: url) { Label("Open in Catalog", systemImage: "safari") }
                         .buttonStyle(.bordered)
-                        .help("See this CD on the library's website, where you can place a hold")
+                        .help("See this CD on the local library's website, where you can place a hold")
                 }
             }
             .controlSize(.large)
             .padding(.top, 6)
+            HStack(spacing: 10) {
+                let copies = catalog.collectionCopies(item)
+                if !copies.isEmpty { CollectionCopyNote(copies: copies) }
+                Button("I Own This…") { model.addToCollection(medium: .cd, prefill: catalog.prefill(item)) }
+                    .help("Add this CD to your physical collection, with your label number and what you paid")
+            }
             shelfStatus.padding(.top, 4)
         }
     }
@@ -523,7 +538,7 @@ struct CatalogDetail: View {
                 }
             }
             .buttonStyle(.plain)
-            .help("Go to \(artist.name) in your library")
+            .help("Go to \(artist.name) in your digital collection")
         } else {
             Text(name).font(.title3.weight(.medium)).textSelection(.enabled)
         }
@@ -555,7 +570,7 @@ struct CatalogDetail: View {
             CatalogStatusBadge(availability: item.availability, text: item.statusText, library: catalog.siteLibrary)
             if let call = item.callNumber {
                 Text(call).font(.callout.monospaced()).textSelection(.enabled)
-                    .help("Call number at \(item.shelfLocation ?? "the library")")
+                    .help("Call number at \(item.shelfLocation ?? "the local library")")
             }
         }
     }
@@ -621,7 +636,7 @@ struct CatalogDetail: View {
     private func releaseDetails(_ details: CatalogAlbumDetails?) -> some View {
         let work = model.catalog.works[item.id]
         let rows: [(String, String)] = [
-            ("Label", details?.label), ("Catalog #", details?.catalogNumber), ("Released", details?.releaseDate),
+            ("Record label", details?.label), ("Catalog #", details?.catalogNumber), ("Released", details?.releaseDate),
             ("Media", details?.media), ("Barcode", details?.barcode ?? work?.upcs.first),
             ("Language", item.language), ("Series", item.series),
             ("Subjects", work.map { $0.subjects.prefix(4).joined(separator: "; ") }.flatMap { $0.isEmpty ? nil : $0 }),
@@ -684,7 +699,7 @@ struct CatalogDetail: View {
                         trackRow(number: i + 1, title: title, artist: nil, duration: nil, preview: lined[i], queue: queue)
                     }
                 }
-                Text("From the library's catalog record.").font(.caption).foregroundStyle(.subtext)
+                Text("From the local library's catalog record.").font(.caption).foregroundStyle(.subtext)
                 previewsFooter(queue)
             }
         } else if let apple, !apple.tracks.isEmpty {
@@ -881,7 +896,7 @@ struct CatalogDetail: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(copy.library).fontWeight(home ? .semibold : .regular)
-                    if home { Text("My Library").font(.caption2).padding(.horizontal, 5).padding(.vertical, 1).background(Capsule().fill(theme.fill)) }
+                    if home { Text("My Local Library").font(.caption2).padding(.horizontal, 5).padding(.vertical, 1).background(Capsule().fill(theme.fill)) }
                 }
                 Text(copy.location.components(separatedBy: " - ").dropFirst().joined(separator: " - "))
                     .font(.caption).foregroundStyle(.subtext)
@@ -947,7 +962,7 @@ struct CatalogCheckoutsView: View {
                 if !list.isEmpty {
                     let missing = list.filter { catalog.ownedAlbum($0) == nil && isMusic($0) }.count
                     if missing > 0 {
-                        Label("\(missing) of these CDs \(missing == 1 ? "isn't" : "aren't") in your library yet. Insert one to rip it from the Import section.",
+                        Label("\(missing) of these CDs \(missing == 1 ? "isn't" : "aren't") in your digital collection yet. Insert one to rip it from the Import section.",
                               systemImage: "opticaldisc")
                             .font(.callout).foregroundStyle(.subtext)
                     }
@@ -986,7 +1001,7 @@ struct CatalogCheckoutsView: View {
             ContentUnavailableView {
                 Label("Not Signed In", systemImage: "person.crop.circle.badge.questionmark")
             } description: {
-                Text(catalogFailure ?? "Sign in to your library account in Settings to see what you have checked out.")
+                Text(catalogFailure ?? "Sign in to your local library account in Settings to see what you have checked out.")
             } actions: {
                 SettingsLink { Text("Open Settings…") }
             }
@@ -1018,12 +1033,12 @@ struct CatalogCheckoutsView: View {
             Spacer()
             if let owned {
                 Button { model.navigationPath.append(owned) } label: {
-                    Label("In Your Library", systemImage: "checkmark.circle.fill").font(.caption)
+                    Label("In Your Digital Collection", systemImage: "checkmark.circle.fill").font(.caption)
                 }
                 .buttonStyle(.borderless)
-                .help("Open \(owned.album) in your library")
+                .help("Open \(owned.album) in your digital collection")
             } else if isMusic(checkout) {
-                Text("Not in your library").font(.caption).foregroundStyle(.subtext)
+                Text("Not in your digital collection").font(.caption).foregroundStyle(.subtext)
             }
             VStack(alignment: .trailing, spacing: 1) {
                 Text(checkout.due.map { "Due \($0)" } ?? "").font(.caption.weight(soon ? .semibold : .regular))
@@ -1074,11 +1089,11 @@ struct CatalogListButton: View {
             if let entry = catalog.listEntry(for: item) {
                 Button { catalog.removeFromList(item) } label: { Label("Remove from \(catalog.listTitle)", systemImage: "bookmark.slash") }
                     .disabled(busy || entry.entryId.isEmpty)
-                    .help("Remove this CD from your list on the library's website")
+                    .help("Remove this CD from your list on the local library's website")
             } else {
                 Button { catalog.addToList(item) } label: { Label("Add to \(catalog.listTitle)", systemImage: "bookmark") }
                     .disabled(busy)
-                    .help("Add this CD to your list on the library's website, so you know what to look for")
+                    .help("Add this CD to your list on the local library's website, so you know what to look for")
             }
         }
     }
@@ -1096,7 +1111,7 @@ struct CatalogListView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     if let url = catalog.webURL(catalog.listId.isEmpty ? "/MyAccount/Lists" : CatalogPaths.list(catalog.listId)) {
-                        Link("Open on the Library's Website", destination: url).font(.callout)
+                        Link("Open on the Local Library's Website", destination: url).font(.callout)
                     }
                     Spacer()
                     if catalog.listLoading { ProgressView().controlSize(.small) }
@@ -1105,7 +1120,7 @@ struct CatalogListView: View {
                 if let error = catalog.listError { CatalogErrorBanner(message: error) { catalog.loadList() } }
                 if !entries.isEmpty {
                     let here = entries.filter { $0.item.availability == .here }.count
-                    let site = catalog.siteLibrary ?? "your library"
+                    let site = catalog.siteLibrary ?? "your local library"
                     Text("\(here) of \(entries.count) on the shelf at \(site) right now.").font(.callout).foregroundStyle(.subtext)
                     VStack(spacing: 0) {
                         ForEach(entries) { row($0) }
@@ -1145,7 +1160,7 @@ struct CatalogListView: View {
                 ContentUnavailableView {
                     Label("Not Signed In", systemImage: "person.crop.circle.badge.questionmark")
                 } description: {
-                    Text("Sign in to your library account in Settings, then pick the list to use.")
+                    Text("Sign in to your local library account in Settings, then pick the list to use.")
                 } actions: {
                     SettingsLink { Text("Open Settings…") }
                 }
@@ -1154,13 +1169,13 @@ struct CatalogListView: View {
             ContentUnavailableView {
                 Label("No List Chosen", systemImage: "bookmark")
             } description: {
-                Text("Pick one of your library lists in Settings ▸ Library. CDs you add while browsing go there.")
+                Text("Pick one of your local library lists in Settings ▸ Local Library. CDs you add while browsing go there.")
             } actions: {
                 SettingsLink { Text("Open Settings…") }
             }
         } else if catalog.listLoaded, entries.isEmpty {
             ContentUnavailableView("Nothing on This List Yet", systemImage: "bookmark",
-                                   description: Text("Add CDs from Library CDs with the bookmark button or by right-clicking them."))
+                                   description: Text("Add CDs from Local Library CDs with the bookmark button or by right-clicking them."))
         }
     }
 
@@ -1183,7 +1198,7 @@ struct CatalogListView: View {
                     }
                     CatalogStatusBadge(availability: item.availability, text: item.statusText, library: catalog.siteLibrary)
                     if owned != nil {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(theme.accent).help("In your library")
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(theme.accent).help("In your digital collection")
                     }
                 }
                 .contentShape(Rectangle())
@@ -1219,6 +1234,75 @@ private struct ListCover: View {
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .task(id: "\(item.id)|\(d?.releaseId ?? d?.releaseGroupId ?? "")") {
             if let found = await model.catalog.cover(for: item) { image = found }
+        }
+    }
+}
+
+/// What you own of a CD listed elsewhere (a library's catalog, a shop): "In your physical collection: CD #142 (not ripped)",
+/// "You have it on Vinyl #12", "You have it as a download". Clicking it opens the copy.
+struct CollectionCopyNote: View {
+    @Environment(AppModel.self) private var model
+    /// The matching copies, the closest first.
+    let copies: [CollectionItem]
+    /// One short line for a card: "CD #142 · not ripped".
+    var compact = false
+    /// For a shop's edition: whether these are copies of that exact edition ("You own this edition (CD #142)").
+    var edition: Bool?
+
+    var body: some View {
+        if let copy = preferred {
+            Button { model.showItem(id: copy.id) } label: {
+                Label(compact ? short(copy) : text(copy), systemImage: "books.vertical.fill")
+                    .font(compact ? .caption : .callout)
+                    .foregroundStyle(.subtext)
+                    .lineLimit(1)
+            }
+            .buttonStyle(.plain)
+            .help(text(copy))
+        }
+    }
+
+    /// A CD first (the lowest label), then a record, then a download.
+    private var preferred: CollectionItem? {
+        copies.min { a, b in
+            let ra = rank(a), rb = rank(b)
+            return ra != rb ? ra < rb : (a.stickerNumber ?? .max) < (b.stickerNumber ?? .max)
+        }
+    }
+
+    private func rank(_ item: CollectionItem) -> Int {
+        switch item.medium {
+        case .cd: 0
+        case .vinyl: 1
+        case .other: 2
+        case .download: 3
+        }
+    }
+
+    private func ripped(_ item: CollectionItem) -> String {
+        model.collection.digitalState(item).hasMusic ? (item.medium == .cd ? "ripped" : "digitized")
+            : (item.medium == .cd ? "not ripped" : "not digitized")
+    }
+
+    private func text(_ item: CollectionItem) -> String {
+        if let edition {
+            let name = item.sticker?.text ?? "your CD"
+            return edition ? "You own this edition (\(name))" : "You own another edition (\(name))"
+        }
+        switch item.medium {
+        case .cd: return "In your physical collection: \(item.sticker?.text ?? "your CD") (\(ripped(item)))"
+        case .vinyl: return "You have it on \(item.sticker?.text ?? "vinyl")"
+        case .download: return "You have it as a download"
+        case .other: return "You have it on \(item.formatDetail ?? "another medium")"
+        }
+    }
+
+    private func short(_ item: CollectionItem) -> String {
+        switch item.medium {
+        case .cd: return "\(item.sticker?.text ?? "Your CD") · \(ripped(item))"
+        case .vinyl: return item.sticker?.text ?? "On vinyl"
+        case .download: return "Your download"
+        case .other: return item.formatDetail ?? "Yours"
         }
     }
 }

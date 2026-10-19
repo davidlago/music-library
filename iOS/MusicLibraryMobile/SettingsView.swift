@@ -29,20 +29,26 @@ struct SettingsView: View {
                 }
                 if model.isSample {
                     Section {
+                        if !model.collection.items.isEmpty {
+                            LabeledContent("Owned", value: collectionSummary)
+                        }
                         Button("Hide Sample Library") { model.hideSample() }
                     } header: {
-                        Text("Library")
+                        Text("Music Library")
                     } footer: {
-                        Text("The sample library's artists and albums are fictional. Your own library replaces it after your first sync.")
+                        Text("The sample library's artists and albums are fictional. Your own music replaces it after your first sync.")
                     }
                 } else if let library = model.library {
-                    Section("Library") {
+                    Section("Music Library") {
                         LabeledContent("Songs on this iPhone", value: "\(library.presentIDs.count) of \(library.tracks.count)")
+                        if !model.collection.items.isEmpty {
+                            LabeledContent("Owned", value: collectionSummary)
+                        }
                         LabeledContent("Folder", value: library.root.lastPathComponent)
-                        Button("Reload Library") { model.reload() }
+                        Button("Reload Music Library") { model.reload() }
                     }
                 } else if PhoneModel.sampleRoot != nil {
-                    Section("Library") {
+                    Section("Music Library") {
                         Button("Explore a Sample Library") { model.showSample() }
                     }
                 }
@@ -55,6 +61,18 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    /// "312 CDs · 48 vinyl · 97 downloads · 9 to digitize".
+    private var collectionSummary: String {
+        let c = model.collection
+        var parts: [String] = []
+        let cds = c.count(.cds), vinyl = c.count(.vinyl), downloads = c.count(.downloads), toDigitize = c.count(.toDigitize)
+        if cds > 0 { parts.append(cds == 1 ? "1 CD" : "\(cds.formatted()) CDs") }
+        if vinyl > 0 { parts.append("\(vinyl.formatted()) vinyl") }
+        if downloads > 0 { parts.append(downloads == 1 ? "1 download" : "\(downloads.formatted()) downloads") }
+        if toDigitize > 0 { parts.append("\(toDigitize.formatted()) to digitize") }
+        return parts.isEmpty ? "\(c.items.count.formatted()) items" : parts.joined(separator: " · ")
     }
 
     private var lastFMSummary: String {

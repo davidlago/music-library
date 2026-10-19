@@ -33,6 +33,8 @@ public struct LibraryExportSummary: Sendable, Equatable {
     public var bytesCopied: Int64 = 0
     public var covers = 0
     public var artistImages = 0
+    /// Collection items' own covers (with the database backup).
+    public var collectionCovers = 0
     public var playlists = 0
     public var databaseBackedUp = false
     public init() {}
@@ -57,13 +59,18 @@ public struct LibraryExporter: Sendable {
         public var covers: [(path: String, size: Int64)] = []
         /// Artist photos the destination is missing or has an older version of (only with the database backup).
         public var artistImages: [(path: String, size: Int64)] = []
+        /// Collection items' own covers the destination is missing (only with the database backup, which refers to
+        /// them). Each change of a cover has a new name, so they're never replaced.
+        public var collectionCovers: [(path: String, size: Int64)] = []
         public var skipped = 0
-        public var bytesNeeded: Int64 { (files + covers + artistImages).reduce(0) { $0 + $1.size } }
+        public var bytesNeeded: Int64 { (files + covers + artistImages + collectionCovers).reduce(0) { $0 + $1.size } }
     }
 
     /// What `export` would copy: tracks (deduplicated, in order) and album covers not yet at the destination, plus
-    /// new or changed artist photos when `artistImages` is set.
-    public func plan(tracks: [Track], libraryRoot: URL, destination: URL, artistImages: Bool = false) throws -> Plan {
+    /// new or changed artist photos when `artistImages` is set and the `collectionCovers` (library-relative paths
+    /// from `Database.collectionCoverPaths`) the destination is missing.
+    public func plan(tracks: [Track], libraryRoot: URL, destination: URL, artistImages: Bool = false,
+                     collectionCovers: [String] = []) throws -> Plan {
         let fm = FileManager.default
         var plan = Plan()
         var seenTracks = Set<String>(), seenDirs = Set<String>()
@@ -97,12 +104,18 @@ public struct LibraryExporter: Sendable {
                 plan.artistImages.append((path, size))
             }
         }
+        for path in Set(collectionCovers).sorted() where SyncPlan.isCollectionCover(path) {
+            guard let source = LibraryPath.resolve(path, in: libraryRoot), let target = LibraryPath.resolve(path, in: destination),
+                  !fm.fileExists(atPath: target.path), let size = Self.size(of: source) else { continue }
+            plan.collectionCovers.append((path, size))
+        }
         return plan
     }
 
     /// Copies `tracks` (and their album covers) into `destination`, writes `playlists` as .m3u files and, when
-    /// `database` is given, replaces `<destination>/library.sqlite` with a fresh snapshot of it and brings
-    /// `Artist Images` up to date, so the destination works as a complete library without re-downloading.
+    /// `database` is given, replaces `<destination>/library.sqlite` with a fresh snapshot of it, brings
+    /// `Artist Images` up to date and adds the collection's own covers, so the destination works as a complete
+    /// library without re-downloading.
     /// Checks for cancellation between files; a cancelled export leaves only complete files behind.
     @discardableResult
     public func export(
@@ -111,17 +124,19 @@ public struct LibraryExporter: Sendable {
         progress: (_ done: Int, _ total: Int) -> Void = { _, _ in }
     ) throws -> LibraryExportSummary {
         let fm = FileManager.default
-        let plan = try plan(tracks: tracks, libraryRoot: libraryRoot, destination: destination, artistImages: database != nil)
+        let plan = try plan(tracks: tracks, libraryRoot: libraryRoot, destination: destination, artistImages: database != nil,
+                            collectionCovers: try database?.collectionCoverPaths() ?? [])
         if let available = Self.availableCapacity(at: destination), plan.bytesNeeded > available {
             throw LibraryExportError.insufficientSpace(needed: plan.bytesNeeded, available: available)
         }
         var summary = LibraryExportSummary()
         summary.skipped = plan.skipped
-        let total = plan.files.count + plan.covers.count + plan.artistImages.count + (database == nil ? 0 : 1)
+        let total = plan.files.count + plan.covers.count + plan.artistImages.count + plan.collectionCovers.count + (database == nil ? 0 : 1)
         var done = 0
         progress(0, total)
-        enum Kind { case track, cover, artistImage }
+        enum Kind { case track, cover, artistImage, collectionCover }
         let work = plan.files.map { (Kind.track, $0) } + plan.covers.map { (Kind.cover, $0) } + plan.artistImages.map { (Kind.artistImage, $0) }
+            + plan.collectionCovers.map { (Kind.collectionCover, $0) }
         for (kind, file) in work {
             try Task.checkCancellation()
             // Artist photos are replaced when they change; music and covers never are.
@@ -133,6 +148,7 @@ public struct LibraryExporter: Sendable {
             case .track: summary.copied += 1; summary.bytesCopied += file.size
             case .cover: summary.covers += 1
             case .artistImage: summary.artistImages += 1
+            case .collectionCover: summary.collectionCovers += 1
             }
             done += 1
             progress(done, total)
@@ -272,13 +288,16 @@ public struct ExportPreview: Sendable {
 
     public init() {}
 
-    public static func make(tracks: [Track], libraryRoot: URL, destination: URL, artistImages: Bool = false) throws -> ExportPreview {
+    /// `collectionCovers` (with the database backup) are counted in the plan, never listed as album folders.
+    public static func make(tracks: [Track], libraryRoot: URL, destination: URL, artistImages: Bool = false,
+                            collectionCovers: [String] = []) throws -> ExportPreview {
         var preview = ExportPreview()
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: destination.path, isDirectory: &isDir), isDir.boolValue else { return preview }
         preview.isAvailable = true
         preview.availableCapacity = LibraryExporter.availableCapacity(at: destination)
-        preview.plan = try LibraryExporter().plan(tracks: tracks, libraryRoot: libraryRoot, destination: destination, artistImages: artistImages)
+        preview.plan = try LibraryExporter().plan(tracks: tracks, libraryRoot: libraryRoot, destination: destination,
+                                                  artistImages: artistImages, collectionCovers: collectionCovers)
         preview.incoming = Dictionary(preview.plan.files.map { ($0.path, $0.size) }, uniquingKeysWith: { a, _ in a })
 
         let fm = FileManager.default

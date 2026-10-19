@@ -18,7 +18,13 @@ struct ImportView: View {
             .frame(minWidth: 260, idealWidth: 300, maxWidth: 420)
             .themedScrollBackground()
             .safeAreaInset(edge: .bottom) {
-                if !importer.batch.isEmpty { ImportBatchPurchaseBar(importer: importer) }
+                if !importer.batch.isEmpty {
+                    VStack(spacing: 0) {
+                        ImportCollectionBar(importer: importer, model: model)
+                        Divider()
+                        ImportBatchPurchaseBar(importer: importer)
+                    }
+                }
             }
             .overlay {
                 if importer.entries.isEmpty {
@@ -106,7 +112,19 @@ struct ImportDetail: View {
 
     /// What you paid for the song and when; editable after it's imported too, and for a duplicate of a song in the
     /// library (saved at once to the library's copy).
+    @ViewBuilder
     private var purchase: some View {
+        // An imported song's price is elsewhere only when it went to an item; one still waiting follows its batch.
+        if entry.status == .done ? entry.pricedOnItem : importer.songsPricedElsewhere && entry.status != .duplicate {
+            Text(importer.boughtAsAlbum && importer.effectiveLinkItem == nil
+                 ? "Bought as a whole album: what you paid is below the list." : "What you paid is on your copy's page.")
+                .font(.caption).foregroundStyle(.subtext)
+        } else {
+            songPurchase
+        }
+    }
+
+    private var songPurchase: some View {
         Form {
             LabeledContent("Paid") {
                 PurchasePriceField(price: Binding(get: { entry.price }, set: { price in
@@ -153,7 +171,7 @@ struct ImportDetail: View {
             TextField("Genre", text: $entry.metadata.genre)
             TextField("Composer", text: $entry.metadata.composer)
             TextField("Lyricist", text: $entry.metadata.extended.lyricist)
-            TextField("Label", text: $entry.metadata.extended.label)
+            TextField("Record label", text: $entry.metadata.extended.label)
             TextField("Catalog #", text: $entry.metadata.extended.catalogNumber)
             DisclosureGroup("More details & credits") {
                 MetadataDetailsView(metadata: entry.metadata) { model.showMusicDNA($0) }.padding(.top, 4)
@@ -242,21 +260,50 @@ struct ImportDetail: View {
 }
 
 /// Below the import list: what you paid for all its songs (bought together, like a whole album), split evenly across
-/// them as you type, and when. Changing a song's own price changes the total.
+/// them as you type, and when. Changing a song's own price changes the total. Bought as a whole album, it's the
+/// price of one album download in your collection instead. Not shown when the files are the digital copy of an item
+/// in your collection: what you paid is on it.
 struct ImportBatchPurchaseBar: View {
     let importer: ImportController
 
     var body: some View {
+        @Bindable var importer = importer
         let count = importer.batch.count
         VStack(alignment: .leading, spacing: 8) {
-            Text(count == 1 ? "Paid for this song" : "Paid for all \(count) songs").font(.callout.weight(.semibold))
-            HStack(spacing: 8) {
-                PurchasePriceField(price: Binding(get: { importer.batchTotal }, set: { importer.setBatchTotal($0, day: importer.batchDay ?? PurchaseDay(Date())) }))
-                PurchaseDateField(day: Binding(get: { importer.batchDay }, set: { importer.setBatchDay($0) }))
-            }
-            .help("Split evenly across the songs; each song's own price can still be changed")
-            if let note = note(), count > 1 {
-                Text(note).font(.caption).foregroundStyle(.subtext)
+            if importer.songsPricedElsewhere, let item = importer.effectiveLinkItem {
+                Text("What you paid is on \(item.sticker?.text ?? "your \(item.medium.name.lowercased())")'s page.")
+                    .font(.caption).foregroundStyle(.subtext)
+            } else {
+                if importer.canBuyAsAlbum {
+                    HStack {
+                        Text("Bought as").font(.callout.weight(.semibold))
+                        Picker("Bought as", selection: $importer.boughtAsAlbum) {
+                            Text("Songs").tag(false)
+                            Text("Whole album").tag(true)
+                        }
+                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                        .help("A whole album is saved as one album download, listed in Downloads, with its date and price")
+                    }
+                }
+                if importer.boughtAsAlbum && importer.canBuyAsAlbum {
+                    HStack(spacing: 8) {
+                        PurchasePriceField(price: Binding(get: { importer.albumPurchase.price },
+                                                          set: { importer.setAlbumPurchase(price: $0, day: importer.albumPurchase.day) }))
+                        PurchaseDateField(day: Binding(get: { importer.albumPurchase.day },
+                                                       set: { importer.setAlbumPurchase(price: importer.albumPurchase.price, day: $0) }))
+                    }
+                    .help("What the album cost and when you bought it")
+                } else {
+                    Text(count == 1 ? "Paid for this song" : "Paid for all \(count) songs").font(.caption).foregroundStyle(.subtext)
+                    HStack(spacing: 8) {
+                        PurchasePriceField(price: Binding(get: { importer.batchTotal }, set: { importer.setBatchTotal($0, day: importer.batchDay ?? PurchaseDay(Date())) }))
+                        PurchaseDateField(day: Binding(get: { importer.batchDay }, set: { importer.setBatchDay($0) }))
+                    }
+                    .help("Split evenly across the songs; each song's own price can still be changed")
+                    if let note = note(), count > 1 {
+                        Text(note).font(.caption).foregroundStyle(.subtext)
+                    }
+                }
             }
         }
         .controlSize(.small)
@@ -286,5 +333,107 @@ struct CandidateThumb: View {
     var body: some View {
         DataImage(data: data, size: 32)
             .task(id: candidate.id) { data = await importer.thumbnail(for: candidate) }
+    }
+}
+
+/// Above the batch's purchase: "These files are the digital copy of: [None ▾]", a CD or record in your collection
+/// that isn't digitized yet (the ones that are this release or album first, picked until you choose), and whether
+/// they were digitized from it or came with it as a download. Once a song is imported, the item is linked to its
+/// album. Hidden while nothing in the collection waits to be digitized.
+struct ImportCollectionBar: View {
+    let importer: ImportController
+    /// Passed in, like the importer: the bar sits over a `List`.
+    let model: AppModel
+    @State private var picking = false
+
+    var body: some View {
+        @Bindable var importer = importer
+        let linked = importer.effectiveLinkItem
+        let candidates = importer.linkCandidates
+        if linked != nil || !candidates.matching.isEmpty || !candidates.others.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(importer.hasSeveralBatches ? "The selected song's batch is the digital copy of" : "These files are the digital copy of")
+                    .font(.callout.weight(.semibold))
+                Button { picking = true } label: {
+                    HStack(spacing: 6) {
+                        if let linked {
+                            if let s = linked.sticker { StickerPill(sticker: s, size: 9) }
+                            Text(linked.album.isEmpty ? "Unknown Album" : linked.album).lineLimit(1)
+                        } else {
+                            Text("None")
+                        }
+                        Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.subtext)
+                    }
+                }
+                .help(linked.map { "\($0.album) — \($0.artist)" } ?? "Pick the CD or record these files were digitized from")
+                .popover(isPresented: $picking, arrowEdge: .trailing) {
+                    ImportLinkPicker(importer: importer, model: model) { picking = false }
+                }
+                // A download is always its own digital copy: only a CD or record asks how it was digitized.
+                if let linked, linked.medium.isPhysical {
+                    Picker("Source", selection: $importer.linkSource) {
+                        Text(linked.medium == .cd ? "Ripped from this CD" : "Digitized from this record").tag(DigitalSource.rip)
+                        Text("Came with it as a download").tag(DigitalSource.download)
+                    }
+                    .pickerStyle(.radioGroup).labelsHidden()
+                    .font(.caption)
+                }
+            }
+            .controlSize(.small)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(.bar)
+        }
+    }
+}
+
+/// The items the batch can be the digital copy of: matches first, then a search of the rest, and None.
+struct ImportLinkPicker: View {
+    let importer: ImportController
+    let model: AppModel
+    let done: () -> Void
+    @State private var query = ""
+
+    var body: some View {
+        let candidates = importer.linkCandidates
+        let q = TextNormalizer.normalize(query)
+        let others = q.isEmpty ? candidates.others : candidates.others.filter {
+            TextNormalizer.normalize("\($0.album) \($0.artist) \($0.sticker?.text ?? "")").contains(q)
+        }
+        VStack(alignment: .leading, spacing: 8) {
+            TextField("Search your physical collection", text: $query, prompt: Text("Search CDs and records not digitized"))
+                .textFieldStyle(.roundedBorder)
+            List {
+                Button("None") { importer.chooseLink(nil); done() }.buttonStyle(.plain)
+                if !candidates.matching.isEmpty {
+                    Section("This Album") { ForEach(candidates.matching) { row($0) } }
+                }
+                Section("Not Digitized Yet") { ForEach(others.prefix(200)) { row($0) } }
+            }
+            .frame(width: 380, height: 360)
+        }
+        .padding(10)
+    }
+
+    private func row(_ item: CollectionItem) -> some View {
+        Button {
+            importer.chooseLink(item)
+            done()
+        } label: {
+            HStack(spacing: 8) {
+                CopyArt(mark: model.collection.mark(item: item), url: model.coverURL(for: item), width: 34, revision: model.coverRevision,
+                        title: item.album)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.album.isEmpty ? "Unknown Album" : item.album).lineLimit(1)
+                    Text([item.artist, item.formatDetail ?? item.medium.name].filter { !$0.isEmpty }.joined(separator: " · "))
+                        .font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                }
+                Spacer()
+                if let s = item.sticker { StickerPill(sticker: s, size: 9) }
+                if importer.effectiveLinkItem?.id == item.id { Image(systemName: "checkmark") }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }

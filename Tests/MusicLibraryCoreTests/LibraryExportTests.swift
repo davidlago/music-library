@@ -156,6 +156,41 @@ import Testing
         #expect(try LibraryExporter().plan(tracks: tracks, libraryRoot: root, destination: dest, artistImages: true).artistImages.isEmpty)
     }
 
+    @Test func databaseBackupBringsCollectionCovers() throws {
+        let (root, db, _) = try TestSupport.makeLibrary()
+        var record = CollectionItem(id: "lp-1", medium: .vinyl, album: "Never Ripped", artist: "Someone")
+        record.coverFile = try CollectionCovers.write(Data("record".utf8), itemID: record.id, root: root)
+        try db.saveCollectionItem(record)
+        var unused = CollectionItem(id: "cd-1", medium: .cd, album: "Other", artist: "Someone")
+        unused.coverFile = "cd-1-0000abcd.jpg"  // named in the row, but no file
+        try db.saveCollectionItem(unused)
+        try Data("stray".utf8).write(to: root.appendingPathComponent("Music/Collection Covers/stray-0000abcd.jpg"))
+        let path = try #require(CollectionCovers.path(record.coverFile!))
+        let dest = try TestSupport.tempDir()
+
+        // Only with the database, which refers to them.
+        let plain = try LibraryExporter().export(tracks: [], libraryRoot: root, to: dest)
+        #expect(plain.collectionCovers == 0 && files(in: dest).isEmpty)
+
+        let summary = try LibraryExporter().export(tracks: [], database: db, libraryRoot: root, to: dest)
+        #expect(summary.collectionCovers == 1)
+        #expect(files(in: dest) == [path, "library.sqlite"])
+        #expect(try Data(contentsOf: dest.appendingPathComponent(path)) == Data("record".utf8))
+        let copy = try LibrarySnapshot(root: dest)
+        #expect(copy.coverURL(item: try #require(copy.collection.item(id: "lp-1")))?.lastPathComponent == record.coverFile)
+
+        // Never overwritten, and not listed as an album folder.
+        try Data("changed at the destination".utf8).write(to: dest.appendingPathComponent(path))
+        #expect(try LibraryExporter().export(tracks: [], database: db, libraryRoot: root, to: dest).collectionCovers == 0)
+        #expect(try Data(contentsOf: dest.appendingPathComponent(path)) == Data("changed at the destination".utf8))
+        try FileManager.default.removeItem(at: dest.appendingPathComponent(path))
+        let preview = try ExportPreview.make(tracks: [], libraryRoot: root, destination: dest, artistImages: true,
+                                             collectionCovers: try db.collectionCoverPaths())
+        #expect(preview.plan.collectionCovers.map(\.path) == [path])
+        #expect(preview.plan.bytesNeeded == 6)
+        #expect(preview.folders.isEmpty)
+    }
+
     @Test func pathsLeadingOutsideTheLibraryOrDestinationAreRefused() async throws {
         let (root, _, tracks) = try await makeLibrary()
         let fm = FileManager.default

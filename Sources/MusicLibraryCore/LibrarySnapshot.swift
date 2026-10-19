@@ -2,7 +2,7 @@ import Foundation
 
 /// A library as the iPhone app shows it: a `library.sqlite` snapshot (written by a sync or an export, opened
 /// read-only) with everything in it (every album, artist, cover, the cached artist and album info, listening
-/// history and ownership), and which songs' files are on the phone. Only those can be played; the rest can be
+/// history and the collection), and which songs' files are on the phone. Only those can be played; the rest can be
 /// browsed and asked for (`SyncRequest`).
 public struct LibrarySnapshot: Sendable {
     public struct PlaylistItem: Identifiable, Hashable, Sendable {
@@ -33,8 +33,13 @@ public struct LibrarySnapshot: Sendable {
     /// The listening history and its totals per track, as of the sync.
     public let plays: [Play]
     public let playTotals: [Int64: PlayTotal]
-    /// Albums owned, by `SearchIndex.albumKey`, including those whose songs you bought (`AlbumPurchase.including`).
-    public let purchases: [String: AlbumPurchase]
+    /// Everything you own (CDs, records, downloads), with or without tracks, as of the sync, plus changes an older
+    /// Mac made to `album_ownership` since (`CollectionLegacy.reconcile`).
+    public let collection: MusicCollection
+    /// The collection, searchable (`LibrarySearch`).
+    public let collectionIndex: CollectionIndex
+    /// Items left out because they need a newer version of the app (`collection.unreadable`).
+    public let labelUnreadable: Int
     /// Songs bought as downloads, by track ID.
     public let songPurchases: [Int64: TrackPurchase]
     /// Cached online info, by `LibrarySnapshot.artistKey` and `SearchIndex.albumKey`.
@@ -61,7 +66,7 @@ public struct LibrarySnapshot: Sendable {
         var plays = (try? db.plays()) ?? []
         var playTotals = (try? db.playTotals()) ?? [:]
         var likedDates = (try? db.likedTrackDates()) ?? [:]
-        var purchases = (try? db.albumPurchases()) ?? [:]
+        var items = Self.collectionItems(db)
         var songPurchases = (try? db.trackPurchases()) ?? [:]
         if datesRelativeToNow {
             let shift = Self.dayShift(latest: plays.last?.startedAt ?? all.map(\.addedAt).max(), now: now)
@@ -69,10 +74,10 @@ public struct LibrarySnapshot: Sendable {
             for i in plays.indices { plays[i].startedAt += shift }
             playTotals = playTotals.mapValues { var t = $0; t.lastPlayed = t.lastPlayed.map { $0 + shift }; return t }
             likedDates = likedDates.mapValues { $0 + shift }
-            purchases = purchases.mapValues { p in
-                var p = p
-                p.purchasedOn = p.purchasedOn.map { PurchaseDay($0.date().addingTimeInterval(shift)) }
-                return p
+            for i in items.items.indices {
+                items.items[i].purchasedOn = items.items[i].purchasedOn.map { PurchaseDay($0.date().addingTimeInterval(shift)) }
+                items.items[i].createdAt += shift
+                items.items[i].updatedAt += shift
             }
             songPurchases = songPurchases.mapValues { p in
                 var p = p
@@ -119,18 +124,44 @@ public struct LibrarySnapshot: Sendable {
         self.libraryID = db.libraryID()
         self.plays = plays
         self.playTotals = playTotals
-        self.purchases = AlbumPurchase.including(songs: songPurchases, tracks: all, in: purchases)
+        let collection = MusicCollection(items: items.items, songPurchases: songPurchases, tracks: all, unreadable: items.unreadable)
+        self.collection = collection
+        self.labelUnreadable = collection.unreadable
         self.songPurchases = songPurchases
         self.artistInfos = infos.mapValues(\.info)
-        self.albumInfos = (try? db.albumInfos()) ?? [:]
+        let albumInfos = (try? db.albumInfos()) ?? [:]
+        self.albumInfos = albumInfos
+        self.collectionIndex = CollectionIndex(collection: collection, tracks: all, albumInfos: albumInfos, index: index)
         self.artistImageFiles = imageFiles
         self.artistPhotos = photos
-        self.collaborations = CollaborationGraph(tracks: all)
+        // Both collections: CDs and records with no digital copy add their releases' people.
+        self.collaborations = CollaborationGraph(tracks: all, physical: CollaborationGraph.physicalSongs(collection: collection, albumInfos: albumInfos))
         self.albumTracks = albumTracks
         self.trackByID = byID
     }
 
     public func track(id: Int64) -> Track? { trackByID[id] }
+
+    /// The collection's items: the table's, with what an older Mac changed in `album_ownership` taken in, or for a
+    /// copy from before the collection, made from `album_ownership`. A copy that can't be read has none.
+    static func collectionItems(_ db: Database) -> CollectionRead {
+        guard var read = try? db.collectionItems() else { return CollectionRead(items: [], unreadable: 0, hadTable: false) }
+        if read.hadTable, let legacy = try? db.legacyOwnershipRows() {
+            read.items = Database.inReadOrder(CollectionLegacy.reconcile(items: read.items, legacy: legacy).items)
+        }
+        return read
+    }
+
+    /// No songs and nothing in the collection.
+    public var isEmpty: Bool { tracks.isEmpty && collection.items.isEmpty }
+
+    /// The item's own cover when its file is on the phone, else the linked album's cover.jpg.
+    public func coverURL(item: CollectionItem) -> URL? {
+        if let file = item.coverFile, let url = CollectionCovers.url(file, root: root), FileManager.default.fileExists(atPath: url.path) {
+            return url
+        }
+        return album(forKey: item.albumKey).flatMap(coverURL(album:))
+    }
 
     /// Whole days from `latest` to `now` (none when `latest` is later or missing).
     static func dayShift(latest: Date?, now: Date) -> TimeInterval {
@@ -171,8 +202,9 @@ public struct LibrarySnapshot: Sendable {
         albums(artist: artist).flatMap { tracks(album: $0) }
     }
 
+    /// Without collection keys, exactly the library's `tracks(matching:)`.
     public func tracks(smartPlaylist p: SmartPlaylist) -> [Track] {
-        index.tracks(matching: SearchQuery.parse(p.query))
+        LibrarySearch.tracks(matching: p.query, index: index, collectionIndex: collectionIndex, collection: collection)
     }
 
     /// An item's tracks, as the Mac resolves it for sync.

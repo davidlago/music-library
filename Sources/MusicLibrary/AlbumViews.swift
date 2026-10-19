@@ -16,6 +16,8 @@ struct AlbumDetail: View {
     @State private var coverSheet: CoverSheetRequest?
     @State private var hoveringCover = false
     @State private var coverDropTargeted = false
+    /// A record sleeve's disc label, tinted from the cover.
+    @State private var coverTint: Color?
 
     private var title: String { album.album.isEmpty ? "Unknown Album" : album.album }
 
@@ -75,6 +77,7 @@ struct AlbumDetail: View {
             guard let url = model.coverURL(forAlbum: album) else { cover = nil; return }
             let data = await Task.detached { try? Data(contentsOf: url) }.value
             cover = data.flatMap(NSImage.init(data:))
+            coverTint = await CoverTint.color(of: url)
         }
     }
 
@@ -147,24 +150,25 @@ struct AlbumDetail: View {
         }
     }
 
-    /// The cover in its jewel case, with your label sticker, and "Change Cover…" on hover (or "Add Cover…" when there is none); dropping an
-    /// image on it opens the cover sheet with that image.
+    /// The cover as you own it (`CopyMark`): in its jewel case with your label sticker when you have the CD, in its
+    /// sleeve when your only physical copy is a record, else flat with its badge (a download, or borrowed). "Change
+    /// Cover…" shows on hover (or "Add Cover…" when there is none); dropping an image on it opens the cover sheet with
+    /// that image.
     private func coverArt(size: CGFloat) -> some View {
-        let side = JewelCase<EmptyView>.bookletSide(width: size)
-        return JewelCase(width: size, ownership: OwnershipMark(model.purchase(for: album))) {
-            if let cover {
-                Image(nsImage: cover).resizable().scaledToFill()
-                    .frame(width: side, height: side).clipped()
-            } else {
-                ZStack {
-                    Rectangle().fill(theme.fill)
-                    VStack(spacing: 12) {
-                        Image(systemName: "music.note").font(.system(size: side / 4)).foregroundStyle(.subtext)
-                        if !tracks.isEmpty {
-                            Button("Add Cover…") { coverSheet = CoverSheetRequest() }
-                        }
-                    }
-                }
+        let mark = model.copyMark(for: album)
+        return Group {
+            switch mark {
+            case .cd:
+                JewelCase(width: size, mark: mark) { booklet(side: JewelCase<EmptyView>.bookletSide(width: size)) }
+            case .vinyl:
+                RecordSleeve(width: size, mark: mark, tint: coverTint) { booklet(side: RecordSleeve<EmptyView>.sleeveSide(width: size)) }
+            default:
+                let side = JewelCase<EmptyView>.height(width: size)
+                booklet(side: side)
+                    .overlay { CoverCopyMark(mark: mark, size: side) }
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .shadow(color: .black.opacity(0.3), radius: 14 * size / 380, y: 14 * size / 380)
+                    .frame(width: size, height: side, alignment: .topLeading)
             }
         }
         .overlay(alignment: .bottomTrailing) {
@@ -190,6 +194,26 @@ struct AlbumDetail: View {
             coverSheet = CoverSheetRequest(image: data, source: url.lastPathComponent)
             return true
         } isTargeted: { coverDropTargeted = $0 }
+    }
+
+    /// The cover image, or a placeholder with "Add Cover…".
+    @ViewBuilder
+    private func booklet(side: CGFloat) -> some View {
+        if let cover {
+            Image(nsImage: cover).resizable().scaledToFill()
+                .frame(width: side, height: side).clipped()
+        } else {
+            ZStack {
+                Rectangle().fill(theme.fill)
+                VStack(spacing: 12) {
+                    Image(systemName: "music.note").font(.system(size: side / 4)).foregroundStyle(.subtext)
+                    if !tracks.isEmpty {
+                        Button("Add Cover…") { coverSheet = CoverSheetRequest() }
+                    }
+                }
+            }
+            .frame(width: side, height: side)
+        }
     }
 
     @ViewBuilder
@@ -267,7 +291,7 @@ struct AlbumDetail: View {
     @ViewBuilder
     private func sections(_ info: AlbumInfo?) -> some View {
         if !album.album.isEmpty {
-            AlbumOwnershipSection(album: album, plays: tracks.reduce(0) { $0 + (model.playTotals[$1.id]?.plays ?? 0) })
+            YourCopiesSection(album: album, plays: tracks.reduce(0) { $0 + (model.playTotals[$1.id]?.plays ?? 0) })
         }
         if let text = info?.description { about(text, info!) }
         else if model.albumInfo.isFetching(album) {
@@ -321,7 +345,7 @@ struct AlbumDetail: View {
     @ViewBuilder
     private var details: some View {
         let rows: [(String, String)] = [
-            ("Label", firstValue(\.label)), ("Catalog #", firstValue(\.catalogNumber)),
+            ("Record label", firstValue(\.label)), ("Catalog #", firstValue(\.catalogNumber)),
             ("Released", firstValue(\.releaseDate)), ("Original release", firstValue(\.originalDate)),
             ("Country", firstValue(\.releaseCountry).map(LabelsCard.countryName)),
             ("Media", firstValue(\.mediaFormat)), ("Packaging", firstValue(\.packaging).flatMap { $0 == "None" ? nil : $0 }),
@@ -407,7 +431,7 @@ struct AlbumDetail: View {
                 SectionHeader(title: "Tracks")
                 Spacer()
                 if missing > 0 {
-                    Text("\(playable.count) of \(rows.count) in your library").font(.callout).foregroundStyle(.subtext)
+                    Text("\(playable.count) of \(rows.count) in your digital collection").font(.callout).foregroundStyle(.subtext)
                 }
             }
             VStack(spacing: 0) {
@@ -431,7 +455,7 @@ struct AlbumDetail: View {
             .background(RoundedRectangle(cornerRadius: 14).fill(theme.card.opacity(0.72)))
             .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(theme.separator.opacity(0.5), lineWidth: 0.5))
             if missing > 0 {
-                Text("Greyed-out tracks are on this release but not in your library.").font(.caption).foregroundStyle(.subtext)
+                Text("Greyed-out tracks are on this release but not in your digital collection.").font(.caption).foregroundStyle(.subtext)
             }
         }
     }
@@ -453,6 +477,8 @@ struct AlbumTrackRow: View {
     let row: AlbumTracklist.Row
     let albumArtist: String
     let total: PlayTotal?
+    /// A record's side and track ("A1", "B2") where the release prints them, instead of the track number.
+    var showsPositions = false
     let play: () -> Void
     @State private var hovering = false
 
@@ -469,7 +495,10 @@ struct AlbumTrackRow: View {
             ZStack {
                 if hovering { Image(systemName: "play.fill").font(.caption) }
                 else if isCurrent { Image(systemName: "speaker.wave.2.fill").font(.caption).foregroundStyle(theme.accent) }
-                else { Text(track.trackNo.map(String.init) ?? entry.map { String($0.number) } ?? "").monospacedDigit().foregroundStyle(.subtext) }
+                else {
+                    Text((showsPositions ? entry?.position : nil) ?? track.trackNo.map(String.init) ?? entry.map { String($0.number) } ?? "")
+                        .monospacedDigit().foregroundStyle(.subtext)
+                }
             }
             .frame(width: 24)
             VStack(alignment: .leading, spacing: 1) {
@@ -510,10 +539,10 @@ struct AlbumTrackRow: View {
 
     private func missing(_ entry: TracklistEntry) -> some View {
         HStack(spacing: 12) {
-            Text(String(entry.number)).monospacedDigit().frame(width: 24)
+            Text(showsPositions ? entry.displayPosition : String(entry.number)).monospacedDigit().frame(width: 24)
             Text(entry.title).lineLimit(1)
             Spacer()
-            Text("Not in library").font(.caption2)
+            Text("Not in digital collection").font(.caption2)
                 .padding(.horizontal, 6).padding(.vertical, 2)
                 .background(Capsule().strokeBorder(theme.separator, lineWidth: 0.5))
             Text(entry.duration.map(formatTime) ?? "").monospacedDigit().frame(width: 46, alignment: .trailing)

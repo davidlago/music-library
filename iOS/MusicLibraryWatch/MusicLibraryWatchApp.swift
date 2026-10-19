@@ -31,17 +31,23 @@ struct ContentView: View {
             if let glance = model.glance {
                 TabView {
                     NowPlayingPage(glance: glance)
+                    ShelfPage(glance: glance)
                     ListeningPage(glance: glance)
-                    PurchasesPage(glance: glance)
                     PlayPage(glance: glance)
                 }
                 .tabViewStyle(.verticalPage)
                 .navigationDestination(for: Glance.Album.self) { AlbumPage(album: $0) }
+                .navigationDestination(for: Glance.Collection.Item.self) { ShelfItemPage(item: $0) }
+                .navigationDestination(for: WatchRoute.self) { route in
+                    switch route {
+                    case .find: WatchFindPage()
+                    }
+                }
             } else {
                 ContentUnavailableView {
                     Label("Open on iPhone", systemImage: "iphone")
                 } description: {
-                    Text("Open Music Library on your iPhone once, and your listening, purchases and what's playing show up here.")
+                    Text("Open Music Library on your iPhone once, and your physical collection, listening and what's playing show up here.")
                 }
             }
         }

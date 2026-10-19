@@ -12,7 +12,7 @@ struct SettingsView: View {
             AppearanceSettings().tabItem { Label("Appearance", systemImage: "paintpalette") }
             LastFMSettings().tabItem { Label("Last.fm", systemImage: "dot.radiowaves.left.and.right") }
             ConcertSettings().tabItem { Label("Concerts", systemImage: "ticket") }
-            LibraryCatalogSettings().tabItem { Label("Library", systemImage: "building.columns") }
+            LibraryCatalogSettings().tabItem { Label("Local Library", systemImage: "building.columns") }
         }
         .frame(width: 600)
         .themedRoot(model.theme)
@@ -25,7 +25,7 @@ struct GeneralSettings: View {
     var body: some View {
         @Bindable var model = model
         Form {
-            Section("Library") {
+            Section("Library Folder") {
                 LabeledContent("Folder") {
                     VStack(alignment: .trailing) {
                         Text(model.libraryRoot.path).textSelection(.enabled).lineLimit(2).truncationMode(.middle)
@@ -62,7 +62,7 @@ struct GeneralSettings: View {
             Section("Artist & album info") {
                 Toggle("Download artist photos, bios, album descriptions and links automatically", isOn: Binding(
                     get: { model.artistInfo.autoSync }, set: { model.artistInfo.autoSync = $0 }))
-                Text("From MusicBrainz, Wikipedia and Wikimedia Commons (and Last.fm when it's connected). Photos are saved in the library's Artist Images folder.")
+                Text("From MusicBrainz, Wikipedia and Wikimedia Commons (and Last.fm when it's connected). Photos are saved in the Artist Images folder of your library folder.")
                     .font(.caption).foregroundStyle(.subtext)
                 HStack {
                     Button("Update All Now") { model.refreshArtistInfo(model.artists.map(\.name)) }
@@ -72,6 +72,12 @@ struct GeneralSettings: View {
             }
             Section("CD ripping") {
                 Toggle("Eject CD after ripping", isOn: $model.ejectAfterRip)
+            }
+            Section("Physical Collection") {
+                Toggle("Ask whether a CD is yours when it's inserted", isOn: $model.askCDOwnership)
+                    .help("Off: a CD that isn't in your physical collection yet is added to it when you rip it, unless you say otherwise")
+                Toggle("Eject after cataloging", isOn: $model.ejectAfterCataloging)
+                    .help("Eject a CD once Catalog Without Ripping has added it to your physical collection")
             }
             Section("Tools") {
                 toolRow("ffmpeg", url: model.tools.ffmpeg, hint: "Install with `brew install ffmpeg`")
@@ -255,12 +261,12 @@ struct LibraryCatalogSettings: View {
         @Bindable var catalog = model.catalog
         Form {
             Section {
-                Text("Browse your public library's music CDs, see which libraries have them on the shelf and which are already in your music library. Works with library catalogs run on Aspen Discovery, like the Minuteman Library Network.")
+                Text("Browse your local library's music CDs, see which libraries have them on the shelf and which are already in your digital or physical collection. Works with library catalogs run on Aspen Discovery, like the Minuteman Library Network.")
                     .font(.callout).foregroundStyle(.subtext)
             }
             Section("Catalog") {
                 CatalogSiteField()
-                Picker("My library", selection: $catalog.homeLibrary) {
+                Picker("My local library", selection: $catalog.homeLibrary) {
                     Text("None").tag("")
                     ForEach(catalog.libraryChoices) { Text($0.name).tag($0.name) }
                 }
@@ -278,13 +284,13 @@ struct LibraryCatalogSettings: View {
                     }
                     .disabled(catalog.userLists.isEmpty)
                     if catalog.userLists.isEmpty, let url = catalog.webURL("/MyAccount/Lists") {
-                        Link("You have no lists yet. Create one on the library's website.", destination: url).font(.caption)
+                        Link("You have no lists yet. Create one on the local library's website.", destination: url).font(.caption)
                     }
                 }
             } header: {
                 Text("Account")
             } footer: {
-                Text("Used to show what you have checked out, and to add CDs to one of your lists on the library's website so you know what to look for. The password is stored in your keychain on this Mac.")
+                Text("Used to show what you have checked out, and to add CDs to one of your lists on the local library's website so you know what to look for. The password is stored in your keychain on this Mac.")
                     .font(.caption).foregroundStyle(.subtext)
             }
             CatalogDownloadSettings()

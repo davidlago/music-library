@@ -56,6 +56,21 @@ import Testing
         #expect(byBarcode.first?.id == Self.okComputer.id && byBarcode.first?.catalogNumber == Self.okComputer.catalogNumber)
     }
 
+    @Test func editionsOfOtherMediaOnlyWhenAsked() throws {
+        let vinyl = try TestSupport.fixture("mb_release_search_vinyl")
+        // The shop stays CD-only: a record isn't an edition to shop for.
+        #expect(try CDEditionParser.parseSearch(vinyl).isEmpty)
+        let records = try CDEditionParser.parseSearch(vinyl, medium: .vinyl)
+        #expect(records.map(\.id) == ["d6a1f166-8a02-4608-849b-9d623912c3e5"] && records.first?.format == "2×Vinyl")
+        // And CDs are the same whether asked for or not.
+        let cds = try TestSupport.fixture("mb_cd_search_okcomputer")
+        #expect(try CDEditionParser.parseSearch(cds, medium: .cd) == CDEditionParser.parseSearch(cds))
+        #expect(try CDEditionParser.parseSearch(cds, medium: .vinyl).isEmpty)
+        #expect(CDEditionParser.isFormat("12\" Vinyl", of: .vinyl) && !CDEditionParser.isFormat("CD", of: .vinyl))
+        #expect(CDEditionParser.isFormat("Hybrid SACD", of: .cd) && !CDEditionParser.isFormat("VCD", of: .cd))
+        #expect(CDEditionParser.isFormat("Digital Media", of: .download) && !CDEditionParser.isFormat("CD", of: .other("cd")))
+    }
+
     @Test func artistDiscography() throws {
         let artists = try CDDiscographyParser.parseArtists(try TestSupport.fixture("mb_artist_search_creedence"))
         #expect(artists.first?.name == "Creedence Clearwater Revival" && artists.first?.score == 100 && artists.count == 10)

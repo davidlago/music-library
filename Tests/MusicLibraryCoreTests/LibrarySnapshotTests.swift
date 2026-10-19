@@ -96,8 +96,93 @@ import Testing
         #expect(s.artistImageURL("Alpha")?.lastPathComponent == "chosen.jpg")
         #expect(s.artistImageURL("Beta") == nil)
         #expect(s.photoCredit("alpha")?.label == "Deezer")
-        #expect(s.purchases.values.first?.price == 12)
+        #expect(LegacyOwnership.purchases(of: s.collection).values.first?.price == 12)
         #expect(s.collaborations.person(named: "Alpha") != nil)
+    }
+
+    @Test func carriesTheCollection() throws {
+        let source = try TestSupport.tempDir()
+        let db = try LibraryLocation.openDatabase(root: source)
+        let t = try db.insertTrack(track(1, album: "Only", artist: "Alpha", year: 2010))
+        try db.recordPlay(trackId: t.id, startedAt: Date(timeIntervalSince1970: 86_400 * 100), listened: 200, counted: true)
+        let onlyKey = SearchIndex.albumKey(album: "Only", artist: "Alpha")
+        var cd = CollectionItem(id: "cd", medium: .cd, album: "Only", artist: "Alpha", now: Date(timeIntervalSince1970: 1000))
+        cd.stickerNumber = 3
+        cd.price = 12
+        cd.purchasedOn = PurchaseDay(year: 2020, month: 6, day: 1)
+        cd.digitalSource = .rip
+        cd.coverFile = "cd-0000abcd.jpg"
+        var lp = CollectionItem(id: "lp", medium: .vinyl, album: "Trackless", artist: "Beta", now: Date(timeIntervalSince1970: 1000))
+        lp.stickerNumber = 1
+        lp.coverFile = "lp-0000abcd.jpg"
+        try db.saveCollectionItems([cd, lp], at: Date(timeIntervalSince1970: 1000))
+        // An older Mac repriced the CD after this copy's collection was written.
+        try db.exec("UPDATE album_ownership SET price='9', updated_at=2000 WHERE key=?", [.text(onlyKey)])
+        try db.exec("INSERT INTO collection_items(id,medium,album,artist,album_key,created_at,updated_at) VALUES('bad id','cd','X','Y','k',0,0)")
+        let root = try TestSupport.tempDir()
+        try db.vacuum(into: LibraryLocation.databaseURL(root: root).path)
+        let covers = root.appendingPathComponent(CollectionCovers.folder)
+        try FileManager.default.createDirectory(at: covers, withIntermediateDirectories: true)
+        try Data([0xFF, 0xD8]).write(to: covers.appendingPathComponent("lp-0000abcd.jpg"))
+        let album = root.appendingPathComponent("Music/Alpha/Only (2010)")
+        try FileManager.default.createDirectory(at: album, withIntermediateDirectories: true)
+        try Data([0xFF, 0xD8]).write(to: album.appendingPathComponent("cover.jpg"))
+
+        let s = try LibrarySnapshot(root: root)
+        #expect(s.collection.items.map(\.id) == ["cd", "lp"])
+        #expect(s.labelUnreadable == 1 && s.collection.unreadable == 1)
+        #expect(s.collection.item(id: "cd")?.price == 9, "an older Mac's edit is taken in")
+        #expect(s.collection.item(id: "cd")?.stickerNumber == 3)
+        #expect(s.collection.digitalState(s.collection.item(id: "lp")!) == .none)
+        #expect(LegacyOwnership.purchases(of: s.collection)[onlyKey]
+                == AlbumPurchase(album: "Only", artist: "Alpha", purchasedOn: PurchaseDay(year: 2020, month: 6, day: 1), price: 9, labelNumber: 3))
+        #expect(LegacyOwnership.purchases(of: s.collection).count == 1, "older call sites don't see records")
+        #expect(s.coverURL(item: s.collection.item(id: "lp")!)?.lastPathComponent == "lp-0000abcd.jpg")
+        #expect(s.coverURL(item: s.collection.item(id: "cd")!)?.path.hasSuffix("Only (2010)/cover.jpg") == true,
+                "a cover file not on the phone falls back to the album's")
+        #expect(!s.isEmpty)
+
+        // The sample's dates move with its history: 10 whole days here.
+        let now = Date(timeIntervalSince1970: 86_400 * 110 + 3600)
+        let shifted = try LibrarySnapshot(root: root, datesRelativeToNow: true, now: now)
+        let moved = try #require(shifted.collection.item(id: "cd"))
+        #expect(moved.purchasedOn == PurchaseDay(PurchaseDay(year: 2020, month: 6, day: 1)!.date().addingTimeInterval(86_400 * 10)))
+        #expect(moved.createdAt == Date(timeIntervalSince1970: 1000 + 86_400 * 10))
+        #expect(moved.updatedAt == Date(timeIntervalSince1970: 2000 + 86_400 * 10))
+    }
+
+    @Test func aCollectionAloneIsALibrary() throws {
+        let source = try TestSupport.tempDir()
+        let db = try LibraryLocation.openDatabase(root: source)
+        let emptyRoot = try TestSupport.tempDir()
+        try db.vacuum(into: LibraryLocation.databaseURL(root: emptyRoot).path)
+        #expect(try LibrarySnapshot(root: emptyRoot).isEmpty)
+
+        try db.saveCollectionItem(CollectionItem(id: "lp", medium: .vinyl, album: "Blue", artist: "Joni Mitchell"))
+        let root = try TestSupport.tempDir()
+        try db.vacuum(into: LibraryLocation.databaseURL(root: root).path)
+        let s = try LibrarySnapshot(root: root)
+        #expect(!s.isEmpty && s.tracks.isEmpty && s.collection.count(.vinyl) == 1)
+        #expect(s.coverURL(item: s.collection.items[0]) == nil)
+    }
+
+    /// A copy from a Mac before the collection: its items are made from `album_ownership`, as the Mac's migration does.
+    @Test func copiesFromBeforeTheCollectionGetTheSameItems() throws {
+        let source = try TestSupport.tempDir()
+        let db = try LibraryLocation.openDatabase(root: source)
+        _ = try db.insertTrack(track(1, album: "Only", artist: "Alpha", year: 2010))
+        try db.saveAlbumPurchase(key: SearchIndex.albumKey(album: "Only", artist: "Alpha"),
+                                 AlbumPurchase(album: "Only", artist: "Alpha", price: 12, labelNumber: 4), at: Date(timeIntervalSince1970: 50))
+        try db.exec("DROP TABLE collection_items")
+        let root = try TestSupport.tempDir()
+        try db.vacuum(into: LibraryLocation.databaseURL(root: root).path)
+        let s = try LibrarySnapshot(root: root)
+        let item = try #require(s.collection.items.first)
+        #expect(s.collection.items.count == 1)
+        #expect(item.id == CollectionItem.legacyID(albumKey: SearchIndex.albumKey(album: "Only", artist: "Alpha")))
+        #expect(item.medium == .cd && item.stickerNumber == 4 && item.price == 12)
+        #expect(s.collection.digitalState(item) == .digitized(tracks: 1))
+        #expect(LegacyOwnership.purchases(of: s.collection).values.first?.labelNumber == 4)
     }
 
     @Test func tracksOutsideTheRootAreNotPresent() throws {

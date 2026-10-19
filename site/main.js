@@ -33,6 +33,8 @@ const queries = [
   "missing:cover",
   'label:"blue note" decade:60s',
   "time:>10m is:lossless",
+  "own:vinyl genre:jazz",
+  "own:cd ripped:no bought:2024",
 ];
 function highlight(text) {
   const escape = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -78,7 +80,7 @@ function swapShot(button, src, alt) {
   (next.decode ? next.decode() : Promise.resolve()).then(show, show);
 }
 
-// Insights: Library / Listening tabs.
+// Insights: Digital Collection / Listening tabs.
 const tabs = document.querySelectorAll('.tabs [role="tab"]');
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => {

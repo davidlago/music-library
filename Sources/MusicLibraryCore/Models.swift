@@ -142,6 +142,10 @@ public struct ArtistSummary: Identifiable, Hashable, Sendable {
     public var name: String
     public var albumCount: Int
     public var trackCount: Int
+
+    public init(name: String, albumCount: Int, trackCount: Int) {
+        self.name = name; self.albumCount = albumCount; self.trackCount = trackCount
+    }
 }
 
 public enum MatchSource: String, Sendable { case musicBrainz, acoustID }

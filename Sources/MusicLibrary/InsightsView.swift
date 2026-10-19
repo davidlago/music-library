@@ -40,19 +40,24 @@ enum VizColor {
 
 struct InsightsView: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("insightsPane") private var pane = Pane.library
+    @AppStorage("insightsPane") private var pane = Pane.owned
     @AppStorage("listeningPeriod") private var period = ListeningStats.Period.month
 
+    /// The raw values are saved (`@AppStorage`, `GlanceLink.insights`), so the Digital Collection pane is still "Library".
     enum Pane: String, CaseIterable, Identifiable {
-        case library = "Library", listening = "Listening", owned = "Owned"
+        case owned = "Owned", library = "Library", listening = "Listening"
         var id: String { rawValue }
+        var title: String { self == .library ? "Digital Collection" : rawValue }
     }
 
     var body: some View {
         Group {
-            if model.totalTracks == 0 {
+            if model.totalTracks == 0 && model.collection.items.isEmpty {
                 ContentUnavailableView("No Insights Yet", systemImage: "chart.bar.xaxis",
-                                       description: Text("Import some music and this page fills in with stats about your collection."))
+                                       description: Text("Add the CDs, records and downloads you own, or import some music, and this page fills in with stats about it."))
+            } else if model.totalTracks == 0 && pane != .owned {
+                ContentUnavailableView("No Music Yet", systemImage: "music.note",
+                                       description: Text("Import some music, or rip one of your CDs, and this pane fills in with stats about your digital collection."))
             } else {
                 switch pane {
                 case .library:
@@ -68,8 +73,8 @@ struct InsightsView: View {
                         ProgressView("Crunching the numbers…").frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 case .owned:
-                    if let stats = model.ownershipStats {
-                        OwnedContent(stats: stats)
+                    if let stats = model.collectionStats {
+                        CollectionContent(stats: stats)
                     } else {
                         ProgressView("Crunching the numbers…").frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
@@ -79,15 +84,15 @@ struct InsightsView: View {
         .navigationTitle("Insights")
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Picker("Insights", selection: $pane) { ForEach(Pane.allCases) { Text($0.rawValue).tag($0) } }
+                Picker("Insights", selection: $pane) { ForEach(Pane.allCases) { Text($0.title).tag($0) } }
                     .pickerStyle(.segmented).labelsHidden().fixedSize()
-                    .help("Your collection, what you listen to, or the albums you own and what you paid")
+                    .help("What you own and what you paid, the music in your digital collection, or what you listen to")
             }
         }
         .onAppear(perform: load)
         .onChange(of: model.libraryVersion) { load() }
         .onChange(of: model.historyVersion) { load() }
-        .onChange(of: model.purchasesVersion) { load() }
+        .onChange(of: model.collectionVersion) { load() }
         .onChange(of: pane) { load() }
         .onChange(of: period) { load() }
     }
@@ -96,7 +101,7 @@ struct InsightsView: View {
         switch pane {
         case .library: model.loadStatsIfNeeded()
         case .listening: model.loadListeningIfNeeded(period)
-        case .owned: model.loadOwnershipIfNeeded()
+        case .owned: model.loadCollectionStatsIfNeeded()
         }
     }
 }
@@ -178,6 +183,8 @@ struct RankedItem: Identifiable {
     var subtitle: String?
     /// Identity when names can repeat (songs with the same title).
     var key: String?
+    /// Opens the Shelf with this collection query instead of searching songs (the Collection pane).
+    var shelfQuery: String?
 }
 
 /// A clickable ranked list with proportional bars; shows the top few and expands to the rest.
@@ -196,7 +203,8 @@ struct RankedBars: View {
         VStack(alignment: .leading, spacing: 2) {
             ForEach(shown) { item in
                 Button {
-                    if let person = item.person { model.showMusicDNA(person) } else if let q = item.query { model.search(q) }
+                    if let q = item.shelfQuery { model.showShelf(query: q) }
+                    else if let person = item.person { model.showMusicDNA(person) } else if let q = item.query { model.search(q) }
                 } label: {
                     HStack(spacing: 10) {
                         VStack(alignment: .leading, spacing: 0) {
@@ -217,12 +225,12 @@ struct RankedBars: View {
                     }
                     .font(.callout)
                     .padding(.vertical, 3).padding(.horizontal, 6)
-                    .background(RoundedRectangle(cornerRadius: 5).fill(hovered == item.id && (item.query != nil || item.person != nil) ? theme.fill : .clear))
+                    .background(RoundedRectangle(cornerRadius: 5).fill(hovered == item.id && (item.query != nil || item.person != nil || item.shelfQuery != nil) ? theme.fill : .clear))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .onHover { hovered = $0 ? item.id : (hovered == item.id ? nil : hovered) }
-                .help(item.person.map { "Show \($0)'s Music DNA" } ?? item.query.map { "Search \($0)" } ?? "")
+                .help(item.shelfQuery.map { "Show \($0) on the Shelf" } ?? item.person.map { "Show \($0)'s Music DNA" } ?? item.query.map { "Search \($0)" } ?? "")
             }
             if items.count > initialCount {
                 Button(expanded ? "Show less" : "Show all \(min(items.count, maxCount))\(items.count > maxCount ? " of \(items.count)" : "")") {
@@ -561,14 +569,14 @@ struct GrowthCard: View {
     @State private var hovered: LibraryStats.GrowthPoint?
 
     var body: some View {
-        InsightCard(title: "Library Growth", subtitle: subtitle) {
+        InsightCard(title: "Growth", subtitle: subtitle) {
             if stats.growth.count >= 2 {
                 VStack(alignment: .leading, spacing: 6) {
                     Group {
                         if let h = hovered {
                             Text("\(period(h.date)) · +\(h.added.formatted()) → \(songCount(h.total))").foregroundStyle(.primary)
                         } else {
-                            Text("Songs in your library over time").foregroundStyle(.subtext)
+                            Text("Songs in your digital collection over time").foregroundStyle(.subtext)
                         }
                     }
                     .font(.caption).monospacedDigit()
@@ -663,7 +671,7 @@ struct LabelsCard: View {
     let stats: LibraryStats
 
     var body: some View {
-        InsightCard(title: "Labels & Countries", subtitle: "From MusicBrainz release data") {
+        InsightCard(title: "Record Labels & Countries", subtitle: "From MusicBrainz release data") {
             if !stats.labels.isEmpty {
                 RankedBars(items: stats.labels.map {
                     RankedItem(name: $0.name, value: Double($0.count), detail: songCount($0.count), query: SearchFilterKey.token("label", $0.name))
@@ -735,6 +743,10 @@ struct FunFact: Identifiable {
     var value: String
     var detail: String
     var query: String?
+    /// Opens this collection item instead of searching.
+    var itemID: String?
+    /// Opens the Shelf with this collection query instead of searching songs.
+    var shelfQuery: String?
 }
 
 /// A grid of fun facts; facts with a query search for it when clicked.
@@ -746,7 +758,11 @@ struct FactsGrid: View {
     var body: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 12, alignment: .top)], alignment: .leading, spacing: 12) {
             ForEach(facts) { f in
-                Button { if let q = f.query { model.search(q) } } label: {
+                Button {
+                    if let id = f.itemID { model.showItem(id: id) }
+                    else if let q = f.shelfQuery { model.showShelf(query: q) }
+                    else if let q = f.query { model.search(q) }
+                } label: {
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: f.icon).font(.title3).foregroundStyle(theme.series).frame(width: 26)
                         VStack(alignment: .leading, spacing: 2) {
@@ -762,7 +778,7 @@ struct FactsGrid: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help(f.query.map { "Search \($0)" } ?? "")
+                .help(f.itemID != nil ? "Open it" : f.shelfQuery.map { "Show \($0) on the Shelf" } ?? f.query.map { "Search \($0)" } ?? "")
             }
         }
     }
@@ -806,7 +822,7 @@ struct FunFactsCard: View {
             out.append(FunFact(icon: "flame", title: "Busiest year", value: String(y.year), detail: "\(songCount(y.count)) released that year", query: "year:\(y.year)"))
         }
         if let a = stats.artistsByAlbums.first, a.count > 1 {
-            out.append(FunFact(icon: "person.2", title: "Most albums", value: a.name, detail: "\(a.count) albums in your library",
+            out.append(FunFact(icon: "person.2", title: "Most albums", value: a.name, detail: "\(a.count) albums in your digital collection",
                                query: SearchFilterKey.token("albumartist", a.name)))
         }
         if let w = stats.titleWords.first {

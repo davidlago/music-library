@@ -152,4 +152,51 @@ import Testing
         #expect(CollaborationGraph.empty.neighborhood(of: 0, depth: 2).nodes.isEmpty)
         #expect(CollaborationGraph.empty.person(named: "x") == nil)
     }
+
+    /// A record with no digital copy adds its release's people (from the cached album info), so a player you have only
+    /// on vinyl links to the same people in the digital collection; a copy whose album has tracks adds nothing more.
+    @Test func physicalOnlyCopiesJoinTheGraph() throws {
+        let miles = "561d854a-6a28-4aa7-8c99-323e6ce46c2a", trane = "b625448e-bf4a-41c3-a421-72ad46cdb831"
+        let digital = Self.t(1, artist: "John Coltrane", mbArtist: [trane], credits: [Self.play("John Coltrane", "tenor saxophone", id: trane),
+                                                                                         Self.play("McCoy Tyner", "piano")])
+        func copy(_ id: String, _ medium: CollectionMedium, album: String, artist: String) -> CollectionItem {
+            CollectionItem(id: id, medium: medium, album: album, artist: artist, now: Date(timeIntervalSince1970: 0))
+        }
+        let vinyl = copy("kob-lp", .vinyl, album: "Kind of Blue", artist: "Miles Davis")
+        let cd = copy("kob-cd", .cd, album: "Kind of Blue", artist: "Miles Davis")      // same album, counted once
+        let bare = copy("bare-lp", .vinyl, album: "Sketches", artist: "Gil Evans")        // no album info: one song
+        let ripped = copy("train-cd", .cd, album: "A", artist: "John Coltrane")         // its tracks are in the library
+        let collection = MusicCollection(items: [vinyl, cd, bare, ripped], songPurchases: [:], tracks: [digital])
+        var info = AlbumInfo(title: "Kind of Blue")
+        info.tracklist = [
+            TracklistEntry(disc: 1, number: 1, title: "So What", artist: "Miles Davis", position: "A1",
+                           credits: [Self.play("John Coltrane", "tenor saxophone", id: trane), Self.play("Bill Evans", "piano")]),
+            TracklistEntry(disc: 1, number: 2, title: "Freddie Freeloader", artist: "Miles Davis", position: "A2",
+                           credits: [Self.play("Wynton Kelly", "piano")]),
+        ]
+        info.releaseCredits = [Credit(role: "producer", name: "Teo Macero", scope: .release),
+                               Credit(role: "photography", name: "Don Hunstein", scope: .release),
+                               Self.play("Miles Davis", "trumpet", id: miles)]
+        let songs = CollaborationGraph.physicalSongs(collection: collection, albumInfos: [vinyl.albumKey: info])
+        #expect(songs.count == 3, "two songs from the record's track list, one for the album with no info")
+        #expect(songs.allSatisfy { $0.id < 0 } && Set(songs.map(\.id)).count == 3)
+        #expect(Set(songs.map(\.itemID)) == ["kob-cd", "bare-lp"], "the first copy of an album, by id")
+        let graph = CollaborationGraph(tracks: [digital], physical: songs)
+
+        let coltrane = try #require(graph.person(named: "John Coltrane"))
+        #expect(coltrane.trackCount == 2, "the digital track and So What from the record, merged by MusicBrainz ID")
+        let shared = graph.sharedTracks(coltrane.id, try #require(graph.person(named: "Miles Davis")).id)
+        #expect(shared.count == 1 && graph.physicalSong(shared[0])?.title == "So What")
+        #expect(graph.collaborators(of: coltrane.id).map(\.person.name).contains("McCoy Tyner"))
+        #expect(graph.person(named: "Teo Macero")?.trackCount == 2, "release credits are on every song of the record")
+        #expect(graph.person(named: "Don Hunstein") == nil, "not a musical credit")
+        #expect(graph.person(named: "Gil Evans")?.trackCount == 1)
+        #expect(graph.physicalSong(1) == nil && graph.physicalSong(-99) == nil)
+    }
+
+    @Test func albumInfoCachedBeforeCreditsStillDecodes() throws {
+        let old = #"{"title":"A","secondaryTypes":[],"genres":[],"ratingVotes":0,"links":[],"tracklist":[{"disc":1,"number":1,"title":"T","artist":"X","recordingId":""}],"fetchedAt":0,"notFound":false}"#
+        let info = try JSONDecoder().decode(AlbumInfo.self, from: Data(old.utf8))
+        #expect(info.releaseCredits == nil && info.tracklist.first?.credits == nil)
+    }
 }

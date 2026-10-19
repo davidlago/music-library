@@ -48,6 +48,19 @@ public enum GlanceLink: Hashable, Sendable {
             return nil
         }
     }
+
+    /// A collection item's page. Rides on the album link (a new case would break exhaustive switches over this
+    /// enum), with the key "item:<id>": older phones look it up as an album, find none and stay where they are.
+    public static func item(id: String) -> GlanceLink { .album(key: itemPrefix + id) }
+
+    /// The item an `item(id:)` link opens.
+    public var itemID: String? {
+        guard case .album(let key) = self, key.hasPrefix(Self.itemPrefix) else { return nil }
+        let id = String(key.dropFirst(Self.itemPrefix.count))
+        return id.isEmpty ? nil : id
+    }
+
+    static let itemPrefix = "item:"
 }
 
 /// The widgets' kinds, so the app can reload one of them.
@@ -93,8 +106,22 @@ public enum GlanceMessage {
     public static let covers = "covers"
     public static let coverData = "coverData"
     public static let coversPerMessage = 4
-    /// Watch → iPhone: asks for the current summary (the reply's `glance`).
+    /// Watch → iPhone: asks for the current summary (the reply's `glance`). With the shelf index the watch has, it
+    /// also carries its `shelfHash`, so the iPhone sends the index again when it differs.
     public static let refresh = "refresh"
+    public static let shelfHash = "shelfHash"
+    /// iPhone → watch, in the reply to a `refresh` whose `shelfHash` differs: the shelf index itself
+    /// (`GlanceStore.encodeShelf`) when it's at most `inlineShelfLimit` bytes, since messages have a size limit. It also
+    /// goes as a file transfer, which may be slow to arrive (and doesn't reach a watch simulator's app); a bigger index
+    /// goes only that way. Older watches ignore the key.
+    public static let shelfData = "shelfData"
+    public static let inlineShelfLimit = 48_000
+    /// iPhone → watch, a file transfer's metadata: `fileKind` is `shelfKind` for the shelf index (`GlanceShelf`),
+    /// `shelfVersion` its version and `fileHash` its `contentHash`.
+    public static let fileKind = "kind"
+    public static let shelfKind = "shelf"
+    public static let shelfVersion = "v"
+    public static let fileHash = "hash"
 
     public static func encode<T: Encodable>(_ value: T) -> Data? { try? JSONEncoder().encode(value) }
     public static func decode<T: Decodable>(_ type: T.Type, from value: Any?) -> T? {
@@ -138,6 +165,16 @@ public enum GlanceFormat {
     public static func hour(_ hour: Int, calendar: Calendar = .current) -> String {
         let date = calendar.date(from: DateComponents(year: 2000, month: 1, day: 1, hour: hour)) ?? Date()
         return date.formatted(.dateTime.hour())
+    }
+
+    /// "CD #12", "Vinyl #12": a label is never shown without its series. Just the number for a medium this version
+    /// doesn't know.
+    public static func sticker(medium: String, number: Int) -> String {
+        switch medium.trimmingCharacters(in: .whitespaces).lowercased() {
+        case "cd": "CD #\(number)"
+        case "vinyl": "Vinyl #\(number)"
+        default: "\(number)"
+        }
     }
 
     public static func count(_ n: Int, _ singular: String, _ plural: String? = nil) -> String {

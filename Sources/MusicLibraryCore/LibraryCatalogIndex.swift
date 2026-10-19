@@ -94,7 +94,8 @@ public enum CatalogLocalSort: String, CaseIterable, Codable, Sendable, Identifia
 }
 
 /// A search of the downloaded catalog in the app's query language (`genre:jazz year:1955-1965 -is:owned`),
-/// plus filters only the catalog has.
+/// plus filters only the catalog has. `is:owned` means in your music library; `own:` means in your collection
+/// (`CatalogSearchContext.collection`).
 public struct CatalogSearchQuery: Equatable, Sendable {
     public enum Flag: String, CaseIterable, Sendable {
         /// Already in your music library.
@@ -112,6 +113,9 @@ public struct CatalogSearchQuery: Equatable, Sendable {
             case flag(Flag)
             case library(String)
             case rating(SearchQuery.NumberRange)
+            /// In your collection: `CatalogSearchQuery.collectionAny`, `collectionNone`, `collectionPhysical`, or a
+            /// medium's raw value ("cd", "vinyl", "download").
+            case collection(String)
         }
 
         public var kind: Kind
@@ -137,10 +141,27 @@ public struct CatalogSearchQuery: Equatable, Sendable {
 
     /// Catalog-only keys and the help shown for them.
     public static let keys: [(name: String, example: String, help: String)] = [
-        ("is", "is:owned", "owned (in your library), available (on the shelf), out, onlist"),
+        ("is", "is:owned", "owned (in your digital collection), available (on the local library's shelf), out, onlist"),
+        ("own", "own:vinyl", "What you own (your physical collection and downloads): any, cd, vinyl, download, none"),
         ("library", "library:acton", "Owned by this library"),
         ("rating", "rating:>=4", "MusicBrainz community rating, 0–5"),
     ]
+
+    static let collectionAny = "any", collectionNone = "none", collectionPhysical = "physical"
+
+    /// `own:` values: "any", "none", "physical" or a medium's raw value; nil for anything else.
+    static func collectionValue(_ raw: String) -> String? {
+        let v = raw.lowercased()
+        switch v {
+        case "any", "yes", "mine": return collectionAny
+        case "none", "no": return collectionNone
+        case "physical": return collectionPhysical
+        case "lp", "record", "records": return CollectionMedium.vinyl.rawValue
+        case "dl", "digital", "downloads": return CollectionMedium.download.rawValue
+        case "cds": return CollectionMedium.cd.rawValue
+        default: return CollectionMedium(rawValue: v)?.rawValue
+        }
+    }
 
     public static func parse(_ text: String, now: Date = Date()) -> CatalogSearchQuery {
         var filters: [Filter] = []
@@ -154,6 +175,8 @@ public struct CatalogSearchQuery: Equatable, Sendable {
                 filters.append(Filter(kind: .library(value), negated: token.negated))
             } else if key == "rating" || key == "stars", let range = ratingRange(value) {
                 filters.append(Filter(kind: .rating(range), negated: token.negated))
+            } else if key == "own" || key == "medium" || key == "media", let medium = collectionValue(value) {
+                filters.append(Filter(kind: .collection(medium), negated: token.negated))
             } else {
                 rest += String(text[token.range]) + " "
             }
@@ -186,12 +209,17 @@ public struct CatalogSearchQuery: Equatable, Sendable {
 
 /// What a search can't know from the records alone: which titles you own or have listed.
 public struct CatalogSearchContext: Sendable {
+    /// In your music library (`is:owned`).
     public var owned: Set<String>
     public var onList: Set<String>
     public var siteLibrary: String?
+    /// In your collection (`own:`): record id → the media of your copies (`CollectionMedium.rawValue`). Nil when
+    /// the collection isn't known, which `own:` reads as owning nothing.
+    public var collection: [String: Set<String>]?
 
-    public init(owned: Set<String> = [], onList: Set<String> = [], siteLibrary: String? = nil) {
-        self.owned = owned; self.onList = onList; self.siteLibrary = siteLibrary
+    public init(owned: Set<String> = [], onList: Set<String> = [], siteLibrary: String? = nil,
+                collection: [String: Set<String>]? = nil) {
+        self.owned = owned; self.onList = onList; self.siteLibrary = siteLibrary; self.collection = collection
     }
 }
 
@@ -306,6 +334,15 @@ public struct CatalogIndex: Sendable {
             let wanted = CatalogText.key(name)
             result = e.record.libraries.contains { CatalogText.key($0) == wanted || CatalogText.key($0).hasPrefix(wanted + " ") }
         case .rating(let range): result = e.rating.map(range.contains) ?? false
+        case .collection(let wanted):
+            let media = context.collection?[id] ?? []
+            switch wanted {
+            case CatalogSearchQuery.collectionAny: result = !media.isEmpty
+            case CatalogSearchQuery.collectionNone: result = media.isEmpty
+            case CatalogSearchQuery.collectionPhysical:
+                result = media.contains { CollectionMedium(rawValue: $0)?.isPhysical ?? false }
+            default: result = media.contains(wanted)
+            }
         }
         return result != filter.negated
     }

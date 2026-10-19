@@ -97,7 +97,7 @@ struct MusicDNAView: View {
                 .onChange(of: center.id) { hovered = nil }
             } else if let name = model.dnaCenter {
                 ContentUnavailableView("\(name) Isn't in Your Credits", systemImage: "person.crop.circle.badge.questionmark",
-                                       description: Text("Nobody by that name appears in the credits of the music in your library."))
+                                       description: Text("Nobody by that name appears in the credits of the music in your digital and physical collections."))
             } else {
                 DNALanding()
             }
@@ -144,7 +144,7 @@ struct DNALegend: View {
                 }
             }
         }
-        .help("Colored by what each person mostly does in your library")
+        .help("Colored by what each person mostly does on your music")
     }
 }
 
@@ -210,10 +210,10 @@ struct DNALanding: View {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Music DNA").font(.largeTitle.bold())
-                    Text("See who played, wrote and produced with whom across your library. Pick someone to put them at the center; click any bubble to follow the connections.")
+                    Text("See who played, wrote and produced with whom across your digital and physical collections. Pick someone to put them at the center; click any bubble to follow the connections.")
                         .foregroundStyle(.subtext).frame(maxWidth: 640, alignment: .leading)
                 }
-                SectionHeader(title: "Most connected in your library")
+                SectionHeader(title: "Most connected in your collections")
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 16)], alignment: .leading, spacing: 18) {
                     ForEach(model.collaborations.mostConnected(limit: 30)) { p in
                         Button { model.showMusicDNA(p.name) } label: {
@@ -477,6 +477,7 @@ struct DNADetailPanel: View {
                 HStack {
                     if hovered == nil {
                         Button { play(graph.tracks(of: person.id)) } label: { Label("Play All", systemImage: "play.fill") }
+                            .disabled(!graph.tracks(of: person.id).contains { $0 >= 0 })
                     }
                     if let artist = model.artistSummary(named: person.name) {
                         Button("Artist Page") { model.navigationPath.append(artist) }
@@ -491,6 +492,7 @@ struct DNADetailPanel: View {
                         Text("Connected to \(center.name) through other collaborators.").font(.callout).foregroundStyle(.subtext)
                     } else {
                         trackList("With \(center.name)", shared)
+                        physicalList("With \(center.name), in your physical collection", shared)
                     }
                     Text("Click the bubble to put \(hovered.name) at the center.").font(.caption).foregroundStyle(.subtext)
                 } else {
@@ -507,17 +509,24 @@ struct DNADetailPanel: View {
                             .font(.callout)
                         }
                     }
-                    trackList("In your library", graph.tracks(of: center.id))
+                    trackList("In your digital collection", graph.tracks(of: center.id))
+                    physicalList("In your physical collection", graph.tracks(of: center.id))
                 }
             }
             .padding(16)
         }
     }
 
+    @ViewBuilder
     private func trackList(_ title: String, _ ids: [Int64]) -> some View {
         let tracks = ids.compactMap { model.trackByID[$0] }
             .sorted { (model.playTotals[$0.id]?.plays ?? 0) > (model.playTotals[$1.id]?.plays ?? 0) }
-        return VStack(alignment: .leading, spacing: 4) {
+        // Someone only on CDs or records has no songs to list here.
+        if !tracks.isEmpty { songList(title, tracks) }
+    }
+
+    private func songList(_ title: String, _ tracks: [Track]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.headline)
             ForEach(Array(tracks.prefix(25).enumerated()), id: \.element.id) { i, t in
                 Button { play(tracks, at: i) } label: {
@@ -532,6 +541,37 @@ struct DNADetailPanel: View {
                 .help("Play")
             }
             if tracks.count > 25 { Text("and \(tracks.count - 25) more").font(.caption).foregroundStyle(.subtext) }
+        }
+    }
+
+    /// Songs on CDs and records with no digital copy (`CollaborationGraph.PhysicalSong`, the negative ids), with the
+    /// copy each is on; clicking one opens that copy.
+    @ViewBuilder
+    private func physicalList(_ title: String, _ ids: [Int64]) -> some View {
+        let songs = ids.compactMap { model.collaborations.physicalSong($0) }
+            .compactMap { song in model.item(id: song.itemID).map { (song: song, item: $0) } }
+        if !songs.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.headline)
+                ForEach(songs.prefix(25), id: \.song.id) { entry in
+                    Button { model.showItem(id: entry.item.id) } label: {
+                        HStack(spacing: 8) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(entry.song.title).lineLimit(1)
+                                Text(entry.item.album).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                            }
+                            Spacer(minLength: 6)
+                            if let sticker = entry.item.sticker { StickerPill(sticker: sticker, size: 9) }
+                            else { Text(entry.item.medium.name).font(.caption2.weight(.semibold)).foregroundStyle(.subtext) }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Open your \(entry.item.sticker?.text ?? entry.item.medium.name)")
+                }
+                if songs.count > 25 { Text("and \(songs.count - 25) more").font(.caption).foregroundStyle(.subtext) }
+            }
         }
     }
 

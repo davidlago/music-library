@@ -4,18 +4,28 @@ import SwiftUI
 /// An album's cover drawn as a CD jewel case (album pages and the album grid), 142 × 125 mm: the cover is the square
 /// booklet behind the clear lid, with the ribbed hinge and its pins on the left, the black tray showing around the
 /// booklet, the two tabs that hold it and the lid's bevelled edges and gloss. The decoration doesn't take clicks, so controls in the booklet work.
-/// The Mac app has the same view (`Sources/MusicLibrary/JewelCase.swift`).
+/// The Mac app has the same view (`Sources/MusicLibrary/JewelCase.swift`); records get a `RecordSleeve`.
 struct JewelCase<Booklet: View>: View {
     let width: CGFloat
-    /// How you got the album: your CD's label number on a sticker across the top of the hinge (where it goes on the real
-    /// case), or a round badge on the booklet for a borrowed CD or a download.
-    var ownership: OwnershipMark?
-    @ViewBuilder var booklet: Booklet
+    /// What you own of the album: your CD's label number on a sticker across the top of the hinge (where it goes on the
+    /// real case), and round badges on the booklet for a CD with no digital copy, a borrowed CD or a download.
+    var mark: CopyMark?
+    var booklet: Booklet
+
+    init(width: CGFloat, mark: CopyMark?, @ViewBuilder booklet: () -> Booklet) {
+        self.width = width
+        self.mark = mark
+        self.booklet = booklet()
+    }
 
     static func height(width: CGFloat) -> CGFloat { width * 125 / 142 }
     /// The booklet's side in a case this wide.
     static func bookletSide(width: CGFloat) -> CGFloat { height(width: width) * 0.944 }
     static func cornerRadius(width: CGFloat) -> CGFloat { width * 0.014 }
+    /// The label sticker's width on a case this wide (a record's sleeve takes the same, in the same place).
+    static func stickerWidth(width: CGFloat) -> CGFloat { width * 0.105 * 0.88 }
+    /// Where the sticker's top-left corner sits on a case this wide: across the top of the hinge.
+    static func stickerOffset(width: CGFloat) -> CGSize { CGSize(width: width * 0.105 * 0.04, height: height(width: width) * 0.012) }
 
     var body: some View {
         let w = width, h = Self.height(width: w)
@@ -42,19 +52,25 @@ struct JewelCase<Booklet: View>: View {
                 ForEach([h * 0.022, h * 0.913], id: \.self) { y in
                     knuckle.frame(width: hinge * 0.65, height: h * 0.065).offset(x: hinge * 0.19, y: y)
                 }
-                if let label = ownership?.labelNumber {
-                    LabelSticker(number: label, width: hinge * 0.88).offset(x: hinge * 0.04, y: h * 0.012)
-                }
-                if let ownership, ownership == .borrowed || ownership == .digital {
-                    OwnershipBadge(mark: ownership, coverSide: side)
-                        .frame(width: side, height: side, alignment: .bottomTrailing)
-                        .offset(x: w - margin - side, y: margin)
-                }
                 RoundedRectangle(cornerRadius: radius)
                     .strokeBorder(LinearGradient(colors: [.white.opacity(0.35), .white.opacity(0.14)], startPoint: .top, endPoint: .bottom),
                                   lineWidth: 1)
             }
             .allowsHitTesting(false)
+            // The marks take a press and hold only, to say what they mean.
+            if let sticker = mark?.sticker {
+                LabelSticker(number: sticker.number, series: sticker.series, width: Self.stickerWidth(width: w)).offset(Self.stickerOffset(width: w))
+            }
+            if let mark, let kind = CopyBadge.kind(for: mark) {
+                CopyBadge(kind: kind, coverSide: side)
+                    .frame(width: side, height: side, alignment: .bottomTrailing)
+                    .offset(x: w - margin - side, y: margin)
+            }
+            if let mark, mark.more > 0, width >= 120 {
+                CopiesChip(count: mark.more + 1, coverSide: side)
+                    .frame(width: side, height: side, alignment: .topTrailing)
+                    .offset(x: w - margin - side, y: margin)
+            }
         }
         .frame(width: w, height: h)
         .background {

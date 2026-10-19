@@ -6,7 +6,8 @@ import Foundation
 
 // MARK: Editions
 
-/// One CD edition of an album: a MusicBrainz release with at least one CD medium.
+/// One CD edition of an album: a MusicBrainz release with at least one CD medium (or, parsed for another medium,
+/// one of that medium).
 public struct CDEdition: Identifiable, Hashable, Codable, Sendable {
     public var id: String
     public var title: String
@@ -197,19 +198,30 @@ public enum CDEditionParser {
         return f.contains("CD") && !f.contains("VCD") && !f.contains("CDV") && !f.contains("CD-ROM")
     }
 
-    /// The CD editions in a MusicBrainz release search, in its order (best match first).
-    public static func parseSearch(_ data: Data) throws -> [CDEdition] {
+    /// Whether a media format is of `medium`: `isCD` for CDs, any record size for vinyl, "Digital Media" for a
+    /// download. Nothing is of an unknown medium.
+    public static func isFormat(_ format: String, of medium: CollectionMedium) -> Bool {
+        switch medium {
+        case .cd: isCD(format)
+        case .vinyl, .download: CollectionMedium(musicBrainzFormats: [format]) == medium
+        case .other: false
+        }
+    }
+
+    /// The editions in a MusicBrainz release search with a medium of `medium` (CDs unless told otherwise), in its
+    /// order (best match first). The shop only ever asks for CDs.
+    public static func parseSearch(_ data: Data, medium: CollectionMedium = .cd) throws -> [CDEdition] {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw NetworkError.badResponse("MusicBrainz search is not a JSON object")
         }
-        return (root["releases"] as? [[String: Any]] ?? []).compactMap(edition)
+        return (root["releases"] as? [[String: Any]] ?? []).compactMap { edition($0, medium: medium) }
     }
 
-    static func edition(_ r: [String: Any]) -> CDEdition? {
+    static func edition(_ r: [String: Any], medium: CollectionMedium = .cd) -> CDEdition? {
         guard let id = MBID.validated(r["id"] as? String) else { return nil }
         let media = r["media"] as? [[String: Any]] ?? []
         let formats = media.map { $0["format"] as? String ?? "" }
-        guard formats.contains(where: isCD) else { return nil }
+        guard formats.contains(where: { isFormat($0, of: medium) }) else { return nil }
         let labels = r["label-info"] as? [[String: Any]] ?? []
         let group = r["release-group"] as? [String: Any]
         let tracks = (r["track-count"] as? Int) ?? media.reduce(0) { $0 + ($1["track-count"] as? Int ?? 0) }

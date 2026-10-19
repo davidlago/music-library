@@ -21,6 +21,9 @@ final class AlbumInfoStore {
     @ObservationIgnored private var queue: [Request] = []
     @ObservationIgnored private var worker: Task<Void, Never>?
     @ObservationIgnored private var database: Database?
+    /// Called once a batch of fetches is done and saved something, so what's built from the info (the collection's
+    /// index, Music DNA's people on CDs and records with no digital copy) is rebuilt.
+    @ObservationIgnored var onFetched: (() -> Void)?
 
     static func key(_ album: AlbumSummary) -> String { SearchIndex.albumKey(album: album.album, artist: album.artist) }
 
@@ -79,6 +82,8 @@ final class AlbumInfoStore {
     }
 
     private func drain(_ fetcher: InfoFetcher) async {
+        var saved = false
+        defer { if saved { onFetched?() } }
         while !Task.isCancelled, !queue.isEmpty {
             let next = queue.removeFirst()
             current = next.key
@@ -89,6 +94,7 @@ final class AlbumInfoStore {
                 guard !Task.isCancelled, let database else { break }
                 try? database.saveAlbumInfo(key: next.key, info)
                 infos[next.key] = info
+                saved = true
             } catch {
                 lastError = "Couldn't update album info: \(error.localizedDescription)"
                 queue = []

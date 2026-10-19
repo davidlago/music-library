@@ -120,6 +120,23 @@ struct SyncFixture {
         #expect(plan.sends.contains { $0.path == f.tracks[0].path })
     }
 
+    @Test func collectionCoversAreAlwaysWanted() throws {
+        let f = try SyncFixture()
+        let cover = "Music/Collection Covers/lp-1-0000abcd.jpg", old = "Music/Collection Covers/lp-1-00000001.jpg"
+        try f.write(cover, bytes: 40)
+        try f.write("Music/Collection Covers/Bad Name.jpg", bytes: 1)
+        try f.write("Notes/x.jpg", bytes: 1)
+        let unsafe = ["Music/Collection Covers/../Artist/First (2000)/cover.jpg", "Music/Collection Covers/Bad Name.jpg",
+                      "Artist Images/artist.jpg", "Notes/x.jpg", "/etc/hosts", "Music/Collection Covers/missing-0000abcd.jpg"]
+        let plan = SyncPlan(tracks: [], collectionCovers: [cover] + unsafe, libraryRoot: f.root,
+                            phone: [SyncFileEntry(path: old, size: 9)])
+        #expect(plan.sends.map(\.path) == [cover, "Artist Images/artist.jpg"])
+        #expect(plan.deletes == [old])  // a cover the item no longer uses
+        let again = SyncPlan(tracks: [], collectionCovers: [cover], libraryRoot: f.root,
+                             phone: [SyncFileEntry(path: cover, size: 40), SyncFileEntry(path: "Artist Images/artist.jpg", size: 70)])
+        #expect(again.sends.isEmpty && again.deletes.isEmpty)
+    }
+
     @Test func snapshotDropsTheCatalog() throws {
         let f = try SyncFixture()
         try f.db.exec("INSERT INTO catalog_items(work_id,json,last_seen) VALUES('w','{}',0)")
@@ -163,6 +180,16 @@ struct SyncFixture {
         #expect(throws: SyncError.unsafePath("Music/Evil/x.flac")) { try r.begin(SyncFileHeader(path: "Music/Evil/x.flac", size: 1)) }
         #expect(throws: SyncError.unsafePath("Music/Evil/x.flac")) { try r.delete(["Music/Evil/x.flac"]) }
         #expect(try FileManager.default.contentsOfDirectory(atPath: outside.path).isEmpty)
+    }
+
+    @Test func acceptsCollectionCoversOnly() throws {
+        let root = try TestSupport.tempDir().appendingPathComponent("lib")
+        let r = try SyncReceiver(root: root)
+        #expect(try r.begin(SyncFileHeader(path: "Music/Collection Covers/lp-1-0000abcd.jpg", size: 0)))
+        #expect(r.manifest() == [SyncFileEntry(path: "Music/Collection Covers/lp-1-0000abcd.jpg", size: 0)])
+        for path in ["Collection Covers/lp-1-0000abcd.jpg", "Music/Collection Covers/../../x.jpg", "Covers/x.jpg", "../Music/x.jpg"] {
+            #expect(throws: SyncError.unsafePath(path)) { try r.begin(SyncFileHeader(path: path, size: 1)) }
+        }
     }
 
     @Test func deletesPruneEmptyFolders() throws {
@@ -289,6 +316,51 @@ struct SyncFixture {
         _ = try await session.value
         #expect(third.deleted == 0)
         #expect(FileManager.default.fileExists(atPath: phoneRoot.appendingPathComponent(f.tracks[1].path).path))
+    }
+
+    @Test func collectionCoversReachThePhone() async throws {
+        let f = try SyncFixture()
+        let key = SyncPairing.newKey()
+        let phoneRoot = try TestSupport.tempDir().appendingPathComponent("Music Library")
+        let scratch = try TestSupport.tempDir()
+        var record = CollectionItem(id: "lp-1", medium: .vinyl, album: "Never Ripped", artist: "Someone")
+        record.stickerNumber = 1
+        record.coverFile = try CollectionCovers.write(Data(repeating: 0xEE, count: 30), itemID: record.id, root: f.root)
+        try f.db.saveCollectionItem(record)
+        let first = try #require(CollectionCovers.path(record.coverFile!))
+
+        var (port, session) = try await listen(key: key, root: phoneRoot, pairing: false)
+        let sent = try await SyncMacSession.sync(endpoint: endpoint(port), key: key, identity: mac, tracks: [f.tracks[2]],
+                                                 libraryRoot: f.root, database: f.db, scratch: scratch)
+        _ = try await session.value
+        #expect(sent.copied == 4)  // the song, its album's cover, the artist photo and the item's cover
+        #expect(try Data(contentsOf: phoneRoot.appendingPathComponent(first)) == Data(repeating: 0xEE, count: 30))
+        let snapshot = try Database(snapshotAt: phoneRoot.appendingPathComponent("library.sqlite").path)
+        #expect(try snapshot.query("SELECT COUNT(*) FROM collection_items") { $0.int(0) }.first == 1)
+        let library = try LibrarySnapshot(root: phoneRoot)
+        let item = try #require(library.collection.item(id: "lp-1"))
+        #expect(library.coverURL(item: item)?.standardizedFileURL == phoneRoot.appendingPathComponent(first).standardizedFileURL)
+
+        // The next sync, with nothing selected, leaves it there.
+        (port, session) = try await listen(key: key, root: phoneRoot, pairing: false)
+        let next = try await SyncMacSession.sync(endpoint: endpoint(port), key: key, identity: mac, tracks: [],
+                                                 libraryRoot: f.root, database: f.db, scratch: scratch)
+        _ = try await session.value
+        #expect(next.copied == 0 && next.deleted == 2)  // only the song and its album's cover
+        #expect(FileManager.default.fileExists(atPath: phoneRoot.appendingPathComponent(first).path))
+
+        // A new cover replaces the old one on the phone.
+        let old = record.coverFile!
+        record.coverFile = try CollectionCovers.write(Data(repeating: 0xEF, count: 31), itemID: record.id, root: f.root)
+        try f.db.saveCollectionItem(record)
+        try FileManager.default.removeItem(at: try #require(CollectionCovers.url(old, root: f.root)))
+        (port, session) = try await listen(key: key, root: phoneRoot, pairing: false)
+        let changed = try await SyncMacSession.sync(endpoint: endpoint(port), key: key, identity: mac, tracks: [],
+                                                    libraryRoot: f.root, database: f.db, scratch: scratch)
+        _ = try await session.value
+        #expect(changed.copied == 1 && changed.deleted == 1)
+        #expect(!FileManager.default.fileExists(atPath: phoneRoot.appendingPathComponent(first).path))
+        #expect(FileManager.default.fileExists(atPath: phoneRoot.appendingPathComponent(CollectionCovers.path(record.coverFile!)!).path))
     }
 
     @Test func thePhoneRefusesASyncThatDoesNotFit() async throws {

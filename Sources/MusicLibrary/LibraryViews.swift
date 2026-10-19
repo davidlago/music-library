@@ -97,23 +97,39 @@ struct SongsView: View {
     }
 }
 
+/// The Albums grid's Owned menu: every album, or only those you have (or don't have) a copy of.
+enum AlbumsCollectionFilter: String, CaseIterable, Identifiable {
+    case all, inCollection, notInCollection
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "All Albums"
+        case .inCollection: "Albums You Own"
+        case .notInCollection: "Albums You Don't Own"
+        }
+    }
+}
+
 struct AlbumsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.undoManager) private var undoManager
     @AppStorage("albumSort") private var sort = AlbumSort.artist
-    /// Only albums you own (`model.purchase(for:)`).
+    @AppStorage("albumsCollectionFilter") private var filter = AlbumsCollectionFilter.all
+    /// Before the collection: only albums you own. Read once as In Your Collection.
     @AppStorage("albumsOwnedOnly") private var ownedOnly = false
 
     var body: some View {
-        let shown = sorted(ownedOnly ? model.albums.filter { model.purchase(for: $0) != nil } : model.albums)
+        let shown = sorted(filtered(model.albums))
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Picker("Show", selection: $ownedOnly) {
-                        Text("All Albums").tag(false)
-                        Text("Owned").tag(true)
+                    Picker("Owned", selection: $filter) {
+                        ForEach(AlbumsCollectionFilter.allCases) { Text($0.title).tag($0) }
                     }
-                    .pickerStyle(.segmented).labelsHidden().fixedSize()
-                    .help("Show only the albums you own")
+                    .fixedSize()
+                    .help("Show every album, or only those you have a copy of (a CD, a record or a download), or don't")
                     Picker("Sort by", selection: $sort) {
                         ForEach(AlbumSort.allCases) { Text($0.label).tag($0) }
                     }
@@ -122,13 +138,12 @@ struct AlbumsView: View {
                 }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 18, alignment: .top)], spacing: 18) {
                     ForEach(shown) { a in
+                        let mark = model.copyMark(for: a)
                         NavigationLink(value: a) {
                             VStack(alignment: .leading, spacing: 4) {
-                                JewelCase(width: 150, ownership: OwnershipMark(model.purchase(for: a))) {
-                                    CoverThumb(url: model.coverURL(forAlbum: a), size: JewelCase<EmptyView>.bookletSide(width: 150),
-                                               revision: model.coverRevision, cornerRadius: 0)
-                                }
-                                .padding(.bottom, 4)
+                                CopyArt(mark: mark, url: model.coverURL(forAlbum: a), width: 150, revision: model.coverRevision)
+                                    .overlay(alignment: .topTrailing) { copiesChip(mark) }
+                                    .padding(.bottom, 4)
                                 Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.headline).lineLimit(1)
                                 Text(a.artist.isEmpty ? "Unknown Artist" : a.artist).font(.subheadline).foregroundStyle(.subtext).lineLimit(1)
                                 if let detail = detail(a) {
@@ -141,6 +156,7 @@ struct AlbumsView: View {
                         .contextMenu {
                             AlbumMenuButtons(album: a)
                             Divider()
+                            addToCollectionMenu(a)
                             AddToExportListButton(album: a)
                             Divider()
                             RemoveFromLibraryButton(album: a)
@@ -149,8 +165,11 @@ struct AlbumsView: View {
                 }
                 if shown.isEmpty, !model.albums.isEmpty {
                     // Below the controls, not over them, so the filter can be switched back.
-                    ContentUnavailableView("No Owned Albums", systemImage: "opticaldisc",
-                                           description: Text("Turn on \u{201C}I own this album\u{201D} on an album's page."))
+                    ContentUnavailableView(filter == .inCollection ? "No Albums You Own" : "No Albums",
+                                           systemImage: "opticaldisc",
+                                           description: Text(filter == .inCollection
+                                                             ? "Add a copy on an album's page, or right-click an album and choose I Own This."
+                                                             : "You own a copy of every album in your digital collection."))
                         .padding(.top, 40)
                 }
             }
@@ -161,6 +180,63 @@ struct AlbumsView: View {
         }
         .navigationTitle("Albums")
         .navigationSubtitle(shown.count == 1 ? "1 album" : "\(shown.count) albums")
+        .onAppear {
+            if ownedOnly {
+                ownedOnly = false
+                if filter == .all { filter = .inCollection }
+            }
+        }
+    }
+
+    private func filtered(_ albums: [AlbumSummary]) -> [AlbumSummary] {
+        switch filter {
+        case .all: albums
+        case .inCollection: albums.filter { !model.collection.copies(albumKey: key($0)).isEmpty }
+        case .notInCollection: albums.filter { model.collection.copies(albumKey: key($0)).isEmpty }
+        }
+    }
+
+    /// "2" in the corner of an album you have more than one copy of.
+    @ViewBuilder
+    private func copiesChip(_ mark: CopyMark) -> some View {
+        let more: Int = switch mark {
+        case .cd(_, _, let more), .vinyl(_, _, let more), .download(_, let more), .other(let more): more
+        case .notInCollection: 0
+        }
+        if more > 0 {
+            Text("\(more + 1)")
+                .font(.caption2.weight(.bold).monospacedDigit())
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(Capsule().fill(.black.opacity(0.65)))
+                .padding(4)
+                .help("You have \(more + 1) copies of this album")
+                .accessibilityLabel("\(more + 1) copies")
+        }
+    }
+
+    /// I Own This ▸ As CD / As Vinyl / As Download, each with the next label in its series; ⌘Z undoes it.
+    private func addToCollectionMenu(_ a: AlbumSummary) -> some View {
+        Menu("I Own This") {
+            ForEach(CollectionMedium.known, id: \.self) { medium in
+                let next = medium.series.map { " (\($0.name) #\(model.nextNumber(in: $0)))" } ?? ""
+                Button("As \(medium.name)\(next)") { addCopy(of: a, medium: medium) }
+            }
+        }
+    }
+
+    private func addCopy(of album: AlbumSummary, medium: CollectionMedium) {
+        guard let saved = model.addCopy(of: album, medium: medium) else { return }
+        let id = saved.id
+        undoManager?.registerUndo(withTarget: model) { model in
+            // Only the item just added, and only while nothing else changed it.
+            MainActor.assumeIsolated {
+                if let current = model.item(id: id), abs(current.updatedAt.timeIntervalSince(saved.updatedAt)) < 0.001 {
+                    model.deleteItem(id: id)
+                }
+            }
+        }
+        undoManager?.setActionName("Add Copy")
     }
 
     private func key(_ a: AlbumSummary) -> String { AlbumInfoStore.key(a) }
@@ -231,7 +307,7 @@ struct PlaylistView: View {
         .overlay {
             if tracks.isEmpty {
                 ContentUnavailableView("Empty Playlist", systemImage: "music.note.list",
-                                       description: Text("Right-click songs in your library and choose Add to Playlist."))
+                                       description: Text("Right-click songs in your digital collection and choose Add to Playlist."))
                     .allowsHitTesting(false)
             }
         }
@@ -276,14 +352,14 @@ struct AlbumMenuButtons: View {
     }
 }
 
-/// "Remove from Library…" for songs or a whole album; `removeFromLibraryConfirmation` asks before anything goes.
+/// "Remove from Digital Collection…" for songs or a whole album; `removeFromLibraryConfirmation` asks before anything goes.
 struct RemoveFromLibraryButton: View {
     @Environment(AppModel.self) private var model
     var tracks: [Track] = []
     var album: AlbumSummary?
 
     var body: some View {
-        Button("Remove from Library…", role: .destructive) {
+        Button("Remove from Digital Collection…", role: .destructive) {
             if let album {
                 model.confirmRemoval(model.tracks(of: album), title: album.album.isEmpty ? "Unknown Album" : album.album)
             } else {
@@ -294,6 +370,24 @@ struct RemoveFromLibraryButton: View {
 }
 
 extension View {
+    /// " Your copy CD #12 stays in your physical collection, marked not ripped.", for the items whose album leaves the
+    /// library.
+    fileprivate static func keptCopies(_ items: [CollectionItem]) -> String {
+        guard let first = items.first else { return "" }
+        func name(_ item: CollectionItem) -> String { item.sticker?.text ?? item.medium.name.lowercased() }
+        func marked(_ item: CollectionItem) -> String {
+            switch item.medium {
+            case .cd: "not ripped"
+            case .download: "not in your digital collection"
+            case .vinyl, .other: "not digitized"
+            }
+        }
+        let place = items.allSatisfy(\.medium.isPhysical) ? "your physical collection"
+            : items.allSatisfy({ $0.medium == .download }) ? "your downloads" : "what you own"
+        if items.count == 1 { return " Your copy \(name(first)) stays in \(place), marked \(marked(first))." }
+        return " Your \(items.count) copies (\(items.prefix(3).map(name).joined(separator: ", "))\(items.count > 3 ? "…" : "")) stay in \(place)."
+    }
+
     /// Asks before removing `model.pendingRemoval` from the library. Shown once, by `ContentView`.
     func removeFromLibraryConfirmation(_ model: AppModel) -> some View {
         let request = model.pendingRemoval
@@ -301,7 +395,7 @@ extension View {
         let what = request?.title.map { "“\($0)”" }
             ?? (count == 1 ? request.map { "“\($0.tracks[0].title)”" } ?? "1 song" : "\(count) songs")
         return confirmationDialog(
-            "Remove \(what) from the library?",
+            "Remove \(what) from your digital collection?",
             isPresented: Binding(get: { model.pendingRemoval != nil }, set: { if !$0 { model.pendingRemoval = nil } }),
             titleVisibility: .visible,
             presenting: request
@@ -309,10 +403,11 @@ extension View {
             Button("Move to Trash", role: .destructive) { model.removeFromLibrary(Set(request.tracks.map(\.id))) }
             Button("Cancel", role: .cancel) {}
         } message: { request in
+            let n = request.tracks.count
             Text("""
-                \(request.tracks.count == 1 ? "The file is" : "The \(request.tracks.count) files are") moved to the Trash. \
-                \(request.tracks.count == 1 ? "The song is" : "The songs are") removed from all playlists, \
-                with \(request.tracks.count == 1 ? "its" : "their") plays and likes.
+                \(n == 1 ? "The file is" : "The \(n) files are") moved to the Trash. \
+                \(n == 1 ? "The song is" : "The songs are") removed from all playlists, \
+                with \(n == 1 ? "its" : "their") plays and likes.\(Self.keptCopies(model.copiesLosingMusic(Set(request.tracks.map(\.id)))))
                 """)
         }
     }

@@ -114,7 +114,7 @@ struct ListeningTiles: View {
             InsightTile(value: stats.plays.formatted(), label: stats.plays == 1 ? "Play" : "Plays", icon: "play.circle",
                         detail: stats.skipped > 0 ? "plus \(stats.skipped.formatted()) skipped" : "none skipped")
             InsightTile(value: stats.songs.total.formatted(), label: stats.songs.total == 1 ? "Song" : "Different songs", icon: "music.note",
-                        detail: "\(stats.libraryPlayed.formatted(.percent.precision(.fractionLength(0...1)))) of your library")
+                        detail: "\(stats.libraryPlayed.formatted(.percent.precision(.fractionLength(0...1)))) of your digital collection")
             InsightTile(value: stats.artists.total.formatted(), label: stats.artists.total == 1 ? "Artist" : "Artists", icon: "music.mic",
                         detail: stats.hasNewAndFamiliarArtists ? "\(stats.newArtists.total.formatted()) new to you" : "album artists")
             InsightTile(value: formatLongDuration(stats.dailyAverage), label: "A day on average", icon: "calendar",
@@ -338,7 +338,7 @@ struct ErasCard: View {
         InsightCard(title: "Eras You Play", subtitle: subtitle) {
             HStack(spacing: 14) {
                 legend("Your listening", theme.series)
-                legend("Your library", theme.neutral)
+                legend("Your digital collection", theme.neutral)
             }
             .font(.caption)
             VStack(alignment: .leading, spacing: 4) {
@@ -363,7 +363,7 @@ struct ErasCard: View {
                     }
                     .buttonStyle(.plain)
                     .onHover { hovered = $0 ? e.decade : (hovered == e.decade ? nil : hovered) }
-                    .help("\(e.listening.formatted(.percent.precision(.fractionLength(0)))) of your listening, \(e.library.formatted(.percent.precision(.fractionLength(0)))) of your library · click to search")
+                    .help("\(e.listening.formatted(.percent.precision(.fractionLength(0)))) of your listening, \(e.library.formatted(.percent.precision(.fractionLength(0)))) of your digital collection · click to search")
                 }
             }
         }
@@ -380,9 +380,9 @@ struct ErasCard: View {
     private var subtitle: String {
         let favored = stats.eras.filter { $0.listening >= 0.05 && $0.library > 0 }.max { $0.listening / $0.library < $1.listening / $1.library }
         if let f = favored, f.listening / f.library >= 1.5 {
-            return "You play the \(String(f.decade))s \((f.listening / f.library).formatted(.number.precision(.fractionLength(1))))× more than your library would suggest"
+            return "You play the \(String(f.decade))s \((f.listening / f.library).formatted(.number.precision(.fractionLength(1))))× more than your digital collection would suggest"
         }
-        return "Listening time by release decade, next to your library"
+        return "Listening time by release decade, next to your digital collection"
     }
 }
 
@@ -466,7 +466,7 @@ struct ListeningFactsCard: View {
         }
         if stats.neverPlayed > 0 {
             out.append(FunFact(icon: "sparkles", title: "Still unplayed", value: stats.neverPlayed.formatted(),
-                               detail: "songs in your library waiting for their first play"))
+                               detail: "songs in your digital collection waiting for their first play"))
         }
         if stats.period == .all, let first = stats.firstListen, let song = stats.firstSong {
             out.append(FunFact(icon: "flag", title: "First listen", value: first.formatted(date: .abbreviated, time: .omitted),

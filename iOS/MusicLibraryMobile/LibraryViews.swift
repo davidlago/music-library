@@ -7,7 +7,7 @@ enum LibraryRoute: Hashable {
     case smartPlaylist(Int64)
 }
 
-/// The Library tab lists the whole library or only what's on this iPhone.
+/// The Digital tab lists the whole digital collection or only what's on this iPhone.
 enum LibraryScope: String, CaseIterable, Identifiable {
     case all = "All Music", onPhone = "On This iPhone"
     var id: Self { self }
@@ -18,19 +18,19 @@ struct LibraryTab: View {
     @State private var showSettings = false
 
     var body: some View {
-        LibraryStack {
+        LibraryStack(opener: PendingAlbumOpener()) {
             Group {
-                if let library = model.library, !library.tracks.isEmpty {
+                // A physical collection without songs yet is a library too (its albums show up as they're ripped).
+                if let library = model.library, !library.isEmpty {
                     LibraryHome(library: library)
                 } else {
                     LibraryStatusView()
                 }
             }
-            .navigationTitle("Library")
+            .navigationTitle("Digital Collection")
             .toolbar {
                 Button("Settings", systemImage: "gearshape") { showSettings = true }
             }
-            .modifier(PendingAlbumOpener())
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
     }
@@ -56,10 +56,11 @@ private struct SampleLibraryNote: View {
     }
 }
 
-/// Pushes the album a widget opened (`PhoneModel.pendingAlbumKey`) once the library is loaded.
+/// Shows the album a widget opened (`PhoneModel.pendingAlbumKey`) once the library is loaded, or the collection item
+/// for it when the album has no songs in the library, over whatever page the tab had pushed.
 private struct PendingAlbumOpener: ViewModifier {
     @Environment(PhoneModel.self) private var model
-    @Environment(\.openRoute) private var openRoute
+    @Environment(\.showRoute) private var showRoute
 
     private struct Pending: Equatable {
         var key: String?
@@ -71,7 +72,11 @@ private struct PendingAlbumOpener: ViewModifier {
             guard let key = model.pendingAlbumKey else { return }
             if case .loading = model.state { return }
             model.pendingAlbumKey = nil
-            if let album = model.library?.album(forKey: key) { openRoute(album) }
+            if let album = model.library?.album(forKey: key) {
+                showRoute(album)
+            } else if let item = model.collection.copies(albumKey: key).first {
+                showRoute(CollectionItemRoute(id: item.id))
+            }
         }
     }
 }
@@ -94,13 +99,29 @@ private struct LibraryHome: View {
                     .listRowInsets(EdgeInsets())
             }
             Section {
-                NavigationLink(value: LibraryRoute.artists) { row("Artists", systemImage: "music.mic", count: counts.artists) }
                 NavigationLink(value: LibraryRoute.albums) { row("Albums", systemImage: "square.stack", count: counts.albums) }
                 NavigationLink(value: LibraryRoute.songs) { row("Songs", systemImage: "music.note", count: counts.songs) }
                 if !model.likedDates.isEmpty {
                     NavigationLink(value: LibraryRoute.liked) { row("Liked Songs", systemImage: "heart", count: counts.liked, tint: .pink) }
                 }
-                NavigationLink(value: DNARoute(name: nil)) { Label("Music DNA", systemImage: "point.3.connected.trianglepath.dotted") }
+                // Albums and songs you bought as downloads (owned items, so the collection's list and item pages).
+                let downloads = model.collection.count(.downloads)
+                if downloads > 0 {
+                    NavigationLink(value: CollectionRoute.scope(.downloads)) {
+                        HStack {
+                            Label {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("Downloads")
+                                    Text("Albums and songs you bought").font(.caption).foregroundStyle(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: "arrow.down.circle")
+                            }
+                            Spacer()
+                            CountPill(count: downloads, tint: .accentColor)
+                        }
+                    }
+                }
             }
             let playlists = library.playlists.filter { scope == .all || model.availability($0.tracks) != .notOnPhone }
             if !playlists.isEmpty || !library.smartPlaylists.isEmpty {
@@ -170,8 +191,11 @@ extension View {
         navigationDestination(for: LibraryRoute.self) { LibraryRoutePage(route: $0) }
             .navigationDestination(for: AlbumSummary.self) { AlbumPage(album: $0) }
             .navigationDestination(for: ArtistSummary.self) { ArtistPage(artist: $0) }
+            .navigationDestination(for: ArtistNameRoute.self) { ArtistPage(name: $0.name) }
             .navigationDestination(for: DNARoute.self) { MusicDNAPage(name: $0.name) }
             .navigationDestination(for: QueryRoute.self) { QueryPage(route: $0) }
+            .navigationDestination(for: CollectionRoute.self) { CollectionRoutePage(route: $0) }
+            .navigationDestination(for: CollectionItemRoute.self) { CollectionItemPage(id: $0.id) }
     }
 }
 
@@ -184,7 +208,9 @@ private struct LibraryRoutePage: View {
         if let library = model.library {
             switch route {
             case .artists:
-                ArtistList(artists: scoped(library.artists) { library.tracks(artist: $0.name) })
+                // Both collections' artists (those you only own on CD or vinyl aren't on the phone).
+                ArtistList(artists: scope == .all ? model.collection.artists(adding: library.artists)
+                                                  : scoped(library.artists) { library.tracks(artist: $0.name) })
                     .navigationTitle("Artists")
             case .albums:
                 AlbumGrid(albums: scoped(library.albums) { library.tracks(album: $0) }, library: library)
@@ -227,7 +253,8 @@ struct ArtistList: View {
                     ArtistPhoto(name: artist.name, size: 44)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(artist.name.isEmpty ? "Unknown Artist" : artist.name).lineLimit(1)
-                        Text("\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") · \(songCount(artist.trackCount))")
+                        Text(artist.trackCount == 0 ? "\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") you own"
+                                                    : "\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") · \(songCount(artist.trackCount))")
                             .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     Spacer(minLength: 6)
@@ -244,32 +271,74 @@ struct ArtistList: View {
     }
 }
 
+/// Which albums of the digital collection the Albums grid shows, by whether you own a copy (a CD, record or download;
+/// as the Mac's).
+enum AlbumCollectionFilter: String, CaseIterable, Identifiable {
+    case all, inCollection, notInCollection
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .all: "All Albums"
+        case .inCollection: "Albums You Own"
+        case .notInCollection: "Albums You Don't Own"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .all: "square.stack"
+        case .inCollection: "books.vertical"
+        case .notInCollection: "arrow.left.arrow.right"
+        }
+    }
+}
+
 struct AlbumGrid: View {
     @Environment(PhoneModel.self) private var model
     let albums: [AlbumSummary]
     let library: LibrarySnapshot
-    /// Only albums you own (`model.purchase(for:)`).
+    @AppStorage("albumsCollectionFilter") private var filter = AlbumCollectionFilter.all
+    /// Before the collection: only albums you own. Read once as Albums You Own.
     @AppStorage("albumsOwnedOnly") private var ownedOnly = false
     /// The Mac's orders (`AlbumSort`).
     @AppStorage("albumSort") private var sort = AlbumSort.artist
 
     var body: some View {
-        let owned = ownedOnly ? albums.filter { model.purchase(for: $0) != nil } : albums
-        let shown = sort.sorted(owned, added: library.albumAddedDates, plays: model.albumPlayTotals)
+        let filtered = albums.filter { album in
+            switch filter {
+            case .all: true
+            case .inCollection: model.copyMark(for: album) != .notInCollection
+            case .notInCollection: model.copyMark(for: album) == .notInCollection
+            }
+        }
+        let shown = sort.sorted(filtered, added: library.albumAddedDates, plays: model.albumPlayTotals)
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 20) {
                 ForEach(shown) { album in
                     NavigationLink(value: album) { AlbumCell(album: album, library: library, detail: detail(album), jewelCase: true) }
                         .buttonStyle(.plain)
                         .contextMenu { AlbumMenu(album: album) }
+                        .environment(\.explainsMarksOnPress, false)
                 }
             }
             .padding()
         }
         .overlay {
-            if ownedOnly, shown.isEmpty, !albums.isEmpty {
-                ContentUnavailableView("No Owned Albums", systemImage: "opticaldisc",
-                                       description: Text("Albums you mark as owned in Music Library on your Mac show up here."))
+            if filter != .all, shown.isEmpty, !albums.isEmpty {
+                if filter == .inCollection {
+                    ContentUnavailableView("No Albums You Own", systemImage: "books.vertical",
+                                           description: Text("Albums you add as CDs, records or downloads in Music Library on your Mac show up here."))
+                } else {
+                    ContentUnavailableView("You Own Them All", systemImage: "books.vertical",
+                                           description: Text("You own a copy of every album in your digital collection."))
+                }
+            }
+        }
+        .onAppear {
+            if ownedOnly {
+                filter = .inCollection
+                ownedOnly = false
             }
         }
         .toolbar {
@@ -278,13 +347,12 @@ struct AlbumGrid: View {
                     ForEach(AlbumSort.allCases) { Text($0.label).tag($0) }
                 }
                 Section {
-                    Picker("Show", selection: $ownedOnly) {
-                        Label("All Albums", systemImage: "square.stack").tag(false)
-                        Label("Owned", systemImage: "opticaldisc").tag(true)
+                    Picker("Ownership", selection: $filter) {
+                        ForEach(AlbumCollectionFilter.allCases) { Label($0.label, systemImage: $0.icon).tag($0) }
                     }
                 }
             } label: {
-                Image(systemName: ownedOnly ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                Image(systemName: filter != .all ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
             }
             .accessibilityLabel("Sort and Filter")
         }
@@ -310,8 +378,8 @@ struct AlbumGrid: View {
     }
 }
 
-/// A cover (in its jewel case in the album grid) with the title and artist; dimmed when none of its songs are on the
-/// phone.
+/// A cover (in the album grid, as you own it: a CD in its jewel case, a record in its sleeve) with the title and artist;
+/// dimmed when none of its songs are on the phone.
 struct AlbumCell: View {
     @Environment(PhoneModel.self) private var model
     let album: AlbumSummary
@@ -327,15 +395,12 @@ struct AlbumCell: View {
         let availability = model.availability(tracks)
         VStack(alignment: .leading, spacing: 4) {
             Group {
-                let ownership = OwnershipMark(model.purchase(for: album))
+                let mark = model.copyMark(for: album)
                 if jewelCase {
-                    JewelCase(width: size, ownership: ownership) {
-                        CoverImage(url: library.coverURL(album: album), size: JewelCase<EmptyView>.bookletSide(width: size),
-                                   cornerRadius: 0)
-                    }
-                    .padding(.bottom, 4)
+                    CopyArt(mark: mark, url: library.coverURL(album: album), width: size, title: album.album)
+                        .padding(.bottom, 4)
                 } else {
-                    CoverImage(url: library.coverURL(album: album), size: size, ownership: ownership)
+                    CoverImage(url: library.coverURL(album: album), size: size, mark: mark)
                 }
             }
             .opacity(availability == .notOnPhone ? 0.55 : 1)
@@ -362,6 +427,11 @@ struct AlbumMenu: View {
     var body: some View {
         let tracks = model.playable(model.library?.tracks(album: album) ?? [])
         let item = ExportItem.album(album: album.album, artist: album.artist)
+        // What the cover's marks mean: pressing and holding them opens this menu.
+        let meanings = model.copyMark(for: album).meanings
+        if !meanings.isEmpty {
+            Section { ForEach(meanings, id: \.self) { Text($0) } }
+        }
         if !tracks.isEmpty {
             Button("Play", systemImage: "play") { player.play(queue: tracks, source: album.album) }
             Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { player.playNext(tracks) }

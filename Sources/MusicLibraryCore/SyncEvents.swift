@@ -142,17 +142,9 @@ extension Database {
                         result.likes += 1
                     }
                 case .purchase(let purchase):
-                    // The newer of the phone's change and the Mac's last one wins.
-                    let key = SearchIndex.albumKey(album: track.album, artist: track.effectiveAlbumArtist)
-                    let updated = try query("SELECT updated_at FROM album_ownership WHERE key=?", [.text(key)]) { $0.double(0) }.first ?? nil
-                    if let updated, updated > e.at.timeIntervalSince1970 { continue }
-                    // Formats and label numbers are only set on the Mac: the album keeps its own.
-                    let current = try albumPurchases()[key]
-                    try saveAlbumPurchase(key: key, purchase.map {
-                        AlbumPurchase(album: track.album, artist: track.effectiveAlbumArtist, format: current?.format ?? .cd,
-                                      purchasedOn: $0.purchasedOn, price: $0.price, labelNumber: current?.labelNumber)
-                    }, at: e.at)
-                    result.purchases += 1
+                    // Date and price only, to the album's primary CD or download, and only when the phone's change is
+                    // newer than the Mac's last one (`CollectionLegacy.applyLegacyPurchase`).
+                    if try applyLegacyPurchase(purchase, track: track, at: e.at) { result.purchases += 1 }
                 }
             }
         }
