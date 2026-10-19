@@ -35,8 +35,9 @@ public struct PurchaseDay: Hashable, Comparable, Codable, Sendable {
 }
 
 /// An album you own a copy of: a CD or a download, when you bought it, what you paid and (for a CD) the number on the
-/// sticker you put on the case, all optional. Saved per album (`SearchIndex.albumKey`) in the `album_ownership` table,
-/// apart from the tracks, so re-importing an album keeps it. Albums you don't own were borrowed (`OwnershipMark`).
+/// sticker you put on the case, all optional. One row per album (`SearchIndex.albumKey`) in the `album_ownership`
+/// table, which is now a projection of the collection (`CollectionItem`, `CollectionLegacy`) for older readers, and
+/// the Codable form of ownership changes from phones before 1.18.
 public struct AlbumPurchase: Hashable, Sendable {
     /// What you bought: the CD, or the album as a download.
     public enum Format: String, CaseIterable, Sendable {
@@ -72,11 +73,13 @@ public struct AlbumPurchase: Hashable, Sendable {
 
     /// The number to suggest for the next album you label: one past the highest in use (counting albums no longer in
     /// the library, whose stickers are still on the shelf), or 1 for the first.
+    /// Deprecated: counts CDs only; use `MusicCollection.nextNumber(in:pending:)`.
     public static func nextLabelNumber(in purchases: [String: AlbumPurchase]) -> Int {
         min((purchases.values.compactMap(\.labelNumber).max() ?? 0) + 1, maxLabelNumber)
     }
 
     /// Another album already labeled with this number, if any (the album with key `excluding` doesn't count).
+    /// Deprecated: use `MusicCollection.taken(_:excluding:)`, which knows the CD and vinyl series apart.
     public static func album(labeled number: Int, in purchases: [String: AlbumPurchase], excluding key: String?) -> AlbumPurchase? {
         purchases.filter { $0.key != key && $0.value.labelNumber == number }
             .min { ($0.value.album, $0.value.artist, $0.key) < ($1.value.album, $1.value.artist, $1.key) }?.value
@@ -147,6 +150,7 @@ public struct TrackPurchase: Hashable, Sendable {
 extension AlbumPurchase {
     /// `records` (albums you said you own) plus, for each album without one, a download made of the songs you bought
     /// from it: their total (nil when none has a price) and the first one's day.
+    /// Deprecated: `MusicCollection` derives these downloads itself (`legacyPurchases` for old call sites).
     public static func including(songs: [Int64: TrackPurchase], tracks: [Track], in records: [String: AlbumPurchase]) -> [String: AlbumPurchase] {
         guard !songs.isEmpty else { return records }
         var all = records
@@ -167,6 +171,7 @@ extension AlbumPurchase {
 
 /// How an album's cover shows how you got it: a CD you bought has your label on its jewel case (when it has one), a CD
 /// you borrowed (from a library or a friend; any album you don't own) and a download each have a round badge.
+/// Deprecated: use `CopyMark` (`MusicCollection.mark(albumKey:)`), which also shows records.
 public enum OwnershipMark: Hashable, Sendable {
     case cd(label: Int?)
     case borrowed
@@ -192,6 +197,7 @@ extension Decimal {
 
 /// What you own and what you paid for it: the Owned pane of Insights. Only albums in the library count; purchases
 /// saved for albums no longer in it are kept (and come back if the album does) but left out.
+/// Deprecated: replaced by the collection's stats; removed in the cleanup.
 public struct OwnershipStats: Sendable {
     public struct OwnedAlbum: Identifiable, Hashable, Sendable {
         /// `SearchIndex.albumKey`.

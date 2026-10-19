@@ -63,4 +63,33 @@ import Testing
         #expect(added[SearchIndex.albumKey(album: "X", artist: "A")] == Date(timeIntervalSince1970: 300))
         #expect(added[SearchIndex.albumKey(album: "Y", artist: "A")] == Date(timeIntervalSince1970: 50))
     }
+
+    @Test func collectionOrders() {
+        func item(_ id: String, _ medium: CollectionMedium, _ number: Int? = nil, album: String = "", artist: String = "",
+                  year: Int? = nil, bought: PurchaseDay? = nil, price: Decimal? = nil, added: TimeInterval = 0) -> CollectionItem {
+            var i = CollectionItem(id: id, medium: medium, album: album, artist: artist, now: Date(timeIntervalSince1970: added))
+            i.stickerNumber = number
+            i.year = year
+            i.purchasedOn = bought
+            i.price = price
+            return i
+        }
+        let items = [
+            item("v2", .vinyl, 2, album: "Blue", artist: "Joni", year: 1971, bought: PurchaseDay(year: 2020, month: 1, day: 1), price: 30, added: 5),
+            item("u1", .cd, album: "Zed", artist: "Beta", added: 9),
+            item("c10", .cd, 10, album: "Abbey", artist: "Beatles", year: 1969, price: 12, added: 1),
+            item("dl", .download, album: "", artist: "", bought: PurchaseDay(year: 2024, month: 5, day: 1), added: 3),
+            item("c2", .cd, 2, album: "Kind", artist: "Miles", year: 1959, bought: PurchaseDay(year: 2020, month: 1, day: 1), price: 12, added: 7),
+            item("u0", .vinyl, album: "Alpha", artist: "Beta", added: 2),
+        ]
+        func order(_ sort: CollectionSort) -> [String] { sort.sorted(items).map(\.id) }
+        #expect(order(.sticker) == ["c2", "c10", "v2", "u0", "u1", "dl"], "CDs, then records, by number; unlabeled by artist and title")
+        #expect(order(.artist) == ["c10", "u1", "u0", "v2", "c2", "dl"])
+        #expect(order(.title) == ["c10", "u0", "v2", "c2", "u1", "dl"])
+        #expect(order(.year) == ["v2", "c10", "c2", "u1", "dl", "u0"], "newest first, undated last in their order")
+        #expect(order(.bought) == ["dl", "v2", "c2", "u1", "c10", "u0"])
+        #expect(order(.price) == ["v2", "c10", "c2", "u1", "dl", "u0"], "ties keep their order")
+        #expect(order(.added) == ["u1", "c2", "v2", "dl", "u0", "c10"])
+        #expect(CollectionSort.sticker.title == "Label")
+    }
 }

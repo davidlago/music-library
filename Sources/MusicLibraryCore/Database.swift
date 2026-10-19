@@ -257,6 +257,9 @@ public final class Database: @unchecked Sendable {
         if !ownershipColumns.contains("format") {
             try exec("ALTER TABLE album_ownership ADD COLUMN format TEXT")
         }
+        // The collection, also without a schema change; `album_ownership` becomes its projection for older readers.
+        try createCollectionTable()
+        try reconcileLegacyOwnership()
         try exec("PRAGMA user_version=\(Self.schemaVersion)")
     }
 
@@ -574,18 +577,6 @@ public final class Database: @unchecked Sendable {
     }
 
     // MARK: Album ownership
-
-    /// Saves (or with nil, forgets) that you own the album with this key (`SearchIndex.albumKey`).
-    public func saveAlbumPurchase(key: String, _ purchase: AlbumPurchase?, at date: Date = Date()) throws {
-        guard let p = purchase else {
-            try exec("DELETE FROM album_ownership WHERE key=?", [.text(key)])
-            return
-        }
-        try exec("INSERT OR REPLACE INTO album_ownership(key,album,artist,format,purchased_on,price,label_number,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                 [.text(key), .text(p.album), .text(p.artist), .text(p.format == .cd ? nil : p.format.rawValue),
-                  .text(p.purchasedOn?.string), .text(AlbumPurchase.priceText(p.price)), .int(p.labelNumber),
-                  .double(date.timeIntervalSince1970)])
-    }
 
     /// Owned albums by key. Dates, prices and label numbers that don't parse (the file may come from elsewhere) read
     /// as unknown, a format that doesn't as a CD, and so do label numbers and formats in a snapshot from a version

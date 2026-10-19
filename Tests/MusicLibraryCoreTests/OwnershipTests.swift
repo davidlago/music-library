@@ -90,6 +90,7 @@ import Testing
         #expect(try db.query("SELECT format FROM album_ownership WHERE key='c'") { $0.string(0) }.first == .some(nil))
         try db.exec("UPDATE album_ownership SET format='vinyl' WHERE key='d'")
         #expect(try db.albumPurchases()["d"]?.format == .cd)
+        #expect(try db.legacyOwnershipRows().first { $0.key == "d" }?.purchase.format == .cd, "and so it does for the collection")
     }
 
     @Test func ownershipMarks() {
@@ -201,6 +202,9 @@ import Testing
         }
         let snapshot = try Database(snapshotAt: path)
         #expect(try snapshot.albumPurchases()["k"] == AlbumPurchase(album: "A", artist: "B", purchasedOn: PurchaseDay(year: 2020, month: 1, day: 2), price: 5))
+        // The phone reconciles it into the collection as a CD.
+        let items = CollectionLegacy.reconcile(items: try snapshot.collectionItems().items, legacy: try snapshot.legacyOwnershipRows()).items
+        #expect(items.map(\.medium) == [.cd] && items.first?.price == 5 && items.first?.id == CollectionItem.legacyID(albumKey: "k"))
 
         let db = try Database(path: path)
         try db.saveAlbumPurchase(key: "k", AlbumPurchase(album: "A", artist: "B", labelNumber: 9))

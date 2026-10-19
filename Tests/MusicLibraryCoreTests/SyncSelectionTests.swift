@@ -148,9 +148,10 @@ import Testing
         let repriced = SyncEvent(track: f.tracks[1], at: Date(timeIntervalSince1970: 3500), kind: .purchase(AlbumPurchase(album: "First", artist: "Artist", price: 18)))
         #expect(try f.db.applySyncEvents([repriced], libraryID: nil).purchases == 1)
         #expect(try f.db.albumPurchases()[key] == AlbumPurchase(album: "First", artist: "Artist", price: 18, labelNumber: 7))
+        // A label is a fact only the Mac records: "not owned" from the phone doesn't remove a labeled CD.
         let newer = SyncEvent(track: f.tracks[1], at: Date(timeIntervalSince1970: 4000), kind: .purchase(nil))
-        #expect(try f.db.applySyncEvents([newer], libraryID: nil).purchases == 1)
-        #expect(try f.db.albumPurchases()[key] == nil)
+        #expect(try f.db.applySyncEvents([newer], libraryID: nil).purchases == 0)
+        #expect(try f.db.albumPurchases()[key]?.labelNumber == 7)
 
         let overlay = SyncOutbox.purchases(base: [:], events: events + [older]) { _ in key }
         #expect(overlay[key] == nil)
@@ -168,6 +169,78 @@ import Testing
         let repriced = SyncEvent(track: f.tracks[0], at: Date(timeIntervalSince1970: 2000), kind: .purchase(AlbumPurchase(album: "First", artist: "Artist", price: 8)))
         #expect(try f.db.applySyncEvents([repriced], libraryID: f.db.libraryID()).purchases == 1)
         #expect(try f.db.albumPurchases()[key] == AlbumPurchase(album: "First", artist: "Artist", format: .digital, price: 8))
+    }
+
+    /// Pre-1.18 events change only the album's primary CD or download: never a record, a label or the medium.
+    @Test func legacyEventsChangeOnlyThePrimaryCopy() throws {
+        let f = try SyncFixture()
+        let key = SearchIndex.albumKey(album: "First", artist: "Artist")
+        let t0 = Date(timeIntervalSince1970: 1000)
+        var vinyl = CollectionItem(id: "vinyl", medium: .vinyl, album: "First", artist: "Artist", now: t0)
+        vinyl.stickerNumber = 3
+        vinyl.price = 30
+        var cd = CollectionItem(id: "cd-low", medium: .cd, album: "First", artist: "Artist", now: t0)
+        cd.stickerNumber = 2
+        var cd2 = CollectionItem(id: "cd-high", medium: .cd, album: "First", artist: "Artist", now: t0)
+        cd2.stickerNumber = 9
+        cd2.price = 5
+        try f.db.saveCollectionItems([vinyl, cd, cd2], at: t0)
+
+        let repriced = SyncEvent(track: f.tracks[0], at: Date(timeIntervalSince1970: 2000),
+                                 kind: .purchase(AlbumPurchase(album: "x", artist: "y", purchasedOn: PurchaseDay(year: 2001, month: 2, day: 3), price: 11)))
+        #expect(try f.db.applySyncEvents([repriced], libraryID: nil).purchases == 1)
+        var items = Dictionary(uniqueKeysWithValues: try f.db.collectionItems().items.map { ($0.id, $0) })
+        #expect(items["cd-low"]?.price == 11 && items["cd-low"]?.purchasedOn == PurchaseDay(year: 2001, month: 2, day: 3))
+        #expect(items["cd-low"]?.stickerNumber == 2 && items["cd-low"]?.medium == .cd && items["cd-low"]?.album == "First")
+        #expect(items["cd-high"]?.price == 5)
+        #expect(items["vinyl"] == vinyl, "records are never touched")
+        #expect(try f.db.albumPurchases()[key] == AlbumPurchase(album: "First", artist: "Artist", purchasedOn: PurchaseDay(year: 2001, month: 2, day: 3),
+                                                                price: 11, labelNumber: 2))
+
+        // An older event loses to the copy's later change; "not owned" keeps labeled copies.
+        let stale = SyncEvent(track: f.tracks[0], at: Date(timeIntervalSince1970: 1500), kind: .purchase(AlbumPurchase(album: "x", artist: "y", price: 1)))
+        let unowned = SyncEvent(track: f.tracks[0], at: Date(timeIntervalSince1970: 3000), kind: .purchase(nil))
+        #expect(try f.db.applySyncEvents([stale, unowned], libraryID: nil).purchases == 0)
+        items = Dictionary(uniqueKeysWithValues: try f.db.collectionItems().items.map { ($0.id, $0) })
+        #expect(items.count == 3 && items["cd-low"]?.price == 11)
+
+        // An unlabeled primary copy is removed by a newer "not owned"; a record alone isn't projected or removed.
+        let other = SearchIndex.albumKey(album: "Second", artist: "Artist")
+        let lp = CollectionItem(id: "lp", medium: .vinyl, album: "Second", artist: "Artist", now: t0)
+        let dl = CollectionItem(id: "dl", medium: .download, album: "Second", artist: "Artist", now: t0)
+        try f.db.saveCollectionItems([lp, dl], at: t0)
+        #expect(try f.db.albumPurchases()[other]?.format == .digital)
+        let gone = SyncEvent(track: f.tracks[2], at: Date(timeIntervalSince1970: 4000), kind: .purchase(nil))
+        #expect(try f.db.applySyncEvents([gone], libraryID: nil).purchases == 1)
+        #expect(try f.db.collectionItems().items.map(\.id).sorted() == ["cd-high", "cd-low", "lp", "vinyl"])
+        #expect(try f.db.albumPurchases()[other] == nil, "a record-only album reads as not owned on older phones")
+
+        // A purchase for an album with only a record adds an unlabeled CD next to it.
+        let bought = SyncEvent(track: f.tracks[2], at: Date(timeIntervalSince1970: 5000), kind: .purchase(AlbumPurchase(album: "x", artist: "y", price: 4)))
+        #expect(try f.db.applySyncEvents([bought], libraryID: nil).purchases == 1)
+        let added = try #require(try f.db.collectionItems().items.first { $0.albumKey == other && $0.medium == .cd })
+        #expect(added.album == "Second" && added.stickerNumber == nil && added.price == 4 && added.id == CollectionItem.legacyID(albumKey: other))
+    }
+
+    /// The phone shows its outbox's pre-1.18 changes with the same rules.
+    @Test func legacyEventsOverlayTheSnapshotItems() {
+        let key = "k"
+        let t0 = Date(timeIntervalSince1970: 1000)
+        var cd = CollectionItem(id: "cd", medium: .cd, album: "A", artist: "B", albumKey: key, now: t0)
+        cd.stickerNumber = 4
+        let vinyl = CollectionItem(id: "v", medium: .vinyl, album: "A", artist: "B", albumKey: key, now: t0)
+        let track = Track(id: 1, path: "p", metadata: TrackMetadata(title: "t"), duration: 1, format: "flac", sha256: "s")
+        let events = [
+            SyncEvent(track: track, at: Date(timeIntervalSince1970: 3000), kind: .purchase(AlbumPurchase(album: "A", artist: "B", price: 9))),
+            SyncEvent(track: track, at: Date(timeIntervalSince1970: 2000), kind: .purchase(AlbumPurchase(album: "A", artist: "B", price: 7))),
+            SyncEvent(track: track, at: Date(timeIntervalSince1970: 4000), kind: .purchase(nil)),
+        ]
+        let items = CollectionLegacy.overlay(events: events, on: [cd, vinyl]) { _ in key }
+        #expect(items.count == 2, "the labeled CD stays")
+        #expect(items.first { $0.id == "cd" }?.price == 9, "the newest change wins")
+        #expect(items.first { $0.id == "v" } == vinyl)
+        #expect(CollectionLegacy.overlay(events: events, on: []) { _ in key }.isEmpty, "added, then removed: unlabeled")
+        #expect(CollectionLegacy.overlay(events: Array(events.prefix(2)), on: []) { _ in key }.map(\.price) == [9])
     }
 
     @Test func purchasesFromAnotherDeviceAreChecked() throws {
