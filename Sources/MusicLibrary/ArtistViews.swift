@@ -43,7 +43,7 @@ struct ArtistsView: View {
     }
 
     var body: some View {
-        let shown = sorted(filtered(model.artists))
+        let shown = sorted(filtered(model.allArtists))
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header(shownCount: shown.count)
@@ -66,7 +66,7 @@ struct ArtistsView: View {
             .padding(20)
         }
         .overlay {
-            if model.artists.isEmpty {
+            if model.allArtists.isEmpty {
                 ContentUnavailableView("No Artists", systemImage: "music.mic")
             } else if shown.isEmpty {
                 ContentUnavailableView.search(text: filter)
@@ -74,7 +74,7 @@ struct ArtistsView: View {
         }
         .sheet(item: $photoArtist) { ArtistPhotoSheet(name: $0.name, request: CoverSheetRequest()).themedSheet() }
         .navigationTitle("Artists")
-        .navigationSubtitle(filter.isEmpty ? "\(model.artists.count) artists" : "\(shown.count) of \(model.artists.count) artists")
+        .navigationSubtitle(filter.isEmpty ? "\(model.allArtists.count) artists" : "\(shown.count) of \(model.allArtists.count) artists")
     }
 
     private func header(shownCount: Int) -> some View {
@@ -140,7 +140,9 @@ struct ArtistCard: View {
                 .padding(.bottom, 4)
             Text(artist.name.isEmpty ? "Unknown Artist" : artist.name)
                 .font(.headline).lineLimit(1)
-            Text("\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") · \(songCount(artist.trackCount))")
+            // An artist you only own on CD or vinyl has albums but no songs.
+            Text(artist.trackCount == 0 ? "\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") you own"
+                                        : "\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") · \(songCount(artist.trackCount))")
                 .font(.caption).foregroundStyle(.subtext).lineLimit(1)
             if listened >= 1 {
                 Label(formatListened(listened), systemImage: "headphones")

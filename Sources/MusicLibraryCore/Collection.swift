@@ -677,6 +677,20 @@ public struct MusicCollection: Sendable {
         items.filter { scope.contains($0, state: digitalState($0)) }
     }
 
+    /// The digital collection's artists plus the ones you only own on CD or vinyl (their albums counted once per album
+    /// key, no songs), case-insensitively by name: the Artists list of both collections.
+    public func artists(adding digital: [ArtistSummary]) -> [ArtistSummary] {
+        let known = Set(digital.map { $0.name.lowercased() })
+        var physical: [String: (name: String, albums: Set<String>)] = [:]
+        for item in items where item.medium.isPhysical && !item.artist.isEmpty {
+            let key = item.artist.lowercased()
+            guard !known.contains(key) else { continue }
+            physical[key, default: (item.artist, [])].albums.insert(item.albumKey)
+        }
+        return digital + physical.values.map { ArtistSummary(name: $0.name, albumCount: $0.albums.count, trackCount: 0) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
     /// Every item's artist, trackless items included, once each (case-insensitively), A to Z.
     public var artists: [String] {
         var seen: [String: String] = [:]

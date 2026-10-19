@@ -214,6 +214,10 @@ final class AppModel {
     private(set) var coverRevision = 0
     private(set) var albums: [AlbumSummary] = []
     private(set) var artists: [ArtistSummary] = []
+
+    /// Every artist in either collection: the digital collection's (`artists`), plus the ones you only own on CD or
+    /// vinyl, their albums counted once per album and no songs. Case-insensitively by name, like artist pages.
+    var allArtists: [ArtistSummary] { collection.artists(adding: artists) }
     private(set) var playlists: [Playlist] = []
     /// When each liked song was liked; the Liked Songs playlist.
     private(set) var likedDates: [Int64: Date] = [:]
@@ -1183,9 +1187,10 @@ final class AppModel {
         trackPurchases = (try? database?.trackPurchases()) ?? trackPurchases
     }
 
+    /// The artist by this name in either collection (`allArtists`), for links to their page.
     func artistSummary(named name: String) -> ArtistSummary? {
         let key = ArtistInfoStore.key(name)
-        return artists.first { ArtistInfoStore.key($0.name) == key }
+        return artists.first { ArtistInfoStore.key($0.name) == key } ?? allArtists.first { ArtistInfoStore.key($0.name) == key }
     }
 
     /// The library's and the collection's artists to look for on the Concerts page, with their MusicBrainz IDs where

@@ -137,12 +137,13 @@ struct SidebarView: View {
             Section("Digital Collection") {
                 Label("Songs", systemImage: "music.note").sidebarBadge(model.tracks.count).tag(SidebarItem.songs)
                 Label("Albums", systemImage: "square.stack").sidebarBadge(model.albums.count).tag(SidebarItem.albums)
-                Label("Artists", systemImage: "music.mic").sidebarBadge(model.artists.count).tag(SidebarItem.artists)
                 Label(CollectionScope.downloads.title, systemImage: CollectionScope.downloads.symbol)
                     .sidebarBadge(model.collection.count(.downloads))
                     .tag(SidebarItem.collection(.downloads))
             }
             Section("Explore") {
+                // Artists from both collections, so they're with Insights, Music DNA and Concerts.
+                Label("Artists", systemImage: "music.mic").sidebarBadge(model.allArtists.count).tag(SidebarItem.artists)
                 Label("Insights", systemImage: "chart.bar.xaxis").tag(SidebarItem.insights)
                 Label("Music DNA", systemImage: "point.3.connected.trianglepath.dotted").tag(SidebarItem.musicDNA)
                 Label("Concerts", systemImage: "ticket").tag(SidebarItem.concerts)

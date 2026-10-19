@@ -139,29 +139,37 @@ struct InsightsTab: View {
     }
 }
 
-/// Explore: pages about your music that belong to neither collection alone. Music DNA covers the people of both;
-/// concerts are on artist pages (the phone has no Concerts page).
+/// Explore: pages about your music that belong to neither collection alone: the artists of both, and Music DNA,
+/// which covers the people of both; concerts are on artist pages (the phone has no Concerts page).
 private struct InsightsExplore: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: "Explore")
-            NavigationLink(value: DNARoute(name: nil)) {
-                HStack(spacing: 12) {
-                    Image(systemName: "point.3.connected.trianglepath.dotted").foregroundStyle(Color.accentColor).frame(width: 26)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Music DNA")
-                        Text("Who played, wrote and produced with whom").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 8)
-                    InsightChevron()
-                }
-                .padding(.horizontal, 14).padding(.vertical, 10)
-                .contentShape(Rectangle())
+            VStack(spacing: 0) {
+                row(LibraryRoute.artists, "Artists", "Everyone in both your collections", symbol: "music.mic")
+                Divider().padding(.leading, 52)
+                row(DNARoute(name: nil), "Music DNA", "Who played, wrote and produced with whom", symbol: "point.3.connected.trianglepath.dotted")
             }
-            .buttonStyle(.plain)
             .card()
-            .accessibilityElement(children: .combine)
         }
+    }
+
+    private func row<Route: Hashable>(_ route: Route, _ title: String, _ detail: String, symbol: String) -> some View {
+        NavigationLink(value: route) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol).foregroundStyle(Color.accentColor).frame(width: 26)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                    Text(detail).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                InsightChevron()
+            }
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
     }
 }
 

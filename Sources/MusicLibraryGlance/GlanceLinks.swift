@@ -110,6 +110,12 @@ public enum GlanceMessage {
     /// also carries its `shelfHash`, so the iPhone sends the index again when it differs.
     public static let refresh = "refresh"
     public static let shelfHash = "shelfHash"
+    /// iPhone → watch, in the reply to a `refresh` whose `shelfHash` differs: the shelf index itself
+    /// (`GlanceStore.encodeShelf`) when it's at most `inlineShelfLimit` bytes, since messages have a size limit. It also
+    /// goes as a file transfer, which may be slow to arrive (and doesn't reach a watch simulator's app); a bigger index
+    /// goes only that way. Older watches ignore the key.
+    public static let shelfData = "shelfData"
+    public static let inlineShelfLimit = 48_000
     /// iPhone → watch, a file transfer's metadata: `fileKind` is `shelfKind` for the shelf index (`GlanceShelf`),
     /// `shelfVersion` its version and `fileHash` its `contentHash`.
     public static let fileKind = "kind"

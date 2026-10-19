@@ -500,9 +500,12 @@ struct CatalogDetail: View {
                         .buttonStyle(.borderedProminent)
                         .help("Open \(owned.album) in your digital collection")
                 } else {
-                    Label("Not in your digital collection", systemImage: "circle.dashed")
+                    // Short, so the buttons beside it keep their full titles.
+                    Label("No digital copy", systemImage: "circle.dashed")
                         .foregroundStyle(.subtext)
+                        .fixedSize()
                         .padding(.trailing, 6)
+                        .help("This CD isn't in your digital collection")
                 }
                 CatalogListButton(item: item).buttonStyle(.bordered)
                 if let url = catalog.webURL(item.pagePath) {

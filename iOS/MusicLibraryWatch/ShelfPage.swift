@@ -74,12 +74,12 @@ struct ShelfPage: View {
             && (c.recent ?? []).isEmpty && (c.toRipList ?? []).isEmpty
     }
 
-    /// "CD 312 · Vinyl 48 · 9 to rip"
+    /// "312 CDs · 48 records · 9 to rip" (counts, so never written like a label: "CD 312" reads as CD #312).
     static func counts(_ c: Glance.Collection) -> String {
         let cds = c.cds ?? 0, vinyl = c.vinyl ?? 0, toRip = c.toRip ?? 0
         var parts: [String] = []
-        if cds > 0 || vinyl == 0 { parts.append("CD \(cds.formatted())") }
-        if vinyl > 0 { parts.append("Vinyl \(vinyl.formatted())") }
+        if cds > 0 || vinyl == 0 { parts.append(GlanceFormat.count(cds, "CD")) }
+        if vinyl > 0 { parts.append(GlanceFormat.count(vinyl, "record")) }
         if toRip > 0 { parts.append("\(toRip.formatted()) to rip") }
         return parts.joined(separator: " · ")
     }
@@ -216,7 +216,8 @@ struct WatchFindPage: View {
         .toolbar {
             if model.shelf != nil {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(series == "vinyl" ? "Show CDs" : "Show Vinyl") {
+                    // Short, so the watch's toolbar doesn't clip it next to the title.
+                    Button(series == "vinyl" ? "CDs" : "Vinyl") {
                         model.setFind(model.find.with(series: series == "vinyl" ? "cd" : "vinyl"))
                     }
                     .accessibilityLabel(series == "vinyl" ? "Showing vinyl; show CDs" : "Showing CDs; show vinyl")

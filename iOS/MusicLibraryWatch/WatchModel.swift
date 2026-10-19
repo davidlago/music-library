@@ -86,6 +86,13 @@ final class WatchModel {
         }
     }
 
+    /// A small shelf index that came in a refresh reply (`GlanceMessage.shelfData`): checked and saved under the
+    /// store's fixed name like one from a file transfer, then shown.
+    private func receiveInline(_ data: Data) {
+        guard let new = GlanceStore.decodeShelf(data), new.contentHash != shelfHash, (try? store.writeShelf(new)) != nil else { return }
+        receive(new)
+    }
+
     /// A shelf index just received (and already saved by the delegate). The iPhone sends one only when it differs
     /// from this watch's, so the last to arrive is the one to show, whatever the clocks say.
     private func receive(_ new: GlanceShelf) {
@@ -152,7 +159,11 @@ final class WatchModel {
         }
         session.sendMessage([GlanceMessage.refresh: true, GlanceMessage.shelfHash: shelfHash], replyHandler: { @Sendable [weak self] reply in
             let data = reply[GlanceMessage.glance] as? Data
-            Task { @MainActor in if let data { self?.receive(data) } }
+            let shelfData = reply[GlanceMessage.shelfData] as? Data
+            Task { @MainActor in
+                if let data { self?.receive(data) }
+                if let shelfData { self?.receiveInline(shelfData) }
+            }
         }, errorHandler: nil)
     }
 

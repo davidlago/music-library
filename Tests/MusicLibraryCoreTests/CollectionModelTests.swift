@@ -349,6 +349,22 @@ import Testing
         #expect(c.syncItems(.all).count == 3)
     }
 
+    /// The Artists list of both collections: the digital collection's as they are, plus the ones only owned on CD or
+    /// vinyl (albums once per album, no songs); downloads and names already listed (any case) add nothing.
+    @Test func artistsOfBothCollections() {
+        let digital = [ArtistSummary(name: "Miles Davis", albumCount: 2, trackCount: 20)]
+        let items = [item("kob", .vinyl, 1, album: "Kind of Blue", artist: "miles davis"),
+                     item("jt", .cd, 1, album: "JT", artist: "James Taylor"),
+                     item("jt-lp", .vinyl, 2, album: "JT", artist: "James Taylor"),
+                     item("gor", .vinyl, 3, album: "Gorilla", artist: "James Taylor"),
+                     item("dl", .download, album: "Bought", artist: "Only Downloads")]
+        let c = MusicCollection(items: items, songPurchases: [:], tracks: [])
+        let all = c.artists(adding: digital)
+        #expect(all.map(\.name) == ["Miles Davis", "James Taylor"])
+        #expect(all.last?.albumCount == 2 && all.last?.trackCount == 0, "JT on CD and vinyl counts once")
+        #expect(c.artists(adding: []).map(\.name) == ["James Taylor", "miles davis"], "sorted A to Z")
+    }
+
     @Test func scopesCountsArtistsAndCovers() {
         let tracks = [track(1, album: "Ripped")]
         var covered = item("lp", .vinyl, 1, album: "Trackless", artist: "beta")

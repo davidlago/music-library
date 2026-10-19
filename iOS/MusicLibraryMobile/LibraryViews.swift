@@ -99,7 +99,6 @@ private struct LibraryHome: View {
                     .listRowInsets(EdgeInsets())
             }
             Section {
-                NavigationLink(value: LibraryRoute.artists) { row("Artists", systemImage: "music.mic", count: counts.artists) }
                 NavigationLink(value: LibraryRoute.albums) { row("Albums", systemImage: "square.stack", count: counts.albums) }
                 NavigationLink(value: LibraryRoute.songs) { row("Songs", systemImage: "music.note", count: counts.songs) }
                 if !model.likedDates.isEmpty {
@@ -209,7 +208,9 @@ private struct LibraryRoutePage: View {
         if let library = model.library {
             switch route {
             case .artists:
-                ArtistList(artists: scoped(library.artists) { library.tracks(artist: $0.name) })
+                // Both collections' artists (those you only own on CD or vinyl aren't on the phone).
+                ArtistList(artists: scope == .all ? model.collection.artists(adding: library.artists)
+                                                  : scoped(library.artists) { library.tracks(artist: $0.name) })
                     .navigationTitle("Artists")
             case .albums:
                 AlbumGrid(albums: scoped(library.albums) { library.tracks(album: $0) }, library: library)
@@ -252,7 +253,8 @@ struct ArtistList: View {
                     ArtistPhoto(name: artist.name, size: 44)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(artist.name.isEmpty ? "Unknown Artist" : artist.name).lineLimit(1)
-                        Text("\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") · \(songCount(artist.trackCount))")
+                        Text(artist.trackCount == 0 ? "\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") you own"
+                                                    : "\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") · \(songCount(artist.trackCount))")
                             .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     Spacer(minLength: 6)

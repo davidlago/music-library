@@ -94,6 +94,14 @@ final class WatchLink: NSObject {
         sendShelf(shelf, force: true)
     }
 
+    /// The index to put in a `refresh` reply (`GlanceMessage.shelfData`): only when the watch has another and it's
+    /// small enough for a message.
+    private func inlineShelf(watchHas hash: String?) -> Data? {
+        guard let hash, let shelf = currentShelf()?.index, hash != shelf.contentHash,
+              let data = try? GlanceStore.encodeShelf(shelf), data.count <= GlanceMessage.inlineShelfLimit else { return nil }
+        return data
+    }
+
     /// The application context reaches a watch app in the background only when watchOS gets to it, so a complication
     /// would show the song that was playing a while ago. With one on the watch face, a change of song or play/pause
     /// goes as a complication transfer, which wakes the watch app at once; there are about 50 a day, so some are left
@@ -124,7 +132,10 @@ final class WatchLink: NSObject {
 
     private func handle(command: GlanceCommand?, refresh: Bool, shelfHash: String?, covers names: [String]?) async -> [String: Any] {
         var reply: [String: Any] = [:]
-        if refresh { checkShelf(watchHas: shelfHash) }
+        if refresh {
+            checkShelf(watchHas: shelfHash)
+            if let data = inlineShelf(watchHas: shelfHash) { reply[GlanceMessage.shelfData] = data }
+        }
         if let names { reply[GlanceMessage.coverData] = await covers(names) }
         if let command {
             let result = await perform?(command) ?? .failed("Music Library isn't ready on the iPhone.")
