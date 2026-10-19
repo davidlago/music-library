@@ -1,7 +1,10 @@
 # Physical collection redesign
 
-Status: plan, for release 1.21. Nothing here bumps `Database.schemaVersion` (14), `SyncProtocol.version` (3) or
-`Glance.currentVersion` (1).
+Status: **implemented**, for release 1.21 (P0–P5 on the `claude/physical-collection` branch: Core, Mac, iPhone, watch
+and widgets, docs, and the cleanup that removed the deprecated ownership APIs). Nothing bumps `Database.schemaVersion`
+(14), `SyncProtocol.version` (3), `Glance.currentVersion` (1) or `GlanceShelf.currentVersion` (1). The sections below
+are the plan as written, kept as the design record; where the implementation differs, §14 says how. The screenshots of
+§11 are still to be taken from a real library window.
 
 ## 1. Goals
 
@@ -1547,3 +1550,50 @@ App Store screenshots wait until P1–P3 have merged.
 
 **Tests.** The full `swift test`, the run with `MUSICLIB_TOOLS_DIR=build/tools`, and the iOS build. Keep the
 legacy-reader assertions ("unknown format reads as CD", the pre-label-number snapshot).
+
+## 14. As implemented: deviations from the plan
+
+- **Older apps' edits (D9, §3.4).** Telling an older app's NULL from a newer app's clear needed the writer markers
+  (`Database.markLegacyWriters`, `CollectionLegacy.Writer`), added during P0 review and already described in §3.4; a
+  row that isn't the projection counts as an older app's edit whatever its time, so a Mac with a slow clock isn't
+  ignored. An owned album with neither album nor artist keeps its empty title (`CollectionItem.isNamed`).
+- **Migration tests.** Beyond the P0 list: `LegacyLibraryMigrationTests` open libraries made by the released code of
+  1.14–1.20 (`Tests/MusicLibraryCoreTests/Fixtures/legacy-libraries`), `DowngradeRoundTripTests` replay the exact 1.17,
+  1.18 and 1.20 writes, and `MigrationRehearsalTests` (opt-in, `MUSICLIB_MIGRATION_REHEARSAL`) runs the same checks on a
+  copy of a real library. After P5, `Tests/MusicLibraryCoreTests/LegacyOwnership.swift` keeps private copies of 1.20's
+  ownership algorithms so they still compare against the old behavior.
+- **Linker.** A missing release ID is never backfilled from another copy's songs (source `.same`); only the release
+  group, which every edition shares, is. Albums whose songs are retagged into several keys move their items to the
+  biggest part.
+- **Mac sync gate (§10).** The Mac doesn't tidy the iPhone selection or plan a sync until the open library's collection
+  is built (`SyncContext.collectionReady`; a sync waits up to 8 s, then refuses), so a launch can't drop Remove from
+  iPhone rules for albums only Collection on iPhone adds.
+- **CD insertion (§4.3, §5.1).** "Ask whether a CD is yours when it's inserted" is **off** by default: a CD that isn't
+  in the collection is added (the panel's toggle is on) unless the setting is turned on. Ripping or cataloging another
+  edition never copies that edition's barcode, catalog number, record label, country or format into an item that
+  names another release.
+- **Adding (§4.1).** Lookups run on Return (barcode, then words, then catalog number), not as you type, to keep
+  MusicBrainz traffic user-initiated; a barcode with one match is picked and the next Return adds it.
+- **Item page (§5.3).** Switching a labeled CD or record to another medium asks first (its number comes off) and can be
+  undone. Items without a label step along the others without one.
+- **Import page (§4.4).** Files added for one item (Import a Transfer…, Import Files…, a CD ripped to the queue) are a
+  batch of their own, and the songs' price and date go onto the chosen item only where it has none
+  (`CollectionItem.takeSongsPurchase`).
+- **Insights (§5.7).** The breakdown card is "Record Labels & Countries"; the runtime fact says how many albums it covers
+  ("across 8 of 12 albums"); album-info genres are capitalized. Both apps open on the Collection pane.
+- **iPhone (§6).** The tab choice is kept in app storage (it survives the app being closed) and the default is settled
+  once the library has loaded, so the tab doesn't jump while the snapshot loads. Siri phrases can't hold a number, so
+  the labels in use are `LabelEntity` values given to Siri (`updateAppShortcutParameters` when they change), with
+  `OpenCollectionItemIntent` and `PhoneModel.pendingLink` opening the item; the series-and-number form stays for
+  Shortcuts. Find by Label reads digits in any script (`Sticker.typedNumber`).
+- **Glance and watch (§7).** `Glance.Collection.Item` gained `addedOn`, and `collection.recent` is sorted by date added
+  (To Rip stays oldest bought first). The watch accepts any validated shelf (no `generatedAt` check), keeps Find's
+  series and last numbers in `watch-find.json` in its store instead of user defaults, and an older watch app (no shelf
+  hash in its refresh) isn't sent the index. Widgets' accessory families show two lines, and next labels only for the
+  series you have.
+- **Visuals (§5.9).** The CD hinge sticker reads "CD 12" and its number scales with the strip; the vinyl disc has a
+  light rim; grid cells drop the status mark the status line already states.
+- **Docs (§11, P4).** The README, site, privacy page, App Store copy (proposed, marked "to review"), CHANGELOG and
+  AGENTS.md are updated; the new screenshots (`collection.png`, `collection-item.png`, `iphone-collection.png`, the
+  watch Find screen) and the site's Collection screenshot tab wait for a real library window, so the site's collection
+  block has no screenshot yet.

@@ -7,6 +7,71 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- **Your collection: CDs, vinyl and downloads.** Music Library now catalogs everything you own, whether or not it's in
+  your music library: CDs you've ripped and ones you haven't, records (usually never digitized) and albums bought as
+  downloads. A new **Collection** section at the top of the Mac sidebar (**Shelf**, **CDs**, **Vinyl**, **Downloads**
+  and **To Digitize**) shows them as jewel cases and record sleeves or as a list, sorted by label, artist, title, year,
+  purchase or date added, and the app opens there once you own something. Each item has its own page: the edition,
+  your copy's details (edited in place), its digital copy (ripped, partly ripped, not ripped yet, from another copy or
+  no longer in the library, with **Rip Now**, **Import a Transfer…** or **Link to Library Album…**), the track list
+  (a record's with its sides), other copies of the album, and **Previous/Next on Shelf** (⌘[ and ⌘]). See
+  [Your collection](https://github.com/davidlago/music-library#your-collection).
+- **Label numbers per medium.** CDs and vinyl each have their own label series, both starting at 1: CD #12 is a white
+  strip on the jewel case's hinge, Vinyl #12 a yellow dot on the record's sleeve, and labels are always written with
+  their series. The next number is suggested, a number already used in the same series is refused (with the next and
+  the first free numbers offered), and **Label Check** lists free numbers and duplicates.
+- **Find by Label** (⌘L on the Mac, the Collection tab on the iPhone, the Shelf page on the Apple Watch, and Siri:
+  "Find CD 12 in Music Library") tells you what's at a label and what sits on either side of it on the shelf. The watch
+  finds labels even away from the iPhone.
+- **Adding to your collection.** **Add to Collection…** (⇧⌘N) finds the edition on MusicBrainz by the barcode on the
+  case (a USB barcode scanner works), a few words of the album and artist, or the catalog number, for a CD, a record or
+  a download, with **Add & Next** for a stack of them; anything MusicBrainz doesn't list can be entered by hand. Albums
+  in your library can be added from their page (**Your Copies ▸ Add a Copy**), the Albums grid, or in bulk with
+  **Collection ▸ Add Library Albums…**.
+- **Unripped CDs and Catalog Without Ripping.** Inserting a CD says which item in your collection it is, or adds it
+  with the next label (Settings ▸ Collection can make it ask instead); the rip is linked to it when its first track is
+  imported. **Catalog Without Ripping** adds the CD with its cover and ejects it. The Import page can mark files as the
+  digital copy of a record (a needle-drop) or CD, and save songs you bought as one album download. Removing an album
+  from the library keeps its items, with their covers, marked not ripped.
+- **Search your collection.** New search keys: `own:` (cd, vinyl, download, physical, any, none), `ripped:` (yes, no,
+  partial, missing, other), `sticker:` (label numbers, like `sticker:cd100-199`), `bought:`, `paid:`, `copies:`,
+  `barcode:` and `catno:`, plus `#12`, `cd#12` and `vinyl#12` in search boxes. Typing a label shows the item above the
+  results, and an **In Your Collection** strip lists the matching items. In Library CDs, `own:` means in your
+  collection, while `is:owned` keeps meaning in your music library.
+- **The Collection pane in Insights** (on the Mac and the iPhone, replacing Owned): how much is digitized, your label
+  series with free numbers and duplicates, how you own your music by medium, spending by medium over time, cost per
+  play and per hour, best value, what's still in the wrapper, artists, genres, decades, and record labels and countries.
+- **Your Copies on album pages.** Album pages list every copy you own, with what the album has cost you per play, and
+  their covers show the CD's case, the record's sleeve or the download badge. The Albums grid's Owned switch is now a
+  **Collection** menu (All Albums, In Your Collection, Not in Your Collection). Library CDs and Shop for CDs say when a
+  CD is already in your collection ("In your collection: CD #142") and have **I Own This**.
+- **The collection on the iPhone.** A new first tab, **Collection**, has Find by Label, your CDs, vinyl, downloads and
+  what's left to digitize, item pages, and **Ready to Download** (with **Download All**) for digitized items whose
+  songs aren't on the phone. Items with no digital copy aren't dimmed and have no Download button. The whole
+  collection and its covers always go to the phone, read-only (it's edited on the Mac), and the Mac's iPhone page has
+  **Collection on iPhone**, per phone, to also put the digital copies of your CDs, your records or everything you own on
+  it.
+- **The Collection widget** (Recent Purchases before; widgets you placed keep working) shows the latest CD, record or
+  download you added in its case or sleeve, how many CDs and records you have and how many CDs are left to rip, and
+  your next labels, also on the lock screen and the watch face. The watch's **Shelf** page replaces Purchases.
+- **"Record label"** is now the name of the company everywhere ("Label" was confusing next to label numbers); the
+  `label:` search key keeps its meaning.
+- **Upgrading keeps everything you filed.** The first time this version opens your library, every album you'd marked as
+  owned becomes an item in your collection with its label number, purchase date and price, and albums you bought songs
+  from show as downloads. Nothing in the library is removed or changed, and libraries made by every version since
+  1.14 are tested to migrate this way.
+- **Albums marked as owned before 1.19 read as CDs.** Those versions didn't record whether you owned the CD or a
+  download, so they come over as CDs; if one was a download, change its medium on the item's page.
+- **iPhones with an older version** (1.14–1.20) keep showing the CDs and downloads of the albums in your library (with
+  CD labels from 1.18), but not your records, items with no music in the library, or second copies; smart playlists that
+  use the new search keys show empty there (or unfiltered, with a negated key like `-own:vinyl`). Update the iPhone app
+  to see the whole collection.
+- **Going back to an older Mac version.** If you open the library with an older version after this one, what you
+  change there to CDs and downloads is picked up when you open it with this version again, but deleting an album's copy
+  there has to be done again here. That version doesn't see the label number of a second CD of the same album, so it
+  can suggest or accept a number that's taken: **Label Check** finds the duplicate after updating again. An older Mac
+  syncing a phone removes the items' own covers from it until the next sync from this version.
+
 ## 1.20.0
 
 - **Shop for CDs.** A new **Shop for CDs** page in the sidebar finds the exact CD on MusicBrainz, by a few words of the album
