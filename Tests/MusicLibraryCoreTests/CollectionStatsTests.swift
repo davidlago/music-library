@@ -157,6 +157,19 @@ import Testing
         #expect(yearly.timeline.reduce(0) { $0 + $1.items } == 4)
     }
 
+    /// Listening totals come from untrusted rows: infinite or huge ones (two plays of 1e308 seconds add up to
+    /// infinity) must not trap converting to `Decimal`.
+    @Test func badListeningTotalsDontTrap() {
+        for bad in [Double.infinity, -Double.infinity, .nan, 1e308, -5] {
+            var totals = playTotals
+            totals[1] = PlayTotal(plays: Int.max, listened: bad)
+            totals[2] = PlayTotal(plays: Int.max, listened: bad)
+            let s = CollectionStats(collection: collection, tracks: tracks, playTotals: totals, albumInfos: albumInfos, now: now, calendar: calendar)
+            if let cost = s.costPerHour { #expect(!cost.isNaN, "\(bad)") }
+            #expect(s.costPerPlay.map { !$0.isNaN } ?? true, "\(bad)")
+        }
+    }
+
     @Test func valueCountsPlaysOncePerAlbum() {
         let s = stats
         // A: $12 for 4 plays; B: $33 (both copies) for 10 plays, counted once; D has music but no plays.

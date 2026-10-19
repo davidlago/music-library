@@ -6,7 +6,10 @@ import Foundation
 /// `album_ownership` (one row per album key, read by name on phones 1.14–1.20 and older Macs) becomes a projection
 /// of the collection: each key's primary CD or download with its own album, artist, date, price and (CDs only) label
 /// number. `format` is only ever NULL (a CD) or 'digital'. Records, other media and downloads derived from bought
-/// songs are never projected, so an older reader sees a record-only album as not owned rather than as a CD.
+/// songs are never projected, so an older reader sees a record-only album as not owned rather than as a CD. Only
+/// the primary copy of a key is projected, so an older reader doesn't see the labels of other CDs of the same album:
+/// after a downgrade, an older Mac can suggest (and accept) a label number a second copy holds. That's documented
+/// (help, CHANGELOG), and Label Check lists the duplicate once 1.21 opens the library again.
 public enum CollectionLegacy {
     /// An `album_ownership` row.
     public struct Row: Hashable, Sendable {
@@ -86,13 +89,20 @@ public enum CollectionLegacy {
         return (items, changed)
     }
 
-    /// An item for an album key known only from an older app: `legacyID` unless that's taken.
+    /// An item for an album key known only from an older app: `legacyID`, or when that's taken (by a copy of
+    /// another medium now), the first free of `legacyID` of "<key>#2", "#3"… The id must not be random: a phone
+    /// reconciles in memory on every load, and links to the item (widgets, the watch) need it to stay the same.
     static func newItem(key: String, album: String, artist: String, medium: CollectionMedium, at date: Date,
                         ids: inout Set<String>) -> CollectionItem {
-        let legacy = CollectionItem.legacyID(albumKey: key)
-        let id = ids.contains(legacy) ? CollectionItem.newID() : legacy
+        var id = CollectionItem.legacyID(albumKey: key)
+        var n = 1
+        while ids.contains(id) {
+            n += 1
+            id = CollectionItem.legacyID(albumKey: key + "#\(n)")
+        }
         ids.insert(id)
-        let album = album.trimmingCharacters(in: .whitespacesAndNewlines), artist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Clipped as `collection_items` reads it back, so the projection doesn't then blank an older reader's title.
+        let album = CollectionItem.clip(album, CollectionItem.maxTitle), artist = CollectionItem.clip(artist, CollectionItem.maxTitle)
         // A row with neither wouldn't read back (and would then stop being projected).
         return CollectionItem(id: id, medium: medium, album: album.isEmpty && artist.isEmpty ? "Unknown Album" : album,
                               artist: artist, albumKey: key, now: date)

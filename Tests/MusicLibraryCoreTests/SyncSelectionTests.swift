@@ -271,6 +271,32 @@ import Testing
         #expect(added.album == "Second" && added.stickerNumber == nil && added.price == 4 && added.id == CollectionItem.legacyID(albumKey: other))
     }
 
+    /// The linker's backfills and rekeys aren't edits: a pre-1.18 phone's change made before them still applies.
+    @Test func automaticChangesDontHideOlderPhonesEdits() throws {
+        let f = try SyncFixture()
+        let key = SearchIndex.albumKey(album: "First", artist: "Artist")
+        let t0 = Date(timeIntervalSince1970: 1000)
+        var cd = CollectionItem(id: "cd", medium: .cd, album: "First", artist: "Artist", now: t0)
+        cd.stickerNumber = 5
+        cd.price = 2
+        try f.db.saveCollectionItem(cd, at: t0)
+        let changes = CollectionLinker.changes(items: try f.db.collectionItems().items, tracks: f.tracks)
+        #expect(!changes.isEmpty)
+        try f.db.applyCollectionChanges(changes, at: Date(timeIntervalSince1970: 5000))
+        try f.db.rekeyCollection(from: key, to: "elsewhere", at: Date(timeIntervalSince1970: 5001))
+        try f.db.rekeyCollection(from: "elsewhere", to: key, at: Date(timeIntervalSince1970: 5002))
+        let linked = try #require(try f.db.collectionItems().items.first)
+        #expect(linked.digitalSource == .rip && linked.updatedAt == t0)
+        #expect(try f.db.legacyOwnershipRows().first?.updatedAt == t0)
+
+        let repriced = SyncEvent(track: f.tracks[0], at: Date(timeIntervalSince1970: 2000), kind: .purchase(AlbumPurchase(album: "x", artist: "y", price: 99)))
+        #expect(try f.db.applySyncEvents([repriced], libraryID: nil).purchases == 1)
+        #expect(try f.db.collectionItems().items.first?.price == 99)
+        // The phone shows it too, over a snapshot the Mac's linker went through.
+        let overlaid = CollectionLegacy.overlay(events: [repriced], on: [linked]) { _ in key }
+        #expect(overlaid.first?.price == 99)
+    }
+
     /// The phone shows its outbox's pre-1.18 changes with the same rules.
     @Test func legacyEventsOverlayTheSnapshotItems() {
         let key = "k"

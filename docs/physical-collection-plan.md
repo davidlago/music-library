@@ -371,7 +371,8 @@ Vinyl, `other` media and derived downloads are never projected.
 **Reconcile** runs for each legacy row R with key K:
 
 - **No projectable copy for K.** It creates an item:
-  - `id`: `legacyID(K)` (a new UUID if that id is taken)
+  - `id`: `legacyID(K)`, or if that id is taken, the first free `legacyID("K#2")`, `legacyID("K#3")`… (never random:
+    the phone reconciles on every load, and links to the item must stay the same)
   - `medium`: `.download` when `format == 'digital'`, otherwise `.cd` (NULL or unknown reads as a CD, as old readers
     do)
   - `stickerNumber`: the CD label, when it validates
@@ -420,6 +421,11 @@ public func rekeyCollection(from oldKey: String, to newKey: String, at: Date = D
 public func projectLegacyOwnership(keys: Set<String>?) throws
 public func collectionCoverPaths() throws -> [String]             // valid cover_file paths under Music/Collection Covers
 ```
+
+`updatedAt` is the time of the user's last edit (or an older app's, taken in): older apps' changes are compared with it
+(newest wins), so `applyCollectionChanges` and `rekeyCollection` keep it (their `at:` is unused). Saving writes text
+as it reads back (trimmed, clipped to the read limits) and refuses an item with neither album nor artist
+(`CollectionError.invalidItem`).
 
 `saveCollectionItem` refuses a non-editable item: it throws `CollectionError.readOnly` for a derived item or an
 `.other` medium. Duplicate refusal (D7) is a UI rule enforced by `CollectionEditor`, not by the database, so legacy
@@ -472,7 +478,7 @@ public func coverURL(item: CollectionItem) -> URL?   // own cover file if presen
 | iPhone 1.19–1.20 | + `format` | CD and download badges correct; no vinyl ever reads as a CD. |
 | iPhone 1.21+ | `collection_items` + in-memory reconcile + overlay | The whole collection. |
 | New phone, snapshot or export from an older Mac | no table | Items synthesized from `album_ownership` with deterministic ids; no covers of their own. |
-| Older Mac after a downgrade | `album_ownership` | Edits CDs and downloads; the next-label suggestion counts CDs only. Its edits are reconciled when 1.21 reopens, and its deletes are not applied (documented). |
+| Older Mac after a downgrade | `album_ownership` | Edits CDs and downloads; the next-label suggestion counts CDs only, and only each album's primary copy: it doesn't see the label of a second CD of the same album, so it can suggest or accept that number (documented; Label Check lists the duplicate after upgrading). Its edits are reconciled when 1.21 reopens, and its deletes are not applied (documented). |
 | Older Mac syncing a new phone | its own plan | Deletes `Music/Collection Covers/*` from the phone (not wanted by its plan); items show placeholders until the next 1.21 sync. Documented. |
 | Older watch | `Glance.owned` | Same meanings as today (library albums only); `collection` is ignored; `shelf.json` is dropped (no delegate method). |
 | New watch, older phone | no `collection`, no shelf | Shelf page reads "Update Music Library on your iPhone to find items by label." |
@@ -999,7 +1005,7 @@ the collection keys and hands the rest to `SearchQuery.parse` as `base`. **None 
 | `own:` (`medium:`, `media:`) | `cd`, `vinyl` (`lp`, `record`), `download` (`dl`), `physical`, `any`, `none`, raw other | The copy's medium; `own:none` = library albums with no copy |
 | `ripped:` (`digitized:`) | `yes`, `no`, `partial`, `missing`, `other` | `DigitalState`: yes = has music from this copy (or digitized), no = needsDigitizing, other = otherCopy |
 | `sticker:` (`labelno:`, `shelf:`) | `12`, `10-20`, `>=100`, `cd`, `vinyl`, `cd12`, `vinyl10-20`, `lp>300`, `none` | Label number in either or one series; `none` = physical without a label |
-| `#12`, `cd#12`, `vinyl#12`, `lp#12`, `v#12` | shorthand | Exact label (`#12` = both series); search boxes only; saved as `sticker:` |
+| `#12`, `cd#12`, `vinyl#12`, `lp#12`, `v#12` | shorthand | Exact label (`#12` = both series); search boxes only, for the items (songs and saved smart playlists read it as text, so "#9 Dream" still matches); saved as `sticker:` |
 | `bought:` (`purchased:`) | the `added:` grammar (`2024`, `<90d`, `2020-2022`), `none` | Purchase day |
 | `paid:` (`price:`) | `>20`, `0`, `10-15`, `none` | Price |
 | `copies:` | `>1`, `2` | Copies with the same album key |
@@ -1165,6 +1171,8 @@ public struct CollectionStats: Sendable {
     "Record label" rename.
   - A note that deleting a copy with an older version has to be repeated.
   - A note that older phones show vinyl-only albums as not owned.
+  - A note that an older Mac (after a downgrade) doesn't see the label numbers of second CD copies of an album, so it
+    may suggest one already in use; Label Check finds it after upgrading again.
 - **AGENTS.md.**
   - Replace the AlbumOwnership bullet with a Collection bullet: `collection_items`, `album_ownership` as a projection
     (format NULL/'digital' only, CD-only labels), reconcile, legacy ids, covers in `Music/Collection Covers`, search

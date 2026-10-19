@@ -137,11 +137,13 @@ import Testing
         "radiohead OR kraftwerk", "artist:miles OR artist:radiohead -is:lossy", "credit:\"john coltrane\"", "is:compilation",
         "1999", "21", "computer", "\"kind of\"", "re: foo", "kraftwrek", "is:bogus", "-", "genre:rock OR genre:jazz -format:mp3",
         "missing:year", "albumartist:\"various artists\"", "composer:evans", "is:matched", "-is:unmatched year:1959",
+        "#41", "#9 dream",
     ]
 
     @Test func existingQueriesGiveIdenticalResults() {
         for text in Self.corpus {
-            let parsed = CollectionSearchQuery.parse(text, now: now)
+            // "#41" is a label in search boxes, but not for songs or saved playlists.
+            let parsed = CollectionSearchQuery.parse(text, now: now, shorthand: false)
             #expect(parsed.base == SearchQuery.parse(text, now: now) && parsed.filters.isEmpty, "\(text)")
             let old = index.search(text, now: now), new = run(text).library
             #expect(new.tracks.map(\.id) == old.tracks.map(\.id), "\(text)")
@@ -151,6 +153,32 @@ import Testing
             let playlist = LibrarySearch.tracks(matching: text, index: index, collectionIndex: collectionIndex, collection: collection, now: now)
             #expect(playlist.map(\.id) == index.tracks(matching: SearchQuery.parse(text, now: now), now: now).map(\.id), "\(text)")
         }
+    }
+
+    /// Songs titled with a "#": in saved smart playlists and in the songs a search finds, the shorthand stays text;
+    /// it still picks the items.
+    @Test func hashTitlesStayText() {
+        var library = tracks
+        library.append(SearchFixtures.track(41, "#41", artist: "Dave Matthews Band", album: "Crash"))
+        library.append(SearchFixtures.track(42, "#9 Dream", artist: "John Lennon", album: "Walls and Bridges"))
+        let index = SearchIndex(tracks: library)
+        let collection = MusicCollection(items: items, songPurchases: [:], tracks: library)
+        let collectionIndex = CollectionIndex(collection: collection, tracks: library, albumInfos: albumInfos)
+        for (text, id) in [("#41", Int64(41)), ("#9 dream", Int64(42)), ("#12", nil)] {
+            let plain = index.tracks(matching: SearchQuery.parse(text, now: now), now: now).map(\.id)
+            #expect(id.map { plain == [$0] } ?? true, "\(text)")
+            let playlist = LibrarySearch.tracks(matching: text, index: index, collectionIndex: collectionIndex, collection: collection, now: now)
+            #expect(playlist.map(\.id) == plain, "\(text)")
+            let results = LibrarySearch.run(text, index: index, collectionIndex: collectionIndex, collection: collection, now: now)
+            #expect(results.library.tracks.map(\.id) == index.search(text, now: now).tracks.map(\.id), "\(text)")
+        }
+        let label = LibrarySearch.run("#12", index: index, collectionIndex: collectionIndex, collection: collection, now: now)
+        #expect(label.items.map(\.id).sorted() == ["cd12", "v12"] && label.labelHits.map(\.id).sorted() == ["cd12", "v12"])
+        // A saved playlist with the canonical form is a label filter.
+        let saved = LibrarySearch.tracks(matching: CollectionSearchQuery.canonical("#12"), index: index, collectionIndex: collectionIndex,
+                                         collection: collection, now: now)
+        #expect(!saved.isEmpty && saved.allSatisfy { $0.album == "Kind of Blue" })
+        #expect(CollectionSearchQuery.parse("#12", now: now, shorthand: false).filters.isEmpty)
     }
 
     @Test func bareNumbersStayTextWithLabelHitsAlongside() {

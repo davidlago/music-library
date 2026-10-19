@@ -310,9 +310,49 @@ import Testing
                                        CollectionLinker.Change(id: "tape", digitalSource: .rip),
                                        CollectionLinker.Change(id: "missing", year: 2000)], at: Date(timeIntervalSince1970: 10))
         let after = Dictionary(uniqueKeysWithValues: try db.collectionItems().items.map { ($0.id, $0) })
-        #expect(after["cd"]?.albumKey == key("Other") && after["cd"]?.digitalSource == .rip && after["cd"]?.updatedAt == Date(timeIntervalSince1970: 10))
+        #expect(after["cd"]?.albumKey == key("Other") && after["cd"]?.digitalSource == .rip && after["cd"]?.updatedAt == items["cd"]?.updatedAt,
+                "automatic changes aren't edits")
         #expect(after["tape"]?.digitalSource == nil)
         #expect(try db.albumPurchases()[key("New")] == nil && db.albumPurchases()[key("Other")] != nil)
+    }
+
+    /// Saving writes what reads back: a blank title is refused (and the projection keeps its row), long text is
+    /// clipped to what's read.
+    @Test func savingNormalizesWhatWouldntReadBack() throws {
+        let db = try Database(path: ":memory:")
+        var blue = item("blue", .cd, 42, album: "Blue")
+        try db.saveCollectionItem(blue)
+        blue.album = "   "
+        blue.artist = ""
+        #expect(throws: CollectionError.invalidItem) { try db.saveCollectionItem(blue) }
+        #expect(try db.collectionItems().items.map(\.id) == ["blue"] && db.collectionItems().unreadable == 0)
+        #expect(try db.albumPurchases()[key("Blue")]?.labelNumber == 42)
+
+        var long = item("long", .cd, 43, album: String(repeating: "a", count: 1001) + "  ", artist: "  Artist ")
+        long.catalogNumber = " " + String(repeating: "c", count: 300)
+        long.notes = "  "
+        long.recordLabel = " Blue Note "
+        long.barcode = "12-34"
+        try db.saveCollectionItem(long)
+        let read = try #require(try db.collectionItems().items.first { $0.id == "long" })
+        #expect(read.album == String(repeating: "a", count: 1000) && read.artist == "Artist")
+        #expect(read.catalogNumber == String(repeating: "c", count: 200) && read.notes == nil && read.recordLabel == "Blue Note" && read.barcode == nil)
+        #expect(try db.albumPurchases()[long.albumKey]?.album == read.album)
+        // Saving what was read changes nothing.
+        try db.saveCollectionItem(read, at: read.updatedAt)
+        #expect(try db.collectionItems().items.first { $0.id == "long" } == read)
+    }
+
+    /// An over-long legacy title (untrusted) is clipped, so the migrated item reads back and its row isn't deleted.
+    @Test func longLegacyTitlesMigrateReadably() throws {
+        let path = try TestSupport.tempDir().appendingPathComponent("library.sqlite").path
+        let title = String(repeating: "t", count: 1500)
+        try makeLegacyLibrary(at: path, rows: [(key("Long"), title, "", nil, 7, nil, nil)])
+        let db = try Database(path: path)
+        let read = try db.collectionItems()
+        #expect(read.unreadable == 0 && read.items.count == 1)
+        #expect(read.items.first?.album == String(title.prefix(1000)) && read.items.first?.stickerNumber == 7)
+        #expect(try db.albumPurchases()[key("Long")]?.labelNumber == 7)
     }
 
     /// The app's ownership views still save through `saveAlbumPurchase` until they move to the collection.

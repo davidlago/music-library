@@ -107,7 +107,9 @@ public struct CollectionSearchQuery: Equatable, Sendable {
         ("catno", "catno:\"cl 1355\"", "Catalog number of your copy"),
     ]
 
-    public static func parse(_ text: String, now: Date = Date()) -> CollectionSearchQuery {
+    /// `shorthand`: whether `#12`-style terms are labels (search boxes) or text, as they were before the collection
+    /// (saved smart playlists, and the songs a search box finds: "#9 Dream" is a song title).
+    public static func parse(_ text: String, now: Date = Date(), shorthand: Bool = true) -> CollectionSearchQuery {
         var filters: [Filter] = []
         var issues: [String] = []
         var rest = ""
@@ -122,7 +124,7 @@ public struct CollectionSearchQuery: Equatable, Sendable {
                 }
                 continue
             }
-            if token.key == nil, !token.quoted, let label = shorthand(token.value) {
+            if shorthand, token.key == nil, !token.quoted, let label = Self.shorthand(token.value) {
                 filters.append(Filter(kind: .sticker(series: label.series, range: exactly(label.number)), negated: token.negated))
                 continue
             }
@@ -506,7 +508,8 @@ public enum LibrarySearch {
     public struct Results: Sendable {
         /// Songs, albums and artists. With no collection filters, exactly `SearchIndex.search`; with them, the base
         /// query's results limited to the albums of the items matching the filters (`own:none`: the albums with no
-        /// copy).
+        /// copy). The `#12` shorthand is text here, as it always was, so "#9 Dream" still finds the song; it only
+        /// picks the items (and `labelHits`).
         public var library: SearchResults
         /// The items matching the query (none for an empty one), trackless ones included.
         public var items: [CollectionItem]
@@ -520,14 +523,15 @@ public enum LibrarySearch {
 
     public static func run(_ text: String, index: SearchIndex, collectionIndex: CollectionIndex, collection: MusicCollection,
                            now: Date = Date(), autocorrect: Bool = true) -> Results {
-        let query = CollectionSearchQuery.parse(text, now: now)
+        let items = CollectionSearchQuery.parse(text, now: now)
+        let query = CollectionSearchQuery.parse(text, now: now, shorthand: false)
         var library: SearchResults
         if query.hasCollectionFilters {
             let keys = albumKeys(query, index: index, collectionIndex: collectionIndex, now: now)
             library = restricted(index.search(query.baseText, now: now, autocorrect: false), to: keys, index: index, base: query.base)
             // Spelling correction leaves the collection terms alone (they aren't text filters).
             if library.tracks.isEmpty, autocorrect, let corrected = index.correction(for: text), corrected != text {
-                let alt = CollectionSearchQuery.parse(corrected, now: now)
+                let alt = CollectionSearchQuery.parse(corrected, now: now, shorthand: false)
                 var results = restricted(index.search(alt.baseText, now: now, autocorrect: false), to: keys, index: index, base: alt.base)
                 if !results.tracks.isEmpty {
                     results.correctedText = corrected
@@ -537,7 +541,7 @@ public enum LibrarySearch {
         } else {
             library = index.search(text, now: now, autocorrect: autocorrect)
         }
-        library.issues = query.issues
+        library.issues = items.issues
 
         var labelHits: [CollectionItem] = []
         if let label = CollectionSearchQuery.labelForm(text) {
@@ -547,13 +551,15 @@ public enum LibrarySearch {
                 labelHits = collection.items(number: label.number)
             }
         }
-        return Results(library: library, items: query.isEmpty ? [] : collectionIndex.search(query, now: now), labelHits: labelHits)
+        return Results(library: library, items: items.isEmpty ? [] : collectionIndex.search(items, now: now), labelHits: labelHits)
     }
 
-    /// A smart playlist's tracks. Without collection keys, exactly `SearchIndex.tracks(matching:)`.
+    /// A smart playlist's tracks. Without collection keys, exactly `SearchIndex.tracks(matching:)`. The `#12`
+    /// shorthand is text: playlists saved before the collection meant it as text, and new ones save `sticker:`
+    /// (`CollectionSearchQuery.canonical`).
     public static func tracks(matching text: String, index: SearchIndex, collectionIndex: CollectionIndex,
                               collection: MusicCollection, now: Date = Date()) -> [Track] {
-        let query = CollectionSearchQuery.parse(text, now: now)
+        let query = CollectionSearchQuery.parse(text, now: now, shorthand: false)
         guard query.hasCollectionFilters else { return index.tracks(matching: SearchQuery.parse(text, now: now), now: now) }
         let keys = albumKeys(query, index: index, collectionIndex: collectionIndex, now: now)
         return index.tracks(matching: query.base, now: now).filter { keys.contains(key($0)) }

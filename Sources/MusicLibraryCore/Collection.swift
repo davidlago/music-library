@@ -276,6 +276,38 @@ public struct CollectionItem: Identifiable, Hashable, Sendable {
         (1...64).contains(id.count) && id.unicodeScalars.allSatisfy(CollectionMedium.isRawScalar)
     }
 
+    /// The longest album or artist, record label (and the other release fields) and notes `collection_items` reads.
+    static let maxTitle = 1000, maxField = 200, maxNotes = 10_000
+
+    /// The item as `collection_items` reads it back: text trimmed and clipped to the lengths read (empty fields nil),
+    /// and values out of range dropped. Saving goes through it, so nothing written reads back blank or unreadable.
+    func normalized() -> CollectionItem {
+        func field(_ s: String?, _ limit: Int) -> String? { s.map { Self.clip($0, limit) }.flatMap { $0.isEmpty ? nil : $0 } }
+        var item = self
+        item.album = Self.clip(album, Self.maxTitle)
+        item.artist = Self.clip(artist, Self.maxTitle)
+        if item.albumKey.isEmpty { item.albumKey = SearchIndex.albumKey(album: item.album, artist: item.artist) }
+        item.year = year.flatMap { (1000...9999).contains($0) ? $0 : nil }
+        item.releaseID = MBID.validated(releaseID)
+        item.releaseGroupID = MBID.validated(releaseGroupID)
+        item.barcode = barcode.flatMap { (6...20).contains($0.count) && $0.allSatisfy { ("0"..."9").contains($0) } ? $0 : nil }
+        item.catalogNumber = field(catalogNumber, Self.maxField)
+        item.recordLabel = field(recordLabel, Self.maxField)
+        item.country = field(country, Self.maxField)
+        item.formatDetail = field(formatDetail, Self.maxField)
+        item.discCount = discCount.flatMap { (1...99).contains($0) ? $0 : nil }
+        item.trackCount = trackCount.flatMap { (1...999).contains($0) ? $0 : nil }
+        item.notes = field(notes, Self.maxNotes)
+        item.coverFile = coverFile.flatMap { CollectionCovers.isFileName($0) ? $0 : nil }
+        return item
+    }
+
+    /// Trimmed and at most `limit` characters (trimmed again, so it reads back the same).
+    static func clip(_ s: String, _ limit: Int) -> String {
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.count <= limit ? t : String(t.prefix(limit)).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// The source to go by: the stored one, or for a CD or download never linked, the files being its own.
     var effectiveSource: DigitalSource? {
         digitalSource ?? (medium == .cd ? .rip : medium == .download ? .download : nil)
@@ -511,10 +543,16 @@ public struct MusicCollection: Sendable {
     /// The library tracks under the item's album key, in album order.
     public func libraryTracks(_ item: CollectionItem) -> [Track] { tracksByKey[item.albumKey] ?? [] }
 
-    /// One past the highest number in the series (counting `pending` ones not saved yet), or 1 for the first.
+    /// One past the highest number in the series (counting `pending` ones not saved yet), or 1 for the first. Once
+    /// the highest is `Sticker.maxNumber`, the lowest free number instead; with none free (never in practice), the
+    /// maximum, which is taken: check `taken` before using it.
     public func nextNumber(in series: StickerSeries, pending: [Int] = []) -> Int {
-        let highest = (numbers(in: series) + pending.filter { (1...Sticker.maxNumber).contains($0) }).max() ?? 0
-        return min(highest + 1, Sticker.maxNumber)
+        let used = Set(numbers(in: series) + pending.filter { (1...Sticker.maxNumber).contains($0) })
+        let highest = used.max() ?? 0
+        guard highest >= Sticker.maxNumber else { return highest + 1 }
+        var n = 1
+        while used.contains(n), n < Sticker.maxNumber { n += 1 }
+        return n
     }
 
     /// The lowest unused number below the highest one.

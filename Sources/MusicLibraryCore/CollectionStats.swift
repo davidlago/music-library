@@ -189,7 +189,11 @@ public struct CollectionStats: Sendable {
             var a = albums[key] ?? Album()
             a.duration += t.duration.isFinite ? max(0, t.duration) : 0
             if let y = t.year, (1000...9999).contains(y) { a.year = max(a.year ?? y, y) }
-            if let p = playTotals[t.id] { a.plays += p.plays; a.listened += p.listened }
+            // Totals come from untrusted rows (synced or exported copies, phones' play events): only sane ones count.
+            if let p = playTotals[t.id] {
+                if p.plays > 0 { a.plays = a.plays.addingReportingOverflow(p.plays).overflow ? Int.max : a.plays + p.plays }
+                if p.listened.isFinite, p.listened > 0 { a.listened += p.listened }
+            }
             for g in SearchIndex.genres(of: t.metadata) where !a.genres.contains(where: { $0.caseInsensitiveCompare(g) == .orderedSame }) {
                 a.genres.append(g)
             }
@@ -338,7 +342,7 @@ public struct CollectionStats: Sendable {
             let spend = spendByKey[key] ?? 0
             if a.plays > 0 {
                 playedSpend += spend
-                plays += a.plays
+                plays = plays.addingReportingOverflow(a.plays).overflow ? Int.max : plays + a.plays
                 if spend > 0, let primary = collection.copies(albumKey: key).first {
                     values.append((primary, spend / Decimal(a.plays)))
                 }
@@ -346,7 +350,11 @@ public struct CollectionStats: Sendable {
             if a.listened > 0 { listenedSpend += spend; listened += a.listened }
         }
         if plays > 0, playedSpend > 0 { costPerPlay = playedSpend / Decimal(plays) }
-        if listened >= 60, listenedSpend > 0 { costPerHour = listenedSpend / Decimal(listened / 3600) }
+        // `Decimal(_: Double)` traps on infinity (many huge totals add up to it).
+        if listened.isFinite, listened >= 60, listenedSpend > 0 {
+            let hours = Decimal(listened / 3600)
+            if !hours.isNaN, hours > 0 { costPerHour = listenedSpend / hours }
+        }
         bestValue = values.sorted { $0.perPlay != $1.perPlay ? $0.perPlay < $1.perPlay : byTitle($0.item, $1.item) }
             .prefix(listLimit).map { row($0.item, pricePerPlay: $0.perPlay) }
         stillInWrapper = items.filter { states[$0.id]?.hasMusic == true && (albums[$0.albumKey]?.plays ?? 0) == 0 }

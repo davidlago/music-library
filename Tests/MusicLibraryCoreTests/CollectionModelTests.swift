@@ -123,6 +123,32 @@ import Testing
 
     // MARK: Series
 
+    /// A label at the maximum (a typo older versions accepted) doesn't make the next number one that's taken.
+    @Test func nextNumberAtTheMaximumIsTheFirstFree() {
+        let max = Sticker.maxNumber
+        let c = MusicCollection(items: [item("top", .cd, max), item("one", .cd, 1), item("two", .cd, 2)], songPurchases: [:], tracks: [])
+        #expect(c.nextNumber(in: .cd) == 3)
+        #expect(c.nextNumber(in: .cd, pending: [3]) == 4)
+        #expect(c.nextNumber(in: .vinyl) == 1)
+        let alone = MusicCollection(items: [item("top", .cd, max)], songPurchases: [:], tracks: [])
+        #expect(alone.nextNumber(in: .cd) == 1 && alone.taken(Sticker(series: .cd, number: 1)!, excluding: nil) == nil)
+    }
+
+    /// A phone reconciles in memory on every load: an item made for a key whose legacy id is taken keeps its id.
+    @Test func reconcileGivesTheSameIDEveryTime() {
+        let key = SearchIndex.albumKey(album: "Album", artist: "Artist")
+        // The migrated CD was changed to vinyl; then an older Mac marked the album owned again.
+        let vinyl = item(CollectionItem.legacyID(albumKey: key), .vinyl, 4, key: key)
+        let row = CollectionLegacy.Row(key: key, purchase: AlbumPurchase(album: "Album", artist: "Artist", price: 5),
+                                       updatedAt: Date(timeIntervalSince1970: 100))
+        let first = CollectionLegacy.reconcile(items: [vinyl], legacy: [row]).changed
+        let second = CollectionLegacy.reconcile(items: [vinyl], legacy: [row]).changed
+        #expect(first.count == 1 && first.map(\.id) == second.map(\.id))
+        #expect(first.first?.id == CollectionItem.legacyID(albumKey: key + "#2") && first.first?.medium == .cd)
+        let third = item(CollectionItem.legacyID(albumKey: key + "#2"), .vinyl, 5, key: key)
+        #expect(CollectionLegacy.reconcile(items: [vinyl, third], legacy: [row]).changed.first?.id == CollectionItem.legacyID(albumKey: key + "#3"))
+    }
+
     @Test func seriesAreNumberedApart() {
         let c = MusicCollection(items: [item("c12", .cd, 12, album: "Blue"), item("v12", .vinyl, 12, album: "Rumours"),
                                         item("c3", .cd, 3), item("v1", .vinyl, 1), item("c12b", .cd, 12, album: "Dup")],

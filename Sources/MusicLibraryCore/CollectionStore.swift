@@ -76,7 +76,7 @@ extension Database {
 
         guard let id = r.string(0)?.lowercased(), CollectionItem.isValidID(id),
               let medium = r.string(1).flatMap(CollectionMedium.init(rawValue:)) else { return nil }
-        let album = text(3, max: 1000) ?? "", artist = text(4, max: 1000) ?? ""
+        let album = text(3, max: CollectionItem.maxTitle) ?? "", artist = text(4, max: CollectionItem.maxTitle) ?? ""
         guard !album.isEmpty || !artist.isEmpty else { return nil }
         let key = r.string(5).flatMap { $0.isEmpty ? nil : $0 } ?? SearchIndex.albumKey(album: album, artist: artist)
         var item = CollectionItem(id: id, medium: medium, album: album, artist: artist, albumKey: key, now: date(21))
@@ -85,15 +85,15 @@ extension Database {
         item.releaseID = MBID.validated(r.string(7))
         item.releaseGroupID = MBID.validated(r.string(8))
         item.barcode = r.string(9).flatMap { (6...20).contains($0.count) && $0.allSatisfy { ("0"..."9").contains($0) } ? $0 : nil }
-        item.catalogNumber = text(10, max: 200)
-        item.recordLabel = text(11, max: 200)
-        item.country = text(12, max: 200)
-        item.formatDetail = text(13, max: 200)
+        item.catalogNumber = text(10, max: CollectionItem.maxField)
+        item.recordLabel = text(11, max: CollectionItem.maxField)
+        item.country = text(12, max: CollectionItem.maxField)
+        item.formatDetail = text(13, max: CollectionItem.maxField)
         item.discCount = int(14, 1...99)
         item.trackCount = int(15, 1...999)
         item.purchasedOn = r.string(16).flatMap(PurchaseDay.init(string:))
         item.price = AlbumPurchase.price(text: r.string(17))
-        item.notes = text(18, max: 10_000)
+        item.notes = text(18, max: CollectionItem.maxNotes)
         item.coverFile = r.string(19).flatMap { CollectionCovers.isFileName($0) ? $0 : nil }
         item.digitalSource = r.string(20).flatMap(DigitalSource.init(rawValue:))
         item.updatedAt = date(22)
@@ -126,8 +126,10 @@ extension Database {
         try saveCollectionItems([item], at: date)
     }
 
-    /// Saves several items in one transaction.
+    /// Saves several items in one transaction. Text is saved as it reads back (`CollectionItem.normalized`), and an
+    /// item left with neither an album nor an artist is refused (`CollectionError.invalidItem`).
     public func saveCollectionItems(_ items: [CollectionItem], at date: Date = Date()) throws {
+        let items = items.map { $0.normalized() }
         for item in items {
             guard item.isEditable else { throw CollectionError.readOnly }
             guard CollectionItem.isValidID(item.id), !item.album.isEmpty || !item.artist.isEmpty else { throw CollectionError.invalidItem }
@@ -153,7 +155,9 @@ extension Database {
         }
     }
 
-    /// Applies `CollectionLinker` changes to the stored items they name.
+    /// Applies `CollectionLinker` changes to the stored items they name. They aren't edits: `updatedAt` stays the
+    /// time of the last one, which changes made by older apps are compared with (`CollectionLegacy`), so `date` is
+    /// unused.
     public func applyCollectionChanges(_ changes: [CollectionLinker.Change], at date: Date = Date()) throws {
         guard !changes.isEmpty else { return }
         try transaction {
@@ -161,23 +165,23 @@ extension Database {
             var keys = Set<String>()
             for change in changes {
                 guard let item = items[change.id], item.isEditable else { continue }
-                var changed = change.applied(to: item)
+                let changed = change.applied(to: item)
                 guard changed != item else { continue }
                 keys.formUnion([item.albumKey, changed.albumKey])
-                changed.updatedAt = date
                 try writeCollectionItem(changed)
             }
             try projectLegacyOwnership(keys: keys)
         }
     }
 
-    /// Moves the items linked to an album whose album or album artist tags changed to its new key.
+    /// Moves the items linked to an album whose album or album artist tags changed to its new key. Like the linker's
+    /// changes, not an edit: `updatedAt` is kept, so `date` is unused.
     public func rekeyCollection(from oldKey: String, to newKey: String, at date: Date = Date()) throws {
         guard oldKey != newKey else { return }
         try transaction {
             let media = CollectionMedium.known.map { "'\($0.rawValue)'" }.joined(separator: ",")
-            try exec("UPDATE collection_items SET album_key=?, updated_at=? WHERE album_key=? AND medium IN (\(media))",
-                     [.text(newKey), .double(date.timeIntervalSince1970), .text(oldKey)])
+            try exec("UPDATE collection_items SET album_key=? WHERE album_key=? AND medium IN (\(media))",
+                     [.text(newKey), .text(oldKey)])
             try projectLegacyOwnership(keys: [oldKey, newKey])
         }
     }
@@ -236,7 +240,8 @@ extension Database {
                 let medium: CollectionMedium = p.format == .digital ? .download : .cd
                 var item = items.min(by: CollectionLegacy.primaryFirst)
                     ?? CollectionLegacy.newItem(key: key, album: p.album, artist: p.artist, medium: medium, at: date, ids: &ids)
-                if !p.album.isEmpty || !p.artist.isEmpty { item.album = p.album; item.artist = p.artist }
+                let album = CollectionItem.clip(p.album, CollectionItem.maxTitle), artist = CollectionItem.clip(p.artist, CollectionItem.maxTitle)
+                if !album.isEmpty || !artist.isEmpty { item.album = album; item.artist = artist }
                 item.medium = medium
                 item.stickerNumber = p.labelNumber
                 item.purchasedOn = p.purchasedOn
@@ -255,8 +260,10 @@ extension Database {
         Set(try query("SELECT album_key FROM collection_items WHERE id=?", [.text(id)]) { $0.string(0) ?? "" })
     }
 
-    /// Writes an item as it is (an upsert that keeps columns a newer version added), without the projection.
+    /// Writes an item as it reads back (`normalized`; an upsert that keeps columns a newer version added), without
+    /// the projection. Callers make sure it has an album or an artist.
     func writeCollectionItem(_ item: CollectionItem) throws {
+        let item = item.normalized()
         let columns = Self.collectionColumns
         let updates = columns.dropFirst().map { "\($0)=excluded.\($0)" }.joined(separator: ",")
         try exec("""
