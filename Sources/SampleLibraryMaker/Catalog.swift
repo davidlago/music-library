@@ -1,4 +1,5 @@
 import Foundation
+import MusicLibraryCore
 
 /// The sample library's made-up artists and albums. Every name, bio and song here is fictional.
 enum SampleCatalog {
@@ -39,7 +40,45 @@ enum SampleCatalog {
         var description: String
         /// Purchase day (days ago) and price; nil day and price for owned without details.
         var owned: (daysAgo: Int?, price: String?)?
+        /// What the owned copy is, and its label number. The songs are its rip (or the download itself).
+        var medium: CollectionMedium = .cd
+        var sticker: Int? = nil
+        var catalogNumber: String? = nil
+        /// Copies owned besides the one the songs came from (the same music: `DigitalSource.same`).
+        var otherCopies: [Copy] = []
         var tracks: [Track]
+    }
+
+    /// A copy in the collection that isn't the album's own: another medium of a library album, or a record or CD
+    /// never ripped (`Shelf`).
+    struct Copy {
+        var medium: CollectionMedium
+        var sticker: Int?
+        var daysAgo: Int?
+        var price: String?
+        /// MusicBrainz media text: "CD", "12\" Vinyl".
+        var formatDetail: String
+        var catalogNumber: String? = nil
+    }
+
+    /// An item with no songs in the library: a record (usually never digitized) or a CD not ripped yet. Its cover is
+    /// its own, in `Music/Collection Covers`, and its track list is in its album info.
+    struct ShelfItem {
+        var title: String
+        var artist: String
+        var year: Int
+        var genre: String
+        var label: String
+        var type = "Album"
+        var copy: Copy
+        var cover: Artwork.Style
+        var palette: Artwork.Palette
+        var fonts: (title: String, artist: String)
+        var letteringColor: Int
+        var letteringTop: Bool
+        var description: String
+        /// The release's positions ("A1" on a record) and titles.
+        var tracks: [(String, String)]
     }
 
     struct Track {
@@ -69,6 +108,9 @@ enum SampleCatalog {
         Artist(name: "Okapi Sound System", type: "Group", country: "GB", begin: "2009", genres: ["dub"],
                bio: "Okapi Sound System is a Bristol collective led by bassist Marcus Obi: deep bass, offbeat chords and long echoes, at the tempo of a very relaxed animal. \(note)",
                palette: .init(colors: [0x2B2118, 0x6B4226, 0xF26419, 0xF6AE2D, 0xFFE8A3])),
+        Artist(name: "Ferro & Finch", type: "Group", country: "US", begin: "2008", genres: ["jazz"],
+               bio: "Ferro & Finch is the piano and upright bass duo of Nadia Ferro and Elliot Finch, who played the late set at a Chicago bar called the Blue Lamp every Thursday for six years. Their records come out on vinyl only. \(note)",
+               palette: .init(colors: [0x0D1B2A, 0x1B263B, 0x415A77, 0xE0B04F, 0xE0E1DD])),
     ]
 
     static let albums: [Album] = [
@@ -81,7 +123,8 @@ enum SampleCatalog {
               personnel: [("synthesizer", "Elin Marsh"), ("guitar", "Kofi Adeyemi"), ("programming", "Kofi Adeyemi")],
               producer: "Theo Navarro", mixer: "Ines Okafor",
               description: "Lumen Harbor's debut drifts between ambient and pop: pads that swell like a tide coming in, plucked arpeggios, and melodies played on something that sounds like a lighthouse bell.",
-              owned: (838, "14.99"),
+              owned: (838, "14.99"), sticker: 3, catalogNumber: "DRIFT-001",
+              otherCopies: [Copy(medium: .vinyl, sticker: 4, daysAgo: 200, price: "27.99", formatDetail: "12\" Vinyl", catalogNumber: "DRIFT-001LP")],
               tracks: [Track(title: "Harbor Lights"), Track(title: "Paper Lanterns"), Track(title: "Low Tide Choir"),
                        Track(title: "Salt & Static"), Track(title: "Lighthouse Hours")]),
         Album(title: "Night Ferries", artist: "Lumen Harbor", year: 2023, month: 4, genre: "Dream Pop", label: "Driftwood Records",
@@ -106,7 +149,7 @@ enum SampleCatalog {
               personnel: [("guitar", "Hattie Bell"), ("flute", "Jonah Reyes"), ("bass", "Sam Whitlock"), ("drums", "Rosa Lindqvist")],
               producer: "Hattie Bell", mixer: "Ines Okafor",
               description: "Recorded around a wood stove over one snowed-in week: strummed guitars, brushed drums and a flute carrying the tunes.",
-              owned: (1018, "12.99"),
+              owned: (1018, "12.99"), sticker: 1, catalogNumber: "PM-014",
               tracks: [Track(title: "Apples in Winter"), Track(title: "Woodstove"), Track(title: "The Long Field"), Track(title: "Frost on the Wire")]),
         Album(title: "Kitchen Radio", artist: "The Velvet Orchard", year: 2021, month: 5, genre: "Indie Folk", label: "Paper Moon",
               style: SynthStyle(tempo: 100...116, scales: [.major], drums: .brushes, chords: .strum, arp: .none, lead: .epiano, bass: .folk, reverb: 0.2),
@@ -117,7 +160,7 @@ enum SampleCatalog {
               personnel: [("guitar", "Hattie Bell"), ("piano", "Jonah Reyes"), ("bass", "Sam Whitlock"), ("drums", "Rosa Lindqvist")],
               producer: "Jonah Reyes", mixer: "Ines Okafor",
               description: "Brighter and quicker than its predecessor, with Jonah Reyes's electric piano taking the melodies.",
-              owned: (555, "13.49"),
+              owned: (555, "13.49"), sticker: 5, catalogNumber: "PM-031",
               tracks: [Track(title: "Kitchen Radio"), Track(title: "Sunday Bread"), Track(title: "Porch Light Waltz"), Track(title: "Letters Home")]),
         Album(title: "Small Hours", artist: "Mara Quell", year: 2020, month: 2, genre: "Neoclassical", label: "Quiet Room", type: "EP", lossless: true,
               style: SynthStyle(tempo: 64...76, scales: [.minor, .major], drums: .none, chords: .epiano, arp: .none, lead: .epiano, bass: .none, reverb: 0.55, length: 30...38),
@@ -128,7 +171,7 @@ enum SampleCatalog {
               personnel: [("piano", "Mara Quell")],
               producer: "Mara Quell", mixer: "Ines Okafor",
               description: "Three short pieces for electric piano, each recorded in a single take in the middle of the night.",
-              owned: (428, "9.99"),
+              owned: (428, "9.99"), sticker: 6, catalogNumber: "QR-002",
               tracks: [Track(title: "2:14 a.m."), Track(title: "Streetlamp Etude"), Track(title: "Small Hours")]),
         Album(title: "Neon Botany", artist: "Circuit Garden", year: 2018, month: 6, genre: "Synthwave", label: "Greenhouse Audio",
               style: SynthStyle(tempo: 108...118, scales: [.minor], drums: .fourOnFloor, chords: .pad, arp: .square, fastArp: true, lead: .square, bass: .pulse, reverb: 0.2),
@@ -139,7 +182,7 @@ enum SampleCatalog {
               personnel: [("synthesizer", "Dex Calloway"), ("synthesizer", "Priya Raman"), ("programming", "Dex Calloway")],
               producer: "Dex Calloway", mixer: "Ines Okafor",
               description: "Square-wave arpeggios, four-on-the-floor drums and a striped sunset: a night drive through a greenhouse.",
-              owned: (695, "18.00"),
+              owned: (695, "18.00"), sticker: 4, catalogNumber: "GHA-007",
               tracks: [Track(title: "Neon Botany"), Track(title: "Photosynthesizer"), Track(title: "Chrome Ivy"),
                        Track(title: "Midnight Greenhouse"), Track(title: "Pollen Drive")]),
         Album(title: "Overgrowth", artist: "Circuit Garden", year: 2024, month: 10, genre: "Synthwave", label: "Greenhouse Audio",
@@ -151,7 +194,7 @@ enum SampleCatalog {
               personnel: [("synthesizer", "Dex Calloway"), ("synthesizer", "Priya Raman")],
               producer: "Theo Navarro", mixer: "Ines Okafor",
               description: "Circuit Garden's third record lets the plants take over: brighter bells, busier drums and a guest turn from Juniper & the Low Tide.",
-              owned: nil,
+              owned: (9, "9.00"), medium: .download,
               tracks: [Track(title: "Overgrowth"), Track(title: "Root Access"),
                        Track(title: "Bloom Protocol", featuring: "Juniper & the Low Tide", extra: [("keyboards", "Juniper Hale")]),
                        Track(title: "Canopy Run")]),
@@ -164,7 +207,7 @@ enum SampleCatalog {
               personnel: [("keyboards", "Juniper Hale"), ("drum machine", "Juniper Hale"), ("bass", "Marcus Obi")],
               producer: "Theo Navarro", mixer: "Juniper Hale",
               description: "Dusty electric piano chords, a lazy swing and the sound of rain on a skylight.",
-              owned: (290, "11.00"),
+              owned: (290, "24.00"), medium: .vinyl, sticker: 3, catalogNumber: "LTT-005",
               tracks: [Track(title: "Sunday Static"), Track(title: "Rain on the Skylight"), Track(title: "Coffee Rings"),
                        Track(title: "Library Card"), Track(title: "Slow Walk Home")]),
         Album(title: "Slow Motion Safari", artist: "Okapi Sound System", year: 2017, month: 7, genre: "Dub", label: "Riverbank Sound",
@@ -176,8 +219,36 @@ enum SampleCatalog {
               personnel: [("bass", "Marcus Obi"), ("melodica", "Lena Fischer"), ("bass", "Sam Whitlock")],
               producer: "Marcus Obi", mixer: "Marcus Obi",
               description: "Half-speed one-drop rhythms, offbeat chords dissolving into echo, and a melodica wandering over the top.",
-              owned: (nil, nil),
+              owned: (nil, nil), sticker: 2,
               tracks: [Track(title: "Slow Motion Safari"), Track(title: "Savanna Dub"), Track(title: "Okapi Skank"), Track(title: "Heat Haze")]),
+    ]
+
+    /// Records and CDs with no songs in the library: Vinyl #1 and #2, never digitized, and CD #7 and #8, not ripped yet.
+    static let shelf: [ShelfItem] = [
+        ShelfItem(title: "Riverbank Versions", artist: "Okapi Sound System", year: 2013, genre: "Dub", label: "Riverbank Sound", type: "EP",
+                  copy: Copy(medium: .vinyl, sticker: 1, daysAgo: 600, price: "22.00", formatDetail: "10\" Vinyl", catalogNumber: "RBS-010"),
+                  cover: .savanna, palette: .init(colors: [0x8AB17D, 0x2A9D8F, 0xE9F5DB, 0x264653, 0x1B2B24, 0x1B2B24]),
+                  fonts: ("HelveticaNeue-CondensedBlack", "HelveticaNeue-Medium"), letteringColor: 2, letteringTop: true,
+                  description: "Four dub versions cut for the sound system's own dances and pressed on ten-inch vinyl, never released digitally.",
+                  tracks: [("A1", "Riverbank Version"), ("A2", "Low Water Dub"), ("B1", "Heron Step"), ("B2", "Floodplain")]),
+        ShelfItem(title: "Blue Lamp Sessions", artist: "Ferro & Finch", year: 2015, genre: "Jazz", label: "Night Owl Records",
+                  copy: Copy(medium: .vinyl, sticker: 2, daysAgo: 380, price: "31.50", formatDetail: "12\" Vinyl", catalogNumber: "NOR-112"),
+                  cover: .night, palette: .init(colors: [0x0D1B2A, 0x1B263B, 0x0B1320, 0xE0E1DD, 0xE0B04F, 0x111111]),
+                  fonts: ("Didot", "Didot-Italic"), letteringColor: 3, letteringTop: true,
+                  description: "Recorded live over three Thursdays at the Blue Lamp: piano, upright bass, glasses and quiet applause.",
+                  tracks: [("A1", "Thursday Set"), ("A2", "Lamplight"), ("A3", "Last Call Blues"), ("B1", "Finch's Walk"), ("B2", "Closing Time Waltz")]),
+        ShelfItem(title: "Lantern Studies", artist: "Mara Quell", year: 2023, genre: "Neoclassical", label: "Quiet Room",
+                  copy: Copy(medium: .cd, sticker: 7, daysAgo: 150, price: "12.00", formatDetail: "CD", catalogNumber: "QR-009"),
+                  cover: .minimal, palette: .init(colors: [0xF2EDE4, 0x2B2B2B, 0xB5651D]),
+                  fonts: ("Didot-Italic", "Didot"), letteringColor: 1, letteringTop: false,
+                  description: "Mara Quell's first full album: studies for electric piano written by lantern light during a winter power cut.",
+                  tracks: [("1", "First Lantern"), ("2", "Wick"), ("3", "Snow Static"), ("4", "Study in Amber"), ("5", "Morning Grid")]),
+        ShelfItem(title: "Live at the Grange", artist: "The Velvet Orchard", year: 2019, genre: "Indie Folk", label: "Paper Moon", type: "Live",
+                  copy: Copy(medium: .cd, sticker: 8, daysAgo: 40, price: "15.00", formatDetail: "CD", catalogNumber: "PM-022"),
+                  cover: .horizon, palette: .init(colors: [0xF6E7CB, 0xDD9787, 0xA6C48A, 0x678D58, 0x3E5641, 0x24221F]),
+                  fonts: ("Baskerville-SemiBoldItalic", "Baskerville"), letteringColor: 5, letteringTop: true,
+                  description: "The band's set at a village grange hall, with the audience singing along on Apples in Winter.",
+                  tracks: [("1", "Woodstove"), ("2", "The Long Field"), ("3", "Sunday Bread"), ("4", "Porch Light Waltz"), ("5", "Apples in Winter")]),
     ]
 
     /// Playlists: name and (album, track number) pairs.
