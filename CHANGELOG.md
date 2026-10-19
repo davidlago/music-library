@@ -8,7 +8,7 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 ## Unreleased
 
 - **Clearer names: Digital Collection, Physical Collection and Local Library.** What used to be "Library" is now your
-  **Digital Collection**: your music files (Songs, Albums, Artists), including the albums you bought as downloads.
+  **Digital Collection**: your music files (Songs and Albums), including the albums you bought as downloads.
   Your **Physical Collection** is the CDs and records you own: **Shelf**, **CDs**, **Vinyl** and **To Digitize**.
   **Downloads** moved to the digital side (the Mac sidebar's Digital Collection section and the iPhone's Digital tab),
   and the Shelf now holds only CDs and records; downloads still show in Your Copies on album pages and in the spending
@@ -16,6 +16,16 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   **Settings ▸ Local Library**. In Insights, the panes are **Owned** (CDs, records and downloads), **Digital
   Collection** and **Listening**. On the iPhone, the tabs are **Physical** and **Digital** (with Insights, Sync and
   Search).
+- **Explore: Artists from both collections.** On the Mac, **Artists** moved to the sidebar's **Explore** section, with
+  **Insights**, **Music DNA** and **Concerts**, and now lists the artists of both collections: someone you only own on
+  CD or vinyl is there too ("2 albums you own"), and their page shows what's in your physical collection. On the
+  iPhone, **Insights** opens with an **Explore** section: **Artists** (everyone in both collections) and **Music DNA**.
+- **Music DNA across both collections.** CDs and records with no digital copy add their songs to Music DNA from their
+  MusicBrainz credits (now kept with each album's info), so a player you only have on vinyl links to the same people
+  as your music files; their songs are listed by the copy they're on.
+- **Covers reach the digital album.** A new cover for a CD or record whose music is in your digital collection can go
+  to that album too (its `cover.jpg` and, optionally, the art embedded in its files, as on the album page), and a cover
+  changed on an album page reaches the copies its songs came from.
 - **Your Physical Collection: CDs and vinyl.** Music Library now catalogs every CD and record you own, whether or not
   it's in your digital collection: CDs you've ripped and ones you haven't, and records (usually never digitized), plus
   the albums you bought as downloads. A new **Physical Collection** section at the top of the Mac sidebar (**Shelf**,
@@ -27,14 +37,16 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   with its sides), other copies of the album, and **Previous/Next on Shelf** (⌘[ and ⌘]). See [Your physical
   collection](https://github.com/davidlago/music-library#your-physical-collection).
 - **Label numbers per medium.** CDs and vinyl each have their own label series, both starting at 1: the number is on a
-  white strip across the top of the jewel case's hinge or down the same edge of the record's sleeve, the case or
-  sleeve under it tells CD #12 from Vinyl #12, and labels in text are always written with their series. Hover a
-  cover's sticker or badge for what it means. The next number is suggested, a number already used in the same series
-  is refused (with the next and the first free numbers offered), and **Label Check** lists free numbers and
-  duplicates.
-- **Find by Label** (⌘L on the Mac, the Physical tab on the iPhone, the Shelf page on the Apple Watch, and Siri: "Find
-  CD 12 in Music Library") tells you what's at a label and what sits on either side of it on the shelf. The watch
-  finds labels even away from the iPhone.
+  white strip across the top of the jewel case's hinge or down the same edge of the record's sleeve, showing just the
+  number: the case or sleeve under it tells CD #12 from Vinyl #12, and labels in text are always written with their
+  series. Hover a cover's sticker or badge on the Mac, or press and hold it on the iPhone, for what it means. The
+  next number is suggested, a number already used in the same series is refused (with the next and the first free
+  numbers offered), and **Label Check** lists free numbers and duplicates.
+- **Find by Label** (⌘L on the Mac, the Physical tab on the iPhone, the Physical page on the Apple Watch, and Siri:
+  "Find CD 12 in Music Library") tells you what's at a label and what sits on either side of it on the shelf. The
+  watch finds labels even away from the iPhone, and gets its index of your labels as soon as you open it with the
+  iPhone nearby (a large collection's still comes as a file transfer, which can take longer), so Find works right
+  away.
 - **Adding to your physical collection.** **Add to Physical Collection…** (⇧⌘N) finds the edition on MusicBrainz by
   the barcode on the case (a USB barcode scanner works), a few words of the album and artist, or the catalog number,
   for a CD, a record or a download, with **Add & Next** for a stack of them; anything MusicBrainz doesn't list can be
@@ -66,7 +78,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   CDs, your records or everything you own that's digitized on it.
 - **The Physical Collection widget** (Recent Purchases before; widgets you placed keep working) shows the latest CD or
   record you added in its case or sleeve, how many CDs and records you have and how many CDs are left to rip, and your
-  next labels, also on the lock screen and the watch face. The watch's **Shelf** page replaces Purchases.
+  next labels, also on the lock screen and the watch face. The watch's **Physical** page replaces Purchases, with
+  your counts ("34 CDs · 5 records"), what you added lately and Find.
 - **"Record label"** is now the name of the company everywhere ("Label" was confusing next to label numbers); the
   `label:` search key keeps its meaning.
 - **Upgrading keeps everything you filed.** The first time this version opens your library, every album you'd marked

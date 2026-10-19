@@ -23,7 +23,7 @@
   <a href="https://github.com/davidlago/music-library/releases/latest"><strong>Download for Mac</strong></a> ·
   <a href="https://apps.apple.com/us/app/daves-music-library/id6822005512"><strong>iPhone app on the App Store</strong></a></p>
 
-![An album page: the cover, a blurred-cover backdrop, rating, genres, listening stats and the full track list](docs/screenshots/album.png)
+![The album page for Roy Orbison's Mystery Girl: the cover in its jewel case with the CD #14 sticker, rating, listening stats, the AccurateRip check and Your Copy](docs/screenshots/album.png)
 
 ## Highlights
 
@@ -37,7 +37,9 @@
 - **A label number on every case and sleeve.** CDs and records each have their own series, both starting at 1, and the
   app never lets you mix them up: the number sits on a white strip across the top of the jewel case's hinge, or
   down the same edge of a record's sleeve, so **CD #12** and **Vinyl #12** are told apart by the case or sleeve
-  they're on, and always written with their series in text. Hover a sticker or a badge for what it means. The next free number is suggested, and a number already taken is refused.
+  they're on (the sticker shows just the number), and always written with their series in text. Hover a sticker or a
+  badge (on the iPhone, press and hold it) for what it means. The next free number is suggested, and a number already
+  taken is refused.
 - **Find by Label.** Type a number (⌘L, anywhere in the app) and see what CD #12 is and what sits next to it on the
   shelf, so you can go and grab it. On the iPhone, the Apple Watch (offline) and with Siri too.
 - **Add by barcode, link by ripping.** Scan or type the barcode on the case, or a few words of the album and artist, and
@@ -63,12 +65,14 @@
 
 - **Albums and artists, beautifully.** Album pages show the full release track list (including what you're missing),
   descriptions, community ratings, genres, credits, release details and links to reviews. Artist pages bring photos,
-  bios, stats and links to dozens of sites. All of it is fetched once and kept locally.
+  bios, stats and links to dozens of sites. **Artists** lists everyone in both collections, including artists you only
+  own on CD or vinyl. All of it is fetched once and kept locally.
 - **Search that understands music.** `genre:jazz year:1955-1965 is:hires`, `credit:"rudy van gelder"`, `added:30d`,
   `missing:cover`… with autocomplete, typo correction, top hits and one-click refinements. Save any search as a smart
   playlist that keeps itself up to date.
-- **Music DNA.** See who played, wrote and produced with whom across your music, and click your way from one
-  collaborator to the next. Any name in the app opens it.
+- **Music DNA.** See who played, wrote and produced with whom across both your collections (CDs and records with no
+  digital copy bring their MusicBrainz credits), and click your way from one collaborator to the next. Any name in the
+  app opens it.
 - **Insights.** Three panes: **Owned** (your CDs, records and downloads: how much is digitized, your label series with
   their free numbers and duplicates, how you own it by medium, money spent over time, cost per play and per hour, best
   value, what's still in the wrapper, artists, genres, decades and record labels), your **Digital Collection** (by
@@ -76,7 +80,9 @@
   songs, artists and albums, activity over time, when you listen, the genres and eras you play, skips, streaks and
   favorites to rediscover) over 7 days, 30 days, 12 months or all time. Everything is clickable.
 - **Fix missing covers.** Change an album's cover from its page: pick one from MusicBrainz's Cover Art Archive, or use
-  an image file, a picture dragged from the web or one you copied. It can be embedded in the album's files too.
+  an image file, a picture dragged from the web or one you copied. It can be embedded in the album's files too. A new
+  cover for a CD or record can go to its album in your digital collection as well, and an album's new cover reaches the
+  copies its songs came from.
 
 **Play it**
 
@@ -89,7 +95,7 @@
 - **Listening history and Last.fm.** Plays and time listened per song, album and artist, and optional scrobbling with an
   offline queue.
 - **Concerts near you.** Artist pages list their upcoming shows near your ZIP code, and the Concerts page gathers every
-  show by an artist in your digital collection, month by month. Listings come from Ticketmaster and JamBase (which
+  show by an artist in either of your collections, month by month. Listings come from Ticketmaster and JamBase (which
   covers small clubs and independent venues), with free keys for either or both.
 - **Shop for CDs.** Find the exact CD on MusicBrainz (by album and artist, or the barcode or catalog number on the case),
   pick the edition, and compare new and used copies that ship to the US on Discogs, eBay, CDandLP and Alibris, with
@@ -132,16 +138,20 @@
 
 The sidebar has two collections. The **Physical Collection** section at the top is your shelf: **Shelf** (every CD and
 record), **CDs**, **Vinyl** and **To Digitize** (the CDs and records with no digital copy yet); it's where the app opens
-once you own a CD or record. The **Digital Collection** section below it is your music files: **Songs**, **Albums**,
-**Artists** and **Downloads**, the albums you bought as downloads (still things you own, with a purchase date and
-price, but files rather than something on a shelf). Show the shelf as covers (each CD in its jewel case, each record in
-its sleeve) or as a list, sorted by label in sections of a hundred, by artist, title, year, purchase date, price or
+once you own a CD or record. The **Digital Collection** section below it is your music files: **Songs**, **Albums** and
+**Downloads**, the albums you bought as downloads (still things you own, with a purchase date and price, but files
+rather than something on a shelf). **Explore** spans both: **Artists** (everyone in either collection; an artist you
+only own on CD or vinyl shows "2 albums you own"), **Insights**, **Music DNA** and **Concerts**. Show the shelf as
+covers (each CD in its jewel case, each record in its sleeve) or as a list, sorted by label in sections of a hundred, by artist, title, year, purchase date, price or
 date added, and filtered with the collection search keys below. **Go to** jumps to a label, and **Label Check** lists
 the free numbers and any duplicates in each series.
 
+![The Shelf: the physical collection as jewel cases and record sleeves with their label stickers, 34 CDs, 5 vinyl and 5 to digitize, and the Go to field for a CD or vinyl label](docs/screenshots/collection.png)
+
 - **CDs, vinyl and downloads.** Every item has a medium. CDs and vinyl carry a label number in their own series (CD #1,
-  CD #2… and Vinyl #1, Vinyl #2…), so CD #12 and Vinyl #12 are two different things; downloads have none. Labels are
-  always shown with their series. A number already used in the same series is refused, with the next number and the
+  CD #2… and Vinyl #1, Vinyl #2…), so CD #12 and Vinyl #12 are two different things; downloads have none. On a cover,
+  the white sticker shows just the number and the jewel case or sleeve tells the series; in text, labels are always
+  shown with their series. Hover a sticker or badge to see what it means. A number already used in the same series is refused, with the next number and the
   first free one offered instead.
 - **Ripped or not.** A CD or record doesn't need any music in your digital collection. Its page says whether it's
   digitized (and from which copy), partly ripped, not ripped yet, or no longer in your digital collection, and offers
@@ -162,8 +172,9 @@ the free numbers and any duplicates in each series.
   digital copy of a record (a needle-drop) or a CD, and songs you bought can be saved as one album download.
 - **Item pages.** The case or sleeve with its label, the release (record label, catalog number, country, format),
   **‹ Previous on Shelf** and **Next on Shelf ›** (⌘[ and ⌘]), the digital copy, the track list (a record's with its
-  sides), your copy's details (edited in place: medium, label, bought, paid, notes, edition, cover), other copies of the
-  same album, and the album's description, reviews and links. An album page lists its **Your Copies** (CDs, records and
+  sides), your copy's details (edited in place: medium, label, bought, paid, notes, edition, cover; a new cover can
+  update its digital album's cover too), other copies of the same album, and the album's description, reviews and
+  links. An album page lists its **Your Copies** (CDs, records and
   downloads), with what the album has cost you per play.
 - **Find by Label** (⌘L): choose CD or Vinyl and type the number. It shows the item, whether it's ripped, and its
   neighbors on the shelf ("between CD #141 and CD #143"); ↑ and ↓ step along the shelf, ⇥ switches series, ↩ opens it.
@@ -172,6 +183,8 @@ the free numbers and any duplicates in each series.
   have **I Own This** to add it.
 - **Removing an album from your digital collection keeps the item**: it keeps the album's cover and is marked not
   ripped.
+
+![The item page for The Köln Concert on Vinyl #2: the record sleeve, sides A to D of the track list (not in your digital collection), Previous and Next on Shelf (Vinyl #1 and Vinyl #3), the Digital Copy card with no digital copy yet and Import a Transfer… and Link…, and the Your Copy editor](docs/screenshots/collection-item.png)
 
 **Coming from an earlier version.** The first time 1.21 opens your library, every album you'd marked as owned becomes
 an item you own, with its label number, purchase date and price: a CD on the Shelf, or a download under Downloads. The
@@ -185,20 +198,25 @@ taken (**Label Check** finds it after updating).
 
 ### Albums and artists
 
-![The albums grid with cover art, sorted by date added](docs/screenshots/albums.png)
+**Artists** (in the sidebar's **Explore** section) lists the artists of both collections: someone you only own on CD
+or vinyl is there too, and their page shows what's in your physical collection.
 
-![An artist page with photo, stats, bio and links](docs/screenshots/artist.png)
+![The Albums grid with cover art, sorted by Recently Played](docs/screenshots/albums.png)
+
+![The artist page for Roy Orbison: stats including the copy you own, bio, links, Concerts Near You and In Your Physical Collection](docs/screenshots/artist.png)
 
 ### Music DNA
 
 Pick anyone from your credits, or click a name anywhere in the app, to see their collaborators. Click a bubble to put that
-person at the center, and choose how many levels of connections to show.
+person at the center, and choose how many levels of connections to show. It covers both collections: a CD or record
+with no digital copy adds its songs' MusicBrainz credits, so a player you only have on vinyl links to the same people as
+your music files.
 
-![Music DNA centered on James Taylor, with musicians, writers and producers around him](docs/screenshots/music-dna.png)
+![Music DNA centered on Roy Orbison, with the Traveling Wilburys, Jeff Lynne, Tom Petty and others around him, three levels deep](docs/screenshots/music-dna.png)
 
 ### Search
 
-![Search results for genre:jazz year:1950-1965, with top hits and refine menus](docs/screenshots/search.png)
+![Search results for genre:jazz year:1950-1965: the What You Own strip with a CD (Birth of the Cool) and a record (The Big Reunion), top hits and songs](docs/screenshots/search.png)
 
 Plain words search titles, artists, albums, genres, composers, labels and credits. Filters narrow things down:
 
@@ -223,7 +241,7 @@ of your jazz records):
 | Release | `copies:>1`, `barcode:886976389413`, `catno:"cl 1355"` |
 
 `label:` still means the record label in the tags. A label number typed on its own (`#142`, `cd 142`) also shows the
-item at that label above the results.
+item at that label above the results, and a **What You Own** strip lists the CDs, records and downloads that match.
 
 Click **?** next to the results for the full reference, or **Save as Smart Playlist** to keep the search. (iPhone
 app versions before 1.21 show a smart playlist that uses collection keys as empty.)
@@ -240,13 +258,13 @@ play.
 
 ![Insights, Digital Collection pane: totals, a timeline by decade, genres, top artists and audio quality](docs/screenshots/insights.png)
 
-![Insights, Listening pane: listening time, plays, streaks, activity over time and top songs, artists and albums](docs/screenshots/listening.png)
+![Insights, Listening pane for the past 7 days: listening time, plays, streaks, activity over time and top songs, artists and albums](docs/screenshots/listening.png)
 
 ### Local Library CDs
 
 ![The downloaded catalog of a public library's CDs, searched for genre:jazz, with genre and decade chips and shelf status](docs/screenshots/library-cds.png)
 
-![A local library CD's page: cover and details from MusicBrainz, where to find it across the network, and its track list](docs/screenshots/library-cd.png)
+![A local library CD's page for Black Radio III: cover and details from MusicBrainz, where to find it across the network, and its track list](docs/screenshots/library-cd.png)
 
 Set it up in **Settings ▸ Local Library**: the catalog's address (it defaults to the Natick library in the Minuteman
 network), your library, and optionally your card number and PIN. Opening **Local Library CDs** (in the sidebar's
@@ -278,32 +296,36 @@ Both your collections. The **Physical** tab (your Physical Collection) finds a l
 its neighbors on the shelf) and lists your CDs, vinyl and what's left to digitize, with the Mac's item pages; **Ready
 to Download** gathers the items whose music is on the Mac but not on the phone. The **Digital** tab (your Digital
 Collection, with your Downloads) has the Mac's album pages (description, rating, the full track list, release details,
-credits, your copies), artist pages (bio, links, concerts near you, albums, most played), Music DNA and Insights, plus
-search, playlists and a Now Playing screen that shows the file's format and the rate your DAC is running at, with
-gapless playback between songs at the same rate. Music that isn't on the phone is dimmed: tap **Download** and the
-phone fetches it from the Mac over Wi-Fi, or **Remove from iPhone** to free the space.
+credits, your copies) and artist pages (bio, links, concerts near you, albums, most played), plus playlists and a Now
+Playing screen that shows the file's format and the rate your DAC is running at, with gapless playback between songs at
+the same rate. **Insights** opens with **Explore**: **Artists** (everyone in both collections) and **Music DNA**. Music
+that isn't on the phone is dimmed: tap **Download** and the phone fetches it from the Mac over Wi-Fi, or **Remove from
+iPhone** to free the space.
 
-![The iPhone app: the whole digital collection's albums with the ones not on the phone dimmed, an album that isn't on the phone with its Download button, and an artist page](docs/screenshots/iphone.png)
+![The iPhone app: the Physical tab with Find by Label on CD #34 and its neighbor, and CDs, Vinyl, To Digitize and Ready to Download; the Vinyl list of five records with their stickers; and JT's item page on Vinyl #4, with no digital copy yet](docs/screenshots/iphone-collection.png)
 
-![The iPhone app: an album's listening stats and track list with the song playing, Music DNA centered on Diana Krall, and Insights with the timeline by decade and top genres](docs/screenshots/iphone-dna-insights.png)
+![The iPhone app: the Digital tab's Albums grid with the albums not on the phone dimmed with a cloud mark, Heavier Things (not on this iPhone) with its Download button, and the John Mayer artist page](docs/screenshots/iphone.png)
+
+![The iPhone app: the item page for Mystery Girl on CD #14 (in your digital collection and on this iPhone, with Play and Shuffle), Music DNA centered on Roy Orbison, and Insights with the Explore section and the Digital pane](docs/screenshots/iphone-dna-insights.png)
 
 ### Widgets and Apple Watch
 
 Home screen widgets show what's playing (with play/pause, skip and like buttons that work without opening the app), how
 much you've listened lately with your streak and top albums, your physical collection with what you added lately and
 your next labels, and your digital collection at a glance. The Apple Watch app is a remote for the iPhone's player with
-your listening, and finds a label on your shelf with the Digital Crown; its complications show your listening time, the
-song playing and your physical collection.
+your listening, and its **Physical** page counts your CDs and records ("34 CDs · 5 records"), lists what you added
+lately and finds a label on your shelf with the Digital Crown, even away from the phone; its complications show your
+listening time, the song playing and your physical collection.
 
-![iPhone widgets: Now Playing with controls and Listening with top albums; Library and Recent Purchases; and the small Library, Listening, latest purchase and Now Playing widgets](docs/screenshots/iphone-widgets.png)
+![iPhone home screen widgets in several sizes: Now Playing with controls, Listening with top albums, and widgets with collection counts and the latest additions](docs/screenshots/iphone-widgets.png)
 
-![The Apple Watch app: a watch face with the Listening and Now Playing complications, Now Playing with controls, Listening for the past 7 days and recent purchases](docs/screenshots/watch.png)
+![The Apple Watch app: the Physical page with Find by Label, 34 CDs · 5 records and recently added; Find by Label on CD #34; recently added records (Vinyl #2 The Köln Concert and Vinyl #1 The Big Reunion, on your shelf with no digital copy); and Listening for the past 7 days](docs/screenshots/watch.png)
 
 ### Themes
 
 | Catppuccin Mocha | Rosé Pine Dawn |
 |---|---|
-| ![Catppuccin Mocha theme](docs/screenshots/theme-catppuccin-mocha.png) | ![Rosé Pine Dawn theme](docs/screenshots/theme-rose-pine-dawn.png) |
+| ![The Mystery Girl album page in the Catppuccin Mocha theme](docs/screenshots/theme-catppuccin-mocha.png) | ![The Mystery Girl album page in the Rosé Pine Dawn theme](docs/screenshots/theme-rose-pine-dawn.png) |
 
 ## Install
 
@@ -387,14 +409,15 @@ then send only what changed.
   the shelf. Below are your CDs, vinyl, **To Digitize**, **Ready to Download** (with **Download All**) and what you
   added lately. Items with
   no digital copy show at full brightness with a disc or record mark, never dimmed or with a Download button: there's
-  nothing to download until you rip or digitize them on the Mac. With Siri or Shortcuts, say "Find CD 12 in Music
-  Library".
+  nothing to download until you rip or digitize them on the Mac. Press and hold a cover's sticker or badge to see what
+  it means. With Siri or Shortcuts, say "Find CD 12 in Music Library".
 - **Digital** (your Digital Collection) lists all your music, with your **Downloads**; switch it to **On This iPhone**
   to see only what you can play right now. Albums, artists
   and songs that aren't on the phone are dimmed: tap one to download it, or long-press anything for **Download to
   iPhone** or **Remove from iPhone**. What's waiting for the Mac is listed in the Sync tab.
-- Album and artist pages, **Music DNA** (from the Digital tab, an artist page or any credited name) and the **Insights** tab work
-  without the music being on the phone, from what the Mac last synced. Songs you like go back to the Mac at the next
+- **Insights** starts with **Explore**: **Artists**, everyone in both collections (artists you only own on CD or vinyl
+  included), and **Music DNA** (also opened from an artist page or any credited name). Album and artist pages, Music
+  DNA and Insights work without the music being on the phone, from what the Mac last synced. Songs you like go back to the Mac at the next
   sync. Your copies (on album pages and item pages) are read-only on the phone: edit them in the Mac app.
 - With a USB DAC connected, each song plays at its own sample rate (16/44.1, 24/96, 24/192…); Now Playing shows where it's
   going and at what rate. For bit-perfect output keep the iPhone's volume at maximum and use the DAC's or amplifier's.
@@ -426,10 +449,10 @@ Tapping a widget opens the app on its album, item, Now Playing or Insights.
 
 The watch app (watchOS 26 or later) installs with the iPhone app (or from the Watch app on the phone, under **Available Apps**). It's a remote
 for the iPhone's player (play/pause, previous, next, like, and starting Liked Songs, a shuffle, or an album from your
-most played, Rediscover and recently added) and shows your listening. Its **Shelf** page counts your CDs and records,
-lists what you added lately and the CDs left to rip, and has **Find**: pick CD or Vinyl and turn the Digital Crown to a
-label to see what it is and its neighbors, even away from the phone (the phone sends the watch an index of your labeled
-items). Its complications show listening time, the song playing and your physical collection. It shows what the phone last
+most played, Rediscover and recently added) and shows your listening. Its **Physical** page counts your CDs and
+records ("34 CDs · 5 records"), lists what you added lately and the CDs left to rip, and has **Find**: pick CD or Vinyl
+and turn the Digital Crown to a label to see what it is and its neighbors, even away from the phone (the phone sends the
+watch an index of your labeled items, usually as soon as you open the watch app with the phone nearby). Its complications show listening time, the song playing and your physical collection. It shows what the phone last
 sent, so the phone app must have run since; commands and covers need the phone nearby.
 
 **Every 7 days (free Apple ID)**
