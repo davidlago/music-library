@@ -616,6 +616,18 @@ struct CollectionBreakdownCard: View {
 struct CollectionFactsCard: View {
     let stats: CollectionStats
 
+    /// In days for the last two weeks ("9 days ago": the named relative style counts calendar weeks and says "2 weeks
+    /// ago"), then relative.
+    static func whenAdded(_ date: Date, now: Date = .now, calendar: Calendar = .current) -> String {
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: now)).day ?? 0
+        switch days {
+        case 0: return "today"
+        case 1: return "yesterday"
+        case 2..<14: return "\(days) days ago"
+        default: return date.formatted(.relative(presentation: .named))
+        }
+    }
+
     var body: some View {
         let facts = facts
         if !facts.isEmpty { InsightFactsCard(facts: facts) }
@@ -630,7 +642,7 @@ struct CollectionFactsCard: View {
             out.append(InsightFact(icon: "clock.arrow.circlepath", title: "Oldest release", value: String(year), detail: describe(item), itemID: item.id))
         }
         if let item = stats.newestAddition {
-            let when = (item.purchasedOn?.date() ?? item.createdAt).formatted(.relative(presentation: .named))
+            let when = Self.whenAdded(item.purchasedOn?.date() ?? item.createdAt)
             out.append(InsightFact(icon: "sparkles", title: "Newest addition", value: when, detail: describe(item), itemID: item.id))
         }
         if let most = stats.mostCopies {

@@ -341,7 +341,10 @@ struct AlbumTrackList: View {
             .padding(.vertical, 4)
             .card()
             if trackless {
-                Text("The track list of the release, from MusicBrainz.").font(.caption).foregroundStyle(.secondary)
+                // Credited only when it's MusicBrainz's (its entries carry recording IDs), not, say, the sample library's.
+                let fromMusicBrainz = info?.tracklist.contains { !$0.recordingId.isEmpty } == true
+                Text(fromMusicBrainz ? "The track list of the release, from MusicBrainz." : "The track list of the release.")
+                    .font(.caption).foregroundStyle(.secondary)
             } else if notInLibrary > 0 {
                 Text("Greyed-out tracks are on this release but not in your library.").font(.caption).foregroundStyle(.secondary)
             }

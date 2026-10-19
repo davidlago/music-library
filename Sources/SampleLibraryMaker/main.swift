@@ -80,7 +80,9 @@ do {
             extended.releaseStatus = "Official"
             extended.releaseCountry = SampleCatalog.artists.first { $0.name == album.artist }?.country ?? ""
             extended.releaseDate = String(format: "%04d-%02d-%02d", album.year, album.month, 1 + (album.title.count * 7) % 27)
-            extended.mediaFormat = "Digital Media"
+            // The release the files came from: the CD or record they were ripped from, when you own one.
+            extended.mediaFormat = album.owned == nil || album.medium == .download ? "Digital Media"
+                : album.medium == .vinyl ? "12\" Vinyl" : "CD"
             extended.producer = album.producer
             extended.mixer = album.mixer
             extended.credits = (album.personnel + song.extra).map { Credit(role: $0.0, name: $0.1, scope: .recording) }

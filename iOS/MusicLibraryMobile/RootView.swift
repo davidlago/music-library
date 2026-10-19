@@ -9,13 +9,31 @@ struct RootView: View {
     @Environment(PhonePlayer.self) private var player
     @Environment(\.scenePhase) private var scenePhase
     @State private var showNowPlaying = false
-    /// The tab last chosen; until then, the collection when there is one, else the library.
-    @SceneStorage("selectedTab") private var chosenTab: Tabs?
-    @AppStorage("insightsPane") private var insightsPane = InsightsPane.library
+    /// The tab last chosen, kept when the app is swiped away (scene storage isn't). Until one is chosen, the collection
+    /// when there is one, else the library, settled once the library has loaded (`settleDefaultTab`) so the tab
+    /// never changes by itself afterwards.
+    @AppStorage("selectedTab") private var chosenTab: Tabs?
+    @AppStorage("insightsPane") private var insightsPane = InsightsPane.owned
 
     private var tab: Tabs {
-        get { chosenTab ?? (model.collection.items.isEmpty ? .library : .collection) }
+        get { chosenTab ?? Self.defaultTab(loaded: isLoaded, collectionIsEmpty: model.collection.items.isEmpty) }
         nonmutating set { chosenTab = newValue }
+    }
+
+    private var isLoaded: Bool {
+        if case .loaded = model.state { true } else { false }
+    }
+
+    /// While loading, the Collection tab (it shows the same progress as the Library tab), so a library with a
+    /// collection doesn't switch tabs when it arrives.
+    static func defaultTab(loaded: Bool, collectionIsEmpty: Bool) -> Tabs {
+        loaded && collectionIsEmpty ? .library : .collection
+    }
+
+    /// The first time a library loads with no tab chosen yet, the default becomes the choice.
+    private func settleDefaultTab() {
+        guard chosenTab == nil, isLoaded else { return }
+        chosenTab = Self.defaultTab(loaded: true, collectionIsEmpty: model.collection.items.isEmpty)
     }
 
     var body: some View {
@@ -40,6 +58,7 @@ struct RootView: View {
         .onChange(of: tab == .sync && scenePhase == .active, initial: true) { _, visible in
             model.sync.setVisible(visible)
         }
+        .onChange(of: isLoaded, initial: true) { settleDefaultTab() }
         .tabViewBottomAccessory {
             MiniPlayer { showNowPlaying = true }
         }

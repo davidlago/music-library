@@ -208,12 +208,16 @@ struct WatchFindPage: View {
                 unavailable
             }
         }
-        .navigationTitle("Find")
+        // The series shown is in the title and on every number (CD #12 and Vinyl #12 are different shelves); the
+        // button says what it switches to.
+        .navigationTitle(model.shelf == nil ? "Find" : (series == "vinyl" ? "Vinyl" : "CDs"))
         .toolbar {
             if model.shelf != nil {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(seriesName) { model.setFind(model.find.with(series: series == "vinyl" ? "cd" : "vinyl")) }
-                        .accessibilityLabel(series == "vinyl" ? "Showing vinyl; show CDs" : "Showing CDs; show vinyl")
+                    Button(series == "vinyl" ? "Show CDs" : "Show Vinyl") {
+                        model.setFind(model.find.with(series: series == "vinyl" ? "cd" : "vinyl"))
+                    }
+                    .accessibilityLabel(series == "vinyl" ? "Showing vinyl; show CDs" : "Showing CDs; show vinyl")
                 }
             }
         }
@@ -254,12 +258,18 @@ struct WatchFindPage: View {
             VStack(spacing: 4) {
                 HStack(spacing: 2) {
                     step(-1)
-                    Text("#\(number)")
-                        .font(.system(size: 40, weight: .bold, design: .rounded).monospacedDigit())
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.4)
-                        .frame(maxWidth: .infinity)
-                        .accessibilityLabel("\(seriesName) label \(number)")
+                    VStack(spacing: -2) {
+                        Text(seriesName.uppercased())
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text("#\(number)")
+                            .font(.system(size: 40, weight: .bold, design: .rounded).monospacedDigit())
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.4)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(seriesName) label \(number)")
                     step(1)
                 }
                 .focusable()
@@ -324,17 +334,19 @@ struct WatchFindPage: View {
         let (previous, next) = index.neighbors(number)
         return HStack {
             if let previous {
-                Button("← #\(previous.n)") { select(previous.n, moveCrown: true) }
-                    .accessibilityLabel("Previous label, \(previous.t)")
+                Button("← \(seriesName) #\(previous.n)") { select(previous.n, moveCrown: true) }
+                    .accessibilityLabel("Previous label, \(seriesName) label \(previous.n), \(previous.t)")
             }
             Spacer(minLength: 4)
             if let next {
-                Button("#\(next.n) →") { select(next.n, moveCrown: true) }
-                    .accessibilityLabel("Next label, \(next.t)")
+                Button("\(seriesName) #\(next.n) →") { select(next.n, moveCrown: true) }
+                    .accessibilityLabel("Next label, \(seriesName) label \(next.n), \(next.t)")
             }
         }
         .buttonStyle(.plain)
         .font(.caption.weight(.medium).monospacedDigit())
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
         .foregroundStyle(.secondary)
     }
 

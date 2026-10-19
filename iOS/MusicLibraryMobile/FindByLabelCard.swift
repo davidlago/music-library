@@ -32,8 +32,8 @@ struct FindByLabelCard: View {
                 HStack(spacing: 4) {
                     Text("#").foregroundStyle(.secondary)
                     TextField("0", text: Binding(get: { number > 0 ? String(number) : "" }, set: { typed in
-                        let digits = String(typed.filter(\.isNumber).prefix(7))
-                        if let n = Int(digits), n > 0 {
+                        // Any script's digits (Arabic-Indic, full-width…): `Int(String)` reads only ASCII ones.
+                        if let n = Sticker.typedNumber(typed), n > 0 {
                             storedNumber = min(n, Sticker.maxNumber)
                             cleared = false
                         } else {
@@ -99,10 +99,11 @@ struct FindByLabelCard: View {
         let neighbors = c.neighbors(of: sticker)
         VStack(alignment: .leading, spacing: 10) {
             if hits.isEmpty {
-                let highest = c.nextNumber(in: sticker.series) - 1
+                // Past the highest label, the number to use is the next one, whatever was typed (as on the Mac).
+                let next = c.nextNumber(in: sticker.series)
                 HStack(spacing: 10) {
                     Image(systemName: "tag").foregroundStyle(.secondary)
-                    Text(sticker.number > highest ? "\(sticker.text) is the next free number" : "\(sticker.text) is free")
+                    Text(sticker.number >= next ? "\(sticker.series.name) #\(next) is the next free number" : "\(sticker.text) is free")
                         .font(.headline)
                 }
                 .padding(.vertical, 4)
@@ -154,7 +155,7 @@ struct FindByLabelCard: View {
                 HStack(spacing: 4) {
                     if leading { Image(systemName: "arrow.left") }
                     VStack(alignment: leading ? .leading : .trailing, spacing: 1) {
-                        Text("#\(sticker.number)").font(.caption.weight(.semibold).monospacedDigit())
+                        Text(sticker.text).font(.caption.weight(.semibold).monospacedDigit())
                         Text(item.album).font(.caption2).lineLimit(1)
                     }
                     if !leading { Image(systemName: "arrow.right") }

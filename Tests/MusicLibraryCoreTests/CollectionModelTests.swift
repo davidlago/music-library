@@ -71,6 +71,19 @@ import Testing
         }
     }
 
+    /// Find by Label's number field: a phone set to Arabic-Indic numerals types those digits, which `Int(String)` can't
+    /// read, so the field showed nothing.
+    @Test func typedNumbersReadDigitsInAnyScript() {
+        for (text, number) in [("12", 12), ("١٢", 12), ("１２", 12), ("۱۲", 12), ("12١", 121), ("#1 2", 12), ("0012", 12),
+                               ("12345678", 1_234_567)] {
+            #expect(Sticker.typedNumber(text) == number, "\(text)")
+        }
+        for none in ["", "#", "abc", "½", "Ⅻ"] {
+            #expect(Sticker.typedNumber(none) == nil, "\(none)")
+        }
+        #expect(Sticker.typedNumber("0") == 0)
+    }
+
     @Test func stickersAlwaysShowTheirSeries() throws {
         let cd = try #require(Sticker(series: .cd, number: 12))
         let vinyl = try #require(Sticker(series: .vinyl, number: 12))

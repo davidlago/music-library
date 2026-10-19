@@ -93,7 +93,8 @@ struct LabelSticker: View {
         Group {
             switch series {
             case .cd:
-                let font = max(9, width * 0.6)
+                // In proportion to the strip, with no floor: a larger number would spill over a small case's hinge.
+                let font = width * 0.6
                 // Monospaced digits are about 0.6 em wide.
                 let height = max(width * 1.5, CGFloat(text.count) * font * 0.62 + font * 0.7)
                 Text(text)
@@ -209,20 +210,25 @@ struct CopyBadge: View {
     }
 }
 
-/// "2" in a capsule: how many copies of the album you own, when more than one.
+/// Two squares and "2" in a capsule: how many copies of the album you own, when more than one (the glyph keeps it from
+/// reading as a label number).
 struct CopiesChip: View {
     let count: Int
     let coverSide: CGFloat
 
     var body: some View {
-        Text(count.formatted())
-            .font(.system(size: max(9, min(13, coverSide * 0.07)), weight: .bold).monospacedDigit())
-            .foregroundStyle(.white)
-            .padding(.horizontal, 6).padding(.vertical, 2)
-            .background(Capsule().fill(.black.opacity(0.65)))
-            .padding(max(4, coverSide * 0.035))
-            .allowsHitTesting(false)
-            .accessibilityLabel("\(count) copies")
+        let size = max(9, min(13, coverSide * 0.07))
+        HStack(spacing: size * 0.25) {
+            Image(systemName: "square.on.square").font(.system(size: size * 0.85, weight: .semibold))
+            Text(count.formatted()).font(.system(size: size, weight: .bold).monospacedDigit())
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 6).padding(.vertical, 2)
+        .background(Capsule().fill(.black.opacity(0.65)))
+        .padding(max(4, coverSide * 0.035))
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(count) copies")
     }
 }
 

@@ -56,7 +56,7 @@ enum InsightsPane: String, CaseIterable, Identifiable {
 /// Insights: what you own (CDs, records, downloads), your digital library, and what you listen to.
 struct InsightsTab: View {
     @Environment(PhoneModel.self) private var model
-    @AppStorage("insightsPane") private var pane = InsightsPane.library
+    @AppStorage("insightsPane") private var pane = InsightsPane.owned
     @AppStorage("listeningPeriod") private var period = ListeningStats.Period.month
 
     var body: some View {
@@ -866,7 +866,7 @@ struct InsightsLabelsCard: View {
     let stats: LibraryStats
 
     var body: some View {
-        InsightCard(title: "Labels & Countries", subtitle: "From MusicBrainz release data") {
+        InsightCard(title: "Record Labels & Countries", subtitle: "From MusicBrainz release data") {
             if !stats.labels.isEmpty {
                 InsightRankedBars(items: stats.labels.map {
                     InsightRankedItem(name: $0.name, value: Double($0.count), detail: songCount($0.count), query: SearchFilterKey.token("label", $0.name))

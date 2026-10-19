@@ -156,6 +156,15 @@ public struct Sticker: Hashable, Comparable, Sendable {
         return (series, n)
     }
 
+    /// The number in a number field's text, from its decimal digits in any script (a number pad set to Arabic-Indic
+    /// numerals types "١٢", which `Int(String)` can't read), the first 7 of them; nil without any. Other characters are
+    /// left out.
+    public static func typedNumber(_ text: String) -> Int? {
+        let digits = text.compactMap(\.wholeNumberValue).filter { (0...9).contains($0) }.prefix(7)
+        guard !digits.isEmpty else { return nil }
+        return digits.reduce(0) { $0 * 10 + $1 }
+    }
+
     public static func < (a: Sticker, b: Sticker) -> Bool { (a.series, a.number) < (b.series, b.number) }
 }
 

@@ -22,10 +22,6 @@ final class WatchLink: NSObject {
     /// Copies of the shelf index being transferred (WatchConnectivity reads the file until the transfer ends, and the
     /// app group's copy is replaced on every change).
     nonisolated private static let shelfOutbox = URL.cachesDirectory.appendingPathComponent("WatchShelf", isDirectory: true)
-    /// A watch that doesn't say which index it has (an older watch app, or one without an index yet) gets it again
-    /// once per launch at most.
-    private var resentForUnknownShelf = false
-
     /// The `contentHash` of the shelf index last handed to WatchConnectivity for this watch. Kept across launches, so
     /// an unchanged index isn't sent at each one; forgotten when a transfer fails or the watch changes.
     nonisolated private static let sentShelfKey = "watchShelfHash"
@@ -91,15 +87,11 @@ final class WatchLink: NSObject {
         sentShelfHash = hash
     }
 
-    /// A watch's `refresh`: sends the index again when the watch has another (nil: it didn't say).
+    /// A watch's `refresh`: sends the index again when the watch has another ("" when it has none yet). A watch app
+    /// that doesn't say (nil) is one from before the collection, which can't read the index: it isn't sent.
     private func checkShelf(watchHas hash: String?) {
-        guard let shelf = currentShelf()?.index else { return }
-        if let hash {
-            if hash != shelf.contentHash { sendShelf(shelf, force: true) }
-        } else if !resentForUnknownShelf {
-            resentForUnknownShelf = true
-            sendShelf(shelf, force: true)
-        }
+        guard let hash, let shelf = currentShelf()?.index, hash != shelf.contentHash else { return }
+        sendShelf(shelf, force: true)
     }
 
     /// The application context reaches a watch app in the background only when watchOS gets to it, so a complication

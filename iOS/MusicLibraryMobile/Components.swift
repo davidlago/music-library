@@ -28,18 +28,39 @@ struct OpenRouteAction {
 
 extension EnvironmentValues {
     @Entry var openRoute = OpenRouteAction { _ in }
+    /// Shows a page on its own over the tab's root, whatever was pushed before (links from widgets and Siri).
+    @Entry var showRoute = OpenRouteAction { _ in }
 }
 
-/// A tab's navigation stack, with library pages and `openRoute` wired up.
-struct LibraryStack<Root: View>: View {
+/// A tab's navigation stack, with library pages and `openRoute` wired up. `opener` watches for links to open
+/// (`showRoute`); it sits on the stack itself, not its root page, so it runs while another page is pushed over the root.
+struct LibraryStack<Root: View, Opener: ViewModifier>: View {
+    var opener: Opener
     @ViewBuilder var root: () -> Root
     @State private var path = NavigationPath()
+
+    init(opener: Opener, @ViewBuilder root: @escaping () -> Root) {
+        self.opener = opener
+        self.root = root
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
             root().libraryDestinations()
         }
+        .modifier(opener)
         .environment(\.openRoute, OpenRouteAction { value in path.append(value) })
+        .environment(\.showRoute, OpenRouteAction { value in
+            var shown = NavigationPath()
+            shown.append(value)
+            path = shown
+        })
+    }
+}
+
+extension LibraryStack where Opener == EmptyModifier {
+    init(@ViewBuilder root: @escaping () -> Root) {
+        self.init(opener: EmptyModifier(), root: root)
     }
 }
 

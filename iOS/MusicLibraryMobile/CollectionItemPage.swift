@@ -149,14 +149,14 @@ private struct CollectionItemContent: View {
     private func shelfSteps(_ neighbors: (previous: CollectionItem?, next: CollectionItem?)) -> some View {
         HStack(spacing: 12) {
             Button { if let p = neighbors.previous { step(p.id) } } label: {
-                Label(neighbors.previous?.sticker.map { "#\($0.number)" } ?? "Previous", systemImage: "chevron.left")
+                Label(neighbors.previous?.sticker.map(\.text) ?? "Previous", systemImage: "chevron.left")
             }
             .disabled(neighbors.previous == nil)
             .accessibilityLabel("Previous on the shelf")
             Text("On the shelf").font(.caption).foregroundStyle(.secondary)
             Button { if let n = neighbors.next { step(n.id) } } label: {
                 HStack(spacing: 4) {
-                    Text(neighbors.next?.sticker.map { "#\($0.number)" } ?? "Next")
+                    Text(neighbors.next?.sticker.map(\.text) ?? "Next")
                     Image(systemName: "chevron.right")
                 }
             }

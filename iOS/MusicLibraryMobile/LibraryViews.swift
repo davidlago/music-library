@@ -18,7 +18,7 @@ struct LibraryTab: View {
     @State private var showSettings = false
 
     var body: some View {
-        LibraryStack {
+        LibraryStack(opener: PendingAlbumOpener()) {
             Group {
                 // A collection without songs yet is a library too (its albums show up as they're ripped).
                 if let library = model.library, !library.isEmpty {
@@ -31,7 +31,6 @@ struct LibraryTab: View {
             .toolbar {
                 Button("Settings", systemImage: "gearshape") { showSettings = true }
             }
-            .modifier(PendingAlbumOpener())
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
     }
@@ -57,11 +56,11 @@ private struct SampleLibraryNote: View {
     }
 }
 
-/// Pushes the album a widget opened (`PhoneModel.pendingAlbumKey`) once the library is loaded, or the collection item
-/// for it when the album has no songs in the library.
+/// Shows the album a widget opened (`PhoneModel.pendingAlbumKey`) once the library is loaded, or the collection item
+/// for it when the album has no songs in the library, over whatever page the tab had pushed.
 private struct PendingAlbumOpener: ViewModifier {
     @Environment(PhoneModel.self) private var model
-    @Environment(\.openRoute) private var openRoute
+    @Environment(\.showRoute) private var showRoute
 
     private struct Pending: Equatable {
         var key: String?
@@ -74,9 +73,9 @@ private struct PendingAlbumOpener: ViewModifier {
             if case .loading = model.state { return }
             model.pendingAlbumKey = nil
             if let album = model.library?.album(forKey: key) {
-                openRoute(album)
+                showRoute(album)
             } else if let item = model.collection.copies(albumKey: key).first {
-                openRoute(CollectionItemRoute(id: item.id))
+                showRoute(CollectionItemRoute(id: item.id))
             }
         }
     }

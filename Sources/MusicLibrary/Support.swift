@@ -100,8 +100,9 @@ struct LabelSticker: View {
     }
 
     private var strip: some View {
-        let font = max(9, width * 0.6)
-        let prefix = max(6, font * 0.55)
+        // In proportion to the strip, with no floor: a larger number would spill over a small case's hinge.
+        let font = width * 0.6
+        let prefix = font * 0.55
         let text = String(number)
         // Monospaced digits are about 0.6 em wide; "CD" and the gap before the number about 1.6 em of the prefix.
         let height = max(width * 1.5, CGFloat(text.count) * font * 0.62 + prefix * 1.6 + font * 0.7)

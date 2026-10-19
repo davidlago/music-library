@@ -91,6 +91,8 @@ struct RecordSleeve<Booklet: View>: View {
                 .clipShape(Circle())
             Circle().fill(label).frame(width: d * 0.34, height: d * 0.34)
             Circle().fill(Color(white: 0.08)).frame(width: d * 0.025, height: d * 0.025)
+            // The rim catching the light, so the disc shows on dark backgrounds too.
+            Circle().strokeBorder(.white.opacity(0.2), lineWidth: max(0.5, d * 0.005))
         }
         .frame(width: d, height: d)
         .shadow(color: .black.opacity(0.4), radius: 2, y: 1)

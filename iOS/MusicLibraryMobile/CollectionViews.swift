@@ -35,7 +35,7 @@ struct CollectionTab: View {
     @Environment(PhoneModel.self) private var model
 
     var body: some View {
-        LibraryStack {
+        LibraryStack(opener: PendingItemOpener()) {
             Group {
                 if let library = model.library {
                     if model.collection.items.isEmpty {
@@ -54,15 +54,15 @@ struct CollectionTab: View {
                 }
             }
             .navigationTitle("Collection")
-            .modifier(PendingItemOpener())
         }
     }
 }
 
-/// Pushes the item a widget opened (`PhoneModel.pendingItemID`) once the library is loaded.
+/// Shows the item a widget or Siri opened (`PhoneModel.pendingItemID`) once the library is loaded, over whatever page
+/// the tab had pushed.
 private struct PendingItemOpener: ViewModifier {
     @Environment(PhoneModel.self) private var model
-    @Environment(\.openRoute) private var openRoute
+    @Environment(\.showRoute) private var showRoute
 
     private struct Pending: Equatable {
         var id: String?
@@ -74,7 +74,7 @@ private struct PendingItemOpener: ViewModifier {
             guard let id = model.pendingItemID else { return }
             if case .loading = model.state { return }
             model.pendingItemID = nil
-            if model.item(id: id) != nil { openRoute(CollectionItemRoute(id: id)) }
+            if model.item(id: id) != nil { showRoute(CollectionItemRoute(id: id)) }
         }
     }
 }
@@ -285,7 +285,9 @@ struct CollectionCell: View {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(item.album.isEmpty ? "Unknown Album" : item.album).font(.subheadline).lineLimit(1)
                 Spacer(minLength: 0)
-                CollectionStatusMark(item: item, state: state)
+                // Only whether the songs are on this iPhone: the status line below already says "Not ripped" or
+                // "Missing", and the title needs the room.
+                if state.hasMusic { CollectionStatusMark(item: item, state: state) }
             }
             Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             // Always there, so cells in a row are as tall.
