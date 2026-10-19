@@ -892,7 +892,7 @@ public struct Collection: Codable, Hashable, Sendable {
     public var toRip: Int?                   // CDs with no digital copy
     public var vinylToDigitize: Int?
     public var nextCD: Int?, nextVinyl: Int? // next free label per series
-    public var recent: [Item]?               // ≤ 8, newest purchasedOn ?? createdAt, any medium, trackless included
+    public var recent: [Item]?               // ≤ 8, newest createdAt (as the iPhone's Recently Added), any medium, trackless included
     public var toRipList: [Item]?            // ≤ 8 unripped CDs, oldest bought first
     public struct Item: Codable, Hashable, Sendable, Identifiable {
         public var id: String                // item id

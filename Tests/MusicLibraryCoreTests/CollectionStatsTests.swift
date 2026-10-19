@@ -194,8 +194,9 @@ import Testing
     @Test func breakdowns() {
         let s = stats
         #expect(s.artists.first?.name == "Band" && s.artists.first?.items == 4 && s.artists.first?.spent == 85)
-        // Tracks' genres, else the album info's.
-        #expect(s.genres.map(\.name) == ["Rock", "jazz"])
+        // Tracks' genres, else the album info's (capitalized like tags: MusicBrainz's are lowercase).
+        #expect(s.genres.map(\.name) == ["Rock", "Jazz"])
+        #expect(CollectionStats.displayGenre("lo-fi hip hop") == "Lo-Fi Hip Hop" && CollectionStats.displayGenre("R&B") == "R&B")
         // The item's year, else the tracks'.
         #expect(s.decades.map(\.name) == ["1950s", "1960s", "1990s"] && s.decades.map(\.items) == [1, 2, 1])
         // The item's record label, else the tracks' tag.
@@ -210,6 +211,8 @@ import Testing
         #expect(s.biggestBox?.id == "box")
         // A, B and D's tracks, plus Blue Train's tracklist.
         #expect(s.runtime == 400 + 300 + 200 + 500)
+        // Of the 6 albums owned, the box and Dup have no known length.
+        #expect(s.runtimeAlbums == 4 && s.albumsOwned == 6)
         #expect(s.recentlyAdded.first?.id == derived && s.recentlyAdded.count == 7)
     }
 }

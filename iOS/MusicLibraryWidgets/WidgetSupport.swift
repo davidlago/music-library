@@ -201,10 +201,10 @@ extension Glance.Collection.Item {
         return "\(ShelfArt.mediumName(medium)) label \(sticker)"
     }
 
-    /// "Added today", "Added 3 days ago", "Added Sep 1" (with the year before this one), from the purchase day, else
-    /// the day it went into the collection (nil from a summary that has neither). `short` leaves out "Added".
+    /// "Added today", "Added 3 days ago", "Added Sep 1" (with the year before this one), from the day it went into the
+    /// collection, not the day it was bought (nil from a summary without it). `short` leaves out "Added".
     func addedText(short: Bool = false, now: Date = Date(), calendar: Calendar = .current) -> String? {
-        let parts = (purchasedOn ?? addedOn)?.split(separator: "-").compactMap { Int($0) } ?? []
+        let parts = addedOn?.split(separator: "-").compactMap { Int($0) } ?? []
         guard parts.count == 3,
               let day = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2])) else { return nil }
         let days = calendar.dateComponents([.day], from: day, to: calendar.startOfDay(for: now)).day ?? 0

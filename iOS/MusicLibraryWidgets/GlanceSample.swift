@@ -57,7 +57,8 @@ extension Glance {
                   price: Decimal?) -> Collection.Item {
             Collection.Item(id: id, albumKey: a.key, title: a.title, artist: a.artist, year: a.year, medium: medium, sticker: sticker,
                             digitized: digitized, playable: playable, cover: a.cover,
-                            purchasedOn: daysAgo.flatMap { Self.day(calendar.date(byAdding: .day, value: -$0, to: today)) }, price: price)
+                            purchasedOn: daysAgo.flatMap { Self.day(calendar.date(byAdding: .day, value: -$0, to: today)) }, price: price,
+                            addedOn: daysAgo.flatMap { Self.day(calendar.date(byAdding: .day, value: -$0, to: today)) })
         }
         let blueTrain = album("Blue Train", "John Coltrane", 1958)
         let collection = Collection(

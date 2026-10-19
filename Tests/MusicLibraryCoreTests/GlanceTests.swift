@@ -211,8 +211,9 @@ extension GlanceTests {
     func day(_ y: Int, _ m: Int, _ d: Int) -> PurchaseDay { PurchaseDay(year: y, month: m, day: d)! }
 
     func copy(_ id: String, _ medium: CollectionMedium, _ number: Int? = nil, album: String, artist: String, day: PurchaseDay? = nil,
-              price: Decimal? = nil, cover: String? = nil) -> CollectionItem {
-        var i = CollectionItem(id: id, medium: medium, album: album, artist: artist, now: Date(timeIntervalSince1970: 0))
+              price: Decimal? = nil, cover: String? = nil, addedDaysAgo: Double? = nil) -> CollectionItem {
+        let added = addedDaysAgo.map { now.addingTimeInterval(-$0 * 86_400) } ?? Date(timeIntervalSince1970: 0)
+        var i = CollectionItem(id: id, medium: medium, album: album, artist: artist, now: added)
         i.stickerNumber = number
         i.purchasedOn = day
         i.price = price
@@ -221,15 +222,17 @@ extension GlanceTests {
     }
 
     /// OK Computer on CD and vinyl, Kind of Blue on vinyl only, two trackless items and songs bought of Computer World.
+    /// The record of OK Computer was bought long ago but cataloged last.
     var collection: MusicCollection {
         MusicCollection(items: [
-            copy("ok-cd", .cd, 3, album: "OK Computer", artist: "Radiohead", day: day(2026, 9, 1), price: 12.5),
-            copy("ok-lp", .vinyl, 1, album: "OK Computer", artist: "Radiohead", day: day(2025, 1, 10), price: 30),
-            copy("blue-lp", .vinyl, 4, album: "Kind of Blue", artist: "Miles Davis", day: day(2026, 3, 1), price: 25),
+            copy("ok-cd", .cd, 3, album: "OK Computer", artist: "Radiohead", day: day(2026, 9, 1), price: 12.5, addedDaysAgo: 10),
+            copy("ok-lp", .vinyl, 1, album: "OK Computer", artist: "Radiohead", day: day(2025, 1, 10), price: 30, addedDaysAgo: 1),
+            copy("blue-lp", .vinyl, 4, album: "Kind of Blue", artist: "Miles Davis", day: day(2026, 3, 1), price: 25,
+                 addedDaysAgo: 30),
             copy("ril-lp", .vinyl, 2, album: "Remain in Light", artist: "Talking Heads", day: day(2026, 9, 10), price: 20,
-                 cover: "ril-lp-0000abcd.jpg"),
-            copy("train-cd", .cd, 4, album: "Blue Train", artist: "John Coltrane", price: 10),
-            copy("dup-cd", .cd, 4, album: "Giant Steps", artist: "John Coltrane"),
+                 cover: "ril-lp-0000abcd.jpg", addedDaysAgo: 5),
+            copy("train-cd", .cd, 4, album: "Blue Train", artist: "John Coltrane", price: 10, addedDaysAgo: 60),
+            copy("dup-cd", .cd, 4, album: "Giant Steps", artist: "John Coltrane", addedDaysAgo: 90),
         ], songPurchases: [6: TrackPurchase(purchasedOn: day(2026, 2, 2), price: Decimal(string: "1.29"))], tracks: tracks)
     }
 
@@ -267,12 +270,13 @@ extension GlanceTests {
         #expect(c.nextCD == 5 && c.nextVinyl == 5)
         let recent = try #require(c.recent)
         #expect(recent.count == 7)
-        #expect(recent.map(\.id).prefix(5) == ["ril-lp", "ok-cd", "blue-lp",
-                                                CollectionItem.songsID(albumKey: SearchIndex.albumKey(album: "Computer World", artist: "Kraftwerk")),
-                                                "ok-lp"])
+        // By when each was added, not bought: the record bought in 2025 and cataloged yesterday comes first.
+        #expect(recent.map(\.id) == ["ok-lp", "ril-lp", "ok-cd", "blue-lp", "train-cd", "dup-cd",
+                                      CollectionItem.songsID(albumKey: SearchIndex.albumKey(album: "Computer World", artist: "Kraftwerk"))])
+        #expect(recent[0].purchasedOn == "2025-01-10" && recent[0].addedOn == PurchaseDay(now.addingTimeInterval(-86_400), calendar: calendar).string)
         #expect(c.toRipList?.map(\.id) == ["dup-cd", "train-cd"])
 
-        let ril = recent[0], ok = recent[1]
+        let ril = recent[1], ok = recent[2]
         #expect(ril.medium == "vinyl" && ril.sticker == 2 && ril.stickerText == "Vinyl #2")
         #expect(ril.digitized == false && ril.playable == false && ril.purchasedOn == "2026-09-10" && ril.price == 20)
         #expect(ok.stickerText == "CD #3" && ok.digitized == true && ok.playable == true && ok.albumKey == Self.okKey)
@@ -292,7 +296,8 @@ extension GlanceTests {
         var items = collection.items.filter { $0.origin == .stored }
         items[items.firstIndex { $0.id == "ril-lp" }!].coverFile = "ril-lp-0000beef.jpg"
         let changed = build(collection: MusicCollection(items: items, songPurchases: [:], tracks: tracks)).glance
-        #expect(changed.collection?.recent?.first?.cover != rilCover)
+        let changedCover = try #require(changed.collection?.recent?.first { $0.id == "ril-lp" }?.cover)
+        #expect(changedCover != rilCover && Glance.isCoverName(changedCover))
     }
 
     @Test func olderPayloadsDecode() throws {
@@ -327,7 +332,7 @@ extension GlanceTests {
         // (JSONSerialization turns prices into doubles, so they're not compared here.)
         #expect(back.owned.recent.map(\.id) == g.owned.recent.map(\.id) && back.owned.ownedCount == g.owned.ownedCount)
         let first = try #require(back.collection?.recent?.first)
-        #expect(first.medium == "cassette" && first.stickerText == "2")
+        #expect(first.medium == "cassette" && first.stickerText == "1")
         #expect(back.collection?.recent?.dropFirst().map(\.id) == g.collection?.recent?.dropFirst().map(\.id))
         #expect(back.collection?.nextVinyl == 5)
         #expect(GlanceStore.decode(try GlanceStore.encode(g)) == g)

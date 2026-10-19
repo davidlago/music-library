@@ -683,6 +683,13 @@ struct CollectionFactsCard: View {
         [item.sticker?.text, item.album, item.artist].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
+    /// "8 of 12 albums" when only some have a known length, else "12 albums".
+    private var runtimeAlbumsText: String {
+        func albums(_ n: Int) -> String { n == 1 ? "1 album" : "\(n.formatted()) albums" }
+        let n = stats.runtimeAlbums, total = stats.albumsOwned
+        return n < total ? "\(n.formatted()) of \(albums(total))" : albums(total)
+    }
+
     private var facts: [FunFact] {
         var out: [FunFact] = []
         if let item = stats.oldestRelease, let y = item.year {
@@ -709,7 +716,7 @@ struct CollectionFactsCard: View {
         }
         if stats.runtime > 0 {
             out.append(FunFact(icon: "infinity", title: "Your collection, back to back", value: formatLongDuration(stats.runtime),
-                               detail: "across \(stats.albumsOwned == 1 ? "1 album" : "\(stats.albumsOwned.formatted()) albums") you own"))
+                               detail: "across \(runtimeAlbumsText) you own"))
         }
         if stats.waitingForTurntable > 0 {
             out.append(FunFact(icon: "record.circle", title: "Waiting for a turntable", value: stats.waitingForTurntable.formatted(),

@@ -51,6 +51,10 @@ struct CollectionInsightsPane: View {
 enum InsightCollection {
     static func itemCount(_ n: Int) -> String { n == 1 ? "1 item" : "\(n.formatted()) items" }
     static func albumCount(_ n: Int) -> String { n == 1 ? "1 album" : "\(n.formatted()) albums" }
+    /// "8 of 12 albums" when only some of them count, else "12 albums".
+    static func albumCount(_ n: Int, of total: Int) -> String {
+        n < total ? "\(n.formatted()) of \(albumCount(total))" : albumCount(total)
+    }
     static func dayLabel(_ d: PurchaseDay) -> String { d.date().formatted(date: .abbreviated, time: .omitted) }
 
     static func mediumName(_ m: CollectionMedium, count: Int) -> String {
@@ -653,7 +657,7 @@ struct CollectionFactsCard: View {
         }
         if stats.runtime > 0 {
             out.append(InsightFact(icon: "infinity", title: "Your collection, back to back", value: formatLongDuration(stats.runtime),
-                                   detail: "across \(InsightCollection.albumCount(stats.albumsOwned))"))
+                                   detail: "across \(InsightCollection.albumCount(stats.runtimeAlbums, of: stats.albumsOwned))"))
         }
         if !stats.needsDetails.isEmpty {
             out.append(InsightFact(icon: "pencil", title: "Needs details", value: stats.needsDetails.count.formatted(),

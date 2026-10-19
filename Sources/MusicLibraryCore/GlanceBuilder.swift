@@ -243,13 +243,15 @@ private struct GlanceBuilder {
             case .other: break
             }
         }
-        // Undated items by when they were added: noon on the purchase day otherwise, as everywhere else.
+        // Recently Added is by when each went into the collection, like the iPhone's (`CollectionSort.added`): an old
+        // CD cataloged today comes first, whatever day it was bought.
+        let recent = collection.items.sorted { $0.createdAt != $1.createdAt ? $0.createdAt > $1.createdAt : $0.id < $1.id }
+        c.recent = recent.prefix(limit).map { glanceItem($0, in: collection, calendar: calendar) }
+        // What's waited longest to be ripped: undated items by when they were added, noon on the purchase day otherwise.
         func when(_ item: CollectionItem) -> Date {
             item.purchasedOn.flatMap { calendar.date(from: DateComponents(year: $0.year, month: $0.month, day: $0.day, hour: 12)) }
                 ?? item.createdAt
         }
-        let recent = collection.items.map { ($0, when($0)) }.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0.id < $1.0.id }
-        c.recent = recent.prefix(limit).map { glanceItem($0.0, in: collection, calendar: calendar) }
         let oldest = toRip.map { ($0, when($0)) }.sorted { $0.1 != $1.1 ? $0.1 < $1.1 : $0.0.id < $1.0.id }
         c.toRipList = oldest.prefix(limit).map { glanceItem($0.0, in: collection, calendar: calendar) }
         return c

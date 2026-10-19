@@ -169,6 +169,8 @@ public struct CollectionStats: Sendable {
     /// The music of every album you own: the library tracks of albums with music, plus the album info's tracklist
     /// for trackless ones when known. Seconds.
     public var runtime: Double = 0
+    /// How many of `albumsOwned` added to `runtime` (the rest have no known length).
+    public var runtimeAlbums = 0
 
     /// Records waiting to be digitized.
     public var waitingForTurntable: Int { vinylToDigitizeCount }
@@ -380,7 +382,8 @@ public struct CollectionStats: Sendable {
         for item in items {
             let album = albums[item.albumKey]
             tally(&artistSpend, item.artist, item)
-            let genres = album.map(\.genres).flatMap { $0.isEmpty ? nil : $0 } ?? albumInfos[item.albumKey]?.genres ?? []
+            let genres = album.map(\.genres).flatMap { $0.isEmpty ? nil : $0 }
+                ?? albumInfos[item.albumKey]?.genres.map(Self.displayGenre) ?? []
             for g in genres { tally(&genreSpend, g, item) }
             if let label = item.recordLabel.flatMap({ $0.isEmpty ? nil : $0 }) ?? album.flatMap({ Self.mostCommonLabel($0.labels) }) {
                 tally(&labelSpend, label, item)
@@ -416,12 +419,22 @@ public struct CollectionStats: Sendable {
         biggestBox = items.filter { ($0.discCount ?? 0) > 1 }
             .max { $0.discCount! != $1.discCount! ? $0.discCount! < $1.discCount! : byTitle($1, $0) }
         for key in owned {
+            var length: Double = 0
             if let a = albums[key] {
-                runtime += a.duration
+                length = a.duration
             } else if let list = albumInfos[key]?.tracklist {
-                runtime += list.compactMap(\.duration).filter { $0.isFinite && $0 > 0 }.reduce(0, +)
+                length = list.compactMap(\.duration).filter { $0.isFinite && $0 > 0 }.reduce(0, +)
             }
+            guard length.isFinite, length > 0 else { continue }
+            runtime += length
+            runtimeAlbums += 1
         }
+    }
+
+    /// An album info genre as tags spell them: MusicBrainz's are all lowercase ("jazz", "lo-fi hip hop"), so those are
+    /// capitalized ("Jazz", "Lo-Fi Hip Hop"), like the genre chips do; any other spelling is kept.
+    static func displayGenre(_ genre: String) -> String {
+        genre == genre.lowercased() ? genre.capitalized : genre
     }
 
     /// The item's year, else its tracks'.

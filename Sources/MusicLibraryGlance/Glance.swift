@@ -228,7 +228,7 @@ public struct Glance: Codable, Hashable, Sendable {
             /// "yyyy-MM-dd", a calendar day with no time zone.
             public var purchasedOn: String?
             public var price: Decimal?
-            /// "yyyy-MM-dd": the day it was added to the collection, for "Added 3 days ago" without a purchase day.
+            /// "yyyy-MM-dd": the day it was added to the collection, for "Added 3 days ago" (`recent` is in this order).
             public var addedOn: String?
 
             public init(id: String, albumKey: String, title: String, artist: String, year: Int? = nil, medium: String,
