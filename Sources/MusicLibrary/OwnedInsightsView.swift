@@ -296,9 +296,15 @@ struct HowYouOwnItCard: View {
         ].filter { $0.count > 0 }
     }
 
+    /// A segment's share of a bar `width` wide that holds `segments` of them 2 points apart, at least 3 points.
+    private static func segmentWidth(_ count: Int, of total: Int, segments: Int, in width: CGFloat) -> CGFloat {
+        let available = width - CGFloat(segments - 1) * 2
+        return max(3, available * CGFloat(count) / CGFloat(total))
+    }
+
     private func mediumRow(_ share: CollectionStats.MediumShare) -> some View {
-        let parts = parts(share)
-        let total = max(parts.reduce(0) { $0 + $1.count }, 1)
+        let segments = parts(share)
+        let total = max(segments.reduce(0) { $0 + $1.count }, 1)
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Image(systemName: share.medium.symbol).foregroundStyle(theme.color(share.medium)).frame(width: 18)
@@ -309,9 +315,9 @@ struct HowYouOwnItCard: View {
             }
             GeometryReader { geo in
                 HStack(spacing: 2) {
-                    ForEach(parts) { p in
+                    ForEach(segments) { p in
                         Rectangle().fill(p.color)
-                            .frame(width: max(3, (geo.size.width - CGFloat(parts.count - 1) * 2) * CGFloat(p.count) / CGFloat(total)))
+                            .frame(width: Self.segmentWidth(p.count, of: total, segments: segments.count, in: geo.size.width))
                             .help("\(p.name): \(itemCount(p.count))")
                             .onTapGesture { model.showShelf(query: p.query) }
                     }
@@ -490,7 +496,7 @@ struct CollectionListsCard: View {
     var body: some View {
         let available = ShelfList.allCases.filter { !rows($0).isEmpty || ($0 == .label && !stats.byLabel.isEmpty) }
         let current = available.contains(list) ? list : (available.first ?? .recent)
-        let rows = rows(current)
+        let shown = rows(current)
         InsightCard(title: "Your Shelves, Sorted", subtitle: subtitle(current)) {
             HStack(spacing: 6) {
                 if current == .label {
@@ -502,12 +508,12 @@ struct CollectionListsCard: View {
             }
         } content: {
             VStack(alignment: .leading, spacing: 2) {
-                if rows.isEmpty {
+                if shown.isEmpty {
                     Text(current == .label ? "No \(series.name) labels yet." : "Nothing here.").font(.callout).foregroundStyle(.subtext)
                 }
-                ForEach(rows.prefix(expanded ? 50 : 8)) { r in row(r, current) }
-                if rows.count > 8 {
-                    Button(expanded ? "Show less" : "Show all \(min(rows.count, 50))\(rows.count > 50 ? " of \(rows.count)" : "")") {
+                ForEach(shown.prefix(expanded ? 50 : 8)) { r in row(r, current) }
+                if shown.count > 8 {
+                    Button(expanded ? "Show less" : "Show all \(min(shown.count, 50))\(shown.count > 50 ? " of \(shown.count)" : "")") {
                         withAnimation(.snappy) { expanded.toggle() }
                     }
                     .buttonStyle(.link).font(.caption).padding(.top, 4).padding(.leading, 6)

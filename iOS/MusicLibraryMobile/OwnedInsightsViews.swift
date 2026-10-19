@@ -457,7 +457,7 @@ struct CollectionListsCard: View {
     var body: some View {
         let available = Shelf.allCases.filter { !rows($0).isEmpty || ($0 == .label && !stats.byLabel.isEmpty) }
         let current = available.contains(list) ? list : (available.first ?? .recent)
-        let rows = rows(current)
+        let shown = rows(current)
         InsightCard(title: "Your Shelves, Sorted", subtitle: subtitle(current)) {
             HStack {
                 Picker("List", selection: Binding(get: { current }, set: { list = $0 })) {
@@ -475,15 +475,15 @@ struct CollectionListsCard: View {
             }
         } content: {
             VStack(alignment: .leading, spacing: 2) {
-                if rows.isEmpty {
+                if shown.isEmpty {
                     Text("Nothing here.").font(.subheadline).foregroundStyle(.secondary)
                 }
-                ForEach(rows.prefix(expanded ? 50 : 8)) { r in
+                ForEach(shown.prefix(expanded ? 50 : 8)) { r in
                     NavigationLink(value: CollectionItemRoute(id: r.item.id)) { row(r, current) }
                         .buttonStyle(.plain)
                 }
-                if rows.count > 8 {
-                    Button(expanded ? "Show Less" : "Show All \(min(rows.count, 50))\(rows.count > 50 ? " of \(rows.count)" : "")") {
+                if shown.count > 8 {
+                    Button(expanded ? "Show Less" : "Show All \(min(shown.count, 50))\(shown.count > 50 ? " of \(shown.count)" : "")") {
                         withAnimation(.snappy) { expanded.toggle() }
                     }
                     .font(.footnote.weight(.medium))
