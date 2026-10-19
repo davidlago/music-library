@@ -77,6 +77,8 @@ final class PhoneModel {
     var pendingAlbumKey: String?
     /// A collection item a widget opened (`GlanceLink.item(id:)`), pushed on the Collection tab once the library has loaded.
     var pendingItemID: String?
+    /// A link to open as if a widget had been tapped (Siri and Shortcuts), handled by `RootView`.
+    var pendingLink: GlanceLink?
 
     /// The summary the widgets and the watch show, and the watch connection.
     @ObservationIgnored let glance: GlanceFeed
@@ -162,7 +164,9 @@ final class PhoneModel {
         player.onStateChange = { [weak self] in self?.glance.setNeedsUpdate(full: false) }
         glance.inputs = { [weak self] in self?.glanceInputs }
         glance.onChange = { [weak self] in self?.watch.send($0) }
+        glance.onShelfChange = { [weak self] in self?.watch.sendShelf($0) }
         watch.current = { [weak self] in self?.glance.current }
+        watch.currentShelf = { [weak self] in self?.glance.shelf }
         watch.perform = { [weak self] in await self?.perform($0) ?? .failed("Music Library isn't ready on the iPhone.") }
         // Scrobbles made offline go out as soon as the phone is back online.
         pathMonitor.pathUpdateHandler = { [weak self] path in
@@ -369,6 +373,14 @@ final class PhoneModel {
 
     func item(id: String) -> CollectionItem? { collection.item(id: id) }
 
+    /// The items with a label, once the library has loaded (Siri can start the app in the background); nil without a
+    /// library.
+    func items(labeled sticker: Sticker) async -> [CollectionItem]? {
+        await ensureLoaded()
+        guard library != nil else { return nil }
+        return collection.items(at: sticker)
+    }
+
     /// How a library album's cover shows the copies you own.
     func copyMark(for album: AlbumSummary) -> CopyMark {
         collection.mark(albumKey: SearchIndex.albumKey(album: album.album, artist: album.artist))
@@ -569,14 +581,14 @@ final class PhoneModel {
             // Hiding the sample library leaves nothing to show; the widgets shouldn't keep showing it.
             guard case .missing = state else { return nil }
             return GlanceFeed.Inputs(root: URL.documentsDirectory, tracks: [], present: [], plays: [], likedDates: [:],
-                                     purchases: [:], playTotals: [:], playing: nil)
+                                     collection: .empty, playTotals: [:], playing: nil)
         }
         let playing = player.currentTrack.map { t in
             Glance.Playing(track: t, isPlaying: player.isPlaying, position: player.currentTime,
                            duration: player.duration > 0 ? player.duration : t.duration, next: player.nextTrack)
         }
         return GlanceFeed.Inputs(root: library.root, tracks: library.tracks, present: library.presentIDs, plays: plays,
-                                 likedDates: likedDates, purchases: purchases, playTotals: playTotals, playing: playing)
+                                 likedDates: likedDates, collection: collection, playTotals: playTotals, playing: playing)
     }
 
     /// Runs a command from a widget button or the watch.

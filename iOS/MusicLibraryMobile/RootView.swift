@@ -49,12 +49,17 @@ struct RootView: View {
         .sheet(item: Binding(get: { model.infoTrack }, set: { model.infoTrack = $0 })) { track in
             SongInfoSheet(track: track)
         }
-        .onOpenURL(perform: open)
+        .onOpenURL { url in GlanceLink(url: url).map(open) }
+        // Siri and Shortcuts (`OpenCollectionItemIntent`), possibly before this view existed.
+        .onChange(of: model.pendingLink, initial: true) { _, link in
+            guard let link else { return }
+            model.pendingLink = nil
+            open(link)
+        }
     }
 
     /// A widget was tapped: `musiclibrary://` links (`GlanceLink`).
-    private func open(_ url: URL) {
-        guard let link = GlanceLink(url: url) else { return }
+    private func open(_ link: GlanceLink) {
         model.infoTrack = nil
         if link != .nowPlaying { showNowPlaying = false }
         switch link {
