@@ -45,6 +45,7 @@ SwiftUI's `@State`/`@Environment` macro plugin is not shipped with the CLT, so t
 - Build: `swift build`
 - Test: `swift test` (needs ffmpeg; generates audio with `ffmpeg -f lavfi`)
 - Live network tests (MusicBrainz, Cover Art Archive): `MUSICLIB_LIVE_TESTS=1 swift test --filter LiveTests`
+- Rehearse the collection migration on a copy of a real library (migrated in place; refuses paths under `~/Music`; prints counts only): `MUSICLIB_MIGRATION_REHEARSAL=<copy>/library.sqlite swift test --filter MigrationRehearsalTests`
 - Build app bundle: `scripts/build-app.sh` -> `build/MusicLibrary.app` (ad-hoc signed; `VERSION=…`, `BUILD=…`, `UNIVERSAL=1` for arm64 + x86_64, which needs Xcode; `SIGN_IDENTITY=…` signs with a certificate and the hardened runtime, plus a secure timestamp for a Developer ID one; one with a Team ID keeps keychain access across rebuilds; `BUNDLE_TOOLS=0` leaves out the tools)
 - Build the app's ffmpeg, ffprobe and fpcalc: `scripts/build-tools.sh` -> `build/tools` (FFmpeg and Chromaprint from pinned, checksummed source releases; needs cmake; `UNIVERSAL=1`; reused until the script changes). `build-app.sh` runs it.
 - Notarize: `NOTARY_PROFILE=… scripts/notarize.sh` (or `NOTARY_KEY`/`NOTARY_KEY_ID`/`NOTARY_ISSUER`) after building with a Developer ID `SIGN_IDENTITY`; staples the ticket. One-time setup: `docs/distribution.md`.
