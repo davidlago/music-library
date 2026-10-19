@@ -7,6 +7,15 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- **A new look for Listening in Insights**, on the Mac and the iPhone, inspired by Last.fm's listening reports. A
+  banner shows the period's plays over a blurred photo of your top artist, with each day's plays next to the same span
+  before and how much more or less you listened. **Top Charts** puts your #1 artist, album and song up big with their
+  photo or cover (each panel takes its color from the picture), followed by the next four, ranked by plays or time.
+  **New to You** shows how many of the artists, albums and songs you played were new, with the top one of each. A
+  **Listening Clock** dial shows your busiest hour and day, **Music by Decade** your favorite decade's top album, and
+  **Quick Facts** compare listening time, plays a day, your most active day and days with music with the span
+  before. Artists and albums open their pages.
+
 ## 1.21.0
 
 - **Clearer names: Digital Collection, Physical Collection and Local Library.** What used to be "Library" is now your

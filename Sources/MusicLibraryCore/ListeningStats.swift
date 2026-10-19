@@ -54,6 +54,8 @@ public struct ListeningStats: Sendable {
         public var listening: Double
         /// Fraction of the library's (dated) running time from the decade.
         public var library: Double
+        /// The album from the decade you spent the most time with.
+        public var topAlbum: Item?
     }
 
     public struct Day: Hashable, Sendable {
@@ -72,6 +74,19 @@ public struct ListeningStats: Sendable {
         public var song: Item
         public var date: Date
         public var plays: Int
+    }
+
+    /// How much one window holds, to compare the period with the same span just before it.
+    public struct Totals: Hashable, Sendable {
+        public var listens = 0
+        public var plays = 0
+        public var listened: Double = 0
+        /// Songs, album artists and albums with at least one counted play.
+        public var songs = 0
+        public var artists = 0
+        public var albums = 0
+        public var activeDays = 0
+        public var biggestDay: Day?
     }
 
     public var period = Period.all
@@ -95,7 +110,11 @@ public struct ListeningStats: Sendable {
     public var plays = 0
     public var listened: Double = 0
     /// Listening time in the same-length window just before the period; nil when there's no history that far back.
-    public var previousListened: Double?
+    public var previousListened: Double? { previous?.listened }
+    /// The same-length window just before the period; nil for all time or when there's no history that far back.
+    public var previous: Totals?
+    /// `activity` for the previous window, bucket for bucket (it can be one bucket shorter or longer).
+    public var previousActivity: [ActivityPoint] = []
     /// Calendar days in the period, and the ones with at least one counted play.
     public var dayCount = 0
     public var activeDays = 0
@@ -104,8 +123,10 @@ public struct ListeningStats: Sendable {
     public var artists = Ranking()
     public var albums = Ranking()
     public var genres = Ranking()
-    /// Album artists first heard during the period (empty for all time).
+    /// Album artists, albums and songs first heard during the period (empty for all time).
     public var newArtists = Ranking()
+    public var newAlbums = Ranking()
+    public var newSongs = Ranking()
     /// Songs skipped at least twice, most skipped first.
     public var mostSkipped: [Item] = []
 
@@ -113,6 +134,8 @@ public struct ListeningStats: Sendable {
     public var granularity = Granularity.day
     /// Seconds listened by weekday (0 is the calendar's first weekday) and hour of the day.
     public var clock: [[Double]] = Array(repeating: Array(repeating: 0, count: 24), count: 7)
+    /// Counted plays by hour of the day.
+    public var hourPlays: [Int] = Array(repeating: 0, count: 24)
     /// Short weekday names in the same order as `clock`.
     public var weekdaySymbols: [String] = []
     public var eras: [EraShare] = []
@@ -160,7 +183,10 @@ public struct ListeningStats: Sendable {
             periodStart = calendar.date(byAdding: .day, value: -(days - 1), to: today) ?? today
             dayCount = days
             if let prevStart = calendar.date(byAdding: .day, value: -days, to: periodStart), firstPlay.startedAt < periodStart {
-                previousListened = history.lazy.filter { $0.startedAt >= prevStart && $0.startedAt < periodStart }.reduce(0) { $0 + $1.listened }
+                let window = history.filter { $0.startedAt >= prevStart && $0.startedAt < periodStart }
+                previous = Self.totals(window, byID: byID, calendar: calendar)
+                previousActivity = Self.activity(window, from: prevStart, to: periodStart.addingTimeInterval(-1), period: period,
+                                                 calendar: calendar).0
             }
         } else {
             periodStart = calendar.startOfDay(for: firstPlay.startedAt)
@@ -170,14 +196,17 @@ public struct ListeningStats: Sendable {
 
         // Whole history: streaks, first plays, forgotten favorites.
         var countedDays = Set<Date>()
+        /// By the same keys as the period's tallies.
         var firstHeard: [String: Date] = [:]
         var perTrack: [Int64: (plays: Int, last: Date)] = [:]
         for p in history {
             perTrack[p.trackId] = ((perTrack[p.trackId]?.plays ?? 0) + (p.counted ? 1 : 0), p.startedAt)
             guard p.counted else { continue }
             countedDays.insert(calendar.startOfDay(for: p.startedAt))
-            let key = Self.artistName(byID[p.trackId]!).lowercased()
-            if firstHeard[key] == nil { firstHeard[key] = p.startedAt }
+            let t = byID[p.trackId]!
+            for key in ["t\(t.id)", Self.artistKey(t)] + (Self.albumKey(t).map { [$0] } ?? []) where firstHeard[key] == nil {
+                firstHeard[key] = p.startedAt
+            }
         }
         firstSong = Self.songItem(byID[firstPlay.trackId]!)
         neverPlayed = tracks.count - perTrack.values.filter { $0.plays > 0 }.count
@@ -195,6 +224,7 @@ public struct ListeningStats: Sendable {
         let inPeriod = history.filter { $0.startedAt >= periodStart }
         var songTally: [String: Item] = [:], artistTally: [String: Item] = [:], albumTally: [String: Item] = [:], genreTally: [String: Item] = [:]
         var decadeListened: [Int: Double] = [:]
+        var decadeAlbums: [Int: [String: Double]] = [:]
         var days: [Date: Day] = [:]
         struct SongDay: Hashable { var id: Int64; var day: Date }
         var songDays: [SongDay: Int] = [:]
@@ -216,16 +246,20 @@ public struct ListeningStats: Sendable {
             if p.counted { plays += 1 }
 
             tally(&songTally, "t\(t.id)", Self.songItem(t), p)
-            let artist = Self.artistName(t)
-            tally(&artistTally, "a:" + artist.lowercased(), Item(id: "a:" + artist.lowercased(), name: artist, subtitle: "", plays: 0, skips: 0, listened: 0), p)
-            if !m.album.isEmpty {
-                let key = "al:" + SearchIndex.albumKey(album: m.album, artist: t.effectiveAlbumArtist)
-                tally(&albumTally, key, Item(id: key, name: m.album, subtitle: artist, plays: 0, skips: 0, listened: 0), p)
+            let artist = Self.artistName(t), artistKey = Self.artistKey(t)
+            // Artists and albums keep a track, for its cover.
+            tally(&artistTally, artistKey, Item(id: artistKey, name: artist, subtitle: "", plays: 0, skips: 0, listened: 0, trackId: t.id), p)
+            let albumKey = Self.albumKey(t)
+            if let key = albumKey {
+                tally(&albumTally, key, Item(id: key, name: m.album, subtitle: artist, plays: 0, skips: 0, listened: 0, trackId: t.id), p)
             }
             for g in SearchIndex.genres(of: m) {
                 tally(&genreTally, "g:" + g.lowercased(), Item(id: "g:" + g.lowercased(), name: g, subtitle: "", plays: 0, skips: 0, listened: 0), p)
             }
-            if let y = m.year, y > 0 { decadeListened[y / 10 * 10, default: 0] += p.listened }
+            if let y = m.year, y > 0 {
+                decadeListened[y / 10 * 10, default: 0] += p.listened
+                if let key = albumKey { decadeAlbums[y / 10 * 10, default: [:]][key, default: 0] += p.listened }
+            }
 
             let day = calendar.startOfDay(for: p.startedAt)
             var d = days[day] ?? Day(date: day, listened: 0, plays: 0)
@@ -234,7 +268,9 @@ public struct ListeningStats: Sendable {
             days[day] = d
 
             let weekday = (calendar.component(.weekday, from: p.startedAt) - first + 7) % 7
-            clock[weekday][calendar.component(.hour, from: p.startedAt)] += p.listened
+            let hour = calendar.component(.hour, from: p.startedAt)
+            clock[weekday][hour] += p.listened
+            if p.counted { hourPlays[hour] += 1 }
 
             if var s = session, p.startedAt.timeIntervalSince(sessionEnd) <= Self.sessionGap {
                 s.listened += p.listened; s.songs += 1
@@ -262,16 +298,56 @@ public struct ListeningStats: Sendable {
             .sorted { $0.skips != $1.skips ? $0.skips > $1.skips : $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
             .prefix(listLimit).map { $0 }
         if period != .all {
-            newArtists = Self.rank(artistTally.filter { firstHeard[String($0.key.dropFirst(2))].map { $0 >= periodStart } ?? false }, limit: listLimit)
+            func new(_ tally: [String: Item]) -> Ranking {
+                Self.rank(tally.filter { firstHeard[$0.key].map { $0 >= periodStart } ?? false }, limit: listLimit)
+            }
+            newArtists = new(artistTally)
+            newAlbums = new(albumTally)
+            newSongs = new(songTally)
         }
 
-        eras = Self.eras(listening: decadeListened, tracks: tracks)
+        eras = Self.eras(listening: decadeListened, tracks: tracks).map { e in
+            var e = e
+            e.topAlbum = decadeAlbums[e.decade]?.max { $0.value != $1.value ? $0.value < $1.value : $0.key > $1.key }.flatMap { albumTally[$0.key] }
+            return e
+        }
         (activity, granularity) = Self.activity(inPeriod, from: periodStart, to: now, period: period, calendar: calendar)
     }
 
     // MARK: Helpers
 
     static func artistName(_ t: Track) -> String { t.effectiveAlbumArtist.isEmpty ? "Unknown Artist" : t.effectiveAlbumArtist }
+    static func artistKey(_ t: Track) -> String { "a:" + artistName(t).lowercased() }
+    /// "al:" and the album's `SearchIndex.albumKey`; nil for songs without an album.
+    static func albumKey(_ t: Track) -> String? {
+        t.metadata.album.isEmpty ? nil : "al:" + SearchIndex.albumKey(album: t.metadata.album, artist: t.effectiveAlbumArtist)
+    }
+
+    static func totals(_ plays: [Play], byID: [Int64: Track], calendar: Calendar) -> Totals {
+        var t = Totals()
+        var songs = Set<Int64>(), artists = Set<String>(), albums = Set<String>()
+        var days: [Date: Day] = [:]
+        for p in plays {
+            guard let track = byID[p.trackId] else { continue }
+            t.listens += 1
+            t.listened += p.listened
+            let day = calendar.startOfDay(for: p.startedAt)
+            var d = days[day] ?? Day(date: day, listened: 0, plays: 0)
+            d.listened += p.listened
+            if p.counted {
+                t.plays += 1
+                d.plays += 1
+                songs.insert(track.id)
+                artists.insert(artistKey(track))
+                if let key = albumKey(track) { albums.insert(key) }
+            }
+            days[day] = d
+        }
+        t.songs = songs.count; t.artists = artists.count; t.albums = albums.count
+        t.activeDays = days.values.filter { $0.plays > 0 }.count
+        t.biggestDay = days.values.max { $0.listened != $1.listened ? $0.listened < $1.listened : $0.date > $1.date }
+        return t
+    }
 
     static func songItem(_ t: Track) -> Item {
         Item(id: "t\(t.id)", name: t.metadata.title.isEmpty ? "Untitled" : t.metadata.title, subtitle: t.metadata.artist,

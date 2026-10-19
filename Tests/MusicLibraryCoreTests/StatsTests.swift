@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import MusicLibraryCore
@@ -235,6 +236,48 @@ import Testing
         // A day of history still charts a week.
         let today = stats(.all, [play(1, 0.1)])
         #expect(today.dayCount == 1 && today.activity.count == 7)
+    }
+
+    @Test func comparesWithThePreviousWindow() {
+        let plays = [
+            play(1, 0.1), play(3, 1),                             // this week: Airbag, So What
+            play(2, 8, listened: 250), play(2, 10, listened: 250),  // the week before: Karma Police twice
+            play(4, 9, listened: 100, counted: false),            // and a skip of Blue in Green
+        ]
+        let s = stats(.week, plays)
+        #expect(s.previous == ListeningStats.Totals(listens: 3, plays: 2, listened: 600, songs: 1, artists: 1, albums: 1, activeDays: 2,
+                                                    biggestDay: s.previous?.biggestDay))
+        #expect(s.previous?.biggestDay?.listened == 250)
+        #expect(s.previousListened == 600)
+        #expect(s.previousActivity.count == 7 && s.previousActivity.reduce(0) { $0 + $1.listened } == 600)
+        #expect(s.previousActivity.last!.date < s.activity.first!.date)
+        // Radiohead was heard the week before; a skip doesn't make Miles Davis familiar.
+        #expect(s.newArtists.byPlays.map(\.name) == ["Miles Davis"])
+        #expect(s.newAlbums.byPlays.map(\.name) == ["Kind of Blue"])
+        #expect(Set(s.newSongs.byPlays.map(\.name)) == ["Airbag", "So What"])
+        #expect(s.hourPlays.reduce(0, +) == s.plays)
+        // Artists and albums carry a track for their cover; each decade its top album.
+        #expect(s.albums.byPlays.allSatisfy { $0.trackId != nil } && s.artists.byPlays.allSatisfy { $0.trackId != nil })
+        #expect(s.eras.first { $0.decade == 1990 }?.topAlbum?.name == "OK Computer")
+        #expect(s.eras.first { $0.decade == 1950 }?.topAlbum?.name == "Kind of Blue")
+        #expect(stats(.all, plays).previous == nil && stats(.all, plays).previousActivity.isEmpty)
+        #expect(stats(.all, plays).newSongs.total == 0)
+    }
+
+    @Test func artworkTintsCarryWhiteText() throws {
+        for color in [RGB(0xffffff), RGB(0xf5e6a0), RGB(0x2a78d6), RGB(0x101010), RGB(0x7f7f7f)] {
+            #expect(ArtworkTint.panel(from: color).contrast(with: .white) >= 4.5)
+        }
+        // A dark color is left as it is.
+        #expect(ArtworkTint.panel(from: RGB(0x202020)) == RGB(0x202020))
+        let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+        let context = try #require(CGContext(data: nil, width: 4, height: 4, bitsPerComponent: 8, bytesPerRow: 16, space: space,
+                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.setFillColor(CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+        let image = try #require(context.makeImage())
+        let red = try #require(ArtworkTint.average(of: image))
+        #expect(red.r > 0.95 && red.g < 0.05 && red.b < 0.05)
     }
 
     @Test func playsRoundTripThroughDatabase() throws {
