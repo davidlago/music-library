@@ -4,11 +4,40 @@ import MusicLibraryCore
 import SwiftUI
 
 enum SidebarItem: Hashable {
+    /// The Shelf (`.all`), one medium, or To Digitize.
+    case collection(CollectionScope)
     case songs, albums, artists, insights, musicDNA, concerts, importQueue, exportList, iPhone, catalog, catalogCheckouts, catalogList, cdShop
     case likedSongs
     case playlist(Int64)
     case smartPlaylist(Int64)
     case cd(String)
+}
+
+/// The collection's sheets, shown by `ContentView` from anywhere (menus, the Shelf, album pages).
+enum CollectionSheet: Identifiable {
+    case add(medium: CollectionMedium?, prefill: CollectionPrefill?)
+    case findByLabel
+    case addLibraryAlbums
+    /// Gaps and duplicates in the label series.
+    case labelCheck
+    /// Link to Library Album… for the item with this id.
+    case link(itemID: String)
+    /// Change Cover… for the item with this id, optionally with an image dropped on its cover.
+    case cover(itemID: String, request: CoverSheetRequest)
+    /// Change Edition… for the item with this id: the edition picker, which replaces only its release details.
+    case changeEdition(itemID: String)
+
+    var id: String {
+        switch self {
+        case .add: "add"
+        case .findByLabel: "find"
+        case .addLibraryAlbums: "bulk"
+        case .labelCheck: "labels"
+        case .link(let id): "link-\(id)"
+        case .cover(let id, let request): "cover-\(id)-\(request.id)"
+        case .changeEdition(let id): "edition-\(id)"
+        }
+    }
 }
 
 struct SmartPlaylistDraft: Identifiable {
@@ -45,6 +74,8 @@ final class AppModel {
         static let matchRate = "matchOutputRate"
         static let matchBitDepth = "matchOutputBitDepth"
         static let ejectAfterRip = "ejectAfterRip"
+        static let askCDOwnership = "collectionAskOnInsert"
+        static let ejectAfterCataloging = "collectionEjectAfterCataloging"
         static let recentSearches = "recentSearches"
         static let theme = "theme"
         static let dnaDepth = "musicDNADepth"
@@ -63,16 +94,26 @@ final class AppModel {
     }
     var theme: Theme { Theme.named(themeID) }
 
+    /// Songs until the collection is first loaded, then the Shelf when there's anything on it (unless something else
+    /// was picked meanwhile).
     var sidebar: SidebarItem? = .songs {
         didSet {
             guard sidebar != oldValue else { return }
+            sidebarChosen = true
             nowPlayingExpanded = false
             navigationPath = NavigationPath()
             // Picking a sidebar item leaves the search results page.
             if !searchText.isEmpty { searchText = "" }
         }
     }
+    @ObservationIgnored private var sidebarChosen = false
     var nowPlayingExpanded = false
+    /// The Shelf's filter, in the collection query language (`showShelf(query:)` sets it).
+    var shelfQuery = ""
+    /// The collection sheet showing, if any (Add to Collection…, Find by Label…, Add Library Albums…).
+    var collectionSheet: CollectionSheet?
+    /// The item Remove from Collection… asks about (`collectionRemovalConfirmation`).
+    var pendingItemRemoval: CollectionItem?
     /// The queue in the window's inspector.
     var showsQueue = UserDefaults.standard.bool(forKey: Keys.showsQueue) {
         didSet { UserDefaults.standard.set(showsQueue, forKey: Keys.showsQueue) }
@@ -91,6 +132,10 @@ final class AppModel {
     /// Cleared when the user asks for their exact text after a spelling correction.
     private(set) var searchAutocorrect = true
     private(set) var searchResults = SearchResults()
+    /// The collection items matching the search, trackless ones included.
+    private(set) var searchItems: [CollectionItem] = []
+    /// When the whole search is a label ("#12", "cd 12", "vinyl 12" or a bare number): the items with that label.
+    private(set) var searchLabelHits: [CollectionItem] = []
     private(set) var recentSearches: [String]
     /// All tracks in library order.
     private(set) var tracks: [Track] = []
@@ -130,8 +175,26 @@ final class AppModel {
     private(set) var historyVersion = 0
     @ObservationIgnored private var listeningRequest: (period: ListeningStats.Period, library: Int, history: Int, at: Date)?
     @ObservationIgnored private var listeningTask: Task<Void, Never>?
-    /// Albums you own, with purchase date and price (keyed by `AlbumInfoStore.key`), including those whose songs you
-    /// bought (`AlbumPurchase.including`).
+    /// Everything you own (CDs, records, downloads), with or without tracks in the library. Rebuilt off the main
+    /// thread after each library reload and each change (`saveItem`, `deleteItem`).
+    private(set) var collection = MusicCollection.empty
+    /// The collection, searchable in the collection query language; rebuilt with `collection`.
+    private(set) var collectionIndex = CollectionIndex.empty
+    /// Bumped whenever `collection` is replaced.
+    private(set) var collectionVersion = 0
+    /// The Collection pane of Insights.
+    private(set) var collectionStats: CollectionStats?
+    @ObservationIgnored private var collectionStatsRequest: (library: Int, collection: Int, history: Int)?
+    @ObservationIgnored private var collectionStatsTask: Task<Void, Never>?
+    @ObservationIgnored private var collectionGeneration = 0
+    /// Items saved (or, as nil, deleted) since the last rebuild started, so lookups right after a change see it.
+    @ObservationIgnored private var unsettledItems: [String: CollectionItem?] = [:]
+    @ObservationIgnored private var appliedDefaultSidebar = false
+    /// False while a reload rebuilds `index`, which is then of other tracks than `tracks`.
+    @ObservationIgnored private var indexIsCurrent = false
+    /// Albums you own, with purchase date and price (keyed by `AlbumInfoStore.key`): each album's primary CD or
+    /// download, or the download made of the songs you bought (`MusicCollection.legacyPurchases`).
+    /// Deprecated: for views not yet moved to `collection`; removed in the cleanup.
     private(set) var purchases: [String: AlbumPurchase] = [:]
     /// The albums you said you own (album page, CD ripping), and the songs you bought (entered when importing).
     private(set) var purchaseRecords: [String: AlbumPurchase] = [:]
@@ -140,10 +203,6 @@ final class AppModel {
     private(set) var purchasesVersion = 0
     /// Bumped when an album gets a new cover, so views showing the same cover.jpg load it again.
     private(set) var coverRevision = 0
-    /// The Owned pane of Insights.
-    private(set) var ownershipStats: OwnershipStats?
-    @ObservationIgnored private var ownershipRequest: (library: Int, purchases: Int, history: Int)?
-    @ObservationIgnored private var ownershipTask: Task<Void, Never>?
     private(set) var albums: [AlbumSummary] = []
     private(set) var artists: [ArtistSummary] = []
     private(set) var playlists: [Playlist] = []
@@ -174,6 +233,10 @@ final class AppModel {
     var acoustIDKey: String { didSet { KeychainStore.app.set(acoustIDKey, for: Keys.acoustID) } }
     var autoMatch: Bool { didSet { UserDefaults.standard.set(autoMatch, forKey: Keys.autoMatch) } }
     var ejectAfterRip: Bool { didSet { UserDefaults.standard.set(ejectAfterRip, forKey: Keys.ejectAfterRip) } }
+    /// Settings ▸ Collection: ask whether an inserted CD with no item is yours, instead of adding it by default.
+    var askCDOwnership: Bool { didSet { UserDefaults.standard.set(askCDOwnership, forKey: Keys.askCDOwnership) } }
+    /// Settings ▸ Collection: eject a CD once Catalog Without Ripping has saved it.
+    var ejectAfterCataloging: Bool { didSet { UserDefaults.standard.set(ejectAfterCataloging, forKey: Keys.ejectAfterCataloging) } }
     var matchOutputRate: Bool {
         didSet {
             UserDefaults.standard.set(matchOutputRate, forKey: Keys.matchRate)
@@ -232,6 +295,10 @@ final class AppModel {
         exportPlaylistFiles = defaults.object(forKey: Keys.exportPlaylistFiles) == nil ? true : defaults.bool(forKey: Keys.exportPlaylistFiles)
         exportDestination = defaults.string(forKey: Keys.exportDestination).map { URL(fileURLWithPath: $0, isDirectory: true) }
         ejectAfterRip = defaults.object(forKey: Keys.ejectAfterRip) == nil ? true : defaults.bool(forKey: Keys.ejectAfterRip)
+        // Off by default: a CD with no copy in the collection is added as a new one, a switch already on (§4.3).
+        askCDOwnership = defaults.bool(forKey: Keys.askCDOwnership)
+        ejectAfterCataloging = defaults.object(forKey: Keys.ejectAfterCataloging) == nil ? true
+            : defaults.bool(forKey: Keys.ejectAfterCataloging)
         matchOutputRate = defaults.object(forKey: Keys.matchRate) == nil ? true : defaults.bool(forKey: Keys.matchRate)
         matchOutputBitDepth = defaults.object(forKey: Keys.matchBitDepth) == nil ? true : defaults.bool(forKey: Keys.matchBitDepth)
         player = Player(root: root, matcher: outputMatcher)
@@ -362,14 +429,18 @@ final class AppModel {
         playTotals = [:]; artistPlayTotals = [:]; albumPlayTotals = [:]; albumAddedDates = [:]
         index = .empty; searchResults = SearchResults(); stats = nil; statsVersion = -1
         listening = nil; listeningRequest = nil
-        purchases = [:]; purchaseRecords = [:]; trackPurchases = [:]; ownershipStats = nil; ownershipRequest = nil
+        purchases = [:]; purchaseRecords = [:]; trackPurchases = [:]
+        collection = .empty; collectionIndex = .empty; collectionStats = nil; collectionStatsRequest = nil
+        unsettledItems = [:]; searchItems = []; searchLabelHits = []; collectionVersion += 1
         openLibrary()
     }
 
     func reloadLibrary() {
         guard let db = database else { return }
         do {
+            let previous = tracks
             tracks = try db.fetchAllTracks()
+            rekeyRetaggedAlbums(from: previous, to: tracks)
             albums = try db.albums()
             artists = try db.artists()
             playlists = try db.playlists()
@@ -388,28 +459,52 @@ final class AppModel {
         rebuildIndex()
     }
 
+    /// Rebuilds the search index, Music DNA and the collection (after linking its items to the library as it is now:
+    /// `CollectionLinker`) in the background.
     private func rebuildIndex() {
         indexGeneration += 1
         let generation = indexGeneration
+        indexIsCurrent = false
         let all = tracks
         let root = libraryRoot
         let smart = smartPlaylists
         let albumList = albums
+        let collectionRequest = startCollectionRebuild()
         Task.detached(priority: .userInitiated) {
             let covers = CoverLookup(root: root)
             let index = SearchIndex(tracks: all, hasCover: covers.hasCover)
             let graph = CollaborationGraph(tracks: all)
             let ownership = Self.catalogOwnership(albums: albumList, tracks: all)
-            let counts = Dictionary(uniqueKeysWithValues: smart.map { ($0.id, index.tracks(matching: SearchQuery.parse($0.query)).count) })
+            var built: (collection: MusicCollection, index: CollectionIndex)?
+            if var request = collectionRequest {
+                let read = request.read.items
+                let changes = CollectionLinker.changes(items: read, tracks: all)
+                if !changes.isEmpty, let linked = await MainActor.run(body: { [weak self] in
+                    self?.applyLinkerChanges(changes, readAt: read)
+                }) {
+                    request.read = linked
+                }
+                built = Self.buildCollection(request.read, songs: request.songs, tracks: all, infos: request.infos, index: index)
+            }
+            let current = built
+            let counts = Dictionary(uniqueKeysWithValues: smart.map { p in
+                (p.id, current.map { LibrarySearch.tracks(matching: p.query, index: index, collectionIndex: $0.index, collection: $0.collection) }?.count
+                    ?? index.tracks(matching: SearchQuery.parse(p.query)).count)
+            })
             await MainActor.run { [weak self] in
                 guard let self, self.indexGeneration == generation else { return }
                 self.index = index
+                self.indexIsCurrent = true
                 self.collaborations = graph
                 self.catalog.ownership = ownership
                 self.smartPlaylistCounts = counts
                 self.libraryVersion += 1
-                self.runSearch()
-                self.syncArtistInfo()
+                if let current, let request = collectionRequest, request.generation == self.collectionGeneration {
+                    self.setCollection(current, settling: request.unsettled)
+                } else {
+                    self.runSearch()
+                    self.syncArtistInfo()
+                }
             }
         }
     }
@@ -545,11 +640,24 @@ final class AppModel {
         return names.map { ($0, taggedArtistIds(byKey[ArtistInfoStore.key($0)] ?? [])) }
     }
 
-    /// Fetches info for artists that don't have it yet (when automatic downloads are on).
+    /// Fetches info for artists and albums that don't have it yet (when automatic downloads are on), including the
+    /// collection's: artists and albums you own without songs in the library.
     func syncArtistInfo() {
         guard artistInfo.autoSync, database != nil else { return }
-        artistInfo.syncMissing(artistRequests(artists.map(\.name)), fetcher: artistFetcher)
-        albumInfo.syncMissing(albums.map(albumRequest), fetcher: artistFetcher)
+        artistInfo.syncMissing(artistRequests(artistNames), fetcher: artistFetcher)
+        let keys = Set(albums.map(AlbumInfoStore.key))
+        var itemRequests: [AlbumInfoStore.Request] = []
+        var seen = keys
+        for item in collection.items where item.origin == .stored && seen.insert(item.albumKey).inserted {
+            itemRequests.append(albumRequest(for: item))
+        }
+        albumInfo.syncMissing(albums.map(albumRequest) + itemRequests, fetcher: artistFetcher)
+    }
+
+    /// The library's artists, then the collection's (trackless items included), once each.
+    private var artistNames: [String] {
+        var seen = Set<String>()
+        return (artists.map(\.name) + collection.artists).filter { seen.insert(ArtistInfoStore.key($0)).inserted }
     }
 
     // MARK: Albums
@@ -568,9 +676,29 @@ final class AppModel {
             let counts = values.compactMap { $0 }.filter { !$0.isEmpty }.reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
             return counts.max { $0.value != $1.value ? $0.value < $1.value : $0.key > $1.key }?.key
         }
-        return AlbumInfoStore.Request(key: AlbumInfoStore.key(album), title: album.album, artist: album.artist,
-                                      releaseGroupId: mostCommon(ts.map { $0.metadata.extended.mbReleaseGroupId }),
-                                      releaseId: mostCommon(ts.map(\.metadata.mbReleaseId)))
+        // Songs not matched on MusicBrainz go by the release of a copy you own.
+        let key = AlbumInfoStore.key(album)
+        let copy = collection.copies(albumKey: key).first { $0.origin == .stored && ($0.releaseID != nil || $0.releaseGroupID != nil) }
+        return AlbumInfoStore.Request(key: key, title: album.album, artist: album.artist,
+                                      releaseGroupId: mostCommon(ts.map { $0.metadata.extended.mbReleaseGroupId }) ?? copy?.releaseGroupID,
+                                      releaseId: mostCommon(ts.map(\.metadata.mbReleaseId)) ?? copy?.releaseID)
+    }
+
+    /// The album info request for an item: its library album's, or for an item without songs, its own release.
+    private func albumRequest(for item: CollectionItem) -> AlbumInfoStore.Request {
+        if !collection.libraryTracks(item).isEmpty, let album = album(forKey: item.albumKey) { return albumRequest(album) }
+        return AlbumInfoStore.Request(key: item.albumKey, title: item.album, artist: item.artist,
+                                      releaseGroupId: item.releaseGroupID, releaseId: item.releaseID)
+    }
+
+    /// Fetches info (track list, genres, reviews) for an item being viewed, if it isn't cached (and downloads are on).
+    func ensureAlbumInfo(for item: CollectionItem) {
+        guard artistInfo.autoSync, !item.album.isEmpty else { return }
+        albumInfo.ensure(albumRequest(for: item), fetcher: artistFetcher)
+    }
+
+    func refreshAlbumInfo(for item: CollectionItem) {
+        albumInfo.refresh([albumRequest(for: item)], fetcher: artistFetcher)
     }
 
     /// Fetches info for an album being viewed, if it isn't cached (and downloads are on).
@@ -602,24 +730,415 @@ final class AppModel {
         albums.first { AlbumInfoStore.key($0) == key }
     }
 
-    // MARK: Ownership
+    // MARK: Collection
 
-    /// How you own the album, if you do: as you said, or as a download made of the songs you bought from it.
+    /// The item with this id, including one saved or removed a moment ago (before `collection` is rebuilt).
+    func item(id: String) -> CollectionItem? {
+        if let recent = unsettledItems[id] { return recent }
+        return collection.item(id: id)
+    }
+
+    /// The number to suggest for the next label in a series, past every saved item (including ones saved a moment
+    /// ago) and `pending` ones not saved yet.
+    func nextNumber(in series: StickerSeries, pending: [Int] = []) -> Int {
+        let recent = unsettledItems.values.compactMap { $0?.sticker?.series == series ? $0?.stickerNumber : nil }
+        return collection.nextNumber(in: series, pending: pending + recent)
+    }
+
+    /// Another item with this label (not the one with id `excluding`), if any: saving it twice is refused (D7).
+    func itemLabeled(_ sticker: Sticker, excluding id: String?) -> CollectionItem? {
+        if let recent = unsettledItems.values.lazy.compactMap({ $0 }).first(where: { $0.sticker == sticker && $0.id != id }) {
+            return recent
+        }
+        return collection.items(at: sticker).first { $0.id != id && unsettledItems[$0.id] == nil }
+    }
+
+    /// Saves an item (new or changed). Pass a copy of what `item(id:)` returns just now, changed only where the user
+    /// changed it: every field is written as given. With `cover` (JPEG), the item gets a new cover of its own; the
+    /// file it had is removed once the row is saved. Returns the item as saved, or nil (with the error shown).
+    @discardableResult
+    func saveItem(_ item: CollectionItem, cover jpeg: Data? = nil) -> CollectionItem? {
+        guard let db = database else { return nil }
+        var item = item
+        let previousCover = self.item(id: item.id)?.coverFile
+        var newCover: String?
+        if let jpeg {
+            do {
+                newCover = try CollectionCovers.write(jpeg, itemID: item.id, root: libraryRoot)
+                item.coverFile = newCover
+            } catch {
+                errorMessage = error.localizedDescription
+                return nil
+            }
+        }
+        let now = Date()
+        do {
+            try db.saveCollectionItem(item, at: now)
+        } catch {
+            if let newCover { removeCoverFile(newCover) }
+            errorMessage = error.localizedDescription
+            return nil
+        }
+        if let previousCover, previousCover != item.coverFile { removeCoverFile(previousCover) }
+        item.updatedAt = now
+        unsettledItems[item.id] = item
+        rebuildCollection()
+        return item
+    }
+
+    /// Saves several items at once (Add Library Albums…), in one transaction: all or none.
+    @discardableResult
+    func saveItems(_ items: [CollectionItem]) -> Bool {
+        guard let db = database, !items.isEmpty else { return false }
+        let now = Date()
+        do {
+            try db.saveCollectionItems(items, at: now)
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+        for var item in items {
+            item.updatedAt = now
+            unsettledItems[item.id] = item
+        }
+        rebuildCollection()
+        return true
+    }
+
+    /// Removes an item from the collection (the user asked to), with its own cover file. Its album's songs stay.
+    func deleteItem(id: String) {
+        guard let db = database else { return }
+        let cover = item(id: id)?.coverFile
+        do {
+            try db.deleteCollectionItem(id: id)
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
+        if let cover { removeCoverFile(cover) }
+        unsettledItems[id] = .some(nil)
+        rebuildCollection()
+    }
+
+    /// An item's own cover file, else its linked album's cover.jpg (when that album has songs).
+    func coverURL(for item: CollectionItem) -> URL? {
+        if let file = item.coverFile, let url = CollectionCovers.url(file, root: libraryRoot),
+           FileManager.default.fileExists(atPath: url.path) { return url }
+        var linked = item
+        linked.coverFile = nil
+        return collection.coverPath(linked).flatMap { LibraryPath.resolve($0, in: libraryRoot) }
+    }
+
+    /// How a library album's cover shows the copies you own.
+    func copyMark(for album: AlbumSummary) -> CopyMark { collection.mark(albumKey: AlbumInfoStore.key(album)) }
+
+    /// Opens an item's page on top of whatever is showing.
+    func showItem(id: String) {
+        nowPlayingExpanded = false
+        navigationPath.append(CollectionItemRoute(id: id))
+    }
+
+    /// Opens the Shelf (or one of its scopes) filtered by `query`, in the collection query language.
+    func showShelf(query: String = "", scope: CollectionScope = .all) {
+        nowPlayingExpanded = false
+        if !searchText.isEmpty { searchText = "" }
+        if sidebar != .collection(scope) { sidebar = .collection(scope) }
+        navigationPath = NavigationPath()
+        shelfQuery = query
+    }
+
+    /// Add to Collection… (⇧⌘N), optionally for a medium and prefilled (e.g. from a catalog or shop listing).
+    func addToCollection(medium: CollectionMedium? = nil, prefill: CollectionPrefill? = nil) {
+        collectionSheet = .add(medium: medium, prefill: prefill)
+    }
+
+    /// Find by Label (⌘L).
+    func findByLabel() { collectionSheet = .findByLabel }
+
+    /// Changes one stored item as it is saved now (not as some view last saw it), so only what `change` sets is
+    /// written. Nothing happens for an item that's gone, read-only, or unchanged. Returns the item as saved.
+    @discardableResult
+    func changeItem(id: String, cover jpeg: Data? = nil, _ change: (inout CollectionItem) -> Void) -> CollectionItem? {
+        guard let current = item(id: id), current.isEditable else { return nil }
+        var item = current
+        change(&item)
+        guard item != current || jpeg != nil else { return current }
+        return saveItem(item, cover: jpeg)
+    }
+
+    /// Asks before removing an item (`collectionRemovalConfirmation`).
+    func confirmItemRemoval(_ item: CollectionItem) {
+        guard item.isEditable else { return }
+        pendingItemRemoval = item
+    }
+
+    /// The library album an item's digital copy is, when its album key has songs.
+    func linkedAlbum(for item: CollectionItem) -> AlbumSummary? {
+        collection.libraryTracks(item).isEmpty ? nil : album(forKey: item.albumKey)
+    }
+
+    /// Plays an item's songs in album order (or shuffled).
+    func play(item: CollectionItem, shuffled: Bool = false) {
+        let songs = collection.libraryTracks(item)
+        guard !songs.isEmpty else { return }
+        player.play(queue: shuffled ? songs.shuffled() : songs, startAt: 0, source: item.album)
+    }
+
+    /// The disc in a drive that is this CD (by release, barcode or album key), if any.
+    func discInDrive(for item: CollectionItem) -> CDDisc? {
+        guard item.medium == .cd else { return nil }
+        return cd.discs.first { disc in
+            guard let release = disc.release else { return false }
+            if let id = item.releaseID { return release.id == id }
+            if let code = item.barcode, !release.barcode.isEmpty {
+                return release.barcode.filter(\.isNumber).drop { $0 == "0" } == code.drop { $0 == "0" }
+            }
+            return disc.albumKey == item.albumKey
+        }
+    }
+
+    /// The album key an item can be unlinked to: its own title and artist's, unless songs are under that key too
+    /// (then it can only be linked to another album).
+    func unlinkedKey(for item: CollectionItem) -> String? {
+        let own = SearchIndex.albumKey(album: item.album, artist: item.artist)
+        return tracks(ofAlbumKey: own).isEmpty ? own : nil
+    }
+
+    /// Whether Unlink can do anything: the item is linked, and its link can be dropped (see `unlink`).
+    func canUnlink(_ item: CollectionItem) -> Bool {
+        guard item.isEditable else { return false }
+        if collection.libraryTracks(item).isEmpty { return item.digitalSource != nil }
+        return unlinkedKey(for: item) != nil
+    }
+
+    /// Unlinks an item from its digital copy. A copy that left the library just stops being linked (a rip under the
+    /// same key links it again); one whose songs are there moves to its own title and artist's key, since songs under
+    /// its key are always its digital copy. The item's other details stay.
+    func unlink(itemID: String) {
+        guard let item = item(id: itemID), canUnlink(item) else { return }
+        let key = collection.libraryTracks(item).isEmpty ? item.albumKey : unlinkedKey(for: item)
+        guard let key else { return }
+        changeItem(id: itemID) {
+            $0.albumKey = key
+            $0.digitalSource = nil
+        }
+    }
+
+    /// Opens an artist's page, also for an artist you only have items by.
+    func showArtist(named name: String) {
+        nowPlayingExpanded = false
+        if let artist = artistSummary(named: name) {
+            navigationPath.append(artist)
+        } else {
+            navigationPath.append(ArtistRoute(name: name))
+        }
+    }
+
+    /// Adds a copy of a library album you own (linked to it) with the next label in its series. Returns it as saved.
+    @discardableResult
+    func addCopy(of album: AlbumSummary, medium: CollectionMedium) -> CollectionItem? {
+        let number = medium.series.map { nextNumber(in: $0) }
+        let item = CollectionDraft.item(album: album, tracks: tracks(of: album), medium: medium, sticker: number)
+        return saveItem(item)
+    }
+
+    /// The item the Import page's files are the digital copy of, preset by Import a Transfer… on an item's page.
+    var importLinkItemID: String?
+
+    /// Import Files… / Import a Transfer… for an item: chooses the files, with the item preset as what they're the
+    /// digital copy of.
+    func importFiles(for item: CollectionItem) {
+        importLinkItemID = item.id
+        // The queue takes it when the files are added; choosing none leaves nothing preset.
+        defer { importLinkItemID = nil }
+        chooseFilesToImport()
+    }
+
+    /// Moves the items of an album whose album or album artist tags changed to its new key.
+    func rekeyCollection(from oldKey: String, to newKey: String) {
+        guard let db = database, oldKey != newKey else { return }
+        do {
+            try db.rekeyCollection(from: oldKey, to: newKey)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Items follow their album when its album or album artist tags change, whatever changed them (the Mac app has
+    /// no tag editor of its own: tags change by re-importing, rematching or outside the app, and show up here). When
+    /// none of an old key's songs is left under it, its items move to the key most of its retagged songs went to
+    /// (an album split in two, by disc say, follows its bigger part and reads partly digitized there, rather than
+    /// missing). An old key that still has songs keeps its items. Called with the songs before and after a reload,
+    /// before the collection is read.
+    private func rekeyRetaggedAlbums(from old: [Track], to new: [Track]) {
+        guard database != nil, !old.isEmpty, !new.isEmpty else { return }
+        let before = Dictionary(old.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let retagged = new.filter { t in
+            before[t.id].map { $0.album != t.album || $0.effectiveAlbumArtist != t.effectiveAlbumArtist } ?? false
+        }
+        guard !retagged.isEmpty else { return }
+        func key(_ t: Track) -> String { SearchIndex.albumKey(album: t.album, artist: t.effectiveAlbumArtist) }
+        let live = Set(new.map(key))
+        var moves: [String: [String: Int]] = [:]
+        for t in retagged {
+            guard let was = before[t.id] else { continue }
+            let oldKey = key(was)
+            // The old key still has songs (some weren't retagged, or others joined it): its items stay.
+            guard !live.contains(oldKey) else { continue }
+            moves[oldKey, default: [:]][key(t), default: 0] += 1
+        }
+        for (oldKey, targets) in moves.sorted(by: { $0.key < $1.key }) {
+            let target = targets.max { $0.value != $1.value ? $0.value < $1.value : $0.key > $1.key }?.key
+            if let target { rekeyCollection(from: oldKey, to: target) }
+        }
+    }
+
+    /// What a collection rebuild works from, read on the main actor.
+    private struct CollectionRequest: Sendable {
+        var read: CollectionRead
+        var songs: [Int64: TrackPurchase]
+        var infos: [String: AlbumInfo]
+        var generation: Int
+        /// The changes made before the read, which the rebuilt collection includes.
+        var unsettled: [String: CollectionItem?]
+    }
+
+    /// Reads the items for a rebuild. Nil when they can't be read: the collection shown stays as it is.
+    private func startCollectionRebuild() -> CollectionRequest? {
+        guard let db = database, let read = try? db.collectionItems() else { return nil }
+        collectionGeneration += 1
+        return CollectionRequest(read: read, songs: trackPurchases, infos: albumInfo.infos, generation: collectionGeneration,
+                                 unsettled: unsettledItems)
+    }
+
+    /// Rebuilds `collection` and its index in the background after a change to the items.
+    private func rebuildCollection() {
+        guard let request = startCollectionRebuild() else { return }
+        let all = tracks
+        // The library's index is reused only when it's of these tracks (not while a reload is rebuilding it).
+        let index = indexIsCurrent ? self.index : nil
+        Task.detached(priority: .userInitiated) {
+            let built = Self.buildCollection(request.read, songs: request.songs, tracks: all, infos: request.infos, index: index)
+            await MainActor.run { [weak self] in
+                guard let self, request.generation == self.collectionGeneration else { return }
+                self.setCollection(built, settling: request.unsettled)
+            }
+        }
+    }
+
+    nonisolated private static func buildCollection(_ read: CollectionRead, songs: [Int64: TrackPurchase], tracks: [Track],
+                                                    infos: [String: AlbumInfo], index: SearchIndex?)
+        -> (collection: MusicCollection, index: CollectionIndex) {
+        let collection = MusicCollection(items: read.items, songPurchases: songs, tracks: tracks, unreadable: read.unreadable)
+        return (collection, CollectionIndex(collection: collection, tracks: tracks, albumInfos: infos, index: index))
+    }
+
+    private func setCollection(_ built: (collection: MusicCollection, index: CollectionIndex), settling unsettled: [String: CollectionItem?]) {
+        collection = built.collection
+        collectionIndex = built.index
+        collectionVersion += 1
+        for (id, change) in unsettled where unsettledItems[id] == change { unsettledItems.removeValue(forKey: id) }
+        purchases = collection.legacyPurchases
+        purchasesVersion += 1
+        catalog.collection = collection
+        refreshCollectionPlaylistCounts()
+        // The app opens on the Shelf once there's anything on it (D19), unless something else was picked already.
+        if !appliedDefaultSidebar {
+            appliedDefaultSidebar = true
+            if !sidebarChosen, !collection.items.isEmpty { sidebar = .collection(.all) }
+        }
+        runSearch()
+        syncArtistInfo()
+    }
+
+    /// Persists what the linker found after a reload, keeping only what's still right for the items as they are now
+    /// (one may have been edited since they were read): nothing for an item whose album key changed meanwhile, and
+    /// fields only filled while still blank. Returns the items as saved.
+    private func applyLinkerChanges(_ changes: [CollectionLinker.Change], readAt old: [CollectionItem]) -> CollectionRead? {
+        guard let db = database, let fresh = try? db.collectionItems() else { return nil }
+        let before = Dictionary(old.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let now = Dictionary(fresh.items.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var kept: [CollectionLinker.Change] = []
+        for change in changes {
+            guard let was = before[change.id], let item = now[change.id], item.albumKey == was.albumKey else { continue }
+            var c = CollectionLinker.Change(id: change.id, albumKey: change.albumKey)
+            if item.releaseID == nil { c.releaseID = change.releaseID }
+            if item.releaseGroupID == nil { c.releaseGroupID = change.releaseGroupID }
+            if item.year == nil { c.year = change.year }
+            if item.digitalSource == nil { c.digitalSource = change.digitalSource }
+            if c != CollectionLinker.Change(id: change.id) { kept.append(c) }
+        }
+        guard !kept.isEmpty else { return fresh }
+        do {
+            try db.applyCollectionChanges(kept)
+            return try db.collectionItems()
+        } catch {
+            errorMessage = error.localizedDescription
+            return fresh
+        }
+    }
+
+    /// Smart playlists with collection filters change with the collection.
+    private func refreshCollectionPlaylistCounts() {
+        for p in smartPlaylists where CollectionSearchQuery.parse(p.query, shorthand: false).hasCollectionFilters {
+            smartPlaylistCounts[p.id] = smartPlaylistTracks(p).count
+        }
+    }
+
+    private func removeCoverFile(_ file: String) {
+        guard let url = CollectionCovers.url(file, root: libraryRoot) else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    /// Computes the Collection pane's stats in the background unless the library, collection and history are unchanged.
+    func loadCollectionStatsIfNeeded() {
+        let request = (library: libraryVersion, collection: collectionVersion, history: historyVersion)
+        if let r = collectionStatsRequest, r == request, collectionStats != nil { return }
+        collectionStatsRequest = request
+        let current = collection, all = tracks, totals = playTotals, infos = albumInfo.infos
+        collectionStatsTask?.cancel()
+        collectionStatsTask = Task.detached(priority: .userInitiated) {
+            let stats = CollectionStats(collection: current, tracks: all, playTotals: totals, albumInfos: infos)
+            guard !Task.isCancelled else { return }
+            await MainActor.run { [weak self] in
+                guard let self, let r = self.collectionStatsRequest, r == request else { return }
+                self.collectionStats = stats
+            }
+        }
+    }
+
+    // MARK: Ownership (deprecated: the views not yet moved to the collection)
+
+    /// How you own the album, if you do: its primary CD or download, or a download made of the songs you bought from it.
     func purchase(for album: AlbumSummary) -> AlbumPurchase? { purchases[AlbumInfoStore.key(album)] }
 
     /// That you own the album, as you said on its page or when ripping it (not counting songs you bought).
     func purchaseRecord(for album: AlbumSummary) -> AlbumPurchase? { purchaseRecords[AlbumInfoStore.key(album)] }
 
-    /// Records that you own the album (with nil, that you don't).
+    /// Records that you own the album as its primary CD or download (with nil, that you don't: only that copy is
+    /// removed; any other copy of the album, a second CD or a record, stays).
     func setPurchase(_ purchase: AlbumPurchase?, forKey key: String) {
         guard let db = database, purchaseRecords[key] != purchase else { return }
         do {
-            try db.saveAlbumPurchase(key: key, purchase)
-            purchaseRecords[key] = purchase
-            combinePurchases()
+            if let purchase {
+                try db.saveAlbumPurchase(key: key, purchase)
+            } else if let primary = CollectionLegacy.primary(storedCopies(albumKey: key), albumKey: key) {
+                try db.deleteCollectionItem(id: primary.id)
+                if let cover = primary.coverFile { removeCoverFile(cover) }
+                unsettledItems[primary.id] = .some(nil)
+            }
+            purchaseRecords = try db.albumPurchases()
+            rebuildCollection()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// The album's stored copies as they are now, including changes not in `collection` yet.
+    private func storedCopies(albumKey key: String) -> [CollectionItem] {
+        var copies = collection.copies(albumKey: key).filter { $0.origin == .stored && unsettledItems[$0.id] == nil }
+        copies += unsettledItems.values.compactMap { $0 }.filter { $0.albumKey == key }
+        return copies
     }
 
     /// Records what you paid for a song (with nil, forgets it).
@@ -628,7 +1147,7 @@ final class AppModel {
         do {
             try db.saveTrackPurchase(trackID: trackID, purchase)
             trackPurchases[trackID] = purchase
-            combinePurchases()
+            rebuildCollection()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -637,12 +1156,6 @@ final class AppModel {
     private func loadPurchases() {
         purchaseRecords = (try? database?.albumPurchases()) ?? purchaseRecords
         trackPurchases = (try? database?.trackPurchases()) ?? trackPurchases
-        combinePurchases()
-    }
-
-    private func combinePurchases() {
-        purchases = AlbumPurchase.including(songs: trackPurchases, tracks: tracks, in: purchaseRecords)
-        purchasesVersion += 1
     }
 
     func setPurchase(_ purchase: AlbumPurchase?, for album: AlbumSummary) {
@@ -654,9 +1167,10 @@ final class AppModel {
         return artists.first { ArtistInfoStore.key($0.name) == key }
     }
 
-    /// The library's artists to look for on the Concerts page, with their MusicBrainz IDs where known.
+    /// The library's and the collection's artists to look for on the Concerts page, with their MusicBrainz IDs where
+    /// known.
     func concertArtists() -> [ConcertArtist] {
-        artists.map { ConcertArtist(name: $0.name, mbid: artistInfo.info(for: $0.name)?.mbid) }
+        artistNames.map { ConcertArtist(name: $0, mbid: artistInfo.info(for: $0)?.mbid) }
     }
 
     func refreshArtistInfo(_ names: [String]) {
@@ -704,14 +1218,27 @@ final class AppModel {
 
     // MARK: Search
 
+    /// Searches the library and the collection together (`LibrarySearch`).
     private func runSearch() {
-        searchResults = searchText.trimmingCharacters(in: .whitespaces).isEmpty
-            ? SearchResults() : index.search(searchText, autocorrect: searchAutocorrect)
+        guard isSearching else {
+            searchResults = SearchResults(); searchItems = []; searchLabelHits = []
+            return
+        }
+        let results = LibrarySearch.run(searchText, index: index, collectionIndex: collectionIndex, collection: collection,
+                                        autocorrect: searchAutocorrect)
+        searchResults = results.library
+        searchItems = results.items
+        searchLabelHits = results.labelHits
     }
 
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
 
-    var searchCompletions: [SearchCompletion] { index.completions(for: searchText) }
+    /// The library's completions, then the collection keys' (`own:`, `ripped:`, `sticker:`…).
+    var searchCompletions: [SearchCompletion] {
+        let library = index.completions(for: searchText)
+        let labels = Set(library.map(\.label))
+        return library + collectionIndex.completions(for: searchText).filter { !labels.contains($0.label) }
+    }
 
     /// Show results for exactly what was typed, skipping spelling correction.
     func searchExactly() {
@@ -791,23 +1318,6 @@ final class AppModel {
         }
     }
 
-    /// Computes the Owned pane's stats in the background unless the library, purchases and history are unchanged.
-    func loadOwnershipIfNeeded() {
-        let request = (library: libraryVersion, purchases: purchasesVersion, history: historyVersion)
-        if let r = ownershipRequest, r == request, ownershipStats != nil { return }
-        ownershipRequest = request
-        let all = tracks, owned = purchases, totals = playTotals, songs = trackPurchases
-        ownershipTask?.cancel()
-        ownershipTask = Task.detached(priority: .userInitiated) {
-            let stats = OwnershipStats(tracks: all, purchases: owned, playTotals: totals, songPurchases: songs)
-            guard !Task.isCancelled else { return }
-            await MainActor.run { [weak self] in
-                guard let self, let r = self.ownershipRequest, r == request else { return }
-                self.ownershipStats = stats
-            }
-        }
-    }
-
     // MARK: Smart playlists
 
     func newSmartPlaylist(query: String = "") {
@@ -843,8 +1353,9 @@ final class AppModel {
         reloadLibrary()
     }
 
+    /// Without collection keys, exactly what the library's index matches (as saved playlists always did).
     func smartPlaylistTracks(_ p: SmartPlaylist) -> [Track] {
-        index.tracks(matching: SearchQuery.parse(p.query))
+        LibrarySearch.tracks(matching: p.query, index: index, collectionIndex: collectionIndex, collection: collection)
     }
 
     func tracks(album: String, artist: String) -> [Track] {
@@ -871,10 +1382,32 @@ final class AppModel {
         pendingRemoval = RemovalRequest(tracks: tracks, title: title)
     }
 
+    /// The items whose album would have no songs left without these: removing them keeps the items, each with its
+    /// album's cover and marked not ripped (D12).
+    func copiesLosingMusic(_ ids: Set<Int64>) -> [CollectionItem] {
+        var keys = Set<String>()
+        for id in ids { if let t = trackByID[id] { keys.insert(SearchIndex.albumKey(album: t.album, artist: t.effectiveAlbumArtist)) } }
+        return keys.sorted().flatMap { key in
+            collection.copies(albumKey: key).filter { item in
+                item.isEditable && collection.libraryTracks(item).allSatisfy { ids.contains($0.id) }
+            }
+        }
+    }
+
     /// Moves the songs' files to the Trash (with album and artist folders left empty but for a cover) and removes
-    /// them from the library, their playlists, likes and listening history, and the play queue.
+    /// them from the library, their playlists, likes and listening history, and the play queue. Items whose album
+    /// leaves the library stay in the collection: first each one without a cover of its own takes a copy of the
+    /// album's cover.jpg (which goes to the Trash with the folder), then once the songs are gone it's marked not
+    /// ripped (its digital source cleared).
     func removeFromLibrary(_ ids: Set<Int64>) {
         guard let db = database else { return }
+        let losing = copiesLosingMusic(ids)
+        var adopted: [String: String] = [:]
+        for item in losing where item.coverFile == nil {
+            guard let url = coverURL(for: item), FileManager.default.fileExists(atPath: url.path),
+                  let file = try? CollectionCovers.adopt(albumCover: url, itemID: item.id, root: libraryRoot) else { continue }
+            adopted[item.id] = file
+        }
         var removed: Set<Int64> = [], trashed: [URL] = []
         for id in ids {
             do {
@@ -894,7 +1427,34 @@ final class AppModel {
             try? FileManager.default.trashItem(at: folder, resultingItemURL: nil)
         }
         player.removeTracks(removed)
+        updateCopies(losing, adopted: adopted, removed: removed)
         reloadLibrary()
+    }
+
+    /// After removing songs: the items keep the covers they adopted, and those whose album has no songs left now are
+    /// marked not ripped. Nothing else about them changes.
+    private func updateCopies(_ losing: [CollectionItem], adopted: [String: String], removed: Set<Int64>) {
+        guard let db = database, !losing.isEmpty else { return }
+        // As saved: only the cover and the source change.
+        let saved = Dictionary(((try? db.collectionItems().items) ?? []).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var changed: [CollectionItem] = []
+        for old in losing {
+            guard let current = saved[old.id], current.isEditable else { continue }
+            var item = current
+            if let file = adopted[item.id], item.coverFile == nil { item.coverFile = file }
+            if collection.libraryTracks(old).allSatisfy({ removed.contains($0.id) }) { item.digitalSource = nil }
+            if item != current { changed.append(item) }
+        }
+        let used = Set(changed.compactMap(\.coverFile))
+        defer { for file in adopted.values where !used.contains(file) { removeCoverFile(file) } }
+        guard !changed.isEmpty else { return }
+        do {
+            try db.saveCollectionItems(changed)
+            for item in changed { unsettledItems[item.id] = item }
+        } catch {
+            for item in changed { if let file = adopted[item.id] { removeCoverFile(file) } }
+            errorMessage = error.localizedDescription
+        }
     }
 
     func showInFinder(_ ts: [Track]) {
@@ -1046,7 +1606,11 @@ final class AppModel {
     }
 
     /// Every track the iPhone selection puts on the phone, once, in list order.
-    var iPhoneTracks: [Track] { iPhone.selection.resolve(tracks(for:)) }
+    /// The songs the iPhone list puts on a phone, with what its Collection on iPhone adds; with nil, on any paired
+    /// phone (the list is shared, each phone has its own scope).
+    func iPhoneTracks(for phone: SyncStore.PairedPhone? = nil) -> [Track] {
+        iPhone.selection.resolve(tracks(for:), implicit: iPhone.implicit(for: phone, collection: collection))
+    }
 
     func syncIPhone(_ phone: SyncStore.PairedPhone) { iPhone.sync(phone) }
 
@@ -1063,8 +1627,11 @@ final class AppModel {
                                                   ticketmasterKey: concerts.ticketmasterKey, jambaseKey: concerts.jambaseKey)
         }
         return SyncContext(libraryRoot: libraryRoot, database: database, lastFM: lastFM, concerts: concertSettings,
-                           library: tracks, tracks: { [unowned self] in self.tracks(for: $0) })
+                           library: tracks, tracks: { [unowned self] in self.tracks(for: $0) }, collection: collection)
     }
+
+    /// The collection's own covers (`Music/Collection Covers`), which go with a database backup.
+    func collectionCoverPaths() -> [String] { (try? database?.collectionCoverPaths()) ?? [] }
 
     /// Every track in the export list once, in list order.
     var exportListTracks: [Track] {

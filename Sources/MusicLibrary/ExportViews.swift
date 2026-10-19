@@ -49,12 +49,16 @@ struct ExportListView: View {
             }.value
         }
         .task(id: PreviewKey(destination: model.exportDestination, tracks: TrackSet(tracks), artistImages: model.exportBackupDatabase,
-                             revision: model.exportRevision, libraryVersion: model.libraryVersion, refresh: refreshToken)) {
+                             revision: model.exportRevision, libraryVersion: model.libraryVersion, collectionVersion: model.collectionVersion,
+                             refresh: refreshToken)) {
             guard let dest = model.exportDestination else { preview = nil; previewError = nil; return }
             let root = model.libraryRoot, artistImages = model.exportBackupDatabase
+            // The database backup refers to the collection's own covers, so they go with it.
+            let covers = artistImages ? model.collectionCoverPaths() : []
             scanning = true
             let result = await Task.detached(priority: .userInitiated) {
-                Result { try ExportPreview.make(tracks: tracks, libraryRoot: root, destination: dest, artistImages: artistImages) }
+                Result { try ExportPreview.make(tracks: tracks, libraryRoot: root, destination: dest, artistImages: artistImages,
+                                                collectionCovers: covers) }
             }.value
             guard !Task.isCancelled else { return }
             scanning = false
@@ -127,6 +131,7 @@ struct ExportListView: View {
         var artistImages: Bool
         var revision: Int
         var libraryVersion: Int
+        var collectionVersion: Int
         var refresh: Int
     }
 }
@@ -335,6 +340,11 @@ struct DestinationContentsView: View {
                                        detail: "\(preview.artistImageCount.formatted()) photo\(preview.artistImageCount == 1 ? "" : "s")",
                                        badge: preview.plan.artistImages.isEmpty ? nil : "+\(preview.plan.artistImages.count) new or updated")
                 }
+                if !preview.plan.collectionCovers.isEmpty {
+                    DestinationDataRow(systemImage: "books.vertical", title: "Collection covers",
+                                       detail: "The covers of your copies that have their own",
+                                       badge: "+\(preview.plan.collectionCovers.count) new")
+                }
                 if !preview.playlists.isEmpty || playlistsToWrite > 0 {
                     DestinationDataRow(systemImage: "music.note.list", title: "Playlists",
                                        detail: preview.playlists.isEmpty ? "None yet" : preview.playlists.map { ($0 as NSString).deletingPathExtension }.joined(separator: ", "),
@@ -446,7 +456,7 @@ struct ExportListFooter: View {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
                     Text("Not enough space: \(bytes) needed, \(ByteCountFormatter.string(fromByteCount: free, countStyle: .file)) free.")
                         .foregroundStyle(.red)
-                } else if plan.files.isEmpty && plan.covers.isEmpty && plan.artistImages.isEmpty {
+                } else if plan.files.isEmpty && plan.covers.isEmpty && plan.artistImages.isEmpty && plan.collectionCovers.isEmpty {
                     Image(systemName: "checkmark.circle").foregroundStyle(.subtext)
                     Text(hasTracks ? "Every picked song is already at the destination." : "Pick something to export.").foregroundStyle(.subtext)
                 } else {
@@ -467,6 +477,9 @@ struct ExportListFooter: View {
         if !plan.files.isEmpty { parts.append(songCount(plan.files.count)) }
         if !plan.covers.isEmpty { parts.append("\(plan.covers.count) album cover\(plan.covers.count == 1 ? "" : "s")") }
         if !plan.artistImages.isEmpty { parts.append("\(plan.artistImages.count) artist photo\(plan.artistImages.count == 1 ? "" : "s")") }
+        if !plan.collectionCovers.isEmpty {
+            parts.append("\(plan.collectionCovers.count) collection cover\(plan.collectionCovers.count == 1 ? "" : "s")")
+        }
         return "Will copy " + ListFormatter.localizedString(byJoining: parts)
     }
 }
@@ -582,6 +595,7 @@ struct ExportSheet: View {
         if s.skipped > 0 { out.append("\(songCount(s.skipped).capitalizedFirst) already there, left untouched.") }
         if s.covers > 0 { out.append("Added \(s.covers) album cover\(s.covers == 1 ? "" : "s").") }
         if s.artistImages > 0 { out.append("Copied \(s.artistImages) artist photo\(s.artistImages == 1 ? "" : "s").") }
+        if s.collectionCovers > 0 { out.append("Copied \(s.collectionCovers) collection cover\(s.collectionCovers == 1 ? "" : "s").") }
         if s.playlists > 0 { out.append("Wrote \(s.playlists) playlist file\(s.playlists == 1 ? "" : "s").") }
         if s.databaseBackedUp { out.append("Backed up the library database (library.sqlite).") }
         return out

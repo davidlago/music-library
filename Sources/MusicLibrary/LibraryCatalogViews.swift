@@ -304,6 +304,8 @@ struct CatalogCard: View {
                 CatalogStatusBadge(availability: item.availability, text: item.statusText, library: catalog.siteLibrary)
                 if let year = details?.year ?? item.year { Text(String(year)).font(.caption).foregroundStyle(.subtext) }
             }
+            let copies = catalog.collectionCopies(item)
+            if !copies.isEmpty { CollectionCopyNote(copies: copies, compact: true) }
         }
         .frame(width: 150, alignment: .leading)
         .contentShape(Rectangle())
@@ -356,6 +358,10 @@ struct CatalogItemMenu: View {
         if let album = model.catalog.ownedAlbum(item) {
             Button("Show in My Library") { model.navigationPath.append(album) }
         }
+        if let copy = model.catalog.collectionCopies(item).first {
+            Button("Show in My Collection") { model.showItem(id: copy.id) }
+        }
+        Button("I Own This…") { model.addToCollection(medium: .cd, prefill: model.catalog.prefill(item)) }
         if let url = model.catalog.webURL(item.pagePath) {
             Link("Open in Library Catalog", destination: url)
         }
@@ -507,6 +513,12 @@ struct CatalogDetail: View {
             }
             .controlSize(.large)
             .padding(.top, 6)
+            HStack(spacing: 10) {
+                let copies = catalog.collectionCopies(item)
+                if !copies.isEmpty { CollectionCopyNote(copies: copies) }
+                Button("I Own This…") { model.addToCollection(medium: .cd, prefill: catalog.prefill(item)) }
+                    .help("Add this CD to your collection, with your label number and what you paid")
+            }
             shelfStatus.padding(.top, 4)
         }
     }
@@ -621,7 +633,7 @@ struct CatalogDetail: View {
     private func releaseDetails(_ details: CatalogAlbumDetails?) -> some View {
         let work = model.catalog.works[item.id]
         let rows: [(String, String)] = [
-            ("Label", details?.label), ("Catalog #", details?.catalogNumber), ("Released", details?.releaseDate),
+            ("Record label", details?.label), ("Catalog #", details?.catalogNumber), ("Released", details?.releaseDate),
             ("Media", details?.media), ("Barcode", details?.barcode ?? work?.upcs.first),
             ("Language", item.language), ("Series", item.series),
             ("Subjects", work.map { $0.subjects.prefix(4).joined(separator: "; ") }.flatMap { $0.isEmpty ? nil : $0 }),
@@ -1219,6 +1231,75 @@ private struct ListCover: View {
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .task(id: "\(item.id)|\(d?.releaseId ?? d?.releaseGroupId ?? "")") {
             if let found = await model.catalog.cover(for: item) { image = found }
+        }
+    }
+}
+
+/// What you own of a CD listed elsewhere (a library's catalog, a shop): "In your collection: CD #142 (not ripped)",
+/// "You have it on Vinyl #12", "You have it as a download". Clicking it opens the copy.
+struct CollectionCopyNote: View {
+    @Environment(AppModel.self) private var model
+    /// The matching copies, the closest first.
+    let copies: [CollectionItem]
+    /// One short line for a card: "CD #142 · not ripped".
+    var compact = false
+    /// For a shop's edition: whether these are copies of that exact edition ("You own this edition (CD #142)").
+    var edition: Bool?
+
+    var body: some View {
+        if let copy = preferred {
+            Button { model.showItem(id: copy.id) } label: {
+                Label(compact ? short(copy) : text(copy), systemImage: "books.vertical.fill")
+                    .font(compact ? .caption : .callout)
+                    .foregroundStyle(.subtext)
+                    .lineLimit(1)
+            }
+            .buttonStyle(.plain)
+            .help(text(copy))
+        }
+    }
+
+    /// A CD first (the lowest label), then a record, then a download.
+    private var preferred: CollectionItem? {
+        copies.min { a, b in
+            let ra = rank(a), rb = rank(b)
+            return ra != rb ? ra < rb : (a.stickerNumber ?? .max) < (b.stickerNumber ?? .max)
+        }
+    }
+
+    private func rank(_ item: CollectionItem) -> Int {
+        switch item.medium {
+        case .cd: 0
+        case .vinyl: 1
+        case .other: 2
+        case .download: 3
+        }
+    }
+
+    private func ripped(_ item: CollectionItem) -> String {
+        model.collection.digitalState(item).hasMusic ? (item.medium == .cd ? "ripped" : "digitized")
+            : (item.medium == .cd ? "not ripped" : "not digitized")
+    }
+
+    private func text(_ item: CollectionItem) -> String {
+        if let edition {
+            let name = item.sticker?.text ?? "your CD"
+            return edition ? "You own this edition (\(name))" : "You own another edition (\(name))"
+        }
+        switch item.medium {
+        case .cd: return "In your collection: \(item.sticker?.text ?? "your CD") (\(ripped(item)))"
+        case .vinyl: return "You have it on \(item.sticker?.text ?? "vinyl")"
+        case .download: return "You have it as a download"
+        case .other: return "You have it on \(item.formatDetail ?? "another medium")"
+        }
+    }
+
+    private func short(_ item: CollectionItem) -> String {
+        switch item.medium {
+        case .cd: return "\(item.sticker?.text ?? "Your CD") · \(ripped(item))"
+        case .vinyl: return item.sticker?.text ?? "On vinyl"
+        case .download: return "Your download"
+        case .other: return item.formatDetail ?? "Yours"
         }
     }
 }

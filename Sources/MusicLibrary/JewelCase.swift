@@ -4,13 +4,25 @@ import SwiftUI
 /// An album's cover drawn as a CD jewel case (album pages and the album grid), 142 × 125 mm: the cover is the square
 /// booklet behind the clear lid, with the ribbed hinge and its pins on the left, the black tray showing around the
 /// booklet, the two tabs that hold it and the lid's bevelled edges and gloss. The decoration doesn't take clicks, so controls in the booklet work.
-/// The iPhone app has the same view (`iOS/MusicLibraryMobile/JewelCase.swift`).
+/// The iPhone app has the same view (`iOS/MusicLibraryMobile/JewelCase.swift`); a record is a `RecordSleeve`.
 struct JewelCase<Booklet: View>: View {
     let width: CGFloat
-    /// How you got the album: your CD's label number on a sticker across the top of the hinge (where it goes on the real
-    /// case), or a round badge on the booklet for a borrowed CD or a download.
-    var ownership: OwnershipMark?
-    @ViewBuilder var booklet: Booklet
+    /// What you own: your CD's label on a sticker across the top of the hinge (where it goes on the real case), a
+    /// small badge on the booklet while it isn't ripped, or a round badge for a borrowed CD or a download.
+    var mark: CopyMark?
+    var booklet: Booklet
+
+    init(width: CGFloat, mark: CopyMark?, @ViewBuilder booklet: () -> Booklet) {
+        self.width = width
+        self.mark = mark
+        self.booklet = booklet()
+    }
+
+    /// Deprecated: pass a `CopyMark` (`mark:`). Kept for the views not moved to the collection yet; removed in the
+    /// cleanup.
+    init(width: CGFloat, ownership: OwnershipMark? = nil, @ViewBuilder booklet: () -> Booklet) {
+        self.init(width: width, mark: ownership.map(CopyMark.init(legacy:)), booklet: booklet)
+    }
 
     static func height(width: CGFloat) -> CGFloat { width * 125 / 142 }
     /// The booklet's side in a case this wide.
@@ -42,11 +54,11 @@ struct JewelCase<Booklet: View>: View {
                 ForEach([h * 0.022, h * 0.913], id: \.self) { y in
                     knuckle.frame(width: hinge * 0.65, height: h * 0.065).offset(x: hinge * 0.19, y: y)
                 }
-                if let label = ownership?.labelNumber {
-                    LabelSticker(number: label, width: hinge * 0.88).offset(x: hinge * 0.04, y: h * 0.012)
+                if let sticker = mark?.sticker, sticker.series == .cd {
+                    LabelSticker(number: sticker.number, series: .cd, width: hinge * 0.88).offset(x: hinge * 0.04, y: h * 0.012)
                 }
-                if let ownership, ownership == .borrowed || ownership == .digital {
-                    OwnershipBadge(mark: ownership, coverSide: side)
+                if let mark, let badge = CopyBadge(mark: mark, coverSide: side) {
+                    badge
                         .frame(width: side, height: side, alignment: .bottomTrailing)
                         .offset(x: w - margin - side, y: margin)
                 }
