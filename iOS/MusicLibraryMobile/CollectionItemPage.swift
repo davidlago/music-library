@@ -86,7 +86,7 @@ private struct CollectionItemContent: View {
             if let meta = metaLine {
                 Text(meta).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
-            if let sticker = item.sticker { shelfSteps(sticker) }
+            shelfSteps
         }
         .frame(maxWidth: .infinity)
     }
@@ -128,10 +128,26 @@ private struct CollectionItemContent: View {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    /// ‹ Previous on the shelf · Next ›, in the item's series.
-    private func shelfSteps(_ sticker: Sticker) -> some View {
-        let neighbors = collection.neighbors(of: sticker)
-        return HStack(spacing: 12) {
+    /// The items on either side on the shelf: by label in the item's series; for one without a label, among the others
+    /// without one, by artist and title (the end of the Shelf sorted by label).
+    private var shelfNeighbors: (previous: CollectionItem?, next: CollectionItem?) {
+        if let sticker = item.sticker { return collection.neighbors(of: sticker) }
+        let unlabeled = CollectionSort.sticker.sorted(collection.items.filter { $0.sticker == nil })
+        guard let i = unlabeled.firstIndex(where: { $0.id == item.id }) else { return (nil, nil) }
+        return (i > 0 ? unlabeled[i - 1] : nil, i + 1 < unlabeled.count ? unlabeled[i + 1] : nil)
+    }
+
+    /// ‹ Previous on the shelf · Next ›.
+    @ViewBuilder
+    private var shelfSteps: some View {
+        let neighbors = shelfNeighbors
+        if neighbors.previous != nil || neighbors.next != nil {
+            shelfSteps(neighbors)
+        }
+    }
+
+    private func shelfSteps(_ neighbors: (previous: CollectionItem?, next: CollectionItem?)) -> some View {
+        HStack(spacing: 12) {
             Button { if let p = neighbors.previous { step(p.id) } } label: {
                 Label(neighbors.previous?.sticker.map { "#\($0.number)" } ?? "Previous", systemImage: "chevron.left")
             }

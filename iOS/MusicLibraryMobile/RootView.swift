@@ -11,7 +11,7 @@ struct RootView: View {
     @State private var showNowPlaying = false
     /// The tab last chosen; until then, the collection when there is one, else the library.
     @SceneStorage("selectedTab") private var chosenTab: Tabs?
-    @AppStorage("insightsPane") private var insightsPane = InsightsPane.owned
+    @AppStorage("insightsPane") private var insightsPane = InsightsPane.library
 
     private var tab: Tabs {
         get { chosenTab ?? (model.collection.items.isEmpty ? .library : .collection) }

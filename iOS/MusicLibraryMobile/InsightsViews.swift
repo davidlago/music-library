@@ -56,7 +56,7 @@ enum InsightsPane: String, CaseIterable, Identifiable {
 /// Insights: what you own (CDs, records, downloads), your digital library, and what you listen to.
 struct InsightsTab: View {
     @Environment(PhoneModel.self) private var model
-    @AppStorage("insightsPane") private var pane = InsightsPane.owned
+    @AppStorage("insightsPane") private var pane = InsightsPane.library
     @AppStorage("listeningPeriod") private var period = ListeningStats.Period.month
 
     var body: some View {

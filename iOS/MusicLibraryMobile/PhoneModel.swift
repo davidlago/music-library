@@ -307,6 +307,7 @@ final class PhoneModel {
         purchases = collection.legacyPurchases
         collectionVersion += 1
         glance.setNeedsUpdate()
+        LabelShortcuts.update(for: collection)
     }
 
     nonisolated static func overlaid(_ library: LibrarySnapshot, events: [SyncEvent]) -> (MusicCollection, CollectionIndex) {
@@ -379,6 +380,12 @@ final class PhoneModel {
         await ensureLoaded()
         guard library != nil else { return nil }
         return collection.items(at: sticker)
+    }
+
+    /// The labels on items in the collection, in order (Siri's phrase values), once the library has loaded.
+    func labelsInUse() async -> [Sticker] {
+        await ensureLoaded()
+        return Set(collection.items.compactMap(\.sticker)).sorted()
     }
 
     /// How a library album's cover shows the copies you own.

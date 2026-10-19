@@ -157,21 +157,35 @@ struct CollectionHome: View {
 
     private func rows(_ c: MusicCollection, ready: [CollectionItem]) -> some View {
         VStack(spacing: 0) {
-            NavigationLink(value: CollectionRoute.scope(.all)) {
-                row("Shelf", systemImage: "books.vertical", count: c.items.count, detail: "Everything you own")
+            scopeRow(.all, "Shelf", systemImage: "books.vertical", count: c.items.count, detail: "Everything you own")
+            divider
+            scopeRow(.cds, "CDs", systemImage: "opticaldisc", count: c.count(.cds), detail: "Ripped or not")
+            divider
+            scopeRow(.vinyl, "Vinyl", systemImage: "record.circle", count: c.count(.vinyl), detail: "Records, digitized or not")
+            divider
+            scopeRow(.downloads, "Downloads", systemImage: "arrow.down.circle", count: c.count(.downloads),
+                     detail: "Albums and songs you bought")
+            divider
+            scopeRow(.toDigitize, "To Digitize", systemImage: "waveform.slash", count: c.count(.toDigitize),
+                     detail: "No digital copy yet")
+            divider
+            NavigationLink(value: CollectionRoute.readyToDownload) {
+                row("Ready to Download", systemImage: "icloud.and.arrow.down", count: ready.count,
+                    detail: "Digitized, not on this iPhone yet")
             }
             .buttonStyle(.plain)
-            if !model.isSample, !ready.isEmpty {
-                Divider().padding(.leading, 50)
-                NavigationLink(value: CollectionRoute.readyToDownload) {
-                    row("Ready to Download", systemImage: "icloud.and.arrow.down", count: ready.count,
-                        detail: "Digitized, not on this iPhone yet")
-                }
-                .buttonStyle(.plain)
-            }
         }
         .padding(.vertical, 2)
         .card()
+    }
+
+    private var divider: some View { Divider().padding(.leading, 50) }
+
+    private func scopeRow(_ scope: CollectionScope, _ title: String, systemImage: String, count: Int, detail: String) -> some View {
+        NavigationLink(value: CollectionRoute.scope(scope)) {
+            row(title, systemImage: systemImage, count: count, detail: detail)
+        }
+        .buttonStyle(.plain)
     }
 
     private func row(_ title: String, systemImage: String, count: Int, detail: String) -> some View {
@@ -607,7 +621,8 @@ struct CollectionListPage: View {
 
 // MARK: Ready to Download
 
-/// Items with a digital copy whose songs aren't all on this iPhone, and Download All.
+/// Items with a digital copy whose songs aren't all on this iPhone, and Download All, which asks the Mac for each
+/// album (`SyncRequest`s, kept until a sync, so it works before pairing too).
 struct ReadyToDownloadPage: View {
     @Environment(PhoneModel.self) private var model
 
@@ -627,13 +642,13 @@ struct ReadyToDownloadPage: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .disabled(waiting.isEmpty || !model.sync.isPaired)
+                    .disabled(waiting.isEmpty)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
                 } footer: {
                     Text(model.sync.isPaired
                          ? "\(items.count) album\(items.count == 1 ? "" : "s") · \(songCount(songs)) not on this iPhone. They download at the next sync with \(model.sync.macName ?? "your Mac")."
-                         : "Pair with your Mac in the Sync tab to download music.")
+                         : "\(items.count) album\(items.count == 1 ? "" : "s") · \(songCount(songs)) not on this iPhone. They download at the first sync after you pair with your Mac in the Sync tab.")
                 }
             }
             Section {

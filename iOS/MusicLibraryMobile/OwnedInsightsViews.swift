@@ -143,9 +143,12 @@ private struct DigitizedTile: View {
 
 // MARK: Shelves
 
-/// Each label series: the numbers used, the next one, free numbers and duplicates; opens Label Check.
+/// Each label series: the numbers used, the next one, free numbers and duplicates; opens Label Check. A find field
+/// shows what has a label as it's typed ("142" in both series, "v12" in one).
 struct CollectionShelvesCard: View {
+    @Environment(PhoneModel.self) private var model
     let stats: CollectionStats
+    @State private var find = ""
 
     var body: some View {
         InsightCard(title: "Your Shelves", subtitle: "CDs and records are numbered apart") {
@@ -156,6 +159,58 @@ struct CollectionShelvesCard: View {
                     NavigationLink(value: CollectionRoute.labelCheck(s.series)) { row(s) }
                         .buttonStyle(.plain)
                 }
+                Divider()
+                findField
+            }
+        }
+    }
+
+    private var findField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "number").foregroundStyle(.secondary)
+                TextField("Find a label, like 142 or v12", text: $find)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                if !find.isEmpty {
+                    Button { find = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Clear")
+                }
+            }
+            .font(.subheadline)
+            .padding(.horizontal, 10).padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color(.tertiarySystemFill)))
+            if let parsed = Sticker.parse(find) { results(parsed) }
+        }
+        .padding(.top, 10)
+    }
+
+    /// The items with the label typed, in either series when it didn't say which.
+    @ViewBuilder
+    private func results(_ parsed: (series: StickerSeries?, number: Int)) -> some View {
+        let c = model.collection
+        let stickers = (parsed.series.map { [$0] } ?? StickerSeries.allCases).compactMap { Sticker(series: $0, number: parsed.number) }
+        let hits = stickers.flatMap { c.items(at: $0) }
+        if hits.isEmpty {
+            Text(stickers.count == 1 ? "\(stickers[0].text) is free" : "No CD or record has #\(parsed.number)")
+                .font(.caption).foregroundStyle(.secondary)
+        } else {
+            ForEach(hits) { item in
+                NavigationLink(value: CollectionItemRoute(id: item.id)) {
+                    HStack(spacing: 10) {
+                        if let sticker = item.sticker { StickerPill(sticker: sticker, size: 11) }
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(item.album.isEmpty ? "Unknown Album" : item.album).font(.subheadline).lineLimit(1)
+                            Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        Spacer(minLength: 8)
+                        InsightChevron()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
     }

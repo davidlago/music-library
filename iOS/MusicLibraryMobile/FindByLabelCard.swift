@@ -9,6 +9,9 @@ struct FindByLabelCard: View {
     @AppStorage("findSeries") private var series = StickerSeries.cd
     /// 0: not picked yet (the series' highest label is shown).
     @AppStorage("findNumber") private var storedNumber = 0
+    /// The field was emptied to type another number: nothing is shown until a digit is typed (or a step or neighbor
+    /// is picked), instead of the highest label coming back.
+    @State private var cleared = false
     @FocusState private var editing: Bool
 
     var body: some View {
@@ -18,7 +21,7 @@ struct FindByLabelCard: View {
             HStack {
                 Label("Find by Label", systemImage: "number").font(.headline)
                 Spacer(minLength: 8)
-                Picker("Series", selection: Binding(get: { series }, set: { series = $0; storedNumber = 0 })) {
+                Picker("Series", selection: Binding(get: { series }, set: { series = $0; storedNumber = 0; cleared = false })) {
                     ForEach(StickerSeries.allCases, id: \.self) { Text($0.name).tag($0) }
                 }
                 .pickerStyle(.segmented)
@@ -30,7 +33,12 @@ struct FindByLabelCard: View {
                     Text("#").foregroundStyle(.secondary)
                     TextField("0", text: Binding(get: { number > 0 ? String(number) : "" }, set: { typed in
                         let digits = String(typed.filter(\.isNumber).prefix(7))
-                        storedNumber = Int(digits).map { min($0, Sticker.maxNumber) } ?? 0
+                        if let n = Int(digits), n > 0 {
+                            storedNumber = min(n, Sticker.maxNumber)
+                            cleared = false
+                        } else {
+                            cleared = true
+                        }
                     }))
                     .keyboardType(.numberPad)
                     .focused($editing)
@@ -45,6 +53,8 @@ struct FindByLabelCard: View {
                 .onTapGesture { editing = true }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(series.name) label number")
+                // Left empty: show the number it had again.
+                .onChange(of: editing) { if !editing { cleared = false } }
                 stepButton(1, number: number, systemImage: "chevron.right", label: "Next number")
             }
             if let sticker = Sticker(series: series, number: number) {
@@ -63,8 +73,9 @@ struct FindByLabelCard: View {
         }
     }
 
-    /// The number typed, else the series' highest label (1 when it has none).
+    /// The number typed, else the series' highest label (1 when it has none); 0 while the field is empty.
     private func shownNumber(_ c: MusicCollection) -> Int {
+        if cleared { return 0 }
         if storedNumber > 0 { return storedNumber }
         return max(c.nextNumber(in: series) - 1, 1)
     }
@@ -72,6 +83,7 @@ struct FindByLabelCard: View {
     private func stepButton(_ step: Int, number: Int, systemImage: String, label: String) -> some View {
         Button {
             storedNumber = min(max(number + step, 1), Sticker.maxNumber)
+            cleared = false
         } label: {
             Image(systemName: systemImage).font(.title3.weight(.semibold)).frame(width: 30, height: 36)
         }
@@ -137,6 +149,7 @@ struct FindByLabelCard: View {
         if let item, let sticker = item.sticker {
             Button {
                 storedNumber = sticker.number
+                cleared = false
             } label: {
                 HStack(spacing: 4) {
                     if leading { Image(systemName: "arrow.left") }
