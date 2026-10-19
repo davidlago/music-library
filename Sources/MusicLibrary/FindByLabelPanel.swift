@@ -148,10 +148,9 @@ struct LabelLookupCard: View {
     private var free: some View {
         let next = model.nextNumber(in: sticker.series)
         let text: String
-        if sticker.number == next {
-            text = "\(sticker.text) is the next free number"
-        } else if sticker.number > next {
-            text = "\(sticker.text) is free · the next number is \(sticker.series.name) #\(next)"
+        if sticker.number >= next {
+            // Past the end: the number to use is the next one, whichever was typed.
+            text = "\(sticker.series.name) #\(next) is the next free number"
         } else {
             text = "\(sticker.text) is free"
         }

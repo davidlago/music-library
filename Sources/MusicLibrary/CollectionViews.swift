@@ -94,7 +94,8 @@ struct CollectionView: View {
                     }
                     .frame(maxHeight: .infinity)
                 } else if layout == .list {
-                    CollectionTable(model: model, items: items, selection: $selection)
+                    CollectionTable(model: model, items: items, selection: $selection, highlighted: highlighted,
+                                    highlight: theme.accent, scrollTarget: $scrollTarget)
                 } else {
                     grid(items)
                 }
@@ -506,17 +507,40 @@ struct CollectionTable: View {
     let model: AppModel
     let items: [CollectionItem]
     @Binding var selection: Set<CollectionItem.ID>
+    /// The item Go to found, outlined for a moment, and the one to scroll to (cleared once scrolled).
+    var highlighted: String?
+    var highlight: Color = .accentColor
+    @Binding var scrollTarget: String?
     @State private var sortOrder: [KeyPathComparator<CollectionItem>] = []
 
     private var sorted: [CollectionItem] { sortOrder.isEmpty ? items : items.sorted(using: sortOrder) }
 
     var body: some View {
+        ScrollViewReader { proxy in
+            table
+                .onChange(of: scrollTarget) {
+                    guard let id = scrollTarget else { return }
+                    withAnimation { proxy.scrollTo(id, anchor: .center) }
+                    scrollTarget = nil
+                }
+        }
+    }
+
+    private var table: some View {
         Table(sorted, selection: $selection, sortOrder: $sortOrder) {
             TableColumn("Label", value: \.labelSort) { item in
-                if let sticker = item.sticker { StickerPill(sticker: sticker, size: 10) }
+                HStack(spacing: 0) {
+                    if let sticker = item.sticker { StickerPill(sticker: sticker, size: 10) }
+                }
+                .padding(2)
+                .background {
+                    if highlighted == item.id { RoundedRectangle(cornerRadius: 5).strokeBorder(highlight, lineWidth: 2) }
+                }
             }
             .width(min: 56, ideal: 80)
-            TableColumn("Title", value: \.album)
+            TableColumn("Title", value: \.album) { item in
+                Text(item.album).fontWeight(highlighted == item.id ? .semibold : nil)
+            }
             TableColumn("Artist", value: \.artist)
             TableColumn("Year", value: \.yearSort) { Text($0.year.map(String.init) ?? "") }.width(46)
             TableColumn("Medium", value: \.mediumSort) { item in

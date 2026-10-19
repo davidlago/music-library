@@ -13,6 +13,8 @@ struct CollectionItemEditor: View {
     /// The label each series had before the medium was switched away from it, given back on switching back (while
     /// it's still free), so trying another medium doesn't lose the number.
     @State private var earlier: [StickerSeries: Int] = [:]
+    @State private var pendingMedium: PendingMedium?
+    @Environment(\.undoManager) private var undoManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -42,6 +44,16 @@ struct CollectionItemEditor: View {
                 }
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
                 .help("Changing between CD and vinyl clears the label: each has its own numbers")
+                .confirmationDialog(pendingMedium.map { "Change \($0.sticker.text) to \($0.medium.name)?" } ?? "",
+                                    isPresented: Binding(get: { pendingMedium != nil }, set: { if !$0 { pendingMedium = nil } }),
+                                    presenting: pendingMedium) { pending in
+                    Button("Change to \(pending.medium.name)", role: .destructive) { setMedium(pending.medium) }
+                    Button("Cancel", role: .cancel) {}
+                } message: { pending in
+                    Text(pending.medium.series == nil
+                         ? "A \(pending.medium.name.lowercased()) has no label, so \(pending.sticker.text) comes off this item and the number becomes free."
+                         : "\(pending.medium.name) has its own numbers, so \(pending.sticker.text) comes off this item and the number becomes free.")
+                }
             }
             if let series = item.medium.series {
                 GridRow(alignment: .firstTextBaseline) {
@@ -96,23 +108,54 @@ struct CollectionItemEditor: View {
         }
     }
 
-    /// The medium; switching between CD and vinyl clears the label (each has its own numbers) and brings back the one
-    /// it had in the other series earlier on this page.
+    /// The medium. Switching away from a series with a label number asks first (the number comes off the item); a
+    /// switch without one is saved at once. Switching back brings back the one it had there earlier on this page.
     private var mediumBinding: Binding<CollectionMedium> {
         Binding(get: { (model.item(id: item.id) ?? item).medium },
                 set: { medium in
                     let current = model.item(id: item.id) ?? item
-                    if let s = current.sticker { earlier[s.series] = s.number }
-                    let restore = medium.series.flatMap { series in
-                        earlier[series].flatMap { n in
-                            Sticker(series: series, number: n).flatMap { model.itemLabeled($0, excluding: item.id) == nil ? n : nil }
-                        }
-                    }
-                    model.changeItem(id: item.id) {
-                        $0.medium = medium
-                        if let restore, $0.stickerNumber == nil { $0.stickerNumber = restore }
+                    guard medium != current.medium else { return }
+                    if let sticker = current.sticker, medium.series != sticker.series {
+                        pendingMedium = PendingMedium(medium: medium, sticker: sticker)
+                    } else {
+                        setMedium(medium)
                     }
                 })
+    }
+
+    /// Saves a new medium, keeping the label the item had (for this page, and for ⌘Z).
+    private func setMedium(_ medium: CollectionMedium) {
+        guard let before = model.item(id: item.id) else { return }
+        if let s = before.sticker { earlier[s.series] = s.number }
+        let restore = medium.series.flatMap { series in
+            earlier[series].flatMap { n in
+                Sticker(series: series, number: n).flatMap { model.itemLabeled($0, excluding: item.id) == nil ? n : nil }
+            }
+        }
+        guard let saved = model.changeItem(id: item.id, {
+            $0.medium = medium
+            if let restore, $0.stickerNumber == nil { $0.stickerNumber = restore }
+        }), saved.medium == medium else { return }
+        let id = item.id
+        undoManager?.registerUndo(withTarget: model) { model in
+            // Only while nothing else changed the item since, and the old number is still free.
+            MainActor.assumeIsolated {
+                guard let current = model.item(id: id), abs(current.updatedAt.timeIntervalSince(saved.updatedAt)) < 0.001
+                else { return }
+                let number = before.sticker.flatMap { model.itemLabeled($0, excluding: id) == nil ? $0.number : nil }
+                model.changeItem(id: id) {
+                    $0.medium = before.medium
+                    $0.stickerNumber = number
+                }
+            }
+        }
+        undoManager?.setActionName("Change Medium")
+    }
+
+    /// A medium switch that would take the label number off the item, waiting for the user to confirm it.
+    private struct PendingMedium {
+        var medium: CollectionMedium
+        var sticker: Sticker
     }
 
     /// A field of the item; every change is saved at once.

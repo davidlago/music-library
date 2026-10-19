@@ -166,9 +166,20 @@ final class SyncStore {
     /// Deletes rules from the list (an exclusion deleted puts its songs back).
     func remove(_ rules: Set<SyncSelection.Rule>) { selection.rules.removeAll { rules.contains($0) } }
 
+    /// The item is on the iPhone at the next sync: on the list, or put there by Collection on iPhone. With several
+    /// phones, on every one of them (each has its own scope), so Add to iPhone stays offered while one lacks it.
     func contains(_ item: ExportItem) -> Bool {
         guard let context = context() else { return false }
-        return selection.contains(item, tracks: context.tracks)
+        guard !phones.isEmpty else { return selection.contains(item, tracks: context.tracks) }
+        return phones.allSatisfy { selection.contains(item, tracks: context.tracks, implicit: implicit(for: $0.id, context)) }
+    }
+
+    /// The albums Collection on iPhone adds: one phone's, or (nil) every paired phone's, each once.
+    func implicit(for phone: PairedPhone?, collection: MusicCollection) -> [ExportItem] {
+        let scopes = phone.map { [collectionScope(for: $0)] } ?? phones.map { collectionScope(for: $0) }
+        var seen = Set<ExportItem>()
+        return Set(scopes).sorted { $0.rawValue < $1.rawValue }
+            .flatMap { collection.syncItems($0) }.filter { seen.insert($0).inserted }
     }
 
     /// Everything the selection puts on the phone, each once, with what its Collection on iPhone adds first.

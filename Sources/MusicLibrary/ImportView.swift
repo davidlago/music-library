@@ -114,7 +114,8 @@ struct ImportDetail: View {
     /// library (saved at once to the library's copy).
     @ViewBuilder
     private var purchase: some View {
-        if importer.songsPricedElsewhere, entry.status != .duplicate {
+        // An imported song's price is elsewhere only when it went to an item; one still waiting follows its batch.
+        if entry.status == .done ? entry.pricedOnItem : importer.songsPricedElsewhere && entry.status != .duplicate {
             Text(importer.boughtAsAlbum && importer.effectiveLinkItem == nil
                  ? "Bought as a whole album: what you paid is below the list." : "What you paid is on your copy in the collection.")
                 .font(.caption).foregroundStyle(.subtext)
@@ -269,20 +270,22 @@ struct ImportBatchPurchaseBar: View {
         @Bindable var importer = importer
         let count = importer.batch.count
         VStack(alignment: .leading, spacing: 8) {
-            if let item = importer.effectiveLinkItem {
+            if importer.songsPricedElsewhere, let item = importer.effectiveLinkItem {
                 Text("What you paid is on \(item.sticker?.text ?? "your \(item.medium.name.lowercased())")'s page in your collection.")
                     .font(.caption).foregroundStyle(.subtext)
             } else {
-                HStack {
-                    Text("Bought as").font(.callout.weight(.semibold))
-                    Picker("Bought as", selection: $importer.boughtAsAlbum) {
-                        Text("Songs").tag(false)
-                        Text("Whole album").tag(true)
+                if importer.canBuyAsAlbum {
+                    HStack {
+                        Text("Bought as").font(.callout.weight(.semibold))
+                        Picker("Bought as", selection: $importer.boughtAsAlbum) {
+                            Text("Songs").tag(false)
+                            Text("Whole album").tag(true)
+                        }
+                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                        .help("A whole album is saved as one download in your collection, with its date and price")
                     }
-                    .pickerStyle(.segmented).labelsHidden().fixedSize()
-                    .help("A whole album is saved as one download in your collection, with its date and price")
                 }
-                if importer.boughtAsAlbum {
+                if importer.boughtAsAlbum && importer.canBuyAsAlbum {
                     HStack(spacing: 8) {
                         PurchasePriceField(price: Binding(get: { importer.albumPurchase.price },
                                                           set: { importer.setAlbumPurchase(price: $0, day: importer.albumPurchase.day) }))
@@ -349,7 +352,8 @@ struct ImportCollectionBar: View {
         let candidates = importer.linkCandidates
         if linked != nil || !candidates.matching.isEmpty || !candidates.others.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                Text("These files are the digital copy of").font(.callout.weight(.semibold))
+                Text(importer.hasSeveralBatches ? "The selected song's batch is the digital copy of" : "These files are the digital copy of")
+                    .font(.callout.weight(.semibold))
                 Button { picking = true } label: {
                     HStack(spacing: 6) {
                         if let linked {

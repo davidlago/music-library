@@ -24,6 +24,14 @@ struct CDCollectionPanel: View {
             if let line = statusLine {
                 Text(line).font(.caption).foregroundStyle(.subtext).padding(.leading, 30)
             }
+            if let id = disc.catalogedItemID, let item = model.item(id: id) {
+                HStack(spacing: 6) {
+                    Label("Saved in your collection as \(item.sticker?.text ?? "a CD")", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Button("Open") { model.showItem(id: id) }.buttonStyle(.link)
+                }
+                .font(.caption).padding(.leading, 30)
+            }
             if let message = disc.collectionMessage {
                 Label(message, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.orange).padding(.leading, 30)
             }

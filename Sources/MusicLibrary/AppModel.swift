@@ -295,7 +295,8 @@ final class AppModel {
         exportPlaylistFiles = defaults.object(forKey: Keys.exportPlaylistFiles) == nil ? true : defaults.bool(forKey: Keys.exportPlaylistFiles)
         exportDestination = defaults.string(forKey: Keys.exportDestination).map { URL(fileURLWithPath: $0, isDirectory: true) }
         ejectAfterRip = defaults.object(forKey: Keys.ejectAfterRip) == nil ? true : defaults.bool(forKey: Keys.ejectAfterRip)
-        askCDOwnership = defaults.object(forKey: Keys.askCDOwnership) == nil ? true : defaults.bool(forKey: Keys.askCDOwnership)
+        // Off by default: a CD with no copy in the collection is added as a new one, a switch already on (§4.3).
+        askCDOwnership = defaults.bool(forKey: Keys.askCDOwnership)
         ejectAfterCataloging = defaults.object(forKey: Keys.ejectAfterCataloging) == nil ? true
             : defaults.bool(forKey: Keys.ejectAfterCataloging)
         matchOutputRate = defaults.object(forKey: Keys.matchRate) == nil ? true : defaults.bool(forKey: Keys.matchRate)
@@ -963,9 +964,12 @@ final class AppModel {
         }
     }
 
-    /// Items follow their album when its album or album artist tags change, whatever changed them: when every song
-    /// that had a key has a new one, and they all have the same new key, the items linked to the old key move to it.
-    /// Called with the songs before and after a reload, before the collection is read.
+    /// Items follow their album when its album or album artist tags change, whatever changed them (the Mac app has
+    /// no tag editor of its own: tags change by re-importing, rematching or outside the app, and show up here). When
+    /// none of an old key's songs is left under it, its items move to the key most of its retagged songs went to
+    /// (an album split in two, by disc say, follows its bigger part and reads partly digitized there, rather than
+    /// missing). An old key that still has songs keeps its items. Called with the songs before and after a reload,
+    /// before the collection is read.
     private func rekeyRetaggedAlbums(from old: [Track], to new: [Track]) {
         guard database != nil, !old.isEmpty, !new.isEmpty else { return }
         let before = Dictionary(old.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
@@ -975,16 +979,17 @@ final class AppModel {
         guard !retagged.isEmpty else { return }
         func key(_ t: Track) -> String { SearchIndex.albumKey(album: t.album, artist: t.effectiveAlbumArtist) }
         let live = Set(new.map(key))
-        var moves: [String: Set<String>] = [:]
+        var moves: [String: [String: Int]] = [:]
         for t in retagged {
             guard let was = before[t.id] else { continue }
             let oldKey = key(was)
             // The old key still has songs (some weren't retagged, or others joined it): its items stay.
             guard !live.contains(oldKey) else { continue }
-            moves[oldKey, default: []].insert(key(t))
+            moves[oldKey, default: [:]][key(t), default: 0] += 1
         }
-        for (oldKey, targets) in moves.sorted(by: { $0.key < $1.key }) where targets.count == 1 {
-            if let newKey = targets.first { rekeyCollection(from: oldKey, to: newKey) }
+        for (oldKey, targets) in moves.sorted(by: { $0.key < $1.key }) {
+            let target = targets.max { $0.value != $1.value ? $0.value < $1.value : $0.key > $1.key }?.key
+            if let target { rekeyCollection(from: oldKey, to: target) }
         }
     }
 
@@ -1601,7 +1606,11 @@ final class AppModel {
     }
 
     /// Every track the iPhone selection puts on the phone, once, in list order.
-    var iPhoneTracks: [Track] { iPhone.selection.resolve(tracks(for:)) }
+    /// The songs the iPhone list puts on a phone, with what its Collection on iPhone adds; with nil, on any paired
+    /// phone (the list is shared, each phone has its own scope).
+    func iPhoneTracks(for phone: SyncStore.PairedPhone? = nil) -> [Track] {
+        iPhone.selection.resolve(tracks(for:), implicit: iPhone.implicit(for: phone, collection: collection))
+    }
 
     func syncIPhone(_ phone: SyncStore.PairedPhone) { iPhone.sync(phone) }
 

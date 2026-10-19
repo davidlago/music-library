@@ -350,7 +350,13 @@ struct AddToCollectionSheet: View {
                     .font(.callout)
                     if let match = libraryMatch {
                         Toggle(isOn: $link) {
-                            Text("Link to “\(match.album.album)” in your library (\(songCount(match.album.trackCount)))")
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Link to “\(match.album.album)” in your library (\(songCount(match.album.trackCount)))")
+                                if !match.sure {
+                                    Text("Matched by title and artist\(match.album.artist.isEmpty ? "" : " (\(match.album.artist))"): check it's the same album")
+                                        .font(.caption).foregroundStyle(.subtext)
+                                }
+                            }
                         }
                         .help(Self.linkHelp(chosenMedium))
                     }
@@ -492,6 +498,12 @@ struct AddToCollectionSheet: View {
     /// The library album this copy's songs would be, if any: under its key, else tagged with its release or release
     /// group (sure), else one with its title by a compatible artist (offered, not linked unless asked).
     private func updateMatch() {
+        let before = libraryMatch.map { AlbumInfoStore.key($0.album) }
+        defer {
+            // On whenever a library album matches (§4.1), each time it's another album; a match by name only says so
+            // next to the switch. The user's choice stays while the match does.
+            if libraryMatch.map({ AlbumInfoStore.key($0.album) }) != before { link = libraryMatch != nil }
+        }
         guard let draft = makeItem(numbered: false, linking: false) else { libraryMatch = nil; return }
         if let album = model.album(forKey: draft.albumKey) {
             libraryMatch = (album, true)
@@ -505,7 +517,6 @@ struct AddToCollectionSheet: View {
         } else {
             libraryMatch = nil
         }
-        link = libraryMatch?.sure ?? false
     }
 
     /// The item as entered. `numbered`: with the label (nil while the label isn't valid); `linking`: linked to the

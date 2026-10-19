@@ -24,12 +24,14 @@ struct MusicLibraryApp: App {
         }
         .commands {
             CommandGroup(replacing: .newItem) {
+                Button("Add to Collection…") { model.addToCollection() }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
                 Button("Import…") { model.chooseFilesToImport() }
                     .keyboardShortcut("o", modifiers: .command)
             }
             CommandMenu("Collection") {
+                // Also in the File menu, which has its shortcut (one key equivalent per command).
                 Button("Add to Collection…") { model.addToCollection() }
-                    .keyboardShortcut("n", modifiers: [.command, .shift])
                 Button("Add Library Albums…") { model.collectionSheet = .addLibraryAlbums }
                 Divider()
                 Button("Find by Label…") { model.findByLabel() }

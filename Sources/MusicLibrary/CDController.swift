@@ -57,6 +57,11 @@ final class CDDisc: Identifiable {
     var collectionSaved = false
     /// The rip has been linked to the item (when its first track was imported).
     var ripLinked = false
+    /// Items that were in the collection before which this page changed (filling in the release, linking the rip):
+    /// each as it was before and as the page last saved it, so picking another copy puts back what it set.
+    var touched: [String: (before: CollectionItem, after: CollectionItem)] = [:]
+    /// The item Catalog Without Ripping saved, while the disc stays in its drive (shown with an Open button).
+    var catalogedItemID: String?
     /// Why the collection item couldn't be saved (a label another item has).
     var collectionMessage: String?
     /// The library's tracks from this disc, by track number: ripped now or before (for checking them).
@@ -308,6 +313,9 @@ final class CDController {
             if model.item(id: created) != nil { model.deleteItem(id: created) }
             disc.createdItemID = nil
         }
+        // A copy that was there before goes back to how it was before this page filled it in and linked the rip.
+        if case .existing(let previous)? = disc.collectionChoice, choice != .existing(previous) { restore(disc, itemID: previous) }
+        disc.catalogedItemID = nil
         disc.collectionChoice = choice
         suggestLabel(disc)
         guard disc.collectionSaved else { return }
@@ -327,7 +335,8 @@ final class CDController {
         case .existing(let id)?:
             guard let current = model.item(id: id), current.isEditable, current.medium == .cd else { break }
             let jpeg = current.coverFile == nil && model.collection.libraryTracks(current).isEmpty ? cover : nil
-            model.changeItem(id: id, cover: jpeg) { fill(&$0, release: release, disc: disc, key: key) }
+            let saved = model.changeItem(id: id, cover: jpeg) { fill(&$0, release: release, disc: disc, key: key) }
+            remember(disc, before: current, after: saved)
         case .new?:
             if let created = disc.createdItemID, model.item(id: created) != nil {
                 model.changeItem(id: created) { fill(&$0, release: release, disc: disc, key: key) }
@@ -387,9 +396,35 @@ final class CDController {
         disc.ripLinked = true
         let key = SearchIndex.albumKey(album: track.album, artist: track.effectiveAlbumArtist)
         guard current.albumKey == key || model.collection.libraryTracks(current).isEmpty else { return }
-        model.changeItem(id: id) {
+        let saved = model.changeItem(id: id) {
             $0.albumKey = key
             $0.digitalSource = .rip
+        }
+        if id != disc.createdItemID { remember(disc, before: current, after: saved) }
+    }
+
+    /// Keeps what this page changed on an item that was in the collection before (the first state it saw).
+    private func remember(_ disc: CDDisc, before: CollectionItem, after: CollectionItem?) {
+        guard let after, after != before || disc.touched[after.id] != nil else { return }
+        disc.touched[after.id] = (disc.touched[after.id]?.before ?? before, after)
+    }
+
+    /// Puts back what this page set on an item that was in the collection before (the release it filled in, its
+    /// link to the rip, the disc's cover), field by field and only where it's still what the page set: anything
+    /// changed since, here or elsewhere, stays. Its label, purchase and notes are never touched by the page.
+    private func restore(_ disc: CDDisc, itemID: String) {
+        guard let t = disc.touched.removeValue(forKey: itemID) else { return }
+        if disc.ripLinked, disc.itemID == itemID { disc.ripLinked = false }
+        model.changeItem(id: itemID) { item in
+            func back<T: Equatable>(_ path: WritableKeyPath<CollectionItem, T>) {
+                if item[keyPath: path] == t.after[keyPath: path], t.before[keyPath: path] != t.after[keyPath: path] {
+                    item[keyPath: path] = t.before[keyPath: path]
+                }
+            }
+            back(\.albumKey); back(\.digitalSource); back(\.coverFile)
+            back(\.trackCount); back(\.discCount); back(\.album); back(\.artist); back(\.year)
+            back(\.releaseID); back(\.releaseGroupID); back(\.barcode); back(\.catalogNumber)
+            back(\.recordLabel); back(\.country); back(\.formatDetail)
         }
     }
 
@@ -405,6 +440,9 @@ final class CDController {
             model.showShelf()
             model.showItem(id: id)
             eject(disc)
+        } else {
+            // The disc stays: its page says it's saved, with a way to open the item.
+            disc.catalogedItemID = id
         }
     }
 

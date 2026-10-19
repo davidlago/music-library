@@ -11,9 +11,10 @@ struct IPhoneSyncView: View {
 
     var body: some View {
         let store = model.iPhone
-        let tracks = model.iPhoneTracks
+        // The list and what each phone's Collection on iPhone adds (with several phones, what any of them gets).
+        let tracks = model.iPhoneTracks()
         VStack(spacing: 0) {
-            phones(store, songs: tracks.count)
+            phones(store, total: tracks.count)
             Divider()
             if store.selection.isEmpty {
                 ContentUnavailableView(store.phones.contains { store.collectionScope(for: $0) != .off } ? "Nothing Else on the List" : "Nothing to Sync Yet",
@@ -74,10 +75,11 @@ struct IPhoneSyncView: View {
     }
 
     @ViewBuilder
-    private func phones(_ store: SyncStore, songs: Int) -> some View {
+    /// `total`: the songs any phone gets, which is the one phone's when there's only one.
+    private func phones(_ store: SyncStore, total: Int) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(store.phones) { phone in
-                phoneRow(phone, store: store, songs: songs)
+                phoneRow(phone, store: store, songs: store.phones.count == 1 ? total : model.iPhoneTracks(for: phone).count)
             }
             ForEach(store.pairingPeers) { peer in
                 pairRow(peer, store: store)
@@ -95,6 +97,7 @@ struct IPhoneSyncView: View {
         .padding(14)
     }
 
+    /// `songs`: what the list and its Collection on iPhone put on this phone.
     private func phoneRow(_ phone: SyncStore.PairedPhone, store: SyncStore, songs: Int) -> some View {
         let peer = store.peer(for: phone)
         return HStack(spacing: 12) {
@@ -157,7 +160,8 @@ struct IPhoneSyncView: View {
 
     private func footer(songs: Int) -> String {
         let size = totalBytes.map { " · " + ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? ""
-        return "\(songs) \(songs == 1 ? "song" : "songs")\(size)"
+        let scoped = model.iPhone.phones.contains { model.iPhone.collectionScope(for: $0) != .off }
+        return "\(songs) \(songs == 1 ? "song" : "songs")\(size)\(scoped ? " with Collection on iPhone" : "")"
     }
 
     private func progressText(_ p: SyncProgress) -> String {

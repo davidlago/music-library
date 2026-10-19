@@ -346,7 +346,7 @@ struct HowYouOwnItCard: View {
 struct CollectionSpendingCard: View {
     @Environment(\.theme) private var theme
     let stats: CollectionStats
-    enum Measure: String, CaseIterable { case spent = "Spent", items = "Items", total = "Running Total" }
+    enum Measure: String, CaseIterable { case spent = "Spent", items = "Items" }
     @State private var measure = Measure.spent
     @State private var hovered: CollectionStats.Period?
 
@@ -361,7 +361,9 @@ struct CollectionSpendingCard: View {
                         Text("\(label(h.start.date())) · \(formatMoney(h.spent)) on \(itemCount(h.items)) · \(formatMoney(h.cumulative)) in all")
                             .foregroundStyle(.primary)
                     } else {
-                        Text("Items with a purchase date, by \(stats.granularity.rawValue), by medium · hover for details").foregroundStyle(.subtext)
+                        Text(measure == .spent
+                             ? "Items with a purchase date, by \(stats.granularity.rawValue), by medium; the line is the running total (right axis) · hover for details"
+                             : "Items with a purchase date, by \(stats.granularity.rawValue) · hover for details").foregroundStyle(.subtext)
                     }
                 }
                 .font(.caption).monospacedDigit()
@@ -378,9 +380,18 @@ struct CollectionSpendingCard: View {
         return keys.compactMap(CollectionMedium.init(rawValue:)).sorted()
     }
 
+    /// The running total is drawn over the bars on their scale: the highest total meets the tallest bar, and the
+    /// right axis reads it back in money.
+    private var totalScale: Double {
+        let tallest = stats.timeline.map(\.spent.doubleValue).max() ?? 0
+        let total = stats.timeline.last?.cumulative.doubleValue ?? 0
+        return tallest > 0 && total > 0 ? tallest / total : 0
+    }
+
     @ViewBuilder
     private var chart: some View {
         let media = self.media
+        let scale = totalScale
         Chart {
             ForEach(stats.timeline) { p in
                 let faded = hovered != nil && hovered != p
@@ -391,18 +402,17 @@ struct CollectionSpendingCard: View {
                             .foregroundStyle(by: .value("Medium", m.plural))
                             .opacity(faded ? 0.35 : 1)
                     }
+                    if scale > 0 {
+                        LineMark(x: .value("Period", p.start.date(), unit: unit), y: .value("Running total", p.cumulative.doubleValue * scale),
+                                 series: .value("Line", "Running total"))
+                            .interpolationMethod(.monotone)
+                            .lineStyle(StrokeStyle(lineWidth: 2))
+                            .foregroundStyle(theme.accent)
+                    }
                 case .items:
                     BarMark(x: .value("Period", p.start.date(), unit: unit), y: .value("Items", p.items))
                         .foregroundStyle(theme.series.opacity(faded ? 0.35 : 1))
                         .cornerRadius(2)
-                case .total:
-                    AreaMark(x: .value("Period", p.start.date(), unit: unit), y: .value("Total", p.cumulative.doubleValue))
-                        .interpolationMethod(.stepEnd)
-                        .foregroundStyle(LinearGradient(colors: [theme.series.opacity(0.28), theme.series.opacity(0.03)], startPoint: .top, endPoint: .bottom))
-                    LineMark(x: .value("Period", p.start.date(), unit: unit), y: .value("Total", p.cumulative.doubleValue))
-                        .interpolationMethod(.stepEnd)
-                        .lineStyle(StrokeStyle(lineWidth: 2))
-                        .foregroundStyle(theme.series)
                 }
             }
         }
@@ -416,6 +426,15 @@ struct CollectionSpendingCard: View {
                         if let v = value.as(Int.self) { Text(v.formatted()) }
                     } else if let v = value.as(Double.self) {
                         Text(formatMoney(Decimal(v), whole: true))
+                    }
+                }
+            }
+            if measure == .spent, scale > 0, let total = stats.timeline.last?.cumulative.doubleValue {
+                AxisMarks(position: .trailing, values: [0, total / 2, total].map { $0 * scale }) { value in
+                    AxisValueLabel {
+                        if let v = value.as(Double.self) {
+                            Text(formatMoney(Decimal(v / scale), whole: true)).foregroundStyle(theme.accent)
+                        }
                     }
                 }
             }
