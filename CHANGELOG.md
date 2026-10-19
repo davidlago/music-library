@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.21.0
+
 - **Clearer names: Digital Collection, Physical Collection and Local Library.** What used to be "Library" is now your
   **Digital Collection**: your music files (Songs and Albums), including the albums you bought as downloads.
   Your **Physical Collection** is the CDs and records you own: **Shelf**, **CDs**, **Vinyl** and **To Digitize**.
