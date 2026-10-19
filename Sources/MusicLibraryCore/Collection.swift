@@ -685,9 +685,10 @@ public enum CollectionLinker {
         }
     }
 
-    /// After a reload: backfills release IDs and year from the most common tags of linked tracks, persists the
-    /// inferred source (nil + tracks → .rip for CDs, .download for downloads, .same otherwise), and relinks an item
-    /// whose key lost its tracks only when its releaseID is on exactly one live album key. Never by name.
+    /// After a reload: backfills release IDs (not from another copy's songs) and year from the most common tags of
+    /// linked tracks, persists the inferred source (nil + tracks → .rip for CDs, .download for downloads, .same
+    /// otherwise), and relinks an item whose key lost its tracks only when its releaseID is on exactly one live album
+    /// key. Never by name.
     public static func changes(items: [CollectionItem], tracks: [Track]) -> [Change] {
         var byKey: [String: [Track]] = [:]
         var keysByRelease: [String: Set<String>] = [:]
@@ -706,20 +707,19 @@ public enum CollectionLinker {
                 key = only
             }
             if let linked = byKey[key] {
-                if item.releaseID == nil { change.releaseID = mostCommon(linked.compactMap { MBID.validated($0.metadata.mbReleaseId) }) }
+                let source = item.digitalSource ?? (item.medium == .cd ? .rip : item.medium == .download ? .download : .same)
+                // Songs from another copy carry that copy's release (a record's music ripped from the CD): only the
+                // release group, shared by every edition, is taken from them.
+                if item.releaseID == nil, source != .same {
+                    change.releaseID = mostCommon(linked.compactMap { MBID.validated($0.metadata.mbReleaseId) })
+                }
                 if item.releaseGroupID == nil {
                     change.releaseGroupID = mostCommon(linked.compactMap { MBID.validated($0.metadata.extended.mbReleaseGroupId) })
                 }
                 if item.year == nil {
                     change.year = mostCommon(linked.compactMap(\.year).filter { (1000...9999).contains($0) })
                 }
-                if item.digitalSource == nil {
-                    change.digitalSource = switch item.medium {
-                    case .cd: .rip
-                    case .download: .download
-                    default: .same
-                    }
-                }
+                if item.digitalSource == nil { change.digitalSource = source }
             }
             if !change.isEmpty { out.append(change) }
         }

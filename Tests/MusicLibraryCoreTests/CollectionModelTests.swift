@@ -327,7 +327,8 @@ import Testing
                      item("none", .cd, 3, album: "Unripped"), item("new", .other("cassette"))]
         let changes = Dictionary(uniqueKeysWithValues: CollectionLinker.changes(items: items, tracks: tracks).map { ($0.id, $0) })
         #expect(changes["cd"] == CollectionLinker.Change(id: "cd", releaseID: releaseA, releaseGroupID: groupA, year: 1959, digitalSource: .rip))
-        #expect(changes["lp"]?.digitalSource == .same)
+        // The record's music is the CD's: it takes the release group, never the CD's release.
+        #expect(changes["lp"] == CollectionLinker.Change(id: "lp", releaseGroupID: groupA, year: 1959, digitalSource: .same))
         #expect(changes["dl"]?.digitalSource == .download)
         #expect(changes["known"] == CollectionLinker.Change(id: "known", releaseGroupID: groupA), "set fields are kept")
         #expect(changes["none"] == nil && changes["new"] == nil)
