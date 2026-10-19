@@ -103,6 +103,126 @@ struct CoverBackground: View {
     }
 }
 
+/// A collection item as it sits on the shelf: a CD in its jewel case with its label on a white sticker across the top of
+/// the hinge, a record in its sleeve with its label on a round yellow dot, or just the cover (a download). `height` is
+/// the art's height; it's a little wider for a case or a sleeve.
+struct ShelfArt: View {
+    var item: Glance.Collection.Item
+    var height: CGFloat
+
+    var body: some View {
+        switch item.mediumKind {
+        case "cd": jewelCase
+        case "vinyl": sleeve
+        default: CoverArt(name: item.cover, title: item.title, cornerRadius: height * 0.08).frame(width: height, height: height)
+        }
+    }
+
+    private var jewelCase: some View {
+        let h = height, w = h * 142 / 125
+        let hinge = w * 0.105, side = h * 0.944, margin = h * 0.028
+        return ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 2).fill(Color(white: 0.08))
+            CoverArt(name: item.cover, title: item.title, cornerRadius: 0)
+                .frame(width: side, height: side)
+                .offset(x: w - margin - side, y: margin)
+            Rectangle()
+                .fill(LinearGradient(colors: [Color(white: 0.28), Color(white: 0.1)], startPoint: .leading, endPoint: .trailing))
+                .frame(width: hinge, height: h)
+            if let number = item.sticker {
+                Text(String(number))
+                    .font(.system(size: max(6, hinge * 0.62), weight: .semibold).monospacedDigit())
+                    .foregroundStyle(Color(white: 0.1))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .frame(width: h * 0.42, height: hinge * 0.8)
+                    .background(RoundedRectangle(cornerRadius: 1.5).fill(Color(white: 0.97)))
+                    .rotationEffect(.degrees(-90))
+                    .frame(width: hinge * 0.8, height: h * 0.42)
+                    .offset(x: hinge * 0.1, y: h * 0.02)
+            }
+            RoundedRectangle(cornerRadius: 2).strokeBorder(.white.opacity(0.3), lineWidth: 0.5)
+        }
+        .frame(width: w, height: h)
+        .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+        .accessibilityElement()
+        .accessibilityLabel(item.spokenSticker ?? "CD")
+    }
+
+    private var sleeve: some View {
+        let h = height
+        return ZStack(alignment: .topLeading) {
+            // The record, part of the way out of its sleeve.
+            Circle()
+                .fill(RadialGradient(colors: [Color(white: 0.2), Color(white: 0.04)], center: .center, startRadius: 0, endRadius: h / 2))
+                .overlay { Circle().fill(Color(white: 0.75)).frame(width: h * 0.3, height: h * 0.3) }
+                .frame(width: h * 0.94, height: h * 0.94)
+                .offset(x: h * 0.21, y: h * 0.03)
+            CoverArt(name: item.cover, title: item.title, cornerRadius: 1.5)
+                .frame(width: h, height: h)
+                .shadow(color: .black.opacity(0.3), radius: 1, x: 1)
+            if let number = item.sticker {
+                Text(String(number))
+                    .font(.system(size: max(6, h * 0.12), weight: .bold).monospacedDigit())
+                    .foregroundStyle(Color(white: 0.1))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.4)
+                    .padding(h * 0.02)
+                    .frame(width: h * 0.26, height: h * 0.26)
+                    .background(Circle().fill(Color(red: 1, green: 0.84, blue: 0.2)))
+                    .offset(x: h * 0.05, y: h * 0.05)
+            }
+        }
+        .frame(width: h * 1.18, height: h, alignment: .leading)
+        .accessibilityElement()
+        .accessibilityLabel(item.spokenSticker ?? "Vinyl")
+    }
+
+    nonisolated static func mediumName(_ medium: String) -> String {
+        switch Glance.Collection.Item.kind(of: medium) {
+        case "cd": "CD"
+        case "vinyl": "Vinyl"
+        case "download": "Download"
+        default: "Other"
+        }
+    }
+}
+
+extension Glance.Collection.Item {
+    /// The medium as `GlanceFormat.sticker` reads it ("CD" and " vinyl" are a CD and a record), so the art, the name
+    /// and the label always agree.
+    static func kind(of medium: String) -> String { medium.trimmingCharacters(in: .whitespaces).lowercased() }
+
+    var mediumKind: String { Self.kind(of: medium) }
+
+    /// "CD label 12", for VoiceOver.
+    var spokenSticker: String? {
+        guard let sticker else { return nil }
+        return "\(ShelfArt.mediumName(medium)) label \(sticker)"
+    }
+
+    /// "Added today", "Added 3 days ago", "Added Sep 1" (with the year before this one), from the purchase day, else
+    /// the day it went into the collection (nil from a summary that has neither). `short` leaves out "Added".
+    func addedText(short: Bool = false, now: Date = Date(), calendar: Calendar = .current) -> String? {
+        let parts = (purchasedOn ?? addedOn)?.split(separator: "-").compactMap { Int($0) } ?? []
+        guard parts.count == 3,
+              let day = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2])) else { return nil }
+        let days = calendar.dateComponents([.day], from: day, to: calendar.startOfDay(for: now)).day ?? 0
+        let text: String
+        switch days {
+        case ..<0: text = day.formatted(.dateTime.month(.abbreviated).day())
+        case 0: text = "today"
+        case 1: text = "yesterday"
+        case 2..<14: text = "\(days) days ago"
+        default:
+            let sameYear = calendar.isDate(day, equalTo: now, toGranularity: .year)
+            text = day.formatted(sameYear ? .dateTime.month(.abbreviated).day() : .dateTime.month(.abbreviated).day().year())
+        }
+        if short { return text.prefix(1).uppercased() + text.dropFirst() }
+        return "Added " + text
+    }
+}
+
 // MARK: Pieces
 
 /// A small caps label with an icon at the top of a widget.

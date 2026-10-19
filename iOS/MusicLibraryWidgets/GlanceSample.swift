@@ -52,6 +52,23 @@ extension Glance {
             Owned.Purchase(album: kindOfBlue, purchasedOn: "2019-05-04", price: 15, plays: 88),
         ]
 
+        // Both label series, a record and a CD with no digital copy, and a download.
+        func item(_ id: String, _ a: Album, _ medium: String, _ sticker: Int?, digitized: Bool, playable: Bool, daysAgo: Int?,
+                  price: Decimal?) -> Collection.Item {
+            Collection.Item(id: id, albumKey: a.key, title: a.title, artist: a.artist, year: a.year, medium: medium, sticker: sticker,
+                            digitized: digitized, playable: playable, cover: a.cover,
+                            purchasedOn: daysAgo.flatMap { Self.day(calendar.date(byAdding: .day, value: -$0, to: today)) }, price: price)
+        }
+        let blueTrain = album("Blue Train", "John Coltrane", 1958)
+        let collection = Collection(
+            items: 457, cds: 312, vinyl: 48, downloads: 97, toRip: 9, vinylToDigitize: 31, nextCD: 313, nextVinyl: 49,
+            recent: [item("sample-1", moanin, "vinyl", 48, digitized: false, playable: false, daysAgo: 3, price: 32),
+                     item("sample-2", inRainbows, "cd", 312, digitized: true, playable: true, daysAgo: 9, price: 14.99),
+                     item("sample-3", blueTrain, "cd", 311, digitized: false, playable: false, daysAgo: 19, price: 9),
+                     item("sample-4", blue, "vinyl", 47, digitized: true, playable: true, daysAgo: 52, price: 27.5),
+                     item("sample-5", okComputer, "download", nil, digitized: true, playable: false, daysAgo: 60, price: 9.99)],
+            toRipList: [item("sample-3", blueTrain, "cd", 311, digitized: false, playable: false, daysAgo: 19, price: 9)])
+
         return Glance(
             generatedAt: Date(), currencyCode: Locale.current.currency?.identifier ?? "USD",
             library: LibraryCounts(songs: 8_412, albums: 694, artists: 312, duration: 2_041_000, songsOnPhone: 1_380,
@@ -64,7 +81,8 @@ extension Glance {
             rediscover: [Ranked(song(5, "Blues March", moanin), plays: 41, listened: 0,
                                 lastPlayed: calendar.date(byAdding: .month, value: -7, to: today)),
                          Ranked(song(6, "Dreams", rumours), plays: 23, listened: 0,
-                                lastPlayed: calendar.date(byAdding: .month, value: -5, to: today))])
+                                lastPlayed: calendar.date(byAdding: .month, value: -5, to: today))],
+            collection: collection)
     }()
 
     private static func day(_ date: Date?) -> String? {

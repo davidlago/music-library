@@ -228,13 +228,15 @@ public struct Glance: Codable, Hashable, Sendable {
             /// "yyyy-MM-dd", a calendar day with no time zone.
             public var purchasedOn: String?
             public var price: Decimal?
+            /// "yyyy-MM-dd": the day it was added to the collection, for "Added 3 days ago" without a purchase day.
+            public var addedOn: String?
 
             public init(id: String, albumKey: String, title: String, artist: String, year: Int? = nil, medium: String,
                         sticker: Int? = nil, digitized: Bool? = nil, playable: Bool? = nil, cover: String? = nil,
-                        purchasedOn: String? = nil, price: Decimal? = nil) {
+                        purchasedOn: String? = nil, price: Decimal? = nil, addedOn: String? = nil) {
                 self.id = id; self.albumKey = albumKey; self.title = title; self.artist = artist; self.year = year
                 self.medium = medium; self.sticker = sticker; self.digitized = digitized; self.playable = playable
-                self.cover = cover; self.purchasedOn = purchasedOn; self.price = price
+                self.cover = cover; self.purchasedOn = purchasedOn; self.price = price; self.addedOn = addedOn
             }
 
             /// "CD #12", "Vinyl #12"; nil without a label.
