@@ -111,7 +111,7 @@ struct ShelfArt: View {
     var height: CGFloat
 
     var body: some View {
-        switch item.medium {
+        switch item.mediumKind {
         case "cd": jewelCase
         case "vinyl": sleeve
         default: CoverArt(name: item.cover, title: item.title, cornerRadius: height * 0.08).frame(width: height, height: height)
@@ -179,7 +179,7 @@ struct ShelfArt: View {
     }
 
     nonisolated static func mediumName(_ medium: String) -> String {
-        switch medium {
+        switch Glance.Collection.Item.kind(of: medium) {
         case "cd": "CD"
         case "vinyl": "Vinyl"
         case "download": "Download"
@@ -189,16 +189,22 @@ struct ShelfArt: View {
 }
 
 extension Glance.Collection.Item {
+    /// The medium as `GlanceFormat.sticker` reads it ("CD" and " vinyl" are a CD and a record), so the art, the name
+    /// and the label always agree.
+    static func kind(of medium: String) -> String { medium.trimmingCharacters(in: .whitespaces).lowercased() }
+
+    var mediumKind: String { Self.kind(of: medium) }
+
     /// "CD label 12", for VoiceOver.
     var spokenSticker: String? {
         guard let sticker else { return nil }
         return "\(ShelfArt.mediumName(medium)) label \(sticker)"
     }
 
-    /// "Added today", "Added 3 days ago", "Added Sep 1" (with the year before this one); nil without a purchase day.
-    /// `short` leaves out "Added".
+    /// "Added today", "Added 3 days ago", "Added Sep 1" (with the year before this one), from the purchase day, else
+    /// the day it went into the collection (nil from a summary that has neither). `short` leaves out "Added".
     func addedText(short: Bool = false, now: Date = Date(), calendar: Calendar = .current) -> String? {
-        let parts = purchasedOn?.split(separator: "-").compactMap { Int($0) } ?? []
+        let parts = (purchasedOn ?? addedOn)?.split(separator: "-").compactMap { Int($0) } ?? []
         guard parts.count == 3,
               let day = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2])) else { return nil }
         let days = calendar.dateComponents([.day], from: day, to: calendar.startOfDay(for: now)).day ?? 0

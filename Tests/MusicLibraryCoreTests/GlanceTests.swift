@@ -278,6 +278,7 @@ extension GlanceTests {
         #expect(ril.medium == "vinyl" && ril.sticker == 2 && ril.stickerText == "Vinyl #2")
         #expect(ril.digitized == false && ril.playable == false && ril.purchasedOn == "2026-09-10" && ril.price == 20)
         #expect(ok.stickerText == "CD #3" && ok.digitized == true && ok.playable == true && ok.albumKey == Self.okKey)
+        #expect(recent.allSatisfy { $0.addedOn.map { $0.count == 10 } ?? false })  // "Added …" without a purchase day
         #expect(ok.cover == Glance.coverName(albumKey: Self.okKey))
         #expect(c.toRipList?.first?.cover == nil)  // trackless, no cover of its own
 

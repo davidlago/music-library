@@ -88,16 +88,18 @@ struct PurchasesWidgetView: View {
 
     /// "Next label: CD #313", or the vinyl series' when there are records and no CDs.
     static func nextLabel(_ c: Glance.Collection) -> String {
-        if (c.cds ?? 0) == 0, (c.vinyl ?? 0) > 0, let next = c.nextVinyl {
-            return "Next label: " + GlanceFormat.sticker(medium: "vinyl", number: next)
+        if (c.cds ?? 0) == 0, (c.vinyl ?? 0) > 0 {
+            return "Next label: " + GlanceFormat.sticker(medium: "vinyl", number: c.nextVinyl ?? 1)
         }
         return "Next label: " + GlanceFormat.sticker(medium: "cd", number: c.nextCD ?? 1)
     }
 
-    /// "Next: CD #313 · Vinyl #49"
+    /// "Next: CD #313 · Vinyl #49": the series you have, the CD one alone when there are neither CDs nor records.
     static func nextLabels(_ c: Glance.Collection) -> String {
-        var parts = [GlanceFormat.sticker(medium: "cd", number: c.nextCD ?? 1)]
-        if (c.vinyl ?? 0) > 0, let next = c.nextVinyl { parts.append(GlanceFormat.sticker(medium: "vinyl", number: next)) }
+        let cds = c.cds ?? 0, vinyl = c.vinyl ?? 0
+        var parts: [String] = []
+        if cds > 0 || vinyl == 0 { parts.append(GlanceFormat.sticker(medium: "cd", number: c.nextCD ?? 1)) }
+        if vinyl > 0 { parts.append(GlanceFormat.sticker(medium: "vinyl", number: c.nextVinyl ?? 1)) }
         return "Next: " + parts.joined(separator: " · ")
     }
 
@@ -242,7 +244,6 @@ struct PurchasesWidgetView: View {
                 .minimumScaleFactor(0.7)
                 .widgetAccentable()
             Text("\((c.toRip ?? 0).formatted()) to rip").font(.caption).lineLimit(1)
-            Text(Self.nextLabels(c)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

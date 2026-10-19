@@ -31,20 +31,28 @@ final class WatchModel {
     @ObservationIgnored private var requested = Set<String>()
     /// The shelf's `contentHash`, sent with `refresh` so the iPhone sends the index again when it has another.
     @ObservationIgnored private var shelfHash = ""
+    /// The saved shelf has been read at launch (or one arrived first), so `shelfHash` is the one to send.
+    @ObservationIgnored private var shelfLoaded = false
+    /// `refresh` was asked for before that: it's sent once the shelf has been read.
+    @ObservationIgnored private var refreshWaiting = false
+    /// Where Find was: the series and the last number looked up in each, in a file in the store (not user defaults).
+    private(set) var find: FindState
+    @ObservationIgnored private var findSave: Task<Void, Never>?
 
     private var session: WCSession? { WCSession.isSupported() ? WCSession.default : nil }
 
     private init() {
         delegate = SessionDelegate(store: store)
         glance = store.read()
+        find = FindState.read(from: store.directory)
         delegate.onGlance = { [weak self] data in self?.receive(data) }
         delegate.onShelf = { [weak self] shelf in self?.receive(shelf) }
         delegate.onReachability = { [weak self] reachable in self?.reachabilityChanged(reachable) }
         // The index can be up to 2 MB: read off the main thread.
         let store = store
         Task.detached(priority: .userInitiated) { [weak self] in
-            guard let shelf = store.readShelf() else { return }
-            await self?.receive(shelf)
+            let shelf = store.readShelf()
+            await self?.loaded(shelf)
         }
         guard let session else { return }
         session.delegate = delegate
@@ -64,11 +72,26 @@ final class WatchModel {
         requestMissingCovers()
     }
 
-    /// A shelf index, read from the store or just received (and already saved by the delegate).
+    /// The shelf saved at launch, unless one was received while it was being read (that one is newer: it replaced
+    /// the file). Then the `refresh` that waited for its hash goes out.
+    private func loaded(_ saved: GlanceShelf?) {
+        if !shelfLoaded, let saved {
+            shelf = saved
+            shelfHash = saved.contentHash
+        }
+        shelfLoaded = true
+        if refreshWaiting {
+            refreshWaiting = false
+            refresh()
+        }
+    }
+
+    /// A shelf index just received (and already saved by the delegate). The iPhone sends one only when it differs
+    /// from this watch's, so the last to arrive is the one to show, whatever the clocks say.
     private func receive(_ new: GlanceShelf) {
-        if let shelf, new.generatedAt < shelf.generatedAt { return }
         shelf = new
         shelfHash = new.contentHash
+        shelfLoaded = true
     }
 
     private func reachabilityChanged(_ reachable: Bool) {
@@ -122,10 +145,30 @@ final class WatchModel {
     /// Asks the iPhone for its latest summary (when the app comes to the front).
     func refresh() {
         guard let session, session.activationState == .activated, session.isReachable else { return }
+        // Without the saved shelf's hash the iPhone would send the whole index again.
+        guard shelfLoaded else {
+            refreshWaiting = true
+            return
+        }
         session.sendMessage([GlanceMessage.refresh: true, GlanceMessage.shelfHash: shelfHash], replyHandler: { @Sendable [weak self] reply in
             let data = reply[GlanceMessage.glance] as? Data
             Task { @MainActor in if let data { self?.receive(data) } }
         }, errorHandler: nil)
+    }
+
+    // MARK: Find
+
+    /// Notes the series and number on screen; saved a moment after the crown stops.
+    func setFind(_ state: FindState) {
+        guard state != find else { return }
+        find = state
+        findSave?.cancel()
+        let directory = store.directory
+        findSave = Task {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            state.write(to: directory)
+        }
     }
 
     // MARK: Commands
@@ -225,16 +268,52 @@ private final class SessionDelegate: NSObject, WCSessionDelegate, @unchecked Sen
     }
 
     /// The shelf index. Its file is deleted when this returns, so it's checked and saved here, under the store's fixed
-    /// name (never the sender's): only a shelf of the version this watch reads, at most `GlanceShelf.maxBytes`, and
-    /// not older than the one already saved.
+    /// name (never the sender's): only a shelf of the version this watch reads, at most `GlanceShelf.maxBytes`.
     nonisolated func session(_ session: WCSession, didReceive file: WCSessionFile) {
         let metadata = file.metadata ?? [:]
         guard metadata[GlanceMessage.fileKind] as? String == GlanceMessage.shelfKind,
               metadata[GlanceMessage.shelfVersion] as? Int == GlanceShelf.currentVersion,
               let size = try? file.fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= GlanceShelf.maxBytes,
               let data = try? Data(contentsOf: file.fileURL), let shelf = GlanceStore.decodeShelf(data) else { return }
-        if let saved = store.readShelf(), saved.generatedAt > shelf.generatedAt { return }
         guard (try? store.writeShelf(shelf)) != nil else { return }
         Task { @MainActor in self.onShelf?(shelf) }
+    }
+}
+
+/// Where the Find page was: the series shown and the last number looked up in each (0 before the first).
+struct FindState: Codable, Equatable {
+    static let fileName = "watch-find.json"
+
+    var series = "cd"
+    var cd = 0
+    var vinyl = 0
+
+    /// "cd" or "vinyl", whatever was saved.
+    var seriesKey: String { series == "vinyl" ? "vinyl" : "cd" }
+
+    func last(in series: String) -> Int { series == "vinyl" ? vinyl : cd }
+
+    func with(series: String) -> FindState {
+        var state = self
+        state.series = series
+        return state
+    }
+
+    func with(last number: Int, in series: String) -> FindState {
+        var state = self
+        if series == "vinyl" { state.vinyl = number } else { state.cd = number }
+        return state
+    }
+
+    static func read(from directory: URL) -> FindState {
+        guard let data = try? Data(contentsOf: directory.appendingPathComponent(fileName)),
+              let state = try? JSONDecoder().decode(FindState.self, from: data) else { return FindState() }
+        return state
+    }
+
+    func write(to directory: URL) {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? data.write(to: directory.appendingPathComponent(Self.fileName), options: .atomic)
     }
 }

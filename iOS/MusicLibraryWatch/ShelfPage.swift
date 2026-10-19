@@ -34,7 +34,7 @@ struct ShelfPage: View {
 
     @ViewBuilder
     private func collectionContent(_ c: Glance.Collection) -> some View {
-        if (c.items ?? 0) == 0 {
+        if Self.isEmpty(c) {
             Text("Add CDs, records and downloads in Music Library on your Mac.")
                 .font(.footnote).foregroundStyle(.secondary)
         } else {
@@ -53,6 +53,9 @@ struct ShelfPage: View {
                     NavigationLink(value: item) { ShelfItemRow(item: item) }
                         .buttonStyle(.plain)
                 }
+            } else if !glance.owned.recent.isEmpty {
+                SectionTitle("Recently Added")
+                ownedRecent(glance.owned)
             }
             if let toRip = c.toRipList, !toRip.isEmpty {
                 SectionTitle("To Rip")
@@ -62,6 +65,12 @@ struct ShelfPage: View {
                 }
             }
         }
+    }
+
+    /// Nothing to show: every field is optional, so it's empty only when none of them has anything.
+    static func isEmpty(_ c: Glance.Collection) -> Bool {
+        [c.items, c.cds, c.vinyl, c.downloads, c.toRip, c.vinylToDigitize].allSatisfy { ($0 ?? 0) == 0 }
+            && (c.recent ?? []).isEmpty && (c.toRipList ?? []).isEmpty
     }
 
     /// "CD 312 · Vinyl 48 · 9 to rip"
@@ -99,12 +108,17 @@ struct ShelfPage: View {
                 .font(.footnote).foregroundStyle(.secondary)
         } else {
             SectionTitle("Latest")
-            ForEach(owned.recent) { p in
-                NavigationLink(value: p.album) {
-                    AlbumRow(album: p.album, detail: [p.price.map { glance.money($0) }, p.dateText].compactMap { $0 }.joined(separator: " · "))
-                }
-                .buttonStyle(.plain)
+            ownedRecent(owned)
+        }
+    }
+
+    /// The library albums bought lately, with what they cost.
+    private func ownedRecent(_ owned: Glance.Owned) -> some View {
+        ForEach(owned.recent) { p in
+            NavigationLink(value: p.album) {
+                AlbumRow(album: p.album, detail: [p.price.map { glance.money($0) }, p.dateText].compactMap { $0 }.joined(separator: " · "))
             }
+            .buttonStyle(.plain)
         }
     }
 }
@@ -172,10 +186,6 @@ struct ShelfItemPage: View {
 /// Digital Crown moves through the labels in use; the buttons step by one, through unused numbers too.
 struct WatchFindPage: View {
     @Environment(WatchModel.self) private var model
-    @AppStorage("watchFindSeries") private var storedSeries = "cd"
-    /// The last number looked up in each series; 0 before the first.
-    @AppStorage("watchFindCD") private var lastCD = 0
-    @AppStorage("watchFindVinyl") private var lastVinyl = 0
     @State private var index = ShelfSeriesIndex()
     /// What `index` was built from; nil until it's built.
     @State private var indexed: IndexKey?
@@ -185,8 +195,8 @@ struct WatchFindPage: View {
     /// Set when the buttons move the crown, so that move doesn't pick a number in turn.
     @State private var ignoreCrown = false
 
-    /// "cd" or "vinyl", whatever the stored value.
-    private var series: String { storedSeries == "vinyl" ? "vinyl" : "cd" }
+    /// "cd" or "vinyl", the series last shown.
+    private var series: String { model.find.seriesKey }
     private var seriesName: String { series == "vinyl" ? "Vinyl" : "CD" }
 
     var body: some View {
@@ -202,7 +212,7 @@ struct WatchFindPage: View {
         .toolbar {
             if model.shelf != nil {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(seriesName) { storedSeries = series == "vinyl" ? "cd" : "vinyl" }
+                    Button(seriesName) { model.setFind(model.find.with(series: series == "vinyl" ? "cd" : "vinyl")) }
                         .accessibilityLabel(series == "vinyl" ? "Showing vinyl; show CDs" : "Showing CDs; show vinyl")
                 }
             }
@@ -332,14 +342,14 @@ struct WatchFindPage: View {
     private func rebuild(_ shelf: GlanceShelf) {
         index = ShelfSeriesIndex(shelf: shelf, series: series)
         indexed = IndexKey(series: series, generatedAt: shelf.generatedAt)
-        let last = series == "vinyl" ? lastVinyl : lastCD
+        let last = model.find.last(in: series)
         number = last > 0 ? last : (index.numbers.last ?? 1)
         moveCrown(to: number)
     }
 
     private func select(_ n: Int, moveCrown move: Bool) {
         number = n
-        if series == "vinyl" { lastVinyl = n } else { lastCD = n }
+        model.setFind(model.find.with(last: n, in: series))
         if move { moveCrown(to: n) }
     }
 
@@ -397,8 +407,11 @@ struct ShelfSeriesIndex {
 
 /// How the watch shows a medium. A string from the iPhone, so a newer phone's medium shows as a generic one.
 enum ShelfMedium {
+    /// The medium as `GlanceFormat.sticker` reads it, so "CD" and " vinyl" show as a CD and a record, like their labels.
+    static func kind(_ medium: String) -> String { medium.trimmingCharacters(in: .whitespaces).lowercased() }
+
     static func symbol(_ medium: String) -> String {
-        switch medium {
+        switch kind(medium) {
         case "cd": "opticaldisc"
         case "vinyl": "record.circle"
         case "download": "arrow.down.circle"
@@ -407,7 +420,7 @@ enum ShelfMedium {
     }
 
     static func name(_ medium: String) -> String {
-        switch medium {
+        switch kind(medium) {
         case "cd": "CD"
         case "vinyl": "Vinyl"
         case "download": "Download"
@@ -420,7 +433,7 @@ extension Glance.Collection.Item {
     /// "On your shelf · no digital copy" for a CD or record whose music isn't in the library; nil otherwise.
     var noCopyText: String? {
         guard digitized == false else { return nil }
-        return medium == "download" ? "No digital copy" : "On your shelf · no digital copy"
+        return ShelfMedium.kind(medium) == "download" ? "No digital copy" : "On your shelf · no digital copy"
     }
 }
 

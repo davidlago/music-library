@@ -267,13 +267,13 @@ private struct GlanceBuilder {
                 ?? item.createdAt
         }
         let recent = collection.items.map { ($0, when($0)) }.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0.id < $1.0.id }
-        c.recent = recent.prefix(limit).map { glanceItem($0.0, in: collection) }
+        c.recent = recent.prefix(limit).map { glanceItem($0.0, in: collection, calendar: calendar) }
         let oldest = toRip.map { ($0, when($0)) }.sorted { $0.1 != $1.1 ? $0.1 < $1.1 : $0.0.id < $1.0.id }
-        c.toRipList = oldest.prefix(limit).map { glanceItem($0.0, in: collection) }
+        c.toRipList = oldest.prefix(limit).map { glanceItem($0.0, in: collection, calendar: calendar) }
         return c
     }
 
-    private mutating func glanceItem(_ item: CollectionItem, in collection: MusicCollection) -> Glance.Collection.Item {
+    private mutating func glanceItem(_ item: CollectionItem, in collection: MusicCollection, calendar: Calendar) -> Glance.Collection.Item {
         let cover = Self.cover(of: item, in: collection)
         if let cover {
             if case .track(let t) = cover.source { usedCovers[cover.name] = t } else { itemCovers[cover.name] = cover.source }
@@ -283,7 +283,8 @@ private struct GlanceBuilder {
                                       medium: item.medium.rawValue, sticker: item.stickerNumber,
                                       digitized: collection.digitalState(item).hasMusic,
                                       playable: albums[item.albumKey]?.playable ?? false, cover: cover?.name,
-                                      purchasedOn: item.purchasedOn?.string, price: item.price)
+                                      purchasedOn: item.purchasedOn?.string, price: item.price,
+                                      addedOn: PurchaseDay(item.createdAt, calendar: calendar).string)
     }
 
     mutating func listening(_ s: ListeningStats, limit: Int) -> Glance.Listening {
