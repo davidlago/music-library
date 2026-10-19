@@ -87,7 +87,7 @@ extension Database {
         guard let id = r.string(0)?.lowercased(), CollectionItem.isValidID(id),
               let medium = r.string(1).flatMap(CollectionMedium.init(rawValue:)) else { return nil }
         let album = text(3, max: CollectionItem.maxTitle) ?? "", artist = text(4, max: CollectionItem.maxTitle) ?? ""
-        guard !album.isEmpty || !artist.isEmpty else { return nil }
+        guard CollectionItem.isNamed(album: album, artist: artist, id: id) else { return nil }
         let key = r.string(5).flatMap { $0.isEmpty ? nil : $0 } ?? SearchIndex.albumKey(album: album, artist: artist)
         var item = CollectionItem(id: id, medium: medium, album: album, artist: artist, albumKey: key, now: date(21))
         item.stickerNumber = r.int(2)
@@ -111,22 +111,68 @@ extension Database {
     }
 
     /// Every `album_ownership` row (none in a copy from before it). Dates, prices and label numbers that don't parse
-    /// read as unknown and a format that doesn't as a CD, as older readers do.
+    /// read as unknown and a format that doesn't as a CD, as older readers do. In a marked table
+    /// (`markLegacyWriters`), the format column also says which app wrote the row.
     public func legacyOwnershipRows() throws -> [CollectionLegacy.Row] {
         let present = try columns(of: "album_ownership")
         guard !present.isEmpty else { return [] }
+        let marked = try hasLegacyWriterMarks()
         let label = present.contains("label_number") ? "label_number" : "NULL"
         let format = present.contains("format") ? "format" : "NULL"
         return try query("SELECT key, album, artist, purchased_on, price, \(label), \(format), updated_at FROM album_ownership ORDER BY key") { r in
             let updated = r.double(7)
+            let format = r.string(6)
+            let writer: CollectionLegacy.Writer = !marked ? .unknown
+                : format == Self.writtenBefore118 ? .noLabel : format == Self.writtenBefore119 ? .noFormat : .current
             return CollectionLegacy.Row(
                 key: r.string(0) ?? "",
                 purchase: AlbumPurchase(album: r.string(1) ?? "", artist: r.string(2) ?? "",
-                                        format: r.string(6).flatMap(AlbumPurchase.Format.init(rawValue:)) ?? .cd,
+                                        format: format.flatMap(AlbumPurchase.Format.init(rawValue:)) ?? .cd,
                                         purchasedOn: r.string(3).flatMap(PurchaseDay.init(string:)),
                                         price: AlbumPurchase.price(text: r.string(4)), labelNumber: r.int(5)),
-                updatedAt: Date(timeIntervalSince1970: updated.isFinite ? updated : 0))
+                updatedAt: Date(timeIntervalSince1970: updated.isFinite ? updated : 0), writer: writer)
         }.filter { !$0.key.isEmpty }
+    }
+
+    /// What a marked `album_ownership` row's format holds when the app that wrote it didn't write the format: 1.18,
+    /// or (with no label number either) 1.14–1.17. Every reader takes them for a CD, as they do NULL, which is what
+    /// those apps wrote until now.
+    static let writtenBefore119 = "pre-1.19", writtenBefore118 = "pre-1.18"
+    static let legacyWriterTrigger = "album_ownership_writer"
+
+    func hasLegacyWriterMarks() throws -> Bool {
+        try !query("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name=?", [.text(Self.legacyWriterTrigger)]) { _ in () }.isEmpty
+    }
+
+    /// Lets `CollectionLegacy.reconcile` tell an older app that never wrote a column from one that cleared it (both
+    /// leave NULL otherwise): `album_ownership` is made again, rows and rowids as they were, with defaults no app
+    /// writes for the columns older apps' INSERT OR REPLACE leaves out (`format` 'pre-1.19', and `label_number` a
+    /// text that a trigger turns into NULL with format 'pre-1.18' right away, so no reader ever sees it). Once, on
+    /// the Mac, after the reconcile that took in what was there before (unmarked rows are read as `.unknown`). A table
+    /// with other columns (from a newer version) is left as it is.
+    func markLegacyWriters() throws {
+        let expected = ["key", "album", "artist", "purchased_on", "price", "updated_at", "label_number", "format"]
+        let columns = try query("SELECT name FROM pragma_table_info('album_ownership') ORDER BY cid") { $0.string(0) ?? "" }
+        guard try !hasLegacyWriterMarks(), columns == expected else { return }
+        let list = expected.joined(separator: ",")
+        try transaction {
+            try exec("""
+            CREATE TABLE album_ownership_marked(
+                key TEXT PRIMARY KEY, album TEXT NOT NULL, artist TEXT NOT NULL,
+                purchased_on TEXT, price TEXT, updated_at REAL NOT NULL,
+                label_number INTEGER DEFAULT 'unwritten', format TEXT DEFAULT '\(Self.writtenBefore119)')
+            """)
+            try exec("INSERT INTO album_ownership_marked(rowid,\(list)) SELECT rowid,\(list) FROM album_ownership")
+            try exec("DROP TABLE album_ownership")
+            try exec("ALTER TABLE album_ownership_marked RENAME TO album_ownership")
+            try exec("""
+            CREATE TRIGGER \(Self.legacyWriterTrigger) AFTER INSERT ON album_ownership
+            WHEN typeof(NEW.label_number) = 'text'
+            BEGIN
+                UPDATE album_ownership SET label_number = NULL, format = '\(Self.writtenBefore118)' WHERE rowid = NEW.rowid;
+            END
+            """)
+        }
     }
 
     /// Saves an item (added or changed), then brings `album_ownership` up to date for its old and new album keys.
@@ -137,12 +183,15 @@ extension Database {
     }
 
     /// Saves several items in one transaction. Text is saved as it reads back (`CollectionItem.normalized`), and an
-    /// item left with neither an album nor an artist is refused (`CollectionError.invalidItem`).
+    /// item left with neither an album nor an artist is refused (`CollectionError.invalidItem`), unless it was made
+    /// from an older app's row with neither (`CollectionItem.isNamed`).
     public func saveCollectionItems(_ items: [CollectionItem], at date: Date = Date()) throws {
         let items = items.map { $0.normalized() }
         for item in items {
             guard item.isEditable else { throw CollectionError.readOnly }
-            guard CollectionItem.isValidID(item.id), !item.album.isEmpty || !item.artist.isEmpty else { throw CollectionError.invalidItem }
+            guard CollectionItem.isValidID(item.id), CollectionItem.isNamed(album: item.album, artist: item.artist, id: item.id) else {
+                throw CollectionError.invalidItem
+            }
         }
         try transaction {
             var keys = Set<String>()
@@ -221,12 +270,18 @@ extension Database {
                     continue
                 }
                 let p = row.purchase
-                let wanted = Stored(album: p.album, artist: p.artist, format: p.format == .cd ? nil : p.format.rawValue,
+                // The row's own text when it reads as the item's (the item's is trimmed and clipped), so an older
+                // reader's title is never rewritten.
+                func text(_ old: String?, _ new: String) -> String {
+                    old.flatMap { CollectionItem.clip($0, CollectionItem.maxTitle) == new ? $0 : nil } ?? new
+                }
+                let wanted = Stored(album: text(stored[key]?.album, p.album), artist: text(stored[key]?.artist, p.artist),
+                                    format: p.format == .cd ? nil : p.format.rawValue,
                                     purchasedOn: p.purchasedOn?.string, price: AlbumPurchase.priceText(p.price),
                                     label: p.labelNumber, updatedAt: row.updatedAt.timeIntervalSince1970)
                 guard stored[key] != wanted else { continue }
                 try exec("INSERT OR REPLACE INTO album_ownership(key,album,artist,format,purchased_on,price,label_number,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                         [.text(key), .text(p.album), .text(p.artist), .text(wanted.format), .text(wanted.purchasedOn),
+                         [.text(key), .text(wanted.album), .text(wanted.artist), .text(wanted.format), .text(wanted.purchasedOn),
                           .text(wanted.price), .int(p.labelNumber), .double(wanted.updatedAt)])
             }
         }
@@ -271,7 +326,7 @@ extension Database {
     }
 
     /// Writes an item as it reads back (`normalized`; an upsert that keeps columns a newer version added), without
-    /// the projection. Callers make sure it has an album or an artist.
+    /// the projection. Callers make sure it has an album or an artist (`CollectionItem.isNamed`).
     func writeCollectionItem(_ item: CollectionItem) throws {
         let item = item.normalized()
         let columns = Self.collectionColumns

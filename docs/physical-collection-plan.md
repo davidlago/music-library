@@ -32,7 +32,7 @@ Each decision has one answer and a short reason.
 | D6 | How labels show | Text always includes the series: **"CD #12"** and **"Vinyl #12"** (VoiceOver: "CD label 12"). The physical sticker differs by series: CDs keep today's white strip across the jewel-case hinge; vinyl gets a round yellow dot on the sleeve's top-left. The UI word is **label**; the company is renamed **Record label** everywhere. In code the number is a `Sticker`, so `label:` keeps its search meaning. | Prevents CD #12 / Vinyl #12 confusion by text, shape and colour. |
 | D7 | Duplicate labels | Saving a number already used by another item in the same series is refused, with "Use #58 (next)" and "Use #31 (first free)" offered. Duplicates that already exist (legacy data) can still be saved for other fields, and they're listed in Label Check. No UNIQUE index. | Existing `album_ownership` data may already hold duplicates, and a unique index would make `migrate()` throw. |
 | D8 | Old readers | `album_ownership` becomes a projection the Mac writes. It holds only CDs and downloads, one row per album key, with the primary copy's own date, price and CD label. `format` is only ever NULL or `'digital'`; `label_number` only ever holds CD numbers. Vinyl and song-derived downloads are never projected. | 1.14–1.20 phones and older Macs then see true (if incomplete) data. A vinyl-only album reads as not owned, never as a fake CD. |
-| D9 | Edits from older apps | Reconcile runs on every Mac open and in memory on the phone. A projected row newer than its primary item is copied into that item. A missing row never deletes an item. | Survives downgrade/upgrade cycles without silent data loss. |
+| D9 | Edits from older apps | Reconcile runs on every Mac open and in memory on the phone. A row that isn't what the projection wrote for its primary item (whatever its time) is copied into that item, as far as its writer knew the columns: `album_ownership` is remade once with defaults no app writes, so a column an older app left out can be told from one it cleared. A missing row never deletes an item. | Survives downgrade/upgrade cycles without silent data loss: a label cleared or a download made a CD on 1.18–1.20 stays so, and clocks that differ don't matter. |
 | D10 | Legacy phone events (pre-1.18 `.purchase`) | Date and price only, newest wins, applied to the primary CD/download copy. A nil event deletes only an unlabeled primary copy. Vinyl is never touched. | A label is a fact only the Mac records. |
 | D11 | Covers for trackless items | `Music/Collection Covers/<item id>-<8 hex>.jpg`, with a new name on each change. NULL means "use the linked album's `cover.jpg`". | Under `Music/`, so current phones' `SyncReceiver` accepts it with no protocol change. Each copy has its own file, and retagging can't leave it stale. |
 | D12 | Removing an album from the library | Linked items with no cover of their own first adopt the album's `cover.jpg` (copied into Collection Covers). Their `digital_source` is cleared, so they read "Not ripped". | `LibraryPath.emptiedFolders` trashes folders that hold only `cover.jpg`. |
@@ -378,15 +378,35 @@ Vinyl, `other` media and derived downloads are never projected.
   - `stickerNumber`: the CD label, when it validates
   - `album`, `artist`, date and price from R; `albumKey = K`; `digitalSource = nil`
   - `createdAt = updatedAt = R.updatedAt`
-- **A primary copy P exists, and `R.updatedAt > P.updatedAt + 0.001`.** An older app edited the row. The reconcile
-  copies `purchasedOn`, `price` and the medium (CD↔download, following R's format) into P. It also copies the label
-  number when the result is a CD, and sets `P.updatedAt = R.updatedAt`.
+- **A primary copy P exists, and R isn't P's projection** (its values, its text once trimmed and clipped, and its
+  `updated_at` within 0.001 s; whatever its time, since an older Mac's clock may be behind the device that last
+  edited P). An older app edited the row. The reconcile copies `purchasedOn` and `price` into P, then the medium and
+  the label as far as R's writer knew them, and sets `P.updatedAt = R.updatedAt`:
+
+  | R's writer | Medium | Label (when the result is a CD) |
+  |---|---|---|
+  | 1.19 and later (`.current`) | follows R's format both ways (NULL is a CD) | R's, a NULL clears it |
+  | 1.18 (`.noFormat`) | `'digital'` never appears; a download becomes a CD only with a label | R's, a NULL clears it |
+  | 1.14–1.17 (`.noLabel`), or unmarked (`.unknown`) | as for 1.18 | R's when it has one; otherwise kept |
+
+  **Telling the writers apart** (`Database.markLegacyWriters`, once on the Mac, after the first reconcile): an older
+  app's INSERT OR REPLACE leaves the columns it doesn't name NULL, the same as a newer app clearing them. So
+  `album_ownership` is made again (rows and rowids as they were, same columns in the same order) with
+  `format DEFAULT 'pre-1.19'` and `label_number DEFAULT 'unwritten'`, plus a trigger `album_ownership_writer` that
+  turns a text label into NULL with `format = 'pre-1.18'` in the same statement, so no reader ever sees the text.
+  Every reader takes both format markers for a CD, as it took the NULL those apps wrote before. The projection names
+  every column, so it never leaves a marker; a marked row is always an older app's edit. A table without the trigger
+  (a copy from before this version) reads `.unknown`, and a table with other columns (a newer version) isn't remade.
 - **Never deletes.** A row that has gone missing is written again by the next projection. The help text and the
   CHANGELOG note say that deleting a copy with an older app version has to be repeated in 1.21.
+- **Text is never made up or rewritten.** An item made for a row with neither album nor artist (an album without
+  tags) keeps them empty: a legacy id reads back untitled (`CollectionItem.isNamed`). The projection keeps a row's own
+  album and artist text when it trims and clips to the item's.
 
 **On the Mac**, `migrate()` runs reconcile against `album_ownership` in one transaction, then
-`projectLegacyOwnership(keys: nil)`. The first run is the migration, and later runs change nothing unless an older
-app wrote. Running it twice is a no-op, and a test covers that.
+`projectLegacyOwnership(keys: nil)`, then `markLegacyWriters()`. The first run is the migration, and later runs change
+nothing unless an older app wrote. Running it twice is a no-op, and a test covers that (`DowngradeRoundTripTests`
+covers edits by the exact statements of 1.17, 1.18 and 1.20 in between).
 
 **On the phone**, `LibrarySnapshot` runs reconcile in memory over the snapshot's `collection_items` and its
 `album_ownership` rows, so a snapshot edited by a downgraded Mac still shows the edits.
@@ -411,6 +431,7 @@ Codable form is unchanged.
 public struct CollectionRead: Sendable { public var items: [CollectionItem]; public var unreadable: Int; public var hadTable: Bool }
 func createCollectionTable() throws                               // from migrate()
 func reconcileLegacyOwnership(now: Date = Date()) throws          // from migrate(), Mac only
+func markLegacyWriters() throws                                   // from migrate(), Mac only, once
 public func collectionItems() throws -> CollectionRead            // probes columns; legacy synthesis when no table
 public func legacyOwnershipRows() throws -> [CollectionLegacy.Row]
 public func saveCollectionItem(_ item: CollectionItem, at: Date = Date()) throws        // upsert + reproject old & new keys
@@ -478,7 +499,7 @@ public func coverURL(item: CollectionItem) -> URL?   // own cover file if presen
 | iPhone 1.19–1.20 | + `format` | CD and download badges correct; no vinyl ever reads as a CD. |
 | iPhone 1.21+ | `collection_items` + in-memory reconcile + overlay | The whole collection. |
 | New phone, snapshot or export from an older Mac | no table | Items synthesized from `album_ownership` with deterministic ids; no covers of their own. |
-| Older Mac after a downgrade | `album_ownership` | Edits CDs and downloads; the next-label suggestion counts CDs only, and only each album's primary copy: it doesn't see the label of a second CD of the same album, so it can suggest or accept that number (documented; Label Check lists the duplicate after upgrading). Its edits are reconciled when 1.21 reopens, and its deletes are not applied (documented). |
+| Older Mac after a downgrade | `album_ownership` | Edits CDs and downloads; the next-label suggestion counts CDs only, and only each album's primary copy: it doesn't see the label of a second CD of the same album, so it can suggest or accept that number (documented; Label Check lists the duplicate after upgrading). Its edits are reconciled when 1.21 reopens (labels cleared and formats changed included; 1.14–1.17 can't clear a label or say a download, so theirs are kept), and its deletes are not applied (documented). |
 | Older Mac syncing a new phone | its own plan | Deletes `Music/Collection Covers/*` from the phone (not wanted by its plan); items show placeholders until the next 1.21 sync. Documented. |
 | Older watch | `Glance.owned` | Same meanings as today (library albums only); `collection` is ignored; `shelf.json` is dropped (no delegate method). |
 | New watch, older phone | no `collection`, no shelf | Shelf page reads "Update Music Library on your iPhone to find items by label." |

@@ -9,17 +9,48 @@ import Foundation
 /// songs are never projected, so an older reader sees a record-only album as not owned rather than as a CD. Only
 /// the primary copy of a key is projected, so an older reader doesn't see the labels of other CDs of the same album:
 /// after a downgrade, an older Mac can suggest (and accept) a label number a second copy holds. That's documented
-/// (help, CHANGELOG), and Label Check lists the duplicate once 1.21 opens the library again.
+/// (help, CHANGELOG), and Label Check lists the duplicate once 1.21 opens the library again. What older apps write is
+/// taken in by `reconcile`, as far as each knew the columns (`Writer`).
 public enum CollectionLegacy {
     /// An `album_ownership` row.
     public struct Row: Hashable, Sendable {
         public var key: String
         public var purchase: AlbumPurchase
         public var updatedAt: Date
+        /// What the app that wrote the row knew (`Database.markLegacyWriters`).
+        public var writer: Writer
 
-        public init(key: String, purchase: AlbumPurchase, updatedAt: Date) {
-            self.key = key; self.purchase = purchase; self.updatedAt = updatedAt
+        public init(key: String, purchase: AlbumPurchase, updatedAt: Date, writer: Writer = .current) {
+            self.key = key; self.purchase = purchase; self.updatedAt = updatedAt; self.writer = writer
         }
+
+        /// The row is what the projection writes for `item` (the text as `collection_items` reads it back), so no
+        /// older app changed it since. A row an app before 1.19 wrote is always a change.
+        func isProjection(of item: CollectionItem) -> Bool {
+            guard writer == .current || writer == .unknown else { return false }
+            var p = purchase
+            p.album = CollectionItem.clip(p.album, CollectionItem.maxTitle)
+            p.artist = CollectionItem.clip(p.artist, CollectionItem.maxTitle)
+            return p == CollectionLegacy.purchase(of: item)
+                && abs(updatedAt.timeIntervalSince1970 - item.updatedAt.timeIntervalSince1970) <= 0.001
+        }
+    }
+
+    /// Which app wrote an `album_ownership` row, as far as the row can tell. An older app's INSERT OR REPLACE leaves
+    /// the columns it doesn't know NULL, the same as a newer one clearing them, so this version gives those columns
+    /// defaults no app writes (`Database.markLegacyWriters`): what's left in them says the writer didn't know them.
+    public enum Writer: Hashable, Sendable {
+        /// 1.19 and later (this version's projection included): the row says the format and the label number.
+        case current
+        /// 1.18: the label number, not the format.
+        case noFormat
+        /// 1.14–1.17: neither.
+        case noLabel
+        /// A table not marked yet (a copy from before this version): any of them.
+        case unknown
+
+        var knowsLabel: Bool { self == .current || self == .noFormat }
+        var knowsFormat: Bool { self == .current }
     }
 
     /// The copy of the key an older reader sees: among stored CDs and downloads of it, the CD with the lowest label
@@ -48,13 +79,12 @@ public enum CollectionLegacy {
     }
 
     /// Takes in rows an older version wrote. A key with no CD or download gets one (the migration: with the id
-    /// `legacyID`, so the Mac and a phone reading an older copy agree). A row newer than its key's primary copy was
-    /// edited by an older app: its date, price and medium are copied into that copy, and its label number when it has
-    /// one. Never deletes: a row gone missing is written again by the next projection. `changed` lists the items
-    /// created or changed.
-    ///
-    /// Two things an older app's row can't say are kept: a label number (versions before 1.18 write none) and a
-    /// download (versions before 1.19 write no format; a row turns a download into a CD only with a label number).
+    /// `legacyID`, so the Mac and a phone reading an older copy agree). A row that isn't what the projection wrote for
+    /// its key's primary copy was edited by an older app (whatever its time: clocks differ): its date and price are
+    /// copied into that copy, and its format and label number as far as the writer knew them (`Writer`): a 1.19 or
+    /// later row's both ways (a NULL label is a cleared one, a NULL format a CD); a 1.18 row's label, and from a
+    /// download to a CD only with a label; nothing more from 1.14–1.17, which wrote neither. Never deletes: a row gone
+    /// missing is written again by the next projection. `changed` lists the items created or changed.
     public static func reconcile(items: [CollectionItem], legacy: [Row]) -> (items: [CollectionItem], changed: [CollectionItem]) {
         var items = items
         var changed: [CollectionItem] = []
@@ -64,14 +94,18 @@ public enum CollectionLegacy {
         for row in legacy.sorted(by: { $0.key < $1.key }) where !row.key.isEmpty {
             if let i = index[row.key]?.min(by: { primaryFirst(items[$0], items[$1]) }) {
                 let p = items[i]
-                guard row.updatedAt.timeIntervalSince1970 > p.updatedAt.timeIntervalSince1970 + 0.001 else { continue }
+                guard !row.isProjection(of: p) else { continue }
                 var q = p
                 q.purchasedOn = row.purchase.purchasedOn
                 q.price = row.purchase.price
                 if row.purchase.format == .digital { q.medium = .download }
-                else if q.medium == .download, row.purchase.labelNumber != nil { q.medium = .cd }
-                if q.medium == .cd, let n = row.purchase.labelNumber { q.stickerNumber = n }
+                else if row.writer.knowsFormat || row.purchase.labelNumber != nil { q.medium = .cd }
+                if q.medium == .cd {
+                    if row.writer.knowsLabel { q.stickerNumber = row.purchase.labelNumber }
+                    else if let n = row.purchase.labelNumber { q.stickerNumber = n }
+                }
                 q.updatedAt = row.updatedAt
+                guard q != p else { continue }
                 items[i] = q
                 changed.append(q)
             } else {
@@ -101,11 +135,10 @@ public enum CollectionLegacy {
             id = CollectionItem.legacyID(albumKey: key + "#\(n)")
         }
         ids.insert(id)
-        // Clipped as `collection_items` reads it back, so the projection doesn't then blank an older reader's title.
+        // Clipped as `collection_items` reads it back. Both may be empty (an album without tags): a legacy id
+        // reads back without a title (`CollectionItem.isNamed`), so nothing is made up for it.
         let album = CollectionItem.clip(album, CollectionItem.maxTitle), artist = CollectionItem.clip(artist, CollectionItem.maxTitle)
-        // A row with neither wouldn't read back (and would then stop being projected).
-        return CollectionItem(id: id, medium: medium, album: album.isEmpty && artist.isEmpty ? "Unknown Album" : album,
-                              artist: artist, albumKey: key, now: date)
+        return CollectionItem(id: id, medium: medium, album: album, artist: artist, albumKey: key, now: date)
     }
 
     /// What `album_ownership` should hold, by key.

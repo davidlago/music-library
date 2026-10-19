@@ -258,6 +258,12 @@ public struct CollectionItem: Identifiable, Hashable, Sendable {
     /// The id of an item migrated from `album_ownership`, the same on the Mac and on a phone reading an older copy.
     public static func legacyID(albumKey: String) -> String { "own-" + fnv1a64Hex(albumKey) }
 
+    /// Every item has an album or an artist, except one made from an older app's row for an album with neither tag
+    /// (a legacy id): it keeps the row's empty title rather than one made up for it.
+    static func isNamed(album: String, artist: String, id: String) -> Bool {
+        !album.isEmpty || !artist.isEmpty || id.hasPrefix("own-")
+    }
+
     /// The id of a download derived from bought songs.
     public static func songsID(albumKey: String) -> String { "songs-" + fnv1a64Hex(albumKey) }
 

@@ -395,3 +395,201 @@ import Testing
         #expect(synced.purchases == legacy)
     }
 }
+
+/// A library this version migrated, then edited by an older Mac (a downgrade, or a second Mac sharing the library) and
+/// opened by this version again: what the older Mac filed is what the collection holds. The older Macs' writes are
+/// the exact statements their `saveAlbumPurchase` runs, on a plain SQLite connection.
+@Suite struct DowngradeRoundTripTests {
+    enum OlderMac: String, CaseIterable, Sendable {
+        case v117 = "1.14–1.17", v118 = "1.18", v120 = "1.19–1.20"
+
+        func save(_ path: URL, key: String, _ p: AlbumPurchase?, at time: Double) throws {
+            let price = AlbumPurchase.priceText(p?.price), day = p?.purchasedOn?.string
+            guard let p else { return try Self.exec(path, "DELETE FROM album_ownership WHERE key=?", [.text(key)]) }
+            switch self {
+            case .v117:
+                try Self.exec(path, "INSERT OR REPLACE INTO album_ownership(key,album,artist,purchased_on,price,updated_at) VALUES(?,?,?,?,?,?)",
+                              [.text(key), .text(p.album), .text(p.artist), .text(day), .text(price), .double(time)])
+            case .v118:
+                try Self.exec(path, "INSERT OR REPLACE INTO album_ownership(key,album,artist,purchased_on,price,label_number,updated_at) VALUES(?,?,?,?,?,?,?)",
+                              [.text(key), .text(p.album), .text(p.artist), .text(day), .text(price), .int(p.labelNumber), .double(time)])
+            case .v120:
+                try Self.exec(path, "INSERT OR REPLACE INTO album_ownership(key,album,artist,format,purchased_on,price,label_number,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                              [.text(key), .text(p.album), .text(p.artist), .text(p.format == .cd ? nil : p.format.rawValue), .text(day),
+                               .text(price), .int(p.labelNumber), .double(time)])
+            }
+        }
+
+        static func exec(_ path: URL, _ sql: String, _ binds: [Bind]) throws {
+            var db: OpaquePointer?
+            defer { sqlite3_close(db) }
+            var stmt: OpaquePointer?
+            guard sqlite3_open(path.path, &db) == SQLITE_OK, sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+                throw DatabaseError.sql(message: String(cString: sqlite3_errmsg(db)), statement: sql)
+            }
+            defer { sqlite3_finalize(stmt) }
+            let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+            for (i, b) in binds.enumerated() {
+                switch b {
+                case .null: sqlite3_bind_null(stmt, Int32(i + 1))
+                case .int(let v): sqlite3_bind_int64(stmt, Int32(i + 1), v)
+                case .double(let v): sqlite3_bind_double(stmt, Int32(i + 1), v)
+                case .text(let v): sqlite3_bind_text(stmt, Int32(i + 1), v, -1, transient)
+                }
+            }
+            guard sqlite3_step(stmt) == SQLITE_DONE else { throw DatabaseError.sql(message: String(cString: sqlite3_errmsg(db)), statement: sql) }
+        }
+    }
+
+    static let fixture = LegacyLibraryMigrationTests.fixtures.first { $0.version == "v1.20.0" }!
+    static func key(_ pair: (String, String)) -> String { LegacyLibraryMigrationTests.key(pair) }
+    /// "Hounds of Love", owned without tracks, label 9; "In Rainbows", a download; "OK Computer", a CD without a label.
+    static let labeled = key(fixture.orphan), download = key(fixture.download!), unlabeled = key(fixture.unlabeled!)
+
+    /// A copy of the 1.20 library, migrated by this version.
+    static func migrated() throws -> URL {
+        let path = try LegacyLibraryMigrationTests.copy(fixture)
+        try LegacyLibraryMigrationTests.openAndClose(path)
+        return path
+    }
+
+    static func primary(_ db: Database, _ key: String) throws -> CollectionItem? {
+        CollectionLegacy.primary(try db.collectionItems().items, albumKey: key)
+    }
+
+    /// The row an older Mac starts from: what it reads (its own `albumPurchases`) for the key.
+    static func owned(_ path: URL, _ key: String) throws -> AlbumPurchase {
+        try #require(try LegacyLibraryMigrationTests.read120(Database(snapshotAt: path.path))[key])
+    }
+
+    /// Reopening with this version: the phone, reading the edited copy in memory, agrees with the Mac, and a second
+    /// open changes nothing.
+    static func reopen(_ path: URL) throws -> Database {
+        let phone = try LibrarySnapshot(root: path.deletingLastPathComponent(), isPresent: { _ in false })
+        try LegacyLibraryMigrationTests.openAndClose(path)
+        let first = try LegacyLibraryMigrationTests.dump(path.path)
+        let db = try Database(path: path.path)
+        #expect(try LegacyLibraryMigrationTests.dump(path.path) == first, "a second open changes nothing")
+        let mac = MusicCollection(items: try db.collectionItems().items, songPurchases: try db.trackPurchases(), tracks: try db.fetchAllTracks())
+        #expect(phone.collection.items == mac.items, "the phone agrees")
+        return db
+    }
+
+    @Test func aLabelClearedOnAnOlderMacStaysCleared() throws {
+        for mac in [OlderMac.v118, .v120] {
+            let path = try Self.migrated()
+            var p = try Self.owned(path, Self.labeled)
+            #expect(p.labelNumber == 9)
+            p.labelNumber = nil
+            try mac.save(path, key: Self.labeled, p, at: 2_000_000_000)
+            let db = try Self.reopen(path)
+            #expect(try Self.primary(db, Self.labeled)?.stickerNumber == nil, "\(mac.rawValue)")
+            #expect(try db.albumPurchases()[Self.labeled]?.labelNumber == nil, "\(mac.rawValue)")
+        }
+    }
+
+    @Test func aDownloadMadeACDOnAnOlderMacStaysACD() throws {
+        let path = try Self.migrated()
+        var p = try Self.owned(path, Self.download)
+        #expect(p.format == .digital)
+        p.format = .cd
+        try OlderMac.v120.save(path, key: Self.download, p, at: 2_000_000_000)
+        let db = try Self.reopen(path)
+        #expect(try Self.primary(db, Self.download)?.medium == .cd)
+        #expect(try db.albumPurchases()[Self.download]?.format == .cd)
+    }
+
+    /// 1.20 makes you clear a number before it's given to another CD: the cleared one doesn't come back as a duplicate.
+    @Test func aLabelMovedOnAnOlderMacIsNotDuplicated() throws {
+        let path = try Self.migrated()
+        var from = try Self.owned(path, Self.labeled), to = try Self.owned(path, Self.unlabeled)
+        #expect(to.labelNumber == nil)
+        from.labelNumber = nil
+        to.labelNumber = 9
+        try OlderMac.v120.save(path, key: Self.labeled, from, at: 2_000_000_000)
+        try OlderMac.v120.save(path, key: Self.unlabeled, to, at: 2_000_000_001)
+        let db = try Self.reopen(path)
+        #expect(try Self.primary(db, Self.labeled)?.stickerNumber == nil && Self.primary(db, Self.unlabeled)?.stickerNumber == 9)
+        let collection = MusicCollection(items: try db.collectionItems().items, songPurchases: [:], tracks: [])
+        #expect(collection.duplicates(in: .cd)[9] == nil)
+        #expect(try db.albumPurchases().values.filter { $0.labelNumber == 9 }.count == 1)
+    }
+
+    /// Apps that never wrote a column can't clear it: their edits keep the label, and a download stays one.
+    @Test func editsFromAppsThatDontWriteAColumnKeepIt() throws {
+        for mac in [OlderMac.v117, .v118] {
+            let path = try Self.migrated()
+            var cd = try Self.owned(path, Self.labeled), dl = try Self.owned(path, Self.download)
+            cd.price = 3
+            dl.price = 4
+            dl.format = .cd  // what an app before 1.19 thinks every album is
+            if mac == .v117 { cd.labelNumber = nil }  // it reads no labels
+            try mac.save(path, key: Self.labeled, cd, at: 2_000_000_000)
+            try mac.save(path, key: Self.download, dl, at: 2_000_000_000)
+            // What older readers see meanwhile is what that app wrote: no stand-in values.
+            let old = try Database(snapshotAt: path.path)
+            #expect(try LegacyLibraryMigrationTests.read118(old)[Self.labeled]?.labelNumber == (mac == .v117 ? nil : 9))
+            #expect(try LegacyLibraryMigrationTests.read120(old)[Self.download]?.format == .cd)
+
+            let db = try Self.reopen(path)
+            let c = try #require(try Self.primary(db, Self.labeled)), d = try #require(try Self.primary(db, Self.download))
+            #expect(c.price == 3 && c.stickerNumber == 9, "\(mac.rawValue)")
+            #expect(d.price == 4 && d.medium == .download, "\(mac.rawValue)")
+            #expect(c.updatedAt == Date(timeIntervalSince1970: 2_000_000_000))
+            #expect(try db.albumPurchases()[Self.download]?.format == .digital)
+            #expect(Set(try db.query("SELECT DISTINCT IFNULL(format,'∅') FROM album_ownership") { $0.string(0) ?? "" }).isSubset(of: ["∅", "digital"]))
+        }
+    }
+
+    /// The copy's time came from a device whose clock is ahead: an older Mac's later edit, with an earlier time, is
+    /// still taken in.
+    @Test func anOlderMacsEditWithAnEarlierClockIsTakenIn() throws {
+        let path = try Self.migrated()
+        do {
+            let db = try Database(path: path.path)
+            var item = try #require(try Self.primary(db, Self.labeled))
+            item.price = 50
+            try db.saveCollectionItem(item, at: Date(timeIntervalSince1970: 3_000_000_000))
+        }
+        var p = try Self.owned(path, Self.labeled)
+        p.price = 5
+        try OlderMac.v120.save(path, key: Self.labeled, p, at: 2_000_000_000)
+        let db = try Self.reopen(path)
+        #expect(try Self.primary(db, Self.labeled)?.price == 5)
+    }
+
+    /// Marking the table keeps every row (and rowid), and a version that never wrote it (no table yet) reads the same.
+    @Test func markingKeepsTheRowsAndOnlyOnce() throws {
+        let path = try LegacyLibraryMigrationTests.copy(Self.fixture)
+        let before = try #require(try LegacyLibraryMigrationTests.dump(path.path).tables["album_ownership"])
+        try LegacyLibraryMigrationTests.openAndClose(path)
+        let db = try Database(path: path.path)
+        #expect(try db.hasLegacyWriterMarks())
+        let after = try #require(try LegacyLibraryMigrationTests.dump(path.path).tables["album_ownership"])
+        #expect(after == before)
+        #expect(try db.legacyOwnershipRows().allSatisfy { $0.writer == .current })
+        let unmarked = try Database(snapshotAt: try LegacyLibraryMigrationTests.copy(Self.fixture).path)
+        #expect(try unmarked.legacyOwnershipRows().allSatisfy { $0.writer == .unknown })
+    }
+
+    /// An owned album with neither an album nor an artist tag keeps its empty title: nothing is made up.
+    @Test func anUntitledOwnedAlbumKeepsItsEmptyTitle() throws {
+        let path = try LegacyLibraryMigrationTests.copy(Self.fixture)
+        let blank = SearchIndex.albumKey(album: "", artist: "")
+        try OlderMac.v120.save(path, key: blank, AlbumPurchase(album: "", artist: "", purchasedOn: PurchaseDay(year: 2020, month: 1, day: 2),
+                                                               price: Decimal(string: "9.99"), labelNumber: 11), at: 1_600_000_000)
+        let before = try #require(try LegacyLibraryMigrationTests.dump(path.path).tables["album_ownership"])
+        let phone = try LibrarySnapshot(root: path.deletingLastPathComponent(), isPresent: { _ in false })
+        try LegacyLibraryMigrationTests.openAndClose(path)
+        #expect(try LegacyLibraryMigrationTests.dump(path.path).tables["album_ownership"] == before, "the row is unchanged")
+        let db = try Self.reopen(path)
+        let item = try #require(try Self.primary(db, blank))
+        #expect(item.id == CollectionItem.legacyID(albumKey: blank) && item.album.isEmpty && item.artist.isEmpty && item.stickerNumber == 11)
+        #expect(phone.collection.items.first { $0.albumKey == blank } == item)
+        // It can still be edited.
+        var edited = item
+        edited.price = 5
+        try db.saveCollectionItem(edited)
+        #expect(try Self.primary(db, blank)?.price == 5 && db.albumPurchases()[blank]?.album == "")
+    }
+}

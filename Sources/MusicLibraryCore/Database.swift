@@ -260,6 +260,7 @@ public final class Database: @unchecked Sendable {
         // The collection, also without a schema change; `album_ownership` becomes its projection for older readers.
         try createCollectionTable()
         try reconcileLegacyOwnership()
+        try markLegacyWriters()
         try exec("PRAGMA user_version=\(Self.schemaVersion)")
     }
 

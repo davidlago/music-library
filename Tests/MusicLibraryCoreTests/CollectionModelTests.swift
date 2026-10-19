@@ -469,12 +469,21 @@ import Testing
         let key = SearchIndex.albumKey(album: "Album", artist: "Artist")
         var cd = item("cd", .cd, 5, created: 100)
         cd.price = 10
-        let older = CollectionLegacy.Row(key: key, purchase: AlbumPurchase(album: "Album", artist: "Artist", price: 1),
-                                         updatedAt: Date(timeIntervalSince1970: 100.0005))
-        #expect(CollectionLegacy.reconcile(items: [cd], legacy: [older]).changed.isEmpty, "not newer: nothing to take in")
+        let projected = CollectionLegacy.Row(key: key, purchase: AlbumPurchase(album: " Album", artist: "Artist", price: 10, labelNumber: 5),
+                                             updatedAt: Date(timeIntervalSince1970: 100.0005))
+        #expect(CollectionLegacy.reconcile(items: [cd], legacy: [projected]).changed.isEmpty, "the projection: nothing to take in")
+        // An older Mac whose clock is behind: its edit is older than the copy's, and still taken in.
+        let behind = CollectionLegacy.Row(key: key, purchase: AlbumPurchase(album: "Album", artist: "Artist", price: 1, labelNumber: 5),
+                                          updatedAt: Date(timeIntervalSince1970: 50))
+        #expect(CollectionLegacy.reconcile(items: [cd], legacy: [behind]).items.map(\.price) == [1])
+        // The same values written by an app before 1.19 are still its edit (its time is taken in).
+        var marked = projected
+        marked.writer = .noFormat
+        #expect(CollectionLegacy.reconcile(items: [cd], legacy: [marked]).changed.map(\.updatedAt) == [Date(timeIntervalSince1970: 100.0005)])
 
         // A 1.17 Mac edited the price: no label or format in its row.
-        let edited = CollectionLegacy.Row(key: key, purchase: AlbumPurchase(album: "Album", artist: "Artist", price: 8), updatedAt: Date(timeIntervalSince1970: 200))
+        let edited = CollectionLegacy.Row(key: key, purchase: AlbumPurchase(album: "Album", artist: "Artist", price: 8), updatedAt: Date(timeIntervalSince1970: 200),
+                                          writer: .noLabel)
         var r = CollectionLegacy.reconcile(items: [cd], legacy: [edited])
         #expect(r.changed.map(\.id) == ["cd"])
         #expect(r.items[0].price == 8 && r.items[0].stickerNumber == 5 && r.items[0].updatedAt == Date(timeIntervalSince1970: 200))
@@ -483,7 +492,7 @@ import Testing
                                                                                   updatedAt: Date(timeIntervalSince1970: 200))])
         #expect(r.items[0].medium == .download && r.items[0].stickerNumber == nil)
         r = CollectionLegacy.reconcile(items: [cd], legacy: [CollectionLegacy.Row(key: key, purchase: AlbumPurchase(album: "Album", artist: "Artist", labelNumber: 6),
-                                                                                  updatedAt: Date(timeIntervalSince1970: 200))])
+                                                                                  updatedAt: Date(timeIntervalSince1970: 200), writer: .noFormat)])
         #expect(r.items[0].stickerNumber == 6)
         // A download edited by a Mac that writes no format stays a download.
         let dl = item("dl", .download, created: 100)
@@ -501,5 +510,28 @@ import Testing
         let taken = item(CollectionItem.legacyID(albumKey: key), .vinyl, 1)
         r = CollectionLegacy.reconcile(items: [taken], legacy: [edited])
         #expect(r.changed.count == 1 && r.changed[0].id != taken.id && CollectionItem.isValidID(r.changed[0].id))
+    }
+
+    /// An older app's NULL label or format is a clear only from an app that wrote the column (`Writer`).
+    @Test func reconcileFollowsWhatTheWriterKnew() {
+        let key = SearchIndex.albumKey(album: "Album", artist: "Artist")
+        let cd = item("cd", .cd, 5, created: 100), dl = item("dl", .download, created: 100)
+        func reconciled(_ item: CollectionItem, _ writer: CollectionLegacy.Writer, label: Int? = nil) -> CollectionItem {
+            let row = CollectionLegacy.Row(key: key, purchase: AlbumPurchase(album: "Album", artist: "Artist", labelNumber: label),
+                                           updatedAt: Date(timeIntervalSince1970: 200), writer: writer)
+            return CollectionLegacy.reconcile(items: [item], legacy: [row]).items[0]
+        }
+        // 1.19 and later write both: a NULL label is cleared, a NULL format is a CD.
+        #expect(reconciled(cd, .current).medium == .cd && reconciled(cd, .current).stickerNumber == nil, "the label was cleared")
+        #expect(reconciled(dl, .current).medium == .cd, "a download made a CD without a label")
+        // 1.18 writes the label, not the format.
+        #expect(reconciled(cd, .noFormat).stickerNumber == nil, "the label was cleared")
+        #expect(reconciled(dl, .noFormat).medium == .download, "it can't say a download")
+        #expect(reconciled(dl, .noFormat, label: 3).medium == .cd && reconciled(dl, .noFormat, label: 3).stickerNumber == 3)
+        // 1.14–1.17 write neither, and a row from an unmarked table may be from any of them.
+        for writer in [CollectionLegacy.Writer.noLabel, .unknown] {
+            #expect(reconciled(cd, writer).stickerNumber == 5 && reconciled(dl, writer).medium == .download, "\(writer)")
+        }
+        #expect(reconciled(cd, .unknown, label: 6).stickerNumber == 6 && reconciled(dl, .unknown, label: 6).medium == .cd)
     }
 }
