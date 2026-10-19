@@ -116,6 +116,43 @@ import Testing
         #expect(AlbumTracklist.merge(library: [bonus], tracklist: []).count == 1)
     }
 
+    @Test func tracklistPositionsShowRecordSides() throws {
+        let json = #"""
+        {"id": "d6a1f166-8a02-4608-849b-9d623912c3e5", "title": "Kind of Blue", "media": [
+          {"position": 1, "format": "12\" Vinyl", "track-count": 2, "tracks": [
+            {"position": 1, "number": "A1", "title": "So What", "length": 562000, "recording": {"id": "r1", "title": "So What"}},
+            {"position": 2, "number": "A2", "title": "Freddie Freeloader", "recording": {"id": "r2"}}]},
+          {"position": 2, "format": "12\" Vinyl", "track-count": 1, "tracks": [
+            {"position": 1, "number": "B1", "title": "All Blues", "recording": {"id": "r3"}}]}]}
+        """#
+        let release = try MusicBrainzParser.parseRelease(Data(json.utf8))
+        let info = AlbumInfo.assemble(title: "Kind of Blue", releaseGroup: nil, release: release, wikidata: nil, wikipedia: nil, lastfm: nil)
+        #expect(info.tracklist.map(\.position) == ["A1", "A2", "B1"])
+        #expect(info.tracklist.map(\.displayPosition) == ["A1", "A2", "B1"] && info.tracklist.map(\.number) == [1, 2, 1])
+        // A CD's numbers are just the track numbers.
+        let cd = AlbumInfo.assemble(title: "OK Computer", releaseGroup: nil,
+                                    release: try MusicBrainzParser.parseRelease(try TestSupport.fixture("mb_release_okcomputer")),
+                                    wikidata: nil, wikipedia: nil, lastfm: nil)
+        #expect(cd.tracklist.allSatisfy { $0.position == nil } && cd.tracklist.first?.displayPosition == "1")
+        #expect(TracklistEntry(disc: 1, number: 3, title: "x", position: " 3 ").position == nil)
+        #expect(TracklistEntry(disc: 1, number: 3, title: "x", position: String(repeating: "A", count: 40)).position == nil)
+    }
+
+    @Test func infoCachedBeforePositionsStillReads() throws {
+        var info = AlbumInfo(title: "Kind of Blue")
+        info.tracklist = [TracklistEntry(disc: 1, number: 1, title: "So What", duration: 562, position: "A1")]
+        // As an older version wrote it: no "position" key.
+        var object = try #require(try JSONSerialization.jsonObject(with: try JSONEncoder().encode(info)) as? [String: Any])
+        object["tracklist"] = (object["tracklist"] as? [[String: Any]])?.map { $0.filter { $0.key != "position" } }
+        let old = try JSONSerialization.data(withJSONObject: object)
+        #expect(!String(decoding: old, as: UTF8.self).contains("position"))
+        let decoded = try JSONDecoder().decode(AlbumInfo.self, from: old)
+        #expect(decoded.tracklist.first?.title == "So What" && decoded.tracklist.first?.position == nil)
+        #expect(decoded.tracklist.first?.displayPosition == "1")
+        // And the new form round-trips.
+        #expect(try JSONDecoder().decode(AlbumInfo.self, from: try JSONEncoder().encode(info)).tracklist.first?.position == "A1")
+    }
+
     @Test func cacheRoundTrip() throws {
         let db = try Database(path: ":memory:")
         var info = AlbumInfo(title: "Abbey Road")

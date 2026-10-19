@@ -39,6 +39,8 @@ public struct LibrarySnapshot: Sendable {
     /// Everything you own (CDs, records, downloads), with or without tracks, as of the sync, plus changes an older
     /// Mac made to `album_ownership` since (`CollectionLegacy.reconcile`).
     public let collection: MusicCollection
+    /// The collection, searchable (`LibrarySearch`).
+    public let collectionIndex: CollectionIndex
     /// Items left out because they need a newer version of the app (`collection.unreadable`).
     public let labelUnreadable: Int
     /// Songs bought as downloads, by track ID.
@@ -131,7 +133,9 @@ public struct LibrarySnapshot: Sendable {
         self.purchases = collection.legacyPurchases
         self.songPurchases = songPurchases
         self.artistInfos = infos.mapValues(\.info)
-        self.albumInfos = (try? db.albumInfos()) ?? [:]
+        let albumInfos = (try? db.albumInfos()) ?? [:]
+        self.albumInfos = albumInfos
+        self.collectionIndex = CollectionIndex(collection: collection, tracks: all, albumInfos: albumInfos, index: index)
         self.artistImageFiles = imageFiles
         self.artistPhotos = photos
         self.collaborations = CollaborationGraph(tracks: all)
@@ -201,8 +205,9 @@ public struct LibrarySnapshot: Sendable {
         albums(artist: artist).flatMap { tracks(album: $0) }
     }
 
+    /// Without collection keys, exactly the library's `tracks(matching:)`.
     public func tracks(smartPlaylist p: SmartPlaylist) -> [Track] {
-        index.tracks(matching: SearchQuery.parse(p.query))
+        LibrarySearch.tracks(matching: p.query, index: index, collectionIndex: collectionIndex, collection: collection)
     }
 
     /// An item's tracks, as the Mac resolves it for sync.

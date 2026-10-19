@@ -156,6 +156,12 @@ public struct MBReleaseSummary: Hashable, Sendable {
 
     public var isCD: Bool { !formats.isEmpty && formats.allSatisfy { $0.contains("CD") } }
 
+    /// Any of its media is a record ("Vinyl", "12\" Vinyl", "7\"").
+    public var isVinyl: Bool { medium == .vinyl }
+
+    /// What a copy of it is (`CollectionMedium(musicBrainzFormats:)`); nil when no format is known.
+    public var medium: CollectionMedium? { CollectionMedium(musicBrainzFormats: formats) }
+
     /// "2×CD", "CD".
     public var mediaLabel: String? {
         guard let f = formats.first else { return nil }

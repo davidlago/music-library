@@ -47,10 +47,26 @@ public struct TracklistEntry: Codable, Hashable, Sendable, Identifiable {
     public var artist: String
     public var duration: Double?
     public var recordingId: String
+    /// The position printed on the release when it isn't just the track number: a record's side and track ("A1",
+    /// "B2"). Nil in info cached before positions were kept, and for plain numbers.
+    public var position: String?
 
-    public init(disc: Int, number: Int, title: String, artist: String = "", duration: Double? = nil, recordingId: String = "") {
+    public init(disc: Int, number: Int, title: String, artist: String = "", duration: Double? = nil, recordingId: String = "",
+                position: String? = nil) {
         self.disc = disc; self.number = number; self.title = title; self.artist = artist
         self.duration = duration; self.recordingId = recordingId
+        self.position = Self.position(position, number: number)
+    }
+
+    /// "A1" for a record's track, else the track number.
+    public var displayPosition: String { position ?? String(number) }
+
+    /// The printed position, unless it's empty, the plain track number or too long to be one (it's from the network).
+    static func position(_ raw: String?, number: Int) -> String? {
+        guard let p = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !p.isEmpty, p.count <= 12, p != String(number) else {
+            return nil
+        }
+        return p
     }
 }
 
@@ -188,7 +204,7 @@ extension AlbumInfo {
         if let release {
             info.tracklist = release.tracks.map {
                 TracklistEntry(disc: $0.discNo, number: $0.trackNo, title: $0.title, artist: $0.artist,
-                               duration: $0.durationSeconds, recordingId: $0.recordingId)
+                               duration: $0.durationSeconds, recordingId: $0.recordingId, position: $0.numberLabel)
             }
         }
         if let wikipedia {

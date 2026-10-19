@@ -78,6 +78,23 @@ import Testing
         #expect(index.search(.parse("is:owned"), context: context).records.map(\.id) == [records[4].id])
         #expect(index.search(.parse("-is:owned"), context: context).records.count == 19)
         #expect(index.search(.parse("is:onlist"), context: context).records.map(\.id) == [records[1].id])
+        // In your collection (own:) isn't in your library (is:owned).
+        let collection = CatalogSearchContext(owned: [records[4].id], collection: [records[2].id: ["cd"], records[3].id: ["vinyl", "cd"],
+                                                                                    records[5].id: ["download"]])
+        #expect(index.search(.parse("is:owned"), context: collection).records.map(\.id) == [records[4].id])
+        #expect(index.search(.parse("own:any"), context: collection).records.map(\.id) == [records[2].id, records[3].id, records[5].id])
+        #expect(index.search(.parse("own:cd"), context: collection).records.map(\.id) == [records[2].id, records[3].id])
+        #expect(index.search(.parse("own:vinyl"), context: collection).records.map(\.id) == [records[3].id])
+        #expect(index.search(.parse("own:lp"), context: collection).records.map(\.id) == [records[3].id])
+        #expect(index.search(.parse("own:download"), context: collection).records.map(\.id) == [records[5].id])
+        #expect(index.search(.parse("own:physical"), context: collection).records.map(\.id) == [records[2].id, records[3].id])
+        #expect(index.search(.parse("own:none"), context: collection).records.count == 17)
+        #expect(index.search(.parse("-own:any"), context: collection).records.count == 17)
+        #expect(index.search(.parse("own:vinyl is:owned"), context: collection).records.isEmpty)
+        // Without the collection, nothing is in it.
+        #expect(index.search(.parse("own:any"), context: context).records.isEmpty)
+        #expect(CatalogSearchQuery.parse("own:cd").filters == [.init(kind: .collection("cd"), negated: false)])
+        #expect(CatalogSearchQuery.parse("own:bogus/x").filters.isEmpty)
         let onShelf = records.filter { $0.item.availability == .here }.count
         #expect(onShelf < 20 && index.search(.parse("is:available")).records.count == onShelf)
         #expect(index.search(.parse("is:out")).records.count == 20 - onShelf)
