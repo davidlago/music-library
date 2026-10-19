@@ -58,6 +58,7 @@ struct MainWindow: View {
                         .navigationDestination(for: AlbumSummary.self) { AlbumDetail(album: $0) }
                         .navigationDestination(for: ArtistSummary.self) { ArtistDetail(artist: $0) }
                         .navigationDestination(for: CatalogItem.self) { CatalogDetail(item: $0) }
+                        .navigationDestination(for: CollectionItemRoute.self) { CollectionItemDetail(id: $0.id) }
                 }
             }
             .background(theme.isThemed ? theme.background : Color.clear)
@@ -87,6 +88,13 @@ struct MainWindow: View {
             ExportSheet().themedSheet()
         }
         .sheet(item: $model.smartPlaylistDraft) { SmartPlaylistEditor(draft: $0).themedSheet() }
+        .sheet(item: $model.collectionSheet) { sheet in
+            switch sheet {
+            case .add(let medium, let prefill): AddToCollectionSheet(medium: medium, prefill: prefill).themedSheet()
+            case .findByLabel: FindByLabelPanel().themedSheet()
+            case .addLibraryAlbums: BulkAddSheet().themedSheet()
+            }
+        }
         .removeFromLibraryConfirmation(model)
     }
 }
@@ -110,6 +118,15 @@ struct SidebarView: View {
     var body: some View {
         @Bindable var model = model
         List(selection: $model.sidebar) {
+            Section("Collection") {
+                ForEach(CollectionScope.allCases, id: \.self) { scope in
+                    let count = model.collection.count(scope)
+                    // To Digitize only while something is waiting (or it's the page showing).
+                    if scope != .toDigitize || count > 0 || model.sidebar == .collection(.toDigitize) {
+                        Label(scope.title, systemImage: scope.symbol).sidebarBadge(count).tag(SidebarItem.collection(scope))
+                    }
+                }
+            }
             Section("Library") {
                 Label("Songs", systemImage: "music.note").sidebarBadge(model.tracks.count).tag(SidebarItem.songs)
                 Label("Albums", systemImage: "square.stack").sidebarBadge(model.albums.count).tag(SidebarItem.albums)
@@ -240,6 +257,7 @@ struct DetailRouter: View {
     @ViewBuilder
     private var destination: some View {
         switch model.sidebar ?? .songs {
+        case .collection(let scope): CollectionView(scope: scope).id(scope)
         case .songs: SongsView()
         case .insights: InsightsView()
         case .musicDNA: MusicDNAView()
@@ -272,6 +290,19 @@ struct DetailRouter: View {
             } else {
                 ContentUnavailableView("Playlist not found", systemImage: "gearshape")
             }
+        }
+    }
+}
+
+extension CollectionScope {
+    /// The scope's sidebar icon.
+    var symbol: String {
+        switch self {
+        case .all: "books.vertical"
+        case .cds: "opticaldisc"
+        case .vinyl: "record.circle"
+        case .downloads: "arrow.down.circle"
+        case .toDigitize: "waveform.slash"
         }
     }
 }

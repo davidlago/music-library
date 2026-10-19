@@ -27,6 +27,14 @@ struct MusicLibraryApp: App {
                 Button("Import…") { model.chooseFilesToImport() }
                     .keyboardShortcut("o", modifiers: .command)
             }
+            CommandMenu("Collection") {
+                Button("Add to Collection…") { model.addToCollection() }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                Button("Add Library Albums…") { model.collectionSheet = .addLibraryAlbums }
+                Divider()
+                Button("Find by Label…") { model.findByLabel() }
+                    .keyboardShortcut("l", modifiers: .command)
+            }
             CommandGroup(after: .toolbar) {
                 Button(model.showsQueue ? "Hide Queue" : "Show Queue") { model.showsQueue.toggle() }
                     .keyboardShortcut("u", modifiers: [.command, .option])

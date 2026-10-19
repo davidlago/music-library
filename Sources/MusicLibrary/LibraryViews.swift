@@ -294,6 +294,21 @@ struct RemoveFromLibraryButton: View {
 }
 
 extension View {
+    /// " Your copy CD #12 stays in your collection, marked not ripped.", for the items whose album leaves the library.
+    fileprivate static func keptCopies(_ items: [CollectionItem]) -> String {
+        guard let first = items.first else { return "" }
+        func name(_ item: CollectionItem) -> String { item.sticker?.text ?? item.medium.name.lowercased() }
+        func marked(_ item: CollectionItem) -> String {
+            switch item.medium {
+            case .cd: "not ripped"
+            case .download: "not in the library"
+            case .vinyl, .other: "not digitized"
+            }
+        }
+        if items.count == 1 { return " Your copy \(name(first)) stays in your collection, marked \(marked(first))." }
+        return " Your \(items.count) copies (\(items.prefix(3).map(name).joined(separator: ", "))\(items.count > 3 ? "…" : "")) stay in your collection."
+    }
+
     /// Asks before removing `model.pendingRemoval` from the library. Shown once, by `ContentView`.
     func removeFromLibraryConfirmation(_ model: AppModel) -> some View {
         let request = model.pendingRemoval
@@ -309,10 +324,11 @@ extension View {
             Button("Move to Trash", role: .destructive) { model.removeFromLibrary(Set(request.tracks.map(\.id))) }
             Button("Cancel", role: .cancel) {}
         } message: { request in
+            let n = request.tracks.count
             Text("""
-                \(request.tracks.count == 1 ? "The file is" : "The \(request.tracks.count) files are") moved to the Trash. \
-                \(request.tracks.count == 1 ? "The song is" : "The songs are") removed from all playlists, \
-                with \(request.tracks.count == 1 ? "its" : "their") plays and likes.
+                \(n == 1 ? "The file is" : "The \(n) files are") moved to the Trash. \
+                \(n == 1 ? "The song is" : "The songs are") removed from all playlists, \
+                with \(n == 1 ? "its" : "their") plays and likes.\(Self.keptCopies(model.copiesLosingMusic(Set(request.tracks.map(\.id)))))
                 """)
         }
     }

@@ -38,9 +38,12 @@ struct CoverThumb: View {
     var size: CGFloat = 140
     /// Pass `AppModel.coverRevision` so a replaced cover.jpg is loaded again.
     var revision = 0
-    /// How you got the album (`OwnershipMark`): your label in the top-left corner or a round badge (`CoverOwnershipMark`).
-    /// In a `JewelCase`, give it to the case instead, which puts the label on the hinge.
+    /// Deprecated: pass `mark`. How you got the album (`OwnershipMark`): your label in the top-left corner or a round
+    /// badge (`CoverOwnershipMark`). In a `JewelCase`, give it to the case instead, which puts the label on the hinge.
     var ownership: OwnershipMark?
+    /// What you own (`CopyMark`): a label pill in the top-left corner and badges in the bottom-right
+    /// (`CoverCopyMark`). Never for a cover inside a `JewelCase` or `RecordSleeve`: give it to the case instead.
+    var mark: CopyMark?
     /// 0 for a booklet in a `JewelCase`.
     var cornerRadius: CGFloat = 6
     @State private var image: NSImage?
@@ -53,7 +56,11 @@ struct CoverThumb: View {
                 Rectangle().fill(.quaternary)
                 Image(systemName: "music.note").font(.system(size: size / 3)).foregroundStyle(.subtext)
             }
-            if let ownership { CoverOwnershipMark(mark: ownership, size: size) }
+            if let mark {
+                CoverCopyMark(mark: mark, size: size)
+            } else if let ownership {
+                CoverOwnershipMark(mark: ownership, size: size)
+            }
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
@@ -65,51 +72,147 @@ struct CoverThumb: View {
     }
 }
 
-/// The white sticker with your label number, like the one on the CD's case: tall, across the top of the hinge
-/// (`JewelCase(ownership:)`), or in the top-left corner of a cover shown without its case. The number runs up the
-/// sticker, read from bottom to top.
+/// The colours of the label stickers, fixed like the real ones (so every theme shows them the same).
+enum StickerColors {
+    /// The CD sticker: a white strip.
+    static let cd = Color(white: 0.97)
+    /// The vinyl sticker: a yellow dot (#F4C542).
+    static let vinyl = Color(red: 0xF4 / 255, green: 0xC5 / 255, blue: 0x42 / 255)
+    static let text = Color(white: 0.1)
+}
+
+/// The sticker with your label number. A CD's is the white strip on the case: tall, across the top of the hinge
+/// (`JewelCase(mark:)`), "CD" and the number running up it, read from bottom to top. A record's is a round yellow
+/// dot on the sleeve's top-left corner (`RecordSleeve`), read across. Both also go in the top-left corner of a cover
+/// shown without its case (`onCover`).
 struct LabelSticker: View {
     let number: Int
-    /// The sticker's width; it's half again as tall, and taller when the number doesn't fit.
+    var series: StickerSeries = .cd
+    /// The strip's width (it's half again as tall, and taller when the number doesn't fit), or the dot's diameter.
     let width: CGFloat
 
     var body: some View {
+        Group {
+            switch series {
+            case .cd: strip
+            case .vinyl: dot
+            }
+        }
+        .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Sticker(series: series, number: number)?.spoken ?? "Label \(number)")
+    }
+
+    private var strip: some View {
         let font = max(9, width * 0.6)
+        let prefix = max(6, font * 0.55)
         let text = String(number)
-        // Monospaced digits are about 0.6 em wide.
-        let height = max(width * 1.5, CGFloat(text.count) * font * 0.62 + font * 0.7)
-        Text(text)
-            .font(.system(size: font, weight: .semibold).monospacedDigit())
-            .foregroundStyle(Color(white: 0.1))
+        // Monospaced digits are about 0.6 em wide; "CD" and the gap before the number about 1.6 em of the prefix.
+        let height = max(width * 1.5, CGFloat(text.count) * font * 0.62 + prefix * 1.6 + font * 0.7)
+        return HStack(alignment: .firstTextBaseline, spacing: prefix * 0.35) {
+            Text("CD").font(.system(size: prefix, weight: .bold))
+            Text(text).font(.system(size: font, weight: .semibold).monospacedDigit())
+        }
+        .foregroundStyle(StickerColors.text)
+        .fixedSize()
+        .rotationEffect(.degrees(-90))
+        .frame(width: width, height: height)
+        .background(RoundedRectangle(cornerRadius: max(2, width * 0.14)).fill(StickerColors.cd))
+    }
+
+    private var dot: some View {
+        let text = String(number)
+        // As large as fits across the dot, at most 0.42 of it.
+        let font = min(width * 0.42, width * 0.78 / (CGFloat(max(text.count, 1)) * 0.62))
+        return Text(text)
+            .font(.system(size: max(5, font), weight: .bold).monospacedDigit())
+            .foregroundStyle(StickerColors.text)
+            .lineLimit(1)
             .fixedSize()
-            .rotationEffect(.degrees(-90))
-            .frame(width: width, height: height)
-            .background(RoundedRectangle(cornerRadius: max(2, width * 0.14)).fill(Color(white: 0.97)))
-            .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
-            .allowsHitTesting(false)
-            .accessibilityLabel("Label \(number)")
+            .frame(width: width, height: width)
+            .background(Circle().fill(StickerColors.vinyl))
+            .overlay(Circle().strokeBorder(.black.opacity(0.12), lineWidth: 0.5))
     }
 
     /// The sticker for a cover `size` wide shown without its case, in its top-left corner (where the hinge would be).
-    static func onCover(_ number: Int, size: CGFloat) -> some View {
-        LabelSticker(number: number, width: size * 0.11)
+    static func onCover(_ number: Int, series: StickerSeries = .cd, size: CGFloat) -> some View {
+        LabelSticker(number: number, series: series, width: size * (series == .cd ? 0.11 : 0.2))
             .padding(size * 0.025)
             .frame(width: size, height: size, alignment: .topLeading)
     }
 }
 
-/// The round badge on the cover of a CD you borrowed (two arrows: lent to you) or an album you bought as a download (a
-/// dollar sign), in its bottom-right corner.
-struct OwnershipBadge: View {
-    /// `.borrowed` or `.digital`.
-    let mark: OwnershipMark
+/// A label in lists and captions: a white pill with a small "CD", or a yellow one with a small "VINYL", then the
+/// number in monospaced digits. Fixed colours, like the stickers.
+struct StickerPill: View {
+    let sticker: Sticker
+    /// The number's font size.
+    var size: CGFloat = 11
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: size * 0.3) {
+            Text(sticker.series == .cd ? "CD" : "VINYL").font(.system(size: size * 0.66, weight: .bold))
+            Text(String(sticker.number)).font(.system(size: size, weight: .semibold).monospacedDigit())
+        }
+        .foregroundStyle(StickerColors.text)
+        .lineLimit(1)
+        .fixedSize()
+        .padding(.horizontal, size * 0.55)
+        .padding(.vertical, size * 0.16)
+        .background(Capsule().fill(sticker.series == .cd ? StickerColors.cd : StickerColors.vinyl))
+        .overlay(Capsule().strokeBorder(.black.opacity(0.15), lineWidth: 0.5))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(sticker.spoken)
+    }
+}
+
+extension CopyMark {
+    /// What an `OwnershipMark` stood for, from before the collection (its CD counts as ripped: nothing said otherwise).
+    init(legacy: OwnershipMark) {
+        switch legacy {
+        case .cd(let label): self = .cd(number: label, digitized: true, more: 0)
+        case .borrowed: self = .notInCollection
+        case .digital: self = .download(partial: false, more: 0)
+        }
+    }
+
+    /// Whether this is a CD or record you own that has no digital copy in the library yet.
+    var needsDigitizing: Bool {
+        switch self {
+        case .cd(_, let digitized, _), .vinyl(_, let digitized, _): !digitized
+        default: false
+        }
+    }
+}
+
+/// The round badge in the bottom-right corner of a cover: two arrows for a CD you borrowed (not in your collection),
+/// a dollar sign for a download, a crossed-out waveform for a CD or record not ripped yet, a box for a medium added
+/// by a newer version. Nil when the mark has none.
+struct CopyBadge: View {
+    let symbol: String
+    let label: String
     /// The cover's side.
     let coverSide: CGFloat
 
+    init(symbol: String, label: String, coverSide: CGFloat) {
+        self.symbol = symbol; self.label = label; self.coverSide = coverSide
+    }
+
+    init?(mark: CopyMark, coverSide: CGFloat) {
+        switch mark {
+        case .notInCollection: self.init(symbol: "arrow.left.arrow.right", label: "Borrowed", coverSide: coverSide)
+        case .download: self.init(symbol: "dollarsign", label: "Bought as a download", coverSide: coverSide)
+        case .cd(_, false, _): self.init(symbol: "waveform.slash", label: "Not ripped", coverSide: coverSide)
+        case .vinyl(_, false, _): self.init(symbol: "waveform.slash", label: "Not digitized", coverSide: coverSide)
+        case .other: self.init(symbol: "shippingbox", label: "Added by a newer version", coverSide: coverSide)
+        case .cd, .vinyl: return nil
+        }
+    }
+
     var body: some View {
         let diameter = max(16, min(30, coverSide * 0.13))
-        let digital = mark == .digital
-        Image(systemName: digital ? "dollarsign" : "arrow.left.arrow.right")
+        Image(systemName: symbol)
             .font(.system(size: diameter * 0.48, weight: .bold))
             .foregroundStyle(Color(white: 0.33))
             .frame(width: diameter, height: diameter)
@@ -117,12 +220,103 @@ struct OwnershipBadge: View {
             .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
             .padding(max(4, coverSide * 0.035))
             .allowsHitTesting(false)
-            .accessibilityLabel(digital ? "Bought as a download" : "Borrowed")
+            .accessibilityLabel(label)
     }
 }
 
-/// How you got the album, on a cover shown without its case: your CD's label in the top-left corner (where the hinge
-/// would be), or the round badge of a borrowed CD or a download.
+/// What you own, on a cover shown without its case: the label pill in the top-left corner and the badge
+/// (`CopyBadge`) in the bottom-right one.
+struct CoverCopyMark: View {
+    let mark: CopyMark
+    /// The cover's side.
+    let size: CGFloat
+
+    var body: some View {
+        ZStack {
+            if let sticker = mark.sticker {
+                StickerPill(sticker: sticker, size: max(7, min(13, size * 0.08)))
+                    .padding(size * 0.03)
+                    .frame(width: size, height: size, alignment: .topLeading)
+            }
+            if let badge = CopyBadge(mark: mark, coverSide: size) {
+                badge.frame(width: size, height: size, alignment: .bottomTrailing)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+/// An item's digital copy in a word or two, with an icon unless it's digitized: "Not ripped", "8 of 12 songs",
+/// "From your CD #142", "Missing from library".
+struct DigitalStatusLabel: View {
+    let state: DigitalState
+    let medium: CollectionMedium
+    /// For `.otherCopy`: the copy the music came from (`DigitalState.otherCopy`'s `from`), if one is in the collection.
+    var from: CollectionItem?
+
+    var body: some View {
+        Group {
+            if let symbol {
+                Label(text, systemImage: symbol)
+            } else {
+                Text(text)
+            }
+        }
+        .foregroundStyle(.subtext)
+        .lineLimit(1)
+    }
+
+    var symbol: String? {
+        switch state {
+        case .digitized: nil
+        case .partial: "circle.lefthalf.filled"
+        case .otherCopy: "arrow.triangle.2.circlepath"
+        case .none: medium.isPhysical ? "waveform.slash" : nil
+        case .missing: "exclamationmark.triangle"
+        }
+    }
+
+    var text: String {
+        switch state {
+        case .digitized:
+            switch medium {
+            case .cd: return "Ripped"
+            case .download: return "Downloaded"
+            case .vinyl, .other: return "Digitized"
+            }
+        case .partial(let have, let of): return "\(have) of \(of) songs"
+        case .otherCopy:
+            if let sticker = from?.sticker { return "From your \(sticker.text)" }
+            if let from { return "From your \(from.medium.name.lowercased())" }
+            return "Same album in library"
+        case .none:
+            switch medium {
+            case .cd: return "Not ripped"
+            case .download: return "Not in library"
+            case .vinyl, .other: return "Not digitized"
+            }
+        case .missing: return "Missing from library"
+        }
+    }
+}
+
+/// Deprecated (`CopyBadge`): the round badge on the cover of a CD you borrowed (two arrows: lent to you) or an
+/// album you bought as a download (a dollar sign), in its bottom-right corner.
+struct OwnershipBadge: View {
+    /// `.borrowed` or `.digital`.
+    let mark: OwnershipMark
+    /// The cover's side.
+    let coverSide: CGFloat
+
+    var body: some View {
+        let digital = mark == .digital
+        CopyBadge(symbol: digital ? "dollarsign" : "arrow.left.arrow.right", label: digital ? "Bought as a download" : "Borrowed",
+                  coverSide: coverSide)
+    }
+}
+
+/// Deprecated (`CoverCopyMark`): how you got the album, on a cover shown without its case: your CD's label in the
+/// top-left corner (where the hinge would be), or the round badge of a borrowed CD or a download.
 struct CoverOwnershipMark: View {
     let mark: OwnershipMark
     /// The cover's side.
