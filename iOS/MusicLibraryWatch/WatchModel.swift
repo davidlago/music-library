@@ -5,13 +5,16 @@ import WatchConnectivity
 import WidgetKit
 
 /// The watch's view of the iPhone app: the summary (`Glance`) it last sent, kept in the app group for the
-/// complications, the covers it shows, and commands for the iPhone's player. The iPhone does the playing; the watch is
-/// a remote and a glance at the stats.
+/// complications, the shelf index for finding a CD or record by its label, the covers they show, and commands for the
+/// iPhone's player. The iPhone does the playing; the watch is a remote and a glance at the stats.
 @Observable
 final class WatchModel {
     static let shared = WatchModel()
 
     private(set) var glance: Glance?
+    /// Every labeled CD and record, sent by the iPhone as a file, so Find works while it's away. Nil until one
+    /// arrives (and always from iPhones before the collection).
+    private(set) var shelf: GlanceShelf?
     /// The iPhone app can be reached right now (commands need it).
     private(set) var reachable = false
     /// A command waiting for the iPhone's answer.
@@ -23,16 +26,26 @@ final class WatchModel {
 
     /// The complications read the same folder; without the app group (an unsigned build) covers go in Caches.
     @ObservationIgnored let store = GlanceStore.shared ?? GlanceStore(directory: URL.cachesDirectory.appendingPathComponent("Glance", isDirectory: true))
-    @ObservationIgnored private let delegate = SessionDelegate()
+    @ObservationIgnored private let delegate: SessionDelegate
     /// Covers asked for and not answered yet.
     @ObservationIgnored private var requested = Set<String>()
+    /// The shelf's `contentHash`, sent with `refresh` so the iPhone sends the index again when it has another.
+    @ObservationIgnored private var shelfHash = ""
 
     private var session: WCSession? { WCSession.isSupported() ? WCSession.default : nil }
 
     private init() {
+        delegate = SessionDelegate(store: store)
         glance = store.read()
         delegate.onGlance = { [weak self] data in self?.receive(data) }
+        delegate.onShelf = { [weak self] shelf in self?.receive(shelf) }
         delegate.onReachability = { [weak self] reachable in self?.reachabilityChanged(reachable) }
+        // The index can be up to 2 MB: read off the main thread.
+        let store = store
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let shelf = store.readShelf() else { return }
+            await self?.receive(shelf)
+        }
         guard let session else { return }
         session.delegate = delegate
         session.activate()
@@ -51,6 +64,13 @@ final class WatchModel {
         requestMissingCovers()
     }
 
+    /// A shelf index, read from the store or just received (and already saved by the delegate).
+    private func receive(_ new: GlanceShelf) {
+        if let shelf, new.generatedAt < shelf.generatedAt { return }
+        shelf = new
+        shelfHash = new.contentHash
+    }
+
     private func reachabilityChanged(_ reachable: Bool) {
         self.reachable = reachable
         if reachable {
@@ -62,8 +82,20 @@ final class WatchModel {
     /// Asks the iPhone for the covers the summary shows that aren't here, a few per message (replies have a size
     /// limit), while it's reachable; the rest are asked for when it is again.
     private func requestMissingCovers() {
-        guard let session, session.activationState == .activated, session.isReachable, let glance else { return }
-        let missing = glance.coverNames.filter { !store.hasCover($0) && !requested.contains($0) }.sorted()
+        guard let glance else { return }
+        requestCovers(glance.coverNames)
+    }
+
+    /// A shelf item's cover is on screen (the Find page): it's kept when the summary changes, among the shelf covers
+    /// looked up most recently, and asked for while the iPhone is reachable.
+    func showShelfCover(_ name: String) {
+        store.rememberShelfCover(name)
+        requestCovers([name])
+    }
+
+    private func requestCovers(_ names: Set<String>) {
+        guard let session, session.activationState == .activated, session.isReachable else { return }
+        let missing = names.filter { !store.hasCover($0) && !requested.contains($0) }.sorted()
         for start in stride(from: 0, to: missing.count, by: GlanceMessage.coversPerMessage) {
             let names = Array(missing[start..<min(start + GlanceMessage.coversPerMessage, missing.count)])
             requested.formUnion(names)
@@ -90,7 +122,7 @@ final class WatchModel {
     /// Asks the iPhone for its latest summary (when the app comes to the front).
     func refresh() {
         guard let session, session.activationState == .activated, session.isReachable else { return }
-        session.sendMessage([GlanceMessage.refresh: true], replyHandler: { @Sendable [weak self] reply in
+        session.sendMessage([GlanceMessage.refresh: true, GlanceMessage.shelfHash: shelfHash], replyHandler: { @Sendable [weak self] reply in
             let data = reply[GlanceMessage.glance] as? Data
             Task { @MainActor in if let data { self?.receive(data) } }
         }, errorHandler: nil)
@@ -154,7 +186,13 @@ final class WatchModel {
 private final class SessionDelegate: NSObject, WCSessionDelegate, @unchecked Sendable {
     // Set once on the main actor before the session is activated, then only read.
     nonisolated(unsafe) var onGlance: (@MainActor (Data) -> Void)?
+    nonisolated(unsafe) var onShelf: (@MainActor (GlanceShelf) -> Void)?
     nonisolated(unsafe) var onReachability: (@MainActor (Bool) -> Void)?
+    nonisolated let store: GlanceStore
+
+    init(store: GlanceStore) {
+        self.store = store
+    }
 
     nonisolated func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
         let context = session.receivedApplicationContext[GlanceMessage.glance] as? Data
@@ -184,5 +222,19 @@ private final class SessionDelegate: NSObject, WCSessionDelegate, @unchecked Sen
     nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
         guard let data = userInfo[GlanceMessage.glance] as? Data else { return }
         Task { @MainActor in self.onGlance?(data) }
+    }
+
+    /// The shelf index. Its file is deleted when this returns, so it's checked and saved here, under the store's fixed
+    /// name (never the sender's): only a shelf of the version this watch reads, at most `GlanceShelf.maxBytes`, and
+    /// not older than the one already saved.
+    nonisolated func session(_ session: WCSession, didReceive file: WCSessionFile) {
+        let metadata = file.metadata ?? [:]
+        guard metadata[GlanceMessage.fileKind] as? String == GlanceMessage.shelfKind,
+              metadata[GlanceMessage.shelfVersion] as? Int == GlanceShelf.currentVersion,
+              let size = try? file.fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= GlanceShelf.maxBytes,
+              let data = try? Data(contentsOf: file.fileURL), let shelf = GlanceStore.decodeShelf(data) else { return }
+        if let saved = store.readShelf(), saved.generatedAt > shelf.generatedAt { return }
+        guard (try? store.writeShelf(shelf)) != nil else { return }
+        Task { @MainActor in self.onShelf?(shelf) }
     }
 }

@@ -172,43 +172,6 @@ struct ListeningPage: View {
     }
 }
 
-// MARK: Purchases
-
-struct PurchasesPage: View {
-    let glance: Glance
-
-    var body: some View {
-        let owned = glance.owned
-        ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(glance.money(owned.spentThisYear, whole: owned.spentThisYear >= 1000))
-                        .font(.system(.title, design: .rounded, weight: .bold))
-                        .minimumScaleFactor(0.6)
-                    Text("\(GlanceFormat.count(owned.boughtThisYear, "album")) this year")
-                        .font(.caption2).foregroundStyle(.secondary)
-                    Text("\(owned.ownedCount.formatted()) owned in all · \(glance.money(owned.totalSpent, whole: true))")
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
-                if owned.recent.isEmpty {
-                    Text("Record when you bought an album, and what you paid, on its page on the iPhone or the Mac.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                } else {
-                    SectionTitle("Latest")
-                    ForEach(owned.recent) { p in
-                        NavigationLink(value: p.album) {
-                            AlbumRow(album: p.album, detail: [p.price.map { glance.money($0) }, p.dateText].compactMap { $0 }.joined(separator: " · "))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-        .navigationTitle("Purchases")
-        .containerBackground(Color.green.gradient, for: .tabView)
-    }
-}
-
 // MARK: Play
 
 /// Starts something on the iPhone: shuffles, this month's favorites, forgotten ones and what's new.
