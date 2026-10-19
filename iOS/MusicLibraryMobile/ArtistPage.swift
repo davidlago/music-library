@@ -2,16 +2,20 @@ import MusicLibraryCore
 import SwiftUI
 
 /// The artist page, top to bottom: the photo on a blurred backdrop with who they are (summary, genres), Play and
-/// Music DNA, whether they're on this iPhone, your listening, the bio, links, concerts near you, their albums and
-/// their most played songs. The same as the Mac's, from the info the Mac cached in the library.
+/// Music DNA, whether they're on this iPhone, your listening, the bio, links, concerts near you, what of theirs is in
+/// your collection, their albums and their most played songs. Also opens for artists who are only in the collection. The same as the Mac's, from the info the Mac cached in the library.
 struct ArtistPage: View {
     @Environment(PhoneModel.self) private var model
-    let artist: ArtistSummary
+    /// The artist's name (`ArtistSummary.name`, or an item's artist for one only in the collection).
+    let name: String
+
+    init(artist: ArtistSummary) { name = artist.name }
+    init(name: String) { self.name = name }
 
     var body: some View {
         if let library = model.library {
-            ArtistPageContent(artist: artist, library: library, tracks: library.tracks(artist: artist.name),
-                              albums: library.albums(artist: artist.name), info: library.artistInfo(artist.name))
+            ArtistPageContent(artistName: name, library: library, tracks: library.tracks(artist: name),
+                              albums: library.albums(artist: name), info: library.artistInfo(name))
         } else {
             LibraryStatusView()
         }
@@ -21,27 +25,29 @@ struct ArtistPage: View {
 private struct ArtistPageContent: View {
     @Environment(PhoneModel.self) private var model
     @Environment(PhonePlayer.self) private var player
-    let artist: ArtistSummary
+    let artistName: String
     let library: LibrarySnapshot
     let tracks: [Track]
     let albums: [AlbumSummary]
     let info: ArtistInfo?
     @State private var showAllSongs = false
 
-    private var name: String { artist.name.isEmpty ? "Unknown Artist" : artist.name }
+    private var name: String { artistName.isEmpty ? "Unknown Artist" : artistName }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 hero
-                AvailabilityBar(item: .artist(artist.name), tracks: tracks, noun: "artist")
-                statTiles
+                if !tracks.isEmpty {
+                    AvailabilityBar(item: .artist(artistName), tracks: tracks, noun: "artist")
+                    statTiles
+                }
                 if let bio = info?.bio, let info {
                     VStack(alignment: .leading, spacing: 8) {
                         SectionHeader(title: "About")
-                        ExpandableText(text: bio, lines: 5, source: info.bioSource, sourceURL: info.bioURL, credit: library.photoCredit(artist.name))
+                        ExpandableText(text: bio, lines: 5, source: info.bioSource, sourceURL: info.bioURL, credit: library.photoCredit(artistName))
                     }
-                } else if let credit = library.photoCredit(artist.name) {
+                } else if let credit = library.photoCredit(artistName) {
                     if let url = credit.url?.webLink { Link("Photo: \(credit.label)", destination: url).font(.caption) }
                     else { Text("Photo: \(credit.label)").font(.caption).foregroundStyle(.secondary) }
                 }
@@ -51,10 +57,11 @@ private struct ArtistPageContent: View {
                         LinkChips(links: links)
                     }
                 }
-                ArtistConcertsSection(artist: artist.name, mbid: info?.mbid)
+                ArtistConcertsSection(artist: artistName, mbid: info?.mbid)
+                collectionSection
                 if !albums.isEmpty { albumsSection }
-                songsSection
-                if info == nil, !artist.name.isEmpty {
+                if !tracks.isEmpty { songsSection }
+                if info == nil, !artistName.isEmpty {
                     Text("The photo, bio and links come from the Mac once it has looked up this artist.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -72,7 +79,7 @@ private struct ArtistPageContent: View {
     private var hero: some View {
         let playable = model.playable(tracks)
         return VStack(spacing: 10) {
-            ArtistPhoto(name: artist.name, size: 170)
+            ArtistPhoto(name: artistName, size: 170)
                 .overlay(Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.25), radius: 16, y: 6)
                 .padding(.top, 12)
@@ -101,8 +108,8 @@ private struct ArtistPageContent: View {
                         .disabled(playable.isEmpty)
                     Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { player.addToQueue(playable) }
                         .disabled(playable.isEmpty)
-                    if library.collaborations.person(named: artist.name) != nil {
-                        NavigationLink(value: DNARoute(name: artist.name)) {
+                    if library.collaborations.person(named: artistName) != nil {
+                        NavigationLink(value: DNARoute(name: artistName)) {
                             Label("Music DNA", systemImage: "point.3.connected.trianglepath.dotted")
                         }
                     }
@@ -114,8 +121,8 @@ private struct ArtistPageContent: View {
             }
             .controlSize(.large)
             .padding(.top, 6)
-            if library.collaborations.person(named: artist.name) != nil {
-                NavigationLink(value: DNARoute(name: artist.name)) {
+            if library.collaborations.person(named: artistName) != nil {
+                NavigationLink(value: DNARoute(name: artistName)) {
                     Label("See who \(name) worked with", systemImage: "point.3.connected.trianglepath.dotted")
                         .font(.callout.weight(.medium))
                 }
@@ -123,11 +130,11 @@ private struct ArtistPageContent: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.bottom, 4)
-        .background { ArtistBackdrop(url: library.artistImageURL(artist.name)) }
+        .background { ArtistBackdrop(url: library.artistImageURL(artistName)) }
     }
 
     private var statTiles: some View {
-        let p = model.artistPlayTotal(artist.name)
+        let p = model.artistPlayTotal(artistName)
         let total = tracks.reduce(0) { $0 + $1.duration }
         return StatGrid {
             StatTile(value: tracks.count.formatted(), label: tracks.count == 1 ? "Song" : "Songs", icon: "music.note")
@@ -143,7 +150,31 @@ private struct ArtistPageContent: View {
         }
     }
 
-    // MARK: Albums and songs
+    // MARK: Collection, albums and songs
+
+    /// Everything of theirs you own, ripped or not.
+    @ViewBuilder
+    private var collectionSection: some View {
+        let items = model.collection.items(artist: artistName)
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: "In Your Collection")
+                ScrollView(.horizontal) {
+                    LazyHStack(alignment: .top, spacing: 14) {
+                        ForEach(items) { item in
+                            NavigationLink(value: CollectionItemRoute(id: item.id)) { CollectionCell(item: item, width: 150) }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollIndicators(.hidden)
+                .scrollTargetBehavior(.viewAligned)
+                .contentMargins(.horizontal, 20, for: .scrollContent)
+                .padding(.horizontal, -20)
+            }
+        }
+    }
 
     private var albumsSection: some View {
         VStack(alignment: .leading, spacing: 12) {

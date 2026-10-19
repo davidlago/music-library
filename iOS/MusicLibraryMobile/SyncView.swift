@@ -18,7 +18,7 @@ struct SyncTab: View {
                     pairing(code)
                 } else if !sync.isPaired {
                     Section {
-                        Text("Sync music from Music Library on your Mac over Wi-Fi: your whole library shows up here to browse, and the Mac sends the albums, artists and playlists you choose, here or on the Mac.")
+                        Text("Sync music from Music Library on your Mac over Wi-Fi: your whole library and collection show up here to browse, and the Mac sends the albums, artists and playlists you choose, here or on the Mac.")
                             .foregroundStyle(.secondary)
                         Button("Pair with a Mac", systemImage: "link") { sync.startPairing() }
                     } footer: {
@@ -124,7 +124,7 @@ struct SyncTab: View {
                 EmptyView()
             }
         } footer: {
-            Text("Keep the app open while syncing: iOS pauses it in the background. Download or remove music from album, artist and playlist pages; the iPhone syncs with the Mac as soon as it's around.")
+            Text("Keep the app open while syncing: iOS pauses it in the background. Download or remove music from album, artist, playlist and collection pages (Ready to Download on the Collection tab gets everything you've digitized); the iPhone syncs with the Mac as soon as it's around.")
         }
     }
 }

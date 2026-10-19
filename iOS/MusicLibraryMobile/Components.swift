@@ -8,6 +8,11 @@ struct DNARoute: Hashable {
     var name: String?
 }
 
+/// An artist's page by name: for artists who are only in the collection, with no `ArtistSummary` in the library.
+struct ArtistNameRoute: Hashable {
+    var name: String
+}
+
 /// Songs, albums and artists matching a query in the app's search language (from Insights, genre chips…).
 struct QueryRoute: Hashable {
     var query: String

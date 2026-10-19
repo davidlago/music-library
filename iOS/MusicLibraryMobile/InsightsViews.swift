@@ -39,12 +39,21 @@ nonisolated enum InsightColor {
 
 // MARK: Tab
 
+/// The panes, Collection first. The raw values are saved (`insightsPane`), so the Collection pane keeps "Owned".
 enum InsightsPane: String, CaseIterable, Identifiable {
-    case library = "Library", listening = "Listening", owned = "Owned"
+    case owned = "Owned", library = "Library", listening = "Listening"
     var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .owned: "Collection"
+        case .library: "Library"
+        case .listening: "Listening"
+        }
+    }
 }
 
-/// Insights: your collection, what you listen to, and the albums you own and what you paid.
+/// Insights: what you own (CDs, records, downloads), your digital library, and what you listen to.
 struct InsightsTab: View {
     @Environment(PhoneModel.self) private var model
     @AppStorage("insightsPane") private var pane = InsightsPane.library
@@ -57,7 +66,7 @@ struct InsightsTab: View {
                 .onAppear(perform: load)
                 .onChange(of: model.libraryVersion) { load() }
                 .onChange(of: model.historyVersion) { load() }
-                .onChange(of: model.purchasesVersion) { load() }
+                .onChange(of: model.collectionVersion) { load() }
                 .onChange(of: pane) { load() }
                 .onChange(of: period) { load() }
         }
@@ -66,13 +75,13 @@ struct InsightsTab: View {
     @ViewBuilder
     private var content: some View {
         if let library = model.library {
-            if library.tracks.isEmpty {
+            if library.isEmpty {
                 ContentUnavailableView("No Insights Yet", systemImage: "chart.bar.xaxis",
-                                       description: Text("Add music to your library and sync, and this page fills in with stats about your collection."))
+                                       description: Text("Add music or the CDs and records you own to your library and sync, and this page fills in with stats about them."))
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        Picker("Insights", selection: $pane) { ForEach(InsightsPane.allCases) { Text($0.rawValue).tag($0) } }
+                        Picker("Insights", selection: $pane) { ForEach(InsightsPane.allCases) { Text($0.title).tag($0) } }
                             .pickerStyle(.segmented).labelsHidden()
                         paneContent
                     }
@@ -88,6 +97,11 @@ struct InsightsTab: View {
     @ViewBuilder
     private var paneContent: some View {
         switch pane {
+        case .library where model.library?.tracks.isEmpty == true, .listening where model.library?.tracks.isEmpty == true:
+            // A collection without songs yet.
+            ContentUnavailableView("No Music Yet", systemImage: "music.note",
+                                   description: Text("Rip a CD or add music on your Mac and sync, and this pane fills in."))
+                .padding(.top, 40)
         case .library:
             if let stats = model.libraryStats {
                 InsightsLibraryPane(stats: stats)
@@ -106,8 +120,8 @@ struct InsightsTab: View {
                 InsightsLoading()
             }
         case .owned:
-            if let stats = model.ownershipStats {
-                OwnedInsightsPane(stats: stats)
+            if let stats = model.collectionStats {
+                CollectionInsightsPane(stats: stats)
             } else {
                 InsightsLoading()
             }
@@ -118,7 +132,7 @@ struct InsightsTab: View {
         switch pane {
         case .library: model.loadLibraryStats()
         case .listening: model.loadListening(period)
-        case .owned: model.loadOwnership()
+        case .owned: model.loadCollectionStats()
         }
     }
 }
@@ -524,6 +538,8 @@ struct InsightFact: Identifiable {
     var query: String?
     /// The search page's title (the value when nil).
     var queryTitle: String?
+    /// Opens this collection item instead of searching.
+    var itemID: String?
 }
 
 /// Fun facts two to a row; facts with a query open its search.
@@ -545,7 +561,10 @@ struct InsightFactsGrid: View {
 
     @ViewBuilder
     private func fact(_ f: InsightFact) -> some View {
-        if let q = f.query {
+        if let id = f.itemID {
+            NavigationLink(value: CollectionItemRoute(id: id)) { cell(f, link: true) }
+                .buttonStyle(.plain)
+        } else if let q = f.query {
             NavigationLink(value: QueryRoute(query: q, title: f.queryTitle ?? f.value)) { cell(f, link: true) }
                 .buttonStyle(.plain)
         } else {

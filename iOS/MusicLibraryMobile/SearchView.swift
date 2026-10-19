@@ -1,20 +1,21 @@
 import MusicLibraryCore
 import SwiftUI
 
-/// The Mac app's search: the same query language (`artist:`, `decade:90s`, `format:flac`…) and spelling correction,
-/// over the whole library (songs that aren't on the phone are dimmed and can be downloaded).
+/// The Mac app's search: the same query language (`artist:`, `decade:90s`, `format:flac`, `own:vinyl`…) and
+/// spelling correction, over the whole library and the collection (songs that aren't on the phone are dimmed and can
+/// be downloaded). A label ("142", "cd 142", "v12") also shows the items that have it.
 struct SearchTab: View {
     @Environment(PhoneModel.self) private var model
     @State private var text = ""
-    @State private var results = SearchResults()
+    @State private var results = LibrarySearch.Results()
 
     var body: some View {
         LibraryStack {
             Group {
-                if let library = model.library, !library.tracks.isEmpty {
+                if let library = model.library, !library.isEmpty {
                     if text.trimmingCharacters(in: .whitespaces).isEmpty {
                         ContentUnavailableView("Search Your Library", systemImage: "magnifyingglass",
-                                               description: Text("Try “radiohead”, “decade:90s”, “format:flac” or “genre:jazz”."))
+                                               description: Text("Try “radiohead”, “decade:90s”, “format:flac”, “own:vinyl” or a label like “cd 12”."))
                     } else {
                         SearchResultsList(results: results, text: text, library: library)
                     }
@@ -27,13 +28,16 @@ struct SearchTab: View {
         .searchable(text: $text, prompt: "Songs, albums, artists, or artist:…")
         .autocorrectionDisabled()
         .textInputAutocapitalization(.never)
-        .task(id: SearchKey(text: text, version: model.libraryVersion)) {
+        .task(id: SearchKey(text: text, version: model.libraryVersion, collection: model.collectionVersion)) {
             guard let index = model.library?.index else { return }
             let query = text
-            guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { results = SearchResults(); return }
+            guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { results = LibrarySearch.Results(); return }
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled else { return }
-            let found = await Task.detached(priority: .userInitiated) { index.search(query) }.value
+            let collectionIndex = model.collectionIndex, collection = model.collection
+            let found = await Task.detached(priority: .userInitiated) {
+                LibrarySearch.run(query, index: index, collectionIndex: collectionIndex, collection: collection)
+            }.value
             guard !Task.isCancelled else { return }
             results = found
         }
@@ -42,6 +46,7 @@ struct SearchTab: View {
     private struct SearchKey: Equatable {
         var text: String
         var version: Int
+        var collection: Int
     }
 }
 
@@ -49,7 +54,7 @@ struct SearchTab: View {
 struct QueryPage: View {
     @Environment(PhoneModel.self) private var model
     let route: QueryRoute
-    @State private var results: SearchResults?
+    @State private var results: LibrarySearch.Results?
 
     var body: some View {
         Group {
@@ -61,25 +66,61 @@ struct QueryPage: View {
         }
         .navigationTitle(route.title ?? route.query)
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: "\(route.query)|\(model.libraryVersion)") {
+        .task(id: "\(route.query)|\(model.libraryVersion)|\(model.collectionVersion)") {
             guard let index = model.library?.index else { return }
             let query = route.query
-            results = await Task.detached(priority: .userInitiated) { index.search(query, autocorrect: false) }.value
+            let collectionIndex = model.collectionIndex, collection = model.collection
+            results = await Task.detached(priority: .userInitiated) {
+                LibrarySearch.run(query, index: index, collectionIndex: collectionIndex, collection: collection, autocorrect: false)
+            }.value
         }
     }
 }
 
 struct SearchResultsList: View {
     @Environment(PhoneModel.self) private var model
-    let results: SearchResults
+    let found: LibrarySearch.Results
     let text: String
     let library: LibrarySnapshot
+    @State private var showAllItems = false
+
+    init(results: LibrarySearch.Results, text: String, library: LibrarySnapshot) {
+        found = results
+        self.text = text
+        self.library = library
+    }
+
+    private var results: SearchResults { found.library }
 
     var body: some View {
-        if results.tracks.isEmpty && results.albums.isEmpty && results.artists.isEmpty && results.issues.isEmpty {
+        // Label hits are listed on their own.
+        let labelIDs = Set(found.labelHits.map(\.id))
+        let items = found.items.filter { !labelIDs.contains($0.id) }
+        if results.tracks.isEmpty && results.albums.isEmpty && results.artists.isEmpty && results.issues.isEmpty
+            && found.labelHits.isEmpty && items.isEmpty {
             ContentUnavailableView.search(text: text)
         } else {
             List {
+                if !found.labelHits.isEmpty {
+                    Section("Label") {
+                        ForEach(found.labelHits) { item in
+                            NavigationLink(value: CollectionItemRoute(id: item.id)) { CollectionRow(item: item) }
+                        }
+                    }
+                }
+                if !items.isEmpty {
+                    Section("Collection") {
+                        ForEach(items.prefix(showAllItems ? 200 : 6)) { item in
+                            NavigationLink(value: CollectionItemRoute(id: item.id)) { CollectionRow(item: item) }
+                        }
+                        if items.count > 6 {
+                            Button(showAllItems ? "Show Fewer" : "Show All \(min(items.count, 200))") {
+                                withAnimation(.snappy) { showAllItems.toggle() }
+                            }
+                            .font(.callout.weight(.medium))
+                        }
+                    }
+                }
                 if !results.issues.isEmpty {
                     Section {
                         ForEach(results.issues, id: \.self) { Label($0, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }

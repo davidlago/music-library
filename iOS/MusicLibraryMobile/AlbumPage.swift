@@ -3,8 +3,8 @@ import SwiftUI
 
 /// The album page, top to bottom: the cover on a blurred backdrop with what the album is (type, year, artist,
 /// label, length, quality, rating, genres), whether it's on this iPhone, Play, your listening, the track list
-/// (with the release's tracks you don't have greyed out), your copy, then the description, reviews, release
-/// details, credits and links. The same as the Mac's, from the info the Mac cached in the library.
+/// (with the release's tracks you don't have greyed out), your copies (CDs, records, downloads), then the
+/// description, reviews, release details, credits and links. The same as the Mac's, from the info the Mac cached in the library.
 struct AlbumPage: View {
     @Environment(PhoneModel.self) private var model
     let album: AlbumSummary
@@ -38,9 +38,8 @@ private struct AlbumPageContent: View {
                 playButtons
                 listening
                 AlbumTrackList(album: album, tracks: tracks, info: info, source: title)
-                if !album.album.isEmpty {
-                    AlbumOwnershipSection(album: album, plays: tracks.reduce(0) { $0 + (model.playTotals[$1.id]?.plays ?? 0) })
-                }
+                YourCopiesSection(albumKey: SearchIndex.albumKey(album: album.album, artist: album.artist),
+                                  plays: tracks.reduce(0) { $0 + (model.playTotals[$1.id]?.plays ?? 0) })
                 if let text = info?.description, let info {
                     VStack(alignment: .leading, spacing: 8) {
                         SectionHeader(title: "About")
@@ -82,9 +81,7 @@ private struct AlbumPageContent: View {
 
     private var header: some View {
         VStack(spacing: 8) {
-            JewelCase(width: 310, ownership: OwnershipMark(model.purchase(for: album))) {
-                CoverImage(url: library.coverURL(album: album), size: JewelCase<EmptyView>.bookletSide(width: 310), cornerRadius: 0)
-            }
+            CopyArt(mark: model.copyMark(for: album), url: library.coverURL(album: album), width: 310, title: album.album)
             .padding(.top, 8)
             .padding(.bottom, 8)
             Text(typeLine).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.secondary)
@@ -200,7 +197,7 @@ private struct AlbumPageContent: View {
     @ViewBuilder
     private var details: some View {
         let rows: [(String, String)] = [
-            ("Label", firstValue(\.label)), ("Catalog #", firstValue(\.catalogNumber)),
+            ("Record label", firstValue(\.label)), ("Catalog #", firstValue(\.catalogNumber)),
             ("Released", firstValue(\.releaseDate)), ("Original release", firstValue(\.originalDate)),
             ("Country", firstValue(\.releaseCountry).map(countryName)),
             ("Media", firstValue(\.mediaFormat)), ("Packaging", firstValue(\.packaging).flatMap { $0 == "None" ? nil : $0 }),
@@ -291,25 +288,35 @@ private struct AlbumPageContent: View {
 // MARK: Tracks
 
 /// The release's track list with the library's songs filled in: songs not on the phone are dimmed (tap to
-/// download), and the release's tracks that aren't in the library are greyed out.
+/// download), and the release's tracks that aren't in the library are greyed out. Records show their sides ("A1").
+/// For a collection item with no digital copy (`album` nil, no tracks), just the release's tracks.
 struct AlbumTrackList: View {
     @Environment(PhoneModel.self) private var model
     @Environment(PhonePlayer.self) private var player
-    let album: AlbumSummary
+    let album: AlbumSummary?
     let tracks: [Track]
     let info: AlbumInfo?
     let source: String
     @State private var missing: Track?
+
+    /// Nothing of it is in the library: every row is greyed out, without saying so on each.
+    private var trackless: Bool { tracks.isEmpty }
 
     var body: some View {
         let rows = AlbumTracklist.merge(library: tracks, tracklist: info?.tracklist ?? [])
         let discs = Array(Set(rows.map(\.disc))).sorted()
         let notInLibrary = rows.filter { if case .missing = $0 { true } else { false } }.count
         let owned = rows.compactMap { if case .owned(let t, _) = $0 { t } else { nil } }
+        if !rows.isEmpty {
+            content(rows: rows, discs: discs, notInLibrary: notInLibrary, owned: owned)
+        }
+    }
+
+    private func content(rows: [AlbumTracklist.Row], discs: [Int], notInLibrary: Int, owned: [Track]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 SectionHeader(title: "Tracks")
-                if notInLibrary > 0 {
+                if notInLibrary > 0, !trackless {
                     Text("\(owned.count) of \(rows.count) in your library").font(.footnote).foregroundStyle(.secondary).fixedSize()
                 }
             }
@@ -333,7 +340,9 @@ struct AlbumTrackList: View {
             }
             .padding(.vertical, 4)
             .card()
-            if notInLibrary > 0 {
+            if trackless {
+                Text("The track list of the release, from MusicBrainz.").font(.caption).foregroundStyle(.secondary)
+            } else if notInLibrary > 0 {
                 Text("Greyed-out tracks are on this release but not in your library.").font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -341,7 +350,9 @@ struct AlbumTrackList: View {
                             titleVisibility: .visible, presenting: missing) { track in
             if model.sync.isPaired {
                 Button("Download Song") { model.download(.track(track.id)) }
-                Button("Download Album") { model.download(.album(album: album.album, artist: album.artist)) }
+                if let album {
+                    Button("Download Album") { model.download(.album(album: album.album, artist: album.artist)) }
+                }
             }
         } message: { _ in
             Text(model.sync.isPaired ? "Download it from your Mac to play it here." : "Pair with your Mac in the Sync tab to download music.")
@@ -358,13 +369,14 @@ struct AlbumTrackList: View {
                 if isCurrent {
                     Image(systemName: "speaker.wave.2.fill").font(.caption).foregroundStyle(Color.accentColor)
                 } else {
-                    Text(track.trackNo.map(String.init) ?? entry.map { String($0.number) } ?? "").monospacedDigit().foregroundStyle(.secondary)
+                    Text(entry?.position ?? track.trackNo.map(String.init) ?? entry.map { String($0.number) } ?? "")
+                        .monospacedDigit().foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
                 }
             }
-            .frame(width: 24)
+            .frame(width: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.title).lineLimit(2).fontWeight(isCurrent ? .semibold : .regular)
-                if !track.artist.isEmpty, LibrarySnapshot.artistKey(track.artist) != LibrarySnapshot.artistKey(album.artist) {
+                if !track.artist.isEmpty, LibrarySnapshot.artistKey(track.artist) != LibrarySnapshot.artistKey(album?.artist ?? track.effectiveAlbumArtist) {
                     Text(track.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
@@ -399,73 +411,106 @@ struct AlbumTrackList: View {
 
     private func missingRow(_ entry: TracklistEntry) -> some View {
         HStack(spacing: 12) {
-            Text(String(entry.number)).monospacedDigit().frame(width: 24)
+            Text(entry.displayPosition).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7).frame(width: 28)
             Text(entry.title).lineLimit(2)
             Spacer(minLength: 6)
-            Text("Not in library").font(.caption2)
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(Capsule().strokeBorder(Color.secondary.opacity(0.5), lineWidth: 0.5))
-                .fixedSize()
+            if !trackless {
+                Text("Not in library").font(.caption2)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Capsule().strokeBorder(Color.secondary.opacity(0.5), lineWidth: 0.5))
+                    .fixedSize()
+            }
             Text(entry.duration.map(Format.time) ?? "").monospacedDigit().frame(minWidth: 40, alignment: .trailing)
         }
         .font(.callout)
         .foregroundStyle(.secondary)
-        .opacity(0.6)
+        .opacity(trackless ? 0.8 : 0.6)
         .padding(.horizontal, 14).padding(.vertical, 9)
     }
 }
 
-// MARK: Your copy
+// MARK: Your copies
 
-/// "Your Copy": the album's label number (to find the CD on the shelf), when you bought it and what you paid, as set
-/// in the Mac app. Read-only here, and shown only for albums you own.
-struct AlbumOwnershipSection: View {
+/// "Your Copies": every copy of the album in your collection (CDs by label number, records, downloads), each opening
+/// its item page, with how long it's been yours and what each play cost. Read-only: the collection is edited on the
+/// Mac. Shown only when you own a copy.
+struct YourCopiesSection: View {
     @Environment(PhoneModel.self) private var model
-    let album: AlbumSummary
+    let albumKey: String
     /// All-time plays of the album's tracks.
     let plays: Int
 
     var body: some View {
-        if let purchase = model.purchase(for: album) {
+        let copies = model.collection.copies(albumKey: albumKey)
+        if !copies.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                SectionHeader(title: "Your Copy")
+                SectionHeader(title: copies.count == 1 ? "Your Copy" : "Your Copies")
                 VStack(spacing: 0) {
-                    let rows = rows(purchase)
-                    ForEach(Array(rows.enumerated()), id: \.offset) { i, row in
-                        if i > 0 { Divider().padding(.leading, 14) }
-                        LabeledContent(row.title) {
-                            Text(row.value).monospacedDigit().foregroundStyle(row.emphasized ? .primary : .secondary)
-                                .fontWeight(row.emphasized ? .semibold : .regular)
+                    ForEach(Array(copies.enumerated()), id: \.element.id) { i, item in
+                        if i > 0 { Divider().padding(.leading, 74) }
+                        NavigationLink(value: CollectionItemRoute(id: item.id)) {
+                            CopyRow(item: item)
                         }
-                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        .buttonStyle(.plain)
                     }
                 }
+                .padding(.vertical, 2)
                 .card()
-                if let summary = summary(purchase) {
+                if let summary = summary(copies) {
                     Text(summary).font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
     }
 
-    private func rows(_ p: AlbumPurchase) -> [(title: String, value: String, emphasized: Bool)] {
-        var rows: [(title: String, value: String, emphasized: Bool)] = []
-        if p.format == .digital { rows.append(("Format", "Download", false)) }
-        if let n = p.labelNumber { rows.append(("Label", "#\(n)", true)) }
-        if let day = p.purchasedOn { rows.append(("Bought", day.date().formatted(date: .abbreviated, time: .omitted), false)) }
-        if let price = p.price { rows.append(("Paid", formatMoney(price), false)) }
-        return rows.isEmpty ? [("You own this album", "", false)] : rows
+    /// "Yours since 2009 · 34 plays · $0.41 a play".
+    private func summary(_ copies: [CollectionItem]) -> String? {
+        var parts: [String] = []
+        if let first = copies.compactMap(\.purchasedOn).min() {
+            parts.append("Yours since \(first.date().formatted(.dateTime.year()))")
+        }
+        if plays > 0 { parts.append(playCount(plays)) }
+        let spent = copies.compactMap(\.price).reduce(0, +)
+        if spent > 0, plays > 0 { parts.append("\(formatMoney(spent / Decimal(plays))) a play") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+}
+
+/// One copy in a list: its case or sleeve, label, medium and format, when you bought it, what you paid and where its
+/// digital copy came from.
+struct CopyRow: View {
+    @Environment(PhoneModel.self) private var model
+    let item: CollectionItem
+
+    var body: some View {
+        let state = model.collection.digitalState(item)
+        HStack(spacing: 12) {
+            CopyArt(mark: model.copyMark(for: item), url: model.library?.coverURL(item: item), width: 50, title: nil)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    if let sticker = item.sticker { StickerPill(sticker: sticker, size: 11) }
+                    Text(mediumLine).font(.subheadline.weight(.medium)).lineLimit(1)
+                }
+                let bought = [item.purchasedOn.map { $0.date().formatted(date: .abbreviated, time: .omitted) },
+                              item.price.map { formatMoney($0) }].compactMap { $0 }
+                if !bought.isEmpty {
+                    Text(bought.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                }
+                DigitalStatusLabel(item: item, state: state, collection: model.collection)
+                    .font(.caption)
+            }
+            Spacer(minLength: 6)
+            InsightChevron()
+        }
+        .padding(.horizontal, 14).padding(.vertical, 9)
+        .contentShape(Rectangle())
     }
 
-    private func summary(_ p: AlbumPurchase) -> String? {
-        var parts: [String] = []
-        if let day = p.purchasedOn {
-            parts.append("Yours since \(day.date().formatted(.relative(presentation: .named)))")
-        }
-        if let price = p.price, price > 0, plays > 0 {
-            parts.append("\(formatMoney(price / Decimal(plays))) a play so far")
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    /// "CD", "2×CD", "12\" Vinyl", "Download (bought as songs)".
+    private var mediumLine: String {
+        if item.origin == .songs { return "Songs bought as downloads" }
+        if case .other(let raw) = item.medium { return raw.capitalized }
+        return item.formatDetail ?? item.medium.name
     }
 }
 
