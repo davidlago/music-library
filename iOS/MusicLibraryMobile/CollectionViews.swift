@@ -269,8 +269,8 @@ enum LabelCheckSummary {
 
 // MARK: Cells and status
 
-/// An item in a grid: its case or sleeve, title, artist, label and whether it has a digital copy. Never dimmed: you
-/// own it whether or not its songs are here (the mark says).
+/// An item in a grid: its case or sleeve, title and artist. The sticker and badges on the cover say the rest (press
+/// and hold one for what it means). Never dimmed: you own it whether or not its songs are here.
 struct CollectionCell: View {
     @Environment(PhoneModel.self) private var model
     let item: CollectionItem
@@ -285,18 +285,10 @@ struct CollectionCell: View {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(item.album.isEmpty ? "Unknown Album" : item.album).font(.subheadline).lineLimit(1)
                 Spacer(minLength: 0)
-                // Only whether the songs are on this iPhone: the status line below already says "Not ripped" or
-                // "Missing", and the title needs the room.
+                // Only whether the songs are on this iPhone: the cover's badge already says "Not ripped".
                 if state.hasMusic { CollectionStatusMark(item: item, state: state) }
             }
             Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            // Always there, so cells in a row are as tall.
-            HStack(spacing: 6) {
-                if let sticker = item.sticker { StickerPill(sticker: sticker, size: 10) }
-                DigitalStatusLabel(item: item, state: state, collection: model.collection, compact: true)
-                    .font(.caption2).lineLimit(1)
-            }
-            .frame(height: 18, alignment: .leading)
         }
         .frame(width: width, alignment: .leading)
         .padding(6)

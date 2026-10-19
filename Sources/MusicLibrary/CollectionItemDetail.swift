@@ -88,10 +88,6 @@ struct CollectionItemDetail: View {
         let album = model.linkedAlbum(for: item)
         return VStack(alignment: .leading, spacing: 10) {
             coverArt(item, size: coverSize).padding(.bottom, 10)
-            HStack(spacing: 8) {
-                if let sticker = item.sticker { StickerPill(sticker: sticker, size: 18) }
-                Text(typeLine(item, info)).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.subtext)
-            }
             Text(item.album.isEmpty ? "Unknown Album" : item.album)
                 .font(.system(size: 30, weight: .bold)).lineLimit(3).minimumScaleFactor(0.7)
                 .textSelection(.enabled)
@@ -175,14 +171,6 @@ struct CollectionItemDetail: View {
             .buttonStyle(.plain)
             .help("Go to \(name)")
         }
-    }
-
-    /// "CD · ALBUM · 1959".
-    private func typeLine(_ item: CollectionItem, _ info: AlbumInfo?) -> String {
-        var parts = [item.medium == .vinyl ? "RECORD" : item.medium.name.uppercased()]
-        if let type = info?.typeLabel { parts.append(type.uppercased()) }
-        if let first = info?.firstReleaseYear { parts.append(String(first)) }
-        return parts.joined(separator: " · ")
     }
 
     /// "1959 · 12″ Vinyl · Columbia CL 1355 · US".

@@ -3,8 +3,8 @@ import SwiftUI
 
 /// A record's cover drawn as its cardboard sleeve with the black disc slid out a little on the right, the centre label
 /// tinted from the cover. As tall as a `JewelCase` of the same width, so records and CDs line up in a grid. The
-/// label number is a round yellow sticker on the sleeve's top-left corner, and a record with no digital copy gets the
-/// waveform badge. The decoration doesn't take taps. The Mac app has the same view (`Sources/MusicLibrary/RecordSleeve.swift`).
+/// label number is the same white strip as a CD's, down the sleeve's top-left edge where the CD's sits on its case,
+/// and a record with no digital copy gets the waveform badge. The decoration doesn't take taps. The Mac app has the same view (`Sources/MusicLibrary/RecordSleeve.swift`).
 struct RecordSleeve<Cover: View>: View {
     let width: CGFloat
     var mark: CopyMark?
@@ -45,21 +45,20 @@ struct RecordSleeve<Cover: View>: View {
                         .allowsHitTesting(false)
                 }
                 .shadow(color: .black.opacity(0.35), radius: side * 0.015, x: side * 0.01, y: side * 0.012)
-            Group {
-                if let sticker = mark?.sticker {
-                    LabelSticker(number: sticker.number, series: sticker.series, width: max(16, side * 0.13))
-                        .padding(side * 0.035)
-                }
-                if let mark, let kind = CopyBadge.kind(for: mark) {
-                    CopyBadge(kind: kind, coverSide: side)
-                        .frame(width: side, height: side, alignment: .bottomTrailing)
-                }
-                if let mark, mark.more > 0, width >= 120 {
-                    CopiesChip(count: mark.more + 1, coverSide: side)
-                        .frame(width: side, height: side, alignment: .topTrailing)
-                }
+            // The marks take a press and hold only, to say what they mean. The sticker is the same strip as a CD's,
+            // in the same place and size.
+            if let sticker = mark?.sticker {
+                LabelSticker(number: sticker.number, series: sticker.series, width: JewelCase<EmptyView>.stickerWidth(width: width))
+                    .offset(JewelCase<EmptyView>.stickerOffset(width: width))
             }
-            .allowsHitTesting(false)
+            if let mark, let kind = CopyBadge.kind(for: mark) {
+                CopyBadge(kind: kind, coverSide: side)
+                    .frame(width: side, height: side, alignment: .bottomTrailing)
+            }
+            if let mark, mark.more > 0, width >= 120 {
+                CopiesChip(count: mark.more + 1, coverSide: side)
+                    .frame(width: side, height: side, alignment: .topTrailing)
+            }
         }
         .frame(width: width, height: side, alignment: .topLeading)
     }

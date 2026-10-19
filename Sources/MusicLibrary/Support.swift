@@ -69,79 +69,57 @@ struct CoverThumb: View {
 
 /// The colours of the label stickers, fixed like the real ones (so every theme shows them the same).
 enum StickerColors {
-    /// The CD sticker: a white strip.
-    static let cd = Color(white: 0.97)
-    /// The vinyl sticker: a yellow dot (#F4C542).
-    static let vinyl = Color(red: 0xF4 / 255, green: 0xC5 / 255, blue: 0x42 / 255)
+    /// The sticker: a white strip, the same on CDs and records (a case and a sleeve are told apart at a glance).
+    static let sticker = Color(white: 0.97)
     static let text = Color(white: 0.1)
 }
 
-/// The sticker with your label number. A CD's is the white strip on the case: tall, across the top of the hinge
-/// (`JewelCase(mark:)`), "CD" and the number running up it, read from bottom to top. A record's is a round yellow
-/// dot on the sleeve's top-left corner (`RecordSleeve`), read across. A cover shown without its case has a
-/// `StickerPill` instead (`CoverCopyMark`).
+/// The sticker with your label number: a strip, tall, across the top of the case's hinge (`JewelCase(mark:)`) or
+/// down the left edge of a record's sleeve in the same place (`RecordSleeve`), the number running up it, read from
+/// bottom to top. It's white on both: the case or the sleeve tells the series. A cover shown without its
+/// case has a `StickerPill` instead (`CoverCopyMark`). Hover it for the label in words.
 struct LabelSticker: View {
     let number: Int
     var series: StickerSeries = .cd
-    /// The strip's width (it's half again as tall, and taller when the number doesn't fit), or the dot's diameter.
+    /// The strip's width (it's half again as tall, and taller when the number doesn't fit).
     let width: CGFloat
 
     var body: some View {
-        Group {
-            switch series {
-            case .cd: strip
-            case .vinyl: dot
-            }
-        }
-        .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
-        .allowsHitTesting(false)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Sticker(series: series, number: number)?.spoken ?? "Label \(number)")
-    }
-
-    private var strip: some View {
+        let sticker = Sticker(series: series, number: number)
         // In proportion to the strip, with no floor: a larger number would spill over a small case's hinge.
         let font = width * 0.6
-        let prefix = font * 0.55
         let text = String(number)
-        // Monospaced digits are about 0.6 em wide; "CD" and the gap before the number about 1.6 em of the prefix.
-        let height = max(width * 1.5, CGFloat(text.count) * font * 0.62 + prefix * 1.6 + font * 0.7)
-        return HStack(alignment: .firstTextBaseline, spacing: prefix * 0.35) {
-            Text("CD").font(.system(size: prefix, weight: .bold))
-            Text(text).font(.system(size: font, weight: .semibold).monospacedDigit())
-        }
-        .foregroundStyle(StickerColors.text)
-        .fixedSize()
-        .rotationEffect(.degrees(-90))
-        .frame(width: width, height: height)
-        .background(RoundedRectangle(cornerRadius: max(2, width * 0.14)).fill(StickerColors.cd))
-    }
-
-    private var dot: some View {
-        let text = String(number)
-        // As large as fits across the dot, at most 0.42 of it.
-        let font = min(width * 0.42, width * 0.78 / (CGFloat(max(text.count, 1)) * 0.62))
-        return Text(text)
-            .font(.system(size: max(5, font), weight: .bold).monospacedDigit())
+        // Monospaced digits are about 0.6 em wide, plus some room at the ends.
+        let height = max(width * 1.5, CGFloat(text.count) * font * 0.62 + font * 0.7)
+        Text(text)
+            .font(.system(size: font, weight: .semibold).monospacedDigit())
             .foregroundStyle(StickerColors.text)
-            .lineLimit(1)
             .fixedSize()
-            .frame(width: width, height: width)
-            .background(Circle().fill(StickerColors.vinyl))
-            .overlay(Circle().strokeBorder(.black.opacity(0.12), lineWidth: 0.5))
+            .rotationEffect(.degrees(-90))
+            .frame(width: width, height: height)
+            .background(RoundedRectangle(cornerRadius: max(2, width * 0.14)).fill(StickerColors.sticker))
+            .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
+            .contentShape(Rectangle())
+            .help(sticker.map { "Your label: \($0.text)" } ?? "Label \(number)")
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(sticker?.spoken ?? "Label \(number)")
     }
 }
 
-/// A label in lists and captions: a white pill with a small "CD", or a yellow one with a small "VINYL", then the
-/// number in monospaced digits. Fixed colours, like the stickers.
+/// A label in lists and captions: a white pill with a small "CD" or "VINYL", then the
+/// number in monospaced digits. Fixed colours, like the stickers. On a cover (`numberOnly`) it's just the number, as
+/// on the stickers.
 struct StickerPill: View {
     let sticker: Sticker
     /// The number's font size.
     var size: CGFloat = 11
+    var numberOnly = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: size * 0.3) {
-            Text(sticker.series == .cd ? "CD" : "VINYL").font(.system(size: size * 0.66, weight: .bold))
+            if !numberOnly {
+                Text(sticker.series == .cd ? "CD" : "VINYL").font(.system(size: size * 0.66, weight: .bold))
+            }
             Text(String(sticker.number)).font(.system(size: size, weight: .semibold).monospacedDigit())
         }
         .foregroundStyle(StickerColors.text)
@@ -149,8 +127,9 @@ struct StickerPill: View {
         .fixedSize()
         .padding(.horizontal, size * 0.55)
         .padding(.vertical, size * 0.16)
-        .background(Capsule().fill(sticker.series == .cd ? StickerColors.cd : StickerColors.vinyl))
+        .background(Capsule().fill(StickerColors.sticker))
         .overlay(Capsule().strokeBorder(.black.opacity(0.15), lineWidth: 0.5))
+        .help("Your label: \(sticker.text)")
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(sticker.spoken)
     }
@@ -181,11 +160,16 @@ struct CopyBadge: View {
 
     init?(mark: CopyMark, coverSide: CGFloat) {
         switch mark {
-        case .notInCollection: self.init(symbol: "arrow.left.arrow.right", label: "Borrowed", coverSide: coverSide)
-        case .download: self.init(symbol: "dollarsign", label: "Bought as a download", coverSide: coverSide)
-        case .cd(_, false, _): self.init(symbol: "waveform.slash", label: "Not ripped", coverSide: coverSide)
-        case .vinyl(_, false, _): self.init(symbol: "waveform.slash", label: "Not digitized", coverSide: coverSide)
-        case .other: self.init(symbol: "shippingbox", label: "Added by a newer version", coverSide: coverSide)
+        case .notInCollection:
+            self.init(symbol: "arrow.left.arrow.right", label: "Borrowed: not in your collection", coverSide: coverSide)
+        case .download(let partial, _):
+            self.init(symbol: "dollarsign", label: partial ? "Some songs bought as downloads" : "Bought as a download",
+                      coverSide: coverSide)
+        case .cd(_, false, _):
+            self.init(symbol: "waveform.slash", label: "Not ripped yet: no digital copy in your library", coverSide: coverSide)
+        case .vinyl(_, false, _):
+            self.init(symbol: "waveform.slash", label: "Not digitized yet: no digital copy in your library", coverSide: coverSide)
+        case .other: self.init(symbol: "shippingbox", label: "Added by a newer version of Music Library", coverSide: coverSide)
         case .cd, .vinyl: return nil
         }
     }
@@ -198,8 +182,9 @@ struct CopyBadge: View {
             .frame(width: diameter, height: diameter)
             .background(Circle().fill(Color(white: 0.98)))
             .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
+            .contentShape(Circle())
+            .help(label)
             .padding(max(4, coverSide * 0.035))
-            .allowsHitTesting(false)
             .accessibilityLabel(label)
     }
 }
@@ -214,7 +199,7 @@ struct CoverCopyMark: View {
     var body: some View {
         ZStack {
             if let sticker = mark.sticker {
-                StickerPill(sticker: sticker, size: max(7, min(13, size * 0.08)))
+                StickerPill(sticker: sticker, size: max(7, min(13, size * 0.08)), numberOnly: true)
                     .padding(size * 0.03)
                     .frame(width: size, height: size, alignment: .topLeading)
             }
@@ -222,7 +207,6 @@ struct CoverCopyMark: View {
                 badge.frame(width: size, height: size, alignment: .bottomTrailing)
             }
         }
-        .allowsHitTesting(false)
     }
 }
 

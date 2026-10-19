@@ -34,8 +34,9 @@
   as downloads. Each has its own page with the edition, when you bought it and what you paid, and links to its digital
   copy in the library when there is one. See [Your collection](#your-collection).
 - **A label number on every case and sleeve.** CDs and records each have their own series, both starting at 1, and the
-  app never lets you mix them up: **CD #12** is a white strip on the jewel case's hinge, **Vinyl #12** a yellow dot on
-  the sleeve. The next free number is suggested, and a number already taken is refused.
+  app never lets you mix them up: the number sits on a white strip across the top of the jewel case's hinge, or
+  down the same edge of a record's sleeve, so **CD #12** and **Vinyl #12** are told apart by the case or sleeve
+  they're on, and always written with their series in text. Hover a sticker or a badge for what it means. The next free number is suggested, and a number already taken is refused.
 - **Find by Label.** Type a number (⌘L, anywhere in the app) and see what CD #12 is and what sits next to it on the
   shelf, so you can go and grab it. On the iPhone, the Apple Watch (offline) and with Siri too.
 - **Add by barcode, link by ripping.** Scan or type the barcode on the case, or a few words of the album and artist, and

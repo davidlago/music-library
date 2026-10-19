@@ -188,6 +188,7 @@ private struct ArtistPageContent: View {
                         }
                         .buttonStyle(.plain)
                         .contextMenu { AlbumMenu(album: a) }
+                        .environment(\.explainsMarksOnPress, false)
                     }
                 }
                 .scrollTargetLayout()

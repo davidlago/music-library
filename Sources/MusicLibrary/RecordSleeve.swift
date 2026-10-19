@@ -4,9 +4,10 @@ import SwiftUI
 
 /// A record's cover drawn as its cardboard sleeve, with the black disc showing on the right (its centre label tinted
 /// from the cover). It takes the same space as a `JewelCase` of the same width, so cases and sleeves line up in a
-/// grid: the sleeve is as tall as the case, and the disc shows in the rest. Your label is a round yellow sticker on
-/// the sleeve's top-left corner, and a record not digitized yet has a small badge in the bottom-right one. The
-/// decoration doesn't take clicks. The iPhone app has the same view (`iOS/MusicLibraryMobile/RecordSleeve.swift`).
+/// grid: the sleeve is as tall as the case, and the disc shows in the rest. Your label is the same white strip as a
+/// CD's, down the sleeve's top-left edge where the CD's sits on its case, and a record not digitized yet has a small badge
+/// in the bottom-right corner; hover either for what it means. The rest of the decoration doesn't take clicks. The
+/// iPhone app has the same view (`iOS/MusicLibraryMobile/RecordSleeve.swift`).
 struct RecordSleeve<Booklet: View>: View {
     let width: CGFloat
     var mark: CopyMark?
@@ -36,16 +37,15 @@ struct RecordSleeve<Booklet: View>: View {
                 .clipShape(RoundedRectangle(cornerRadius: radius))
                 .overlay { sleeveFinish(radius: radius) }
                 .shadow(color: .black.opacity(0.35), radius: max(1, side * 0.012), x: max(0.5, side * 0.006))
-            Group {
-                if let sticker = mark?.sticker, sticker.series == .vinyl {
-                    LabelSticker(number: sticker.number, series: .vinyl, width: max(14, side * 0.13))
-                        .padding(side * 0.035)
-                }
-                if let mark, let badge = CopyBadge(mark: mark, coverSide: side) {
-                    badge.frame(width: side, height: side, alignment: .bottomTrailing)
-                }
+            // The same strip as a CD's, in the same place and size. It and the badge take the pointer only
+            // to show what they mean.
+            if let sticker = mark?.sticker, sticker.series == .vinyl {
+                LabelSticker(number: sticker.number, series: .vinyl, width: JewelCase<EmptyView>.stickerWidth(width: width))
+                    .offset(JewelCase<EmptyView>.stickerOffset(width: width))
             }
-            .allowsHitTesting(false)
+            if let mark, let badge = CopyBadge(mark: mark, coverSide: side) {
+                badge.frame(width: side, height: side, alignment: .bottomTrailing)
+            }
         }
         .frame(width: width, height: h, alignment: .topLeading)
         .background(alignment: .topLeading) {

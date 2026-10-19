@@ -76,72 +76,60 @@ extension CopyMark {
 
 // MARK: Labels
 
-/// The sticker with your label number, like the one on the real thing. A CD's is a white strip across the top of the
-/// jewel case's hinge, the number read bottom to top; a record's is a round yellow dot on the sleeve's top-left corner,
-/// read across. Fixed colors, like the real stickers, whatever the appearance.
+/// The sticker with your label number, like the one on the real thing: a strip across the top of a jewel case's
+/// hinge, or down the left edge of a record's sleeve in the same place, the number read bottom to top. White on both
+/// (the case or the sleeve tells the series), whatever the appearance.
 struct LabelSticker: View {
     let number: Int
     var series: StickerSeries = .cd
-    /// The strip's width or the dot's diameter; the strip is half again as tall, and taller when the number doesn't fit.
+    /// The strip's width; it's half again as tall, and taller when the number doesn't fit.
     let width: CGFloat
 
-    /// The vinyl dot's yellow.
-    static let vinylYellow = Color(red: 0xF4 / 255, green: 0xC5 / 255, blue: 0x42 / 255)
+    /// The sticker's white, the same on CDs and records.
+    static let white = Color(white: 0.97)
 
     var body: some View {
         let text = String(number)
-        Group {
-            switch series {
-            case .cd:
-                // In proportion to the strip, with no floor: a larger number would spill over a small case's hinge.
-                let font = width * 0.6
-                // Monospaced digits are about 0.6 em wide.
-                let height = max(width * 1.5, CGFloat(text.count) * font * 0.62 + font * 0.7)
-                Text(text)
-                    .font(.system(size: font, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(Color(white: 0.1))
-                    .fixedSize()
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: width, height: height)
-                    .background(RoundedRectangle(cornerRadius: max(2, width * 0.14)).fill(Color(white: 0.97)))
-            case .vinyl:
-                // Shrinks the digits to stay inside the dot.
-                let font = max(7, width * (text.count <= 2 ? 0.46 : text.count == 3 ? 0.36 : 0.28))
-                Text(text)
-                    .font(.system(size: font, weight: .bold).monospacedDigit())
-                    .foregroundStyle(Color(white: 0.08))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .padding(width * 0.08)
-                    .frame(width: width, height: width)
-                    .background(Circle().fill(Self.vinylYellow))
-            }
-        }
-        .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
-        .allowsHitTesting(false)
-        .accessibilityLabel(Sticker(series: series, number: number)?.spoken ?? "Label \(number)")
+        // In proportion to the strip, with no floor: a larger number would spill over a small case's hinge.
+        let font = width * 0.6
+        // Monospaced digits are about 0.6 em wide.
+        let height = max(width * 1.5, CGFloat(text.count) * font * 0.62 + font * 0.7)
+        Text(text)
+            .font(.system(size: font, weight: .semibold).monospacedDigit())
+            .foregroundStyle(Color(white: 0.1))
+            .fixedSize()
+            .rotationEffect(.degrees(-90))
+            .frame(width: width, height: height)
+            .background(RoundedRectangle(cornerRadius: max(2, width * 0.14)).fill(Self.white))
+            .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
+            .explainOnLongPress(Sticker(series: series, number: number).map { "Your label: \($0.text)" } ?? "Label \(number)")
+            .accessibilityLabel(Sticker(series: series, number: number)?.spoken ?? "Label \(number)")
     }
 
     /// The sticker for a cover `size` wide shown without its case, in its top-left corner.
     static func onCover(_ sticker: Sticker, size: CGFloat) -> some View {
-        LabelSticker(number: sticker.number, series: sticker.series, width: size * (sticker.series == .cd ? 0.11 : 0.2))
+        LabelSticker(number: sticker.number, series: sticker.series, width: size * 0.11)
             .padding(size * 0.025)
             .frame(width: size, height: size, alignment: .topLeading)
     }
 }
 
-/// A label in text: "CD" or "VINYL" and the number in a pill, white for CDs and yellow for records, so CD #12 and
-/// Vinyl #12 never look alike. Fixed colors, like the stickers.
+/// A label in text: "CD" or "VINYL" and the number in a white pill, so CD #12 and Vinyl #12 never read alike. Fixed
+/// colors, like the stickers.
 struct StickerPill: View {
     let sticker: Sticker
     var size: CGFloat = 12
+    /// On a cover: just the number, as on the stickers (press and hold it for the label in words).
+    var numberOnly = false
 
     var body: some View {
         HStack(spacing: size * 0.3) {
-            Text(sticker.series == .cd ? "CD" : "VINYL")
-                .font(.system(size: size * 0.66, weight: .heavy))
-                .tracking(size * 0.03)
-                .opacity(0.6)
+            if !numberOnly {
+                Text(sticker.series == .cd ? "CD" : "VINYL")
+                    .font(.system(size: size * 0.66, weight: .heavy))
+                    .tracking(size * 0.03)
+                    .opacity(0.6)
+            }
             Text(String(sticker.number))
                 .font(.system(size: size, weight: .semibold, design: .monospaced))
         }
@@ -150,7 +138,7 @@ struct StickerPill: View {
         .fixedSize()
         .padding(.horizontal, size * 0.55)
         .padding(.vertical, size * 0.18)
-        .background(Capsule().fill(sticker.series == .cd ? Color(white: 0.97) : LabelSticker.vinylYellow))
+        .background(Capsule().fill(LabelSticker.white))
         .overlay(Capsule().strokeBorder(Color.black.opacity(0.18), lineWidth: 0.5))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(sticker.spoken)
@@ -163,7 +151,7 @@ struct StickerPill: View {
 /// a download (a dollar sign), a CD or record with no digital copy (a crossed-out waveform), or a medium a newer
 /// version added.
 struct CopyBadge: View {
-    enum Kind { case borrowed, download, notDigitized, other }
+    enum Kind { case borrowed, download, notRipped, notDigitized, other }
     let kind: Kind
     /// The cover's side.
     let coverSide: CGFloat
@@ -176,8 +164,8 @@ struct CopyBadge: View {
             .frame(width: diameter, height: diameter)
             .background(Circle().fill(Color(white: 0.98)))
             .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
+            .explainOnLongPress(label)
             .padding(max(4, coverSide * 0.035))
-            .allowsHitTesting(false)
             .accessibilityLabel(label)
     }
 
@@ -185,17 +173,20 @@ struct CopyBadge: View {
         switch kind {
         case .borrowed: "arrow.left.arrow.right"
         case .download: "dollarsign"
-        case .notDigitized: "waveform.slash"
+        case .notRipped, .notDigitized: "waveform.slash"
         case .other: "shippingbox"
         }
     }
 
-    private var label: String {
+    private var label: String { Self.label(kind) }
+
+    static func label(_ kind: Kind) -> String {
         switch kind {
-        case .borrowed: "Not in your collection"
+        case .borrowed: "Borrowed: not in your collection"
         case .download: "Bought as a download"
-        case .notDigitized: "No digital copy"
-        case .other: "Other medium"
+        case .notRipped: "Not ripped yet: no digital copy in your library"
+        case .notDigitized: "Not digitized yet: no digital copy in your library"
+        case .other: "Added by a newer version of Music Library"
         }
     }
 
@@ -205,7 +196,8 @@ struct CopyBadge: View {
         case .notInCollection: .borrowed
         case .download: .download
         case .other: .other
-        case .cd(_, let digitized, _), .vinyl(_, let digitized, _): digitized ? nil : .notDigitized
+        case .cd(_, let digitized, _): digitized ? nil : .notRipped
+        case .vinyl(_, let digitized, _): digitized ? nil : .notDigitized
         }
     }
 }
@@ -225,8 +217,8 @@ struct CopiesChip: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 6).padding(.vertical, 2)
         .background(Capsule().fill(.black.opacity(0.65)))
+        .explainOnLongPress("You own \(count) copies of this album")
         .padding(max(4, coverSide * 0.035))
-        .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(count) copies")
     }
@@ -243,7 +235,8 @@ struct CoverCopyMark: View {
         ZStack {
             if let sticker = mark.sticker {
                 if size >= 90 {
-                    StickerPill(sticker: sticker, size: max(9, min(14, size * 0.075)))
+                    StickerPill(sticker: sticker, size: max(9, min(14, size * 0.075)), numberOnly: true)
+                        .explainOnLongPress("Your label: \(sticker.text)")
                         .padding(size * 0.04)
                         .frame(width: size, height: size, alignment: .topLeading)
                 } else {
@@ -258,8 +251,56 @@ struct CoverCopyMark: View {
             }
         }
         .frame(width: size, height: size)
-        .allowsHitTesting(false)
     }
+}
+
+extension EnvironmentValues {
+    /// Whether a cover's marks say what they mean when pressed and held. Off where the cover has its own context menu
+    /// (the long press is the menu's): the menu lists what they mean instead (`CopyMark.meanings`).
+    @Entry var explainsMarksOnPress = true
+}
+
+extension CopyMark {
+    /// What a cover's marks mean, in words: its label, its badge, how many copies.
+    var meanings: [String] {
+        var lines: [String] = []
+        if let sticker { lines.append("Your label: \(sticker.text)") }
+        if let kind = CopyBadge.kind(for: self) { lines.append(CopyBadge.label(kind)) }
+        if more > 0 { lines.append("You own \(more + 1) copies of this album") }
+        return lines
+    }
+}
+
+/// Press and hold a cover's sticker, badge or copies chip to see what it means in a small bubble: the iPhone's
+/// stand-in for the Mac's tooltips.
+struct ExplainOnLongPress: ViewModifier {
+    let text: String
+    @Environment(\.explainsMarksOnPress) private var enabled
+    @State private var shown = false
+
+    func body(content: Content) -> some View {
+        if enabled { explained(content) } else { content }
+    }
+
+    private func explained(_ content: Content) -> some View {
+        content
+            .contentShape(Rectangle())
+            .onLongPressGesture(minimumDuration: 0.35) { shown = true }
+            .sensoryFeedback(.selection, trigger: shown) { _, new in new }
+            .popover(isPresented: $shown) {
+                Text(text)
+                    .font(.footnote)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: 260)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .presentationCompactAdaptation(.popover)
+            }
+    }
+}
+
+extension View {
+    func explainOnLongPress(_ text: String) -> some View { modifier(ExplainOnLongPress(text: text)) }
 }
 
 nonisolated enum CoverLoader {

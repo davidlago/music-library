@@ -3,7 +3,8 @@ import SwiftUI
 
 /// An album's cover drawn as a CD jewel case (album pages and the album grid), 142 × 125 mm: the cover is the square
 /// booklet behind the clear lid, with the ribbed hinge and its pins on the left, the black tray showing around the
-/// booklet, the two tabs that hold it and the lid's bevelled edges and gloss. The decoration doesn't take clicks, so controls in the booklet work.
+/// booklet, the two tabs that hold it and the lid's bevelled edges and gloss. The decoration doesn't take clicks, so
+/// controls in the booklet work; the label sticker and the badge only show what they mean on hover.
 /// The iPhone app has the same view (`iOS/MusicLibraryMobile/JewelCase.swift`); a record is a `RecordSleeve`.
 struct JewelCase<Booklet: View>: View {
     let width: CGFloat
@@ -22,6 +23,10 @@ struct JewelCase<Booklet: View>: View {
     /// The booklet's side in a case this wide.
     static func bookletSide(width: CGFloat) -> CGFloat { height(width: width) * 0.944 }
     static func cornerRadius(width: CGFloat) -> CGFloat { width * 0.014 }
+    /// The label sticker's width on a case this wide (a record's sleeve takes the same, in the same place).
+    static func stickerWidth(width: CGFloat) -> CGFloat { width * 0.105 * 0.88 }
+    /// Where the sticker's top-left corner sits on a case this wide: across the top of the hinge.
+    static func stickerOffset(width: CGFloat) -> CGSize { CGSize(width: width * 0.105 * 0.04, height: height(width: width) * 0.012) }
 
     var body: some View {
         let w = width, h = Self.height(width: w)
@@ -48,19 +53,21 @@ struct JewelCase<Booklet: View>: View {
                 ForEach([h * 0.022, h * 0.913], id: \.self) { y in
                     knuckle.frame(width: hinge * 0.65, height: h * 0.065).offset(x: hinge * 0.19, y: y)
                 }
-                if let sticker = mark?.sticker, sticker.series == .cd {
-                    LabelSticker(number: sticker.number, series: .cd, width: hinge * 0.88).offset(x: hinge * 0.04, y: h * 0.012)
-                }
-                if let mark, let badge = CopyBadge(mark: mark, coverSide: side) {
-                    badge
-                        .frame(width: side, height: side, alignment: .bottomTrailing)
-                        .offset(x: w - margin - side, y: margin)
-                }
                 RoundedRectangle(cornerRadius: radius)
                     .strokeBorder(LinearGradient(colors: [.white.opacity(0.35), .white.opacity(0.14)], startPoint: .top, endPoint: .bottom),
                                   lineWidth: 1)
             }
             .allowsHitTesting(false)
+            // The sticker and the badge take the pointer only to show what they mean.
+            if let sticker = mark?.sticker, sticker.series == .cd {
+                LabelSticker(number: sticker.number, series: .cd, width: Self.stickerWidth(width: w))
+                    .offset(Self.stickerOffset(width: w))
+            }
+            if let mark, let badge = CopyBadge(mark: mark, coverSide: side) {
+                badge
+                    .frame(width: side, height: side, alignment: .bottomTrailing)
+                    .offset(x: w - margin - side, y: margin)
+            }
         }
         .frame(width: w, height: h)
         .background {

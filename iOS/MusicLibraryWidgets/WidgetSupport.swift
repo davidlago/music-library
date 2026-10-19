@@ -104,7 +104,7 @@ struct CoverBackground: View {
 }
 
 /// A collection item as it sits on the shelf: a CD in its jewel case with its label on a white sticker across the top of
-/// the hinge, a record in its sleeve with its label on a round yellow dot, or just the cover (a download). `height` is
+/// the hinge, a record in its sleeve with the same sticker in the same place, or just the cover (a download). `height` is
 /// the art's height; it's a little wider for a case or a sleeve.
 struct ShelfArt: View {
     var item: Glance.Collection.Item
@@ -129,18 +129,7 @@ struct ShelfArt: View {
             Rectangle()
                 .fill(LinearGradient(colors: [Color(white: 0.28), Color(white: 0.1)], startPoint: .leading, endPoint: .trailing))
                 .frame(width: hinge, height: h)
-            if let number = item.sticker {
-                Text(String(number))
-                    .font(.system(size: max(6, hinge * 0.62), weight: .semibold).monospacedDigit())
-                    .foregroundStyle(Color(white: 0.1))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .frame(width: h * 0.42, height: hinge * 0.8)
-                    .background(RoundedRectangle(cornerRadius: 1.5).fill(Color(white: 0.97)))
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: hinge * 0.8, height: h * 0.42)
-                    .offset(x: hinge * 0.1, y: h * 0.02)
-            }
+            if let number = item.sticker { Self.sticker(number, height: h) }
             RoundedRectangle(cornerRadius: 2).strokeBorder(.white.opacity(0.3), lineWidth: 0.5)
         }
         .frame(width: w, height: h)
@@ -161,21 +150,28 @@ struct ShelfArt: View {
             CoverArt(name: item.cover, title: item.title, cornerRadius: 1.5)
                 .frame(width: h, height: h)
                 .shadow(color: .black.opacity(0.3), radius: 1, x: 1)
-            if let number = item.sticker {
-                Text(String(number))
-                    .font(.system(size: max(6, h * 0.12), weight: .bold).monospacedDigit())
-                    .foregroundStyle(Color(white: 0.1))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.4)
-                    .padding(h * 0.02)
-                    .frame(width: h * 0.26, height: h * 0.26)
-                    .background(Circle().fill(Color(red: 1, green: 0.84, blue: 0.2)))
-                    .offset(x: h * 0.05, y: h * 0.05)
-            }
+            // The same sticker as a CD's, in the same place.
+            if let number = item.sticker { Self.sticker(number, height: h) }
         }
         .frame(width: h * 1.18, height: h, alignment: .leading)
         .accessibilityElement()
         .accessibilityLabel(item.spokenSticker ?? "Vinyl")
+    }
+
+    /// The label sticker: a white strip across the top of a case's hinge, or down a sleeve's left edge in the same
+    /// place, the number read bottom to top.
+    private static func sticker(_ number: Int, height h: CGFloat) -> some View {
+        let hinge = h * 142 / 125 * 0.105
+        return Text(String(number))
+            .font(.system(size: max(6, hinge * 0.62), weight: .semibold).monospacedDigit())
+            .foregroundStyle(Color(white: 0.1))
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            .frame(width: h * 0.42, height: hinge * 0.8)
+            .background(RoundedRectangle(cornerRadius: 1.5).fill(Color(white: 0.97)))
+            .rotationEffect(.degrees(-90))
+            .frame(width: hinge * 0.8, height: h * 0.42)
+            .offset(x: hinge * 0.1, y: h * 0.02)
     }
 
     nonisolated static func mediumName(_ medium: String) -> String {

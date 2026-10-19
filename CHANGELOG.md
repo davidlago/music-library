@@ -16,9 +16,10 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   no longer in the library, with **Rip Now**, **Import a Transfer…** or **Link to Library Album…**), the track list
   (a record's with its sides), other copies of the album, and **Previous/Next on Shelf** (⌘[ and ⌘]). See
   [Your collection](https://github.com/davidlago/music-library#your-collection).
-- **Label numbers per medium.** CDs and vinyl each have their own label series, both starting at 1: CD #12 is a white
-  strip on the jewel case's hinge, Vinyl #12 a yellow dot on the record's sleeve, and labels are always written with
-  their series. The next number is suggested, a number already used in the same series is refused (with the next and
+- **Label numbers per medium.** CDs and vinyl each have their own label series, both starting at 1: the number is on a white
+  strip across the top of the jewel case's hinge or down the same edge of the record's sleeve, the case or sleeve
+  under it tells CD #12 from Vinyl #12, and labels in text are always written with their series. Hover a cover's
+  sticker or badge for what it means. The next number is suggested, a number already used in the same series is refused (with the next and
   the first free numbers offered), and **Label Check** lists free numbers and duplicates.
 - **Find by Label** (⌘L on the Mac, the Collection tab on the iPhone, the Shelf page on the Apple Watch, and Siri:
   "Find CD 12 in Music Library") tells you what's at a label and what sits on either side of it on the shelf. The watch

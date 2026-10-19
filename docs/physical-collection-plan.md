@@ -32,7 +32,7 @@ Each decision has one answer and a short reason.
 | D3 | Link to the music | One `album_key` per item, the `SearchIndex.albumKey` that its digital copy has or would have, plus `digital_source` (`rip`, `download`, `same`, or NULL meaning never linked). Digitization is always derived, never stored. | Covers several copies of one album and can tell "ripped from this copy" apart from "the same music came from elsewhere", without a many-to-many table. |
 | D4 | When a rip links | `digital_source = rip` is set when the first ripped track is imported, not when ripping starts. | A cancelled rip leaves the item correctly marked "Not ripped". |
 | D5 | Label series | Two fixed series, `cd` and `vinyl`, each 1…9,999,999. The next number is the highest in that series + 1. | This is what was asked for. Configurable prefixes add parsing surface for little gain. |
-| D6 | How labels show | Text always includes the series: **"CD #12"** and **"Vinyl #12"** (VoiceOver: "CD label 12"). The physical sticker differs by series: CDs keep today's white strip across the jewel-case hinge; vinyl gets a round yellow dot on the sleeve's top-left. The UI word is **label**; the company is renamed **Record label** everywhere. In code the number is a `Sticker`, so `label:` keeps its search meaning. | Prevents CD #12 / Vinyl #12 confusion by text, shape and colour. |
+| D6 | How labels show | Text always includes the series: **"CD #12"** and **"Vinyl #12"** (VoiceOver: "CD label 12"). The physical sticker is the same white strip, across the jewel-case hinge or down the same edge of the sleeve, with the number only: the case or sleeve tells the series. The UI word is **label**; the company is renamed **Record label** everywhere. In code the number is a `Sticker`, so `label:` keeps its search meaning. | Prevents CD #12 / Vinyl #12 confusion by text, shape and colour. |
 | D7 | Duplicate labels | Saving a number already used by another item in the same series is refused, with "Use #58 (next)" and "Use #31 (first free)" offered. Duplicates that already exist (legacy data) can still be saved for other fields, and they're listed in Label Check. No UNIQUE index. | Existing `album_ownership` data may already hold duplicates, and a unique index would make `migrate()` throw. |
 | D8 | Old readers | `album_ownership` becomes a projection the Mac writes. It holds only CDs and downloads, one row per album key, with the primary copy's own date, price and CD label. `format` is only ever NULL or `'digital'`; `label_number` only ever holds CD numbers. Vinyl and song-derived downloads are never projected. | 1.14–1.20 phones and older Macs then see true (if incomplete) data. A vinyl-only album reads as not owned, never as a fake CD. |
 | D9 | Edits from older apps | Reconcile runs on every Mac open and in memory on the phone. A row that isn't what the projection wrote for its primary item (whatever its time) is copied into that item, as far as its writer knew the columns: `album_ownership` is remade once with defaults no app writes, so a column an older app left out can be told from one it cleared. A missing row never deletes an item. | Survives downgrade/upgrade cycles without silent data loss: a label cleared or a download made a CD on 1.18–1.20 stays so, and clocks that differ don't matter. |
@@ -813,10 +813,11 @@ Rows push `CollectionItemRoute`. Drill-downs open the Shelf with a collection qu
   same undigitized badge is used.
 - **`LabelSticker(number:series:)`.**
   - The CD sticker is today's white strip, read bottom to top.
-  - The vinyl sticker is a round dot in `#F4C542` with near-black text, read horizontally.
+  - The vinyl sticker is the same white strip, in the same place and size on the sleeve's left edge (changed after
+    review: the case or sleeve tells the series, so stickers on covers show the number only, and the yellow dot was dropped).
   - Both use fixed colours, like today's sticker, so `ThemeTests` aren't affected.
-- **`StickerPill(sticker:size:)`**, for lists and captions: a white pill with a small "CD" prefix, or a yellow pill
-  with a small "VINYL" prefix, and monospaced digits.
+- **`StickerPill(sticker:size:)`**, for lists and captions: a white pill with a small "CD" or "VINYL" prefix and
+  monospaced digits (number only on a flat cover).
 - **`CopyArt(mark:url:width:)`** chooses the case, sleeve or flat cover.
 - **`CoverCopyMark`** replaces `CoverOwnershipMark` for covers shown without a case: a `StickerPill` top-left and
   badges bottom-right. A cover inside a case never gets a mark.

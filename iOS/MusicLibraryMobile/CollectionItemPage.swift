@@ -77,10 +77,6 @@ private struct CollectionItemContent: View {
             CopyArt(mark: collection.mark(item: item), url: library.coverURL(item: item), width: 300, title: item.album)
                 .padding(.top, 8)
                 .padding(.bottom, 8)
-            if let sticker = item.sticker {
-                StickerPill(sticker: sticker, size: 20)
-            }
-            Text(typeLine).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.secondary)
             Text(title).font(.title2.bold()).multilineTextAlignment(.center).textSelection(.enabled)
             artistButton
             if let meta = metaLine {
@@ -89,15 +85,6 @@ private struct CollectionItemContent: View {
             shelfSteps
         }
         .frame(maxWidth: .infinity)
-    }
-
-    /// "VINYL · 10\" VINYL", "CD", "DOWNLOAD · BOUGHT AS SONGS".
-    private var typeLine: String {
-        if item.origin == .songs { return "DOWNLOAD · BOUGHT AS SONGS" }
-        if case .other(let raw) = item.medium { return raw.uppercased() }
-        // "12\" Vinyl" says it already.
-        if let detail = item.formatDetail, detail.localizedCaseInsensitiveContains(item.medium.name) { return detail.uppercased() }
-        return [item.medium.name, item.formatDetail].compactMap { $0?.uppercased() }.joined(separator: " · ")
     }
 
     @ViewBuilder
@@ -118,10 +105,14 @@ private struct CollectionItemContent: View {
         }
     }
 
-    /// "1959 · Columbia CL 1355 · US".
+    /// "1959 · 12″ Vinyl · Columbia CL 1355 · US", "2008 · Download · Bought as songs".
     private var metaLine: String? {
         var parts: [String] = []
         if let year = item.year ?? info?.firstReleaseYear { parts.append(String(year)) }
+        if case .other(let raw) = item.medium { parts.append(raw) }
+        else if let detail = item.formatDetail { parts.append(detail) }
+        else { parts.append(item.medium.name) }
+        if item.origin == .songs { parts.append("Bought as songs") }
         let label = [item.recordLabel, item.catalogNumber].compactMap { $0 }.joined(separator: " ")
         if !label.isEmpty { parts.append(label) }
         if let country = item.country { parts.append(countryName(country)) }

@@ -419,8 +419,8 @@ extension CollectionScope {
     }
 }
 
-/// One item in the Shelf's grid: its case or sleeve, title, artist, and its label and digital status. Owned items are
-/// never dimmed, digitized or not.
+/// One item in the Shelf's grid: its case or sleeve, title and artist. The label sticker and the badges on the cover
+/// say the rest (hover them for what they mean). Owned items are never dimmed, digitized or not.
 struct CollectionCell: View {
     @Environment(AppModel.self) private var model
     let item: CollectionItem
@@ -433,20 +433,10 @@ struct CollectionCell: View {
                 .padding(.bottom, 4)
             Text(item.album.isEmpty ? "Unknown Album" : item.album).font(.callout.weight(.medium)).lineLimit(1)
             Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).font(.caption).foregroundStyle(.subtext).lineLimit(1)
-            HStack(spacing: 6) {
-                if let sticker = item.sticker { StickerPill(sticker: sticker, size: 9) }
-                let state = model.collection.digitalState(item)
-                DigitalStatusLabel(state: state, medium: item.medium, from: from(state)).font(.caption2)
-            }
         }
         .frame(width: width, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-    }
-
-    private func from(_ state: DigitalState) -> CollectionItem? {
-        if case .otherCopy(_, let id?) = state { return model.item(id: id) }
-        return nil
     }
 }
 

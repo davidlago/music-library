@@ -299,6 +299,7 @@ struct AlbumGrid: View {
                     NavigationLink(value: album) { AlbumCell(album: album, library: library, detail: detail(album), jewelCase: true) }
                         .buttonStyle(.plain)
                         .contextMenu { AlbumMenu(album: album) }
+                        .environment(\.explainsMarksOnPress, false)
                 }
             }
             .padding()
@@ -406,6 +407,11 @@ struct AlbumMenu: View {
     var body: some View {
         let tracks = model.playable(model.library?.tracks(album: album) ?? [])
         let item = ExportItem.album(album: album.album, artist: album.artist)
+        // What the cover's marks mean: pressing and holding them opens this menu.
+        let meanings = model.copyMark(for: album).meanings
+        if !meanings.isEmpty {
+            Section { ForEach(meanings, id: \.self) { Text($0) } }
+        }
         if !tracks.isEmpty {
             Button("Play", systemImage: "play") { player.play(queue: tracks, source: album.album) }
             Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { player.playNext(tracks) }
