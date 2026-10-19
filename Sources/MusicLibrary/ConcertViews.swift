@@ -345,7 +345,7 @@ struct ConcertsView: View {
             ContentUnavailableView {
                 Label("Concerts Near You", systemImage: "ticket")
             } description: {
-                Text("See when artists in your library play near you. Add your \(store.codeName.lowercased()) and a free Ticketmaster or JamBase key in Settings.")
+                Text("See when artists in your digital and physical collections play near you. Add your \(store.codeName.lowercased()) and a free Ticketmaster or JamBase key in Settings.")
             } actions: {
                 SettingsLink { Text("Open Settings…") }
             }
@@ -397,7 +397,7 @@ struct ConcertSettings: View {
         @Bindable var store = model.concerts
         Form {
             Section {
-                Text("See upcoming concerts near you on artist pages, and every artist in your library on the Concerts page.")
+                Text("See upcoming concerts near you on artist pages, and every artist in your digital and physical collections on the Concerts page.")
                     .font(.callout).foregroundStyle(.subtext)
             }
             Section("Where you live") {
@@ -415,7 +415,7 @@ struct ConcertSettings: View {
             } header: {
                 Text("Concert listings")
             } footer: {
-                Text("Use either or both; shows listed by both appear once. Keys are stored in your keychain on this Mac. Results are saved for a day (two for the whole library) to stay within the free limits.")
+                Text("Use either or both; shows listed by both appear once. Keys are stored in your keychain on this Mac. Results are saved for a day (two for all your artists) to stay within the free limits.")
                     .font(.caption).foregroundStyle(.subtext)
             }
             Section("Artist pages") {

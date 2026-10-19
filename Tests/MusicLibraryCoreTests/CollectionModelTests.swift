@@ -356,7 +356,9 @@ import Testing
         let items = [item("cd", .cd, 1, album: "Ripped", source: .rip), item("unripped", .cd, 2, album: "Never", artist: "Beta"),
                      covered, item("dl", .download, album: "Gone", source: .download)]
         let c = MusicCollection(items: items, songPurchases: [:], tracks: tracks)
-        #expect(c.count(.all) == 4 && c.count(.cds) == 2 && c.count(.vinyl) == 1 && c.count(.downloads) == 1)
+        #expect(c.count(.all) == 3, "the Shelf is the physical collection: no downloads")
+        #expect(c.items(in: .all).map(\.id).sorted() == ["cd", "lp", "unripped"])
+        #expect(c.count(.cds) == 2 && c.count(.vinyl) == 1 && c.count(.downloads) == 1)
         #expect(c.items(in: .toDigitize).map(\.id).sorted() == ["lp", "unripped"], "a download with no tracks isn't waiting")
         #expect(c.count(.toDigitize) == 2)
         #expect(c.artists == ["Artist", "Beta"])
@@ -365,7 +367,8 @@ import Testing
         #expect(c.coverPath(c.item(id: "cd")!) == "Music/Artist/Ripped/cover.jpg")
         #expect(c.coverPath(c.item(id: "unripped")!) == nil)
         #expect(CollectionScope.toDigitize.query == "own:physical ripped:no" && CollectionScope.all.title == "Shelf")
-        #expect(CollectionSyncScope.all.title == "Everything digitized in my collection")
+        #expect(CollectionScope.all.query == "own:physical")
+        #expect(CollectionSyncScope.all.title == "Everything I own that's digitized")
     }
 
     @Test func olderVersionsSeeThePrimaryCDsAndDownloads() {

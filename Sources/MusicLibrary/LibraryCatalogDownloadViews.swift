@@ -30,7 +30,7 @@ struct DownloadedCatalogView: View {
             .padding(20)
         }
         .overlay { emptyState(result) }
-        .navigationTitle("Library CDs")
+        .navigationTitle("Local Library CDs")
         .navigationSubtitle(subtitle(result))
         .toolbar {
             ToolbarItem {
@@ -97,7 +97,7 @@ struct DownloadedCatalogView: View {
             }
         } else if result.records.isEmpty {
             ContentUnavailableView("No CDs Match", systemImage: "magnifyingglass",
-                                   description: Text("Try fewer filters, or search the whole network live from the library menu."))
+                                   description: Text("Try fewer filters, or search the whole network live from the libraries menu."))
         }
     }
 }
@@ -131,7 +131,7 @@ struct DownloadedSearchBar: View {
                 libraryMenu
                 Picker("Availability", selection: $catalog.localAvailability) {
                     Text("Any Availability").tag(LibraryCatalogStore.LocalAvailability.any)
-                    Text("On the Shelf at \(catalog.siteLibrary ?? "My Library")").tag(LibraryCatalogStore.LocalAvailability.available)
+                    Text("On the Shelf at \(catalog.siteLibrary ?? "My Local Library")").tag(LibraryCatalogStore.LocalAvailability.available)
                     Text("Not on the Shelf").tag(LibraryCatalogStore.LocalAvailability.out)
                 }
                 .labelsHidden().fixedSize()
@@ -165,7 +165,7 @@ struct DownloadedSearchBar: View {
                     }
                 }
             }
-            Section("Library catalog") {
+            Section("Local library catalog") {
                 ForEach(CatalogSearchQuery.keys, id: \.name) { key in
                     Button("\(key.example) — \(key.help)") { catalog.addToLocalSearch(key.example) }
                 }
@@ -232,7 +232,7 @@ struct DownloadStatus: View {
                 ProgressView(value: Double(progress.page), total: Double(max(progress.pages ?? 1, 1)))
                     .frame(width: 120)
                 if let until = progress.pausedUntil {
-                    Text("Paused: the library's website asked for a break. Resuming at \(until.formatted(date: .omitted, time: .shortened)) (page \(progress.page) of \(progress.pages ?? 0)).")
+                    Text("Paused: the local library's website asked for a break. Resuming at \(until.formatted(date: .omitted, time: .shortened)) (page \(progress.page) of \(progress.pages ?? 0)).")
                         .font(.caption).foregroundStyle(.subtext)
                 } else {
                     Text(progress.pages.map { "Downloading \(progress.library)'s CDs… page \(progress.page) of \($0)" }

@@ -169,7 +169,7 @@ struct EditionResults: View {
             Spacer(minLength: 0)
             if let owned = model.collection.matches(releaseID: e.id, releaseGroupID: nil, albumKey: nil, barcode: nil, medium: nil).first {
                 Text(owned.sticker?.text ?? "Yours").font(.caption.weight(.medium)).foregroundStyle(.subtext)
-                    .help("Already in your collection")
+                    .help("You already own a copy")
             }
         }
         .padding(.vertical, 2)
@@ -243,7 +243,7 @@ struct AddToCollectionSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Add to Collection").font(.title2.bold())
+                Text(chosenMedium == .download ? "Add a Download" : "Add to Physical Collection").font(.title2.bold())
                 Spacer()
                 Picker("Medium", selection: $chosenMedium) {
                     ForEach(CollectionMedium.known, id: \.self) { Text($0.name).tag($0) }
@@ -351,15 +351,15 @@ struct AddToCollectionSheet: View {
                     if let match = libraryMatch, match.ownKey {
                         // The songs under this title and artist are always its digital copy: there's nothing to turn off.
                         VStack(alignment: .leading, spacing: 2) {
-                            Label("Linked to “\(match.album.album)” in your library (\(songCount(match.album.trackCount)))", systemImage: "link")
-                            Text("Your library's songs under this title and artist are its digital copy.")
+                            Label("Linked to “\(match.album.album)” in your digital collection (\(songCount(match.album.trackCount)))", systemImage: "link")
+                            Text("The songs in your digital collection under this title and artist are its digital copy.")
                                 .font(.caption).foregroundStyle(.subtext)
                         }
                         .help(Self.linkHelp(chosenMedium))
                     } else if let match = libraryMatch {
                         Toggle(isOn: $link) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Link to “\(match.album.album)” in your library (\(songCount(match.album.trackCount)))")
+                                Text("Link to “\(match.album.album)” in your digital collection (\(songCount(match.album.trackCount)))")
                                 if !match.sure {
                                     Text("Matched by title and artist\(match.album.artist.isEmpty ? "" : " (\(match.album.artist))"): check it's the same album")
                                         .font(.caption).foregroundStyle(.subtext)
@@ -393,7 +393,7 @@ struct AddToCollectionSheet: View {
         if !owned.isEmpty {
             HStack(spacing: 6) {
                 Image(systemName: "info.circle").foregroundStyle(.subtext)
-                Text("Already in your collection:").foregroundStyle(.subtext)
+                Text("You already own:").foregroundStyle(.subtext)
                 ForEach(owned.prefix(3)) { item in
                     if let s = item.sticker { StickerPill(sticker: s, size: 10) } else { Text(item.medium.name) }
                 }

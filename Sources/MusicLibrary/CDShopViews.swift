@@ -212,7 +212,7 @@ private struct CDShopEditionRow: View {
             }
             Spacer()
             Button("I Own This…") { model.addToCollection(medium: .cd, prefill: CDShopOwnedNote.prefill(edition)) }
-                .help("Add this edition to your collection, with your label number and what you paid")
+                .help("Add this edition to your physical collection, with your label number and what you paid")
             Button("Shop This Edition", action: choose).buttonStyle(.bordered)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
@@ -309,7 +309,7 @@ private struct CDShopOffersSection: View {
                                       ?? CollectionPrefill(album: target.album, artist: target.artist, releaseGroupID: target.releaseGroupId,
                                                            barcode: target.typedBarcode))
             }
-            .help("Add this CD to your collection, with your label number and what you paid")
+            .help("Add this CD to your physical collection, with your label number and what you paid")
             Button { store.unlock() } label: { Label("Choose Another", systemImage: "chevron.backward") }
                 .help("Back to the editions")
         }

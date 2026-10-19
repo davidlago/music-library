@@ -182,10 +182,10 @@ struct CopyBadge: View {
 
     static func label(_ kind: Kind) -> String {
         switch kind {
-        case .borrowed: "Borrowed: not in your collection"
+        case .borrowed: "Borrowed: you don't own a copy"
         case .download: "Bought as a download"
-        case .notRipped: "Not ripped yet: no digital copy in your library"
-        case .notDigitized: "Not digitized yet: no digital copy in your library"
+        case .notRipped: "Not ripped yet: no digital copy"
+        case .notDigitized: "Not digitized yet: no digital copy"
         case .other: "Added by a newer version of Music Library"
         }
     }

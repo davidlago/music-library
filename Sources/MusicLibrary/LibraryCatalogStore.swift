@@ -32,9 +32,9 @@ final class LibraryCatalogStore {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .all: "In Library or Not"
-            case .notOwned: "Not in My Library"
-            case .owned: "In My Library"
+            case .all: "In Digital Collection or Not"
+            case .notOwned: "Not in My Digital Collection"
+            case .owned: "In My Digital Collection"
             }
         }
     }
@@ -333,7 +333,7 @@ final class LibraryCatalogStore {
     }
 
     private func loadNextPage(untilVisible target: Int = 1, pagesLeft: Int = 1) {
-        guard siteURL != nil else { error = "Enter the library catalog's address in Settings."; return }
+        guard siteURL != nil else { error = "Enter the local library catalog's address in Settings."; return }
         let generation = searchGeneration
         let page = loadedPages + 1
         let path = query.path(page: page)

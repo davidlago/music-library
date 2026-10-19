@@ -281,7 +281,7 @@ final class LibraryCatalogClient: NSObject, WKNavigationDelegate {
 
     struct TimeoutError: LocalizedError {
         var seconds: TimeInterval
-        var errorDescription: String? { "The library's website didn't answer in \(Int(seconds)) seconds." }
+        var errorDescription: String? { "The local library's website didn't answer in \(Int(seconds)) seconds." }
     }
 
     /// Resumes a continuation with whichever result comes first.

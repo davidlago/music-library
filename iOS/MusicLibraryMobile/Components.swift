@@ -471,7 +471,7 @@ struct AvailabilityBar: View {
         .confirmationDialog("Remove this \(noun) from the iPhone?", isPresented: $confirmRemove, titleVisibility: .visible) {
             Button("Remove from iPhone", role: .destructive) { model.remove(item) }
         } message: {
-            Text("Its songs are deleted from this iPhone and the Mac stops syncing them. It stays in your library, and you can download it again.")
+            Text("Its songs are deleted from this iPhone and the Mac stops syncing them. It stays in your digital collection, and you can download it again.")
         }
     }
 

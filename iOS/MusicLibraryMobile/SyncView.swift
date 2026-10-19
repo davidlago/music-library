@@ -10,7 +10,7 @@ struct SyncTab: View {
             List {
                 if model.isSample {
                     Section {
-                        Label("You're exploring the sample library. After your first sync, your own library replaces it.", systemImage: "sparkles")
+                        Label("You're exploring the sample library. After your first sync, your own digital and physical collections replace it.", systemImage: "sparkles")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -18,7 +18,7 @@ struct SyncTab: View {
                     pairing(code)
                 } else if !sync.isPaired {
                     Section {
-                        Text("Sync music from Music Library on your Mac over Wi-Fi: your whole library and collection show up here to browse, and the Mac sends the albums, artists and playlists you choose, here or on the Mac.")
+                        Text("Sync music from Music Library on your Mac over Wi-Fi: both your digital and physical collections show up here to browse, and the Mac sends the albums, artists and playlists you choose, here or on the Mac.")
                             .foregroundStyle(.secondary)
                         Button("Pair with a Mac", systemImage: "link") { sync.startPairing() }
                     } footer: {
@@ -124,7 +124,7 @@ struct SyncTab: View {
                 EmptyView()
             }
         } footer: {
-            Text("Keep the app open while syncing: iOS pauses it in the background. Download or remove music from album, artist, playlist and collection pages (Ready to Download on the Collection tab gets everything you've digitized); the iPhone syncs with the Mac as soon as it's around.")
+            Text("Keep the app open while syncing: iOS pauses it in the background. Download or remove music from album, artist and playlist pages and on the Physical tab (its Ready to Download gets every CD and record you've digitized); the iPhone syncs with the Mac as soon as it's around.")
         }
     }
 }
@@ -136,7 +136,7 @@ enum SyncText {
         if s.deleted > 0 { parts.append("removed \(s.deleted)") }
         if s.plays > 0 { parts.append("sent \(s.plays) \(s.plays == 1 ? "play" : "plays")") }
         if s.likes > 0 { parts.append("sent \(s.likes) \(s.likes == 1 ? "like" : "likes")") }
-        if s.databaseUpdated { parts.append("library updated") }
+        if s.databaseUpdated { parts.append("music library updated") }
         if let n = s.purchases, n > 0 { parts.append("sent \(n) ownership \(n == 1 ? "change" : "changes")") }
         if s.missing > 0 { parts.append("\(s.missing) missing on the Mac") }
         return parts.joined(separator: ", ") + "."
@@ -153,7 +153,7 @@ extension SyncTab {
     func title(_ item: ExportItem) -> String {
         let library = model.library
         switch item {
-        case .library: return "Entire library"
+        case .library: return "Entire digital collection"
         case .album(let album, let artist): return "\(album.isEmpty ? "Unknown Album" : album) · \(artist)"
         case .artist(let name): return name.isEmpty ? "Unknown Artist" : name
         case .track(let id): return library?.track(id: id).map { "\($0.title) · \($0.artist)" } ?? "A song"

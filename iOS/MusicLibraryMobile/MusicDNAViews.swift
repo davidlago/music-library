@@ -44,7 +44,7 @@ struct MusicDNAPage: View {
                 let graph = library.collaborations
                 if graph.people.isEmpty {
                     ContentUnavailableView("No Credits Yet", systemImage: "point.3.connected.trianglepath.dotted",
-                                           description: Text("Music DNA maps who played, wrote and produced together. It fills in as you import music matched to MusicBrainz on your Mac."))
+                                           description: Text("Music DNA maps who played, wrote and produced together. It fills in as you add music, CDs and records matched to MusicBrainz on your Mac."))
                         .navigationTitle("Music DNA")
                 } else if let name {
                     Group {
@@ -52,7 +52,7 @@ struct MusicDNAPage: View {
                             DNAPersonPage(graph: graph, center: center)
                         } else {
                             ContentUnavailableView("\(name) Isn't in Your Credits", systemImage: "person.crop.circle.badge.questionmark",
-                                                   description: Text("Nobody by that name appears in the credits of the music in your library."))
+                                                   description: Text("Nobody by that name appears in the credits of your music, digital or physical."))
                                 .navigationTitle("Music DNA")
                         }
                     }
@@ -60,7 +60,7 @@ struct MusicDNAPage: View {
                         ToolbarItemGroup(placement: .topBarTrailing) {
                             Button("Find Someone", systemImage: "magnifyingglass") { searching = true }
                             Button("Start Over", systemImage: "square.grid.2x2") { openRoute(DNARoute(name: nil)) }
-                                .accessibilityHint("Shows the best-connected people in your library")
+                                .accessibilityHint("Shows the best-connected people in your music")
                         }
                     }
                     .sheet(isPresented: $searching) {
@@ -93,10 +93,10 @@ private struct DNALanding: View {
             if query.trimmingCharacters(in: .whitespaces).isEmpty {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        Text("See who played, wrote and produced with whom across your library. Pick someone to put them at the center; tap any bubble to follow the connections.")
+                        Text("See who played, wrote and produced with whom across your digital and physical collections. Pick someone to put them at the center; tap any bubble to follow the connections.")
                             .foregroundStyle(.secondary)
                         DNALegend()
-                        SectionHeader(title: "Most connected in your library")
+                        SectionHeader(title: "Most connected in your music")
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), alignment: .center, spacing: 20) {
                             ForEach(graph.mostConnected(limit: 30)) { p in
                                 NavigationLink(value: DNARoute(name: p.name)) {
@@ -147,7 +147,7 @@ private struct DNASearchSheet: View {
                             .buttonStyle(.plain)
                     }
                 } header: {
-                    if empty { Text("Most connected in your library") }
+                    if empty { Text("Most connected in your music") }
                 }
             }
             .listStyle(.plain)
@@ -190,7 +190,7 @@ private struct DNALegend: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Colored by what each person mostly does in your library")
+        .accessibilityHint("Colored by what each person mostly does in your music")
     }
 }
 
@@ -541,6 +541,7 @@ private struct DNADetail: View {
                     Text("Connected to \(center.name) through other collaborators.").font(.callout).foregroundStyle(.secondary)
                 } else {
                     DNATrackList(title: "With \(center.name)", ids: shared, source: "\(person.name) with \(center.name)")
+                    DNAPhysicalList(title: "With \(center.name), in your physical collection", ids: shared, graph: graph)
                 }
                 if selected.level >= 2, let parent = selected.parent.flatMap({ id in hood.nodes.first { $0.id == id }?.person }) {
                     Text("Reached through \(parent.name): \(songCount(selected.shared)) together.")
@@ -549,7 +550,8 @@ private struct DNADetail: View {
                 Text("Tap the bubble again to put \(person.name) at the center.").font(.caption).foregroundStyle(.secondary)
             } else {
                 topCollaborators
-                DNATrackList(title: "In your library", ids: graph.tracks(of: center.id), source: center.name)
+                DNATrackList(title: "In your digital collection", ids: graph.tracks(of: center.id), source: center.name)
+                DNAPhysicalList(title: "In your physical collection", ids: graph.tracks(of: center.id), graph: graph)
             }
         }
     }
@@ -623,6 +625,10 @@ private struct DNATrackList: View {
         let tracks = ids.compactMap { model.library?.track(id: $0) }
             .sorted { (model.playTotals[$0.id]?.plays ?? 0) > (model.playTotals[$1.id]?.plays ?? 0) }
         let shown = Array(tracks.prefix(Self.shownLimit))
+        if !tracks.isEmpty { list(tracks, shown) }
+    }
+
+    private func list(_ tracks: [Track], _ shown: [Track]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).font(.headline)
             VStack(spacing: 0) {
@@ -661,6 +667,51 @@ private struct DNATrackList: View {
             }
         } message: { _ in
             Text(model.sync.isPaired ? "Download it from your Mac to play it here." : "Pair with your Mac in the Sync tab to download music.")
+        }
+    }
+}
+
+/// Songs on CDs and records with no digital copy (`CollaborationGraph.PhysicalSong`, the negative ids), by the copy
+/// they're on; tapping one opens that copy.
+private struct DNAPhysicalList: View {
+    @Environment(PhoneModel.self) private var model
+    let title: String
+    let ids: [Int64]
+    let graph: CollaborationGraph
+
+    var body: some View {
+        let songs = ids.compactMap { graph.physicalSong($0) }
+            .compactMap { song in model.item(id: song.itemID).map { (song: song, item: $0) } }
+        let shown = Array(songs.prefix(DNATrackList.shownLimit))
+        if !songs.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title).font(.headline)
+                VStack(spacing: 0) {
+                    ForEach(Array(shown.enumerated()), id: \.element.song.id) { i, entry in
+                        NavigationLink(value: CollectionItemRoute(id: entry.item.id)) {
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(entry.song.title).lineLimit(1)
+                                    Text(entry.item.album).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                                Spacer(minLength: 8)
+                                if let sticker = entry.item.sticker { StickerPill(sticker: sticker, size: 10) }
+                                else { Text(entry.item.medium.name).font(.caption2.weight(.semibold)).foregroundStyle(.secondary) }
+                                Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                            }
+                            .padding(.horizontal, 12).padding(.vertical, 9)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Opens your \(entry.item.sticker?.text ?? entry.item.medium.name)")
+                        if i < shown.count - 1 { Divider().padding(.leading, 12) }
+                    }
+                }
+                .card()
+                if songs.count > DNATrackList.shownLimit {
+                    Text("and \(songs.count - DNATrackList.shownLimit) more").font(.caption).foregroundStyle(.secondary)
+                }
+            }
         }
     }
 }

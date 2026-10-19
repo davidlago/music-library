@@ -233,7 +233,7 @@ struct CDView: View {
         case .queued:
             Label("Sent to Import", systemImage: "tray.and.arrow.down").font(.caption).foregroundStyle(.subtext)
         case .inLibrary:
-            Text("In library" + (ripped.map { " · \($0.text) · ripped" } ?? "")).font(.caption).foregroundStyle(.subtext)
+            Text("In digital collection" + (ripped.map { " · \($0.text) · ripped" } ?? "")).font(.caption).foregroundStyle(.subtext)
         case .failed(let message):
             Text(message).font(.caption).foregroundStyle(.red).lineLimit(1).help(message)
         }
@@ -302,7 +302,7 @@ struct CDView: View {
                 if !disc.libraryTracks.isEmpty {
                     Button("Check with AccurateRip") { Task { await model.cd.checkRips(disc) } }
                         .disabled(disc.isChecking || !model.ffmpegAvailable)
-                        .help("Compare the library's rips of this disc with other people's rips in AccurateRip")
+                        .help("Compare your rips of this disc with other people's rips in AccurateRip")
                 }
                 if disc.release == nil {
                     Button("Rip to Import Queue") { model.cd.ripToImportQueue(disc) }
@@ -311,8 +311,8 @@ struct CDView: View {
                 }
                 Button("Catalog Without Ripping") { model.cd.catalog(disc) }
                     .disabled(disc.release == nil)
-                    .help(model.ejectAfterCataloging ? "Save this CD in your collection without ripping it, then eject it"
-                          : "Save this CD in your collection without ripping it")
+                    .help(model.ejectAfterCataloging ? "Save this CD in your physical collection without ripping it, then eject it"
+                          : "Save this CD in your physical collection without ripping it")
                 Button("Rip \(disc.selectedCount) Track\(disc.selectedCount == 1 ? "" : "s")") {
                     if disc.collectionChoice == nil { askOwnership = true } else { model.cd.rip(disc) }
                 }

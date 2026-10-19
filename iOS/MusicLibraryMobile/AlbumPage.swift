@@ -317,7 +317,7 @@ struct AlbumTrackList: View {
             HStack(alignment: .firstTextBaseline) {
                 SectionHeader(title: "Tracks")
                 if notInLibrary > 0, !trackless {
-                    Text("\(owned.count) of \(rows.count) in your library").font(.footnote).foregroundStyle(.secondary).fixedSize()
+                    Text("\(owned.count) of \(rows.count) in your digital collection").font(.footnote).foregroundStyle(.secondary).fixedSize()
                 }
             }
             VStack(spacing: 0) {
@@ -346,7 +346,7 @@ struct AlbumTrackList: View {
                 Text(fromMusicBrainz ? "The track list of the release, from MusicBrainz." : "The track list of the release.")
                     .font(.caption).foregroundStyle(.secondary)
             } else if notInLibrary > 0 {
-                Text("Greyed-out tracks are on this release but not in your library.").font(.caption).foregroundStyle(.secondary)
+                Text("Greyed-out tracks are on this release but not in your digital collection.").font(.caption).foregroundStyle(.secondary)
             }
         }
         .confirmationDialog("“\(missing?.title ?? "")” isn't on this iPhone", isPresented: Binding(get: { missing != nil }, set: { if !$0 { missing = nil } }),
@@ -418,7 +418,7 @@ struct AlbumTrackList: View {
             Text(entry.title).lineLimit(2)
             Spacer(minLength: 6)
             if !trackless {
-                Text("Not in library").font(.caption2)
+                Text("No digital copy").font(.caption2)
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(Capsule().strokeBorder(Color.secondary.opacity(0.5), lineWidth: 0.5))
                     .fixedSize()

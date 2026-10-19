@@ -39,21 +39,22 @@ nonisolated enum InsightColor {
 
 // MARK: Tab
 
-/// The panes, Collection first. The raw values are saved (`insightsPane`), so the Collection pane keeps "Owned".
+/// The panes, Owned first. The raw values are saved (`insightsPane`), so they keep their old names.
 enum InsightsPane: String, CaseIterable, Identifiable {
     case owned = "Owned", library = "Library", listening = "Listening"
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .owned: "Collection"
-        case .library: "Library"
+        case .owned: "Owned"
+        case .library: "Digital"
         case .listening: "Listening"
         }
     }
 }
 
-/// Insights: what you own (CDs, records, downloads), your digital library, and what you listen to.
+/// Insights: what you own (CDs, records, downloads), your digital collection, and what you listen to, plus Explore
+/// (Music DNA), which spans both collections.
 struct InsightsTab: View {
     @Environment(PhoneModel.self) private var model
     @AppStorage("insightsPane") private var pane = InsightsPane.owned
@@ -77,10 +78,11 @@ struct InsightsTab: View {
         if let library = model.library {
             if library.isEmpty {
                 ContentUnavailableView("No Insights Yet", systemImage: "chart.bar.xaxis",
-                                       description: Text("Add music or the CDs and records you own to your library and sync, and this page fills in with stats about them."))
+                                       description: Text("Add music or the CDs and records you own in Music Library on your Mac and sync, and this page fills in with stats about them."))
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
+                        InsightsExplore()
                         Picker("Insights", selection: $pane) { ForEach(InsightsPane.allCases) { Text($0.title).tag($0) } }
                             .pickerStyle(.segmented).labelsHidden()
                         paneContent
@@ -137,6 +139,32 @@ struct InsightsTab: View {
     }
 }
 
+/// Explore: pages about your music that belong to neither collection alone. Music DNA covers the people of both;
+/// concerts are on artist pages (the phone has no Concerts page).
+private struct InsightsExplore: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionHeader(title: "Explore")
+            NavigationLink(value: DNARoute(name: nil)) {
+                HStack(spacing: 12) {
+                    Image(systemName: "point.3.connected.trianglepath.dotted").foregroundStyle(Color.accentColor).frame(width: 26)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Music DNA")
+                        Text("Who played, wrote and produced with whom").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    InsightChevron()
+                }
+                .padding(.horizontal, 14).padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .card()
+            .accessibilityElement(children: .combine)
+        }
+    }
+}
+
 struct InsightsLoading: View {
     var body: some View {
         ProgressView("Crunching the numbers…")
@@ -145,7 +173,7 @@ struct InsightsLoading: View {
     }
 }
 
-/// The Library pane: stats about the whole collection.
+/// The Digital pane: stats about the whole digital collection.
 struct InsightsLibraryPane: View {
     let stats: LibraryStats
 
@@ -775,11 +803,11 @@ struct InsightsGrowthCard: View {
     @State private var selected: LibraryStats.GrowthPoint?
 
     var body: some View {
-        InsightCard(title: "Library Growth", subtitle: subtitle) {
+        InsightCard(title: "Digital Collection Growth", subtitle: subtitle) {
             if stats.growth.count >= 2 {
                 VStack(alignment: .leading, spacing: 12) {
                     InsightReadout(text: selected.map { "\(period($0.date)) · +\($0.added.formatted()) → \(songCount($0.total))" },
-                                   hint: "Songs in your library over time · drag for details")
+                                   hint: "Songs in your digital collection over time · drag for details")
                     Chart {
                         ForEach(stats.growth) { p in
                             AreaMark(x: .value("Date", p.date), y: .value("Songs", p.total))
@@ -954,7 +982,7 @@ struct InsightsFunFactsCard: View {
             out.append(InsightFact(icon: "flame", title: "Busiest year", value: String(y.year), detail: "\(songCount(y.count)) released that year", query: "year:\(y.year)"))
         }
         if let a = stats.artistsByAlbums.first, a.count > 1 {
-            out.append(InsightFact(icon: "person.2", title: "Most albums", value: a.name, detail: "\(a.count) albums in your library",
+            out.append(InsightFact(icon: "person.2", title: "Most albums", value: a.name, detail: "\(a.count) albums in your digital collection",
                                    query: SearchFilterKey.token("albumartist", a.name)))
         }
         if let w = stats.titleWords.first {

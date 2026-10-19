@@ -8,8 +8,9 @@ enum WatchRoute: Hashable {
 
 // MARK: Shelf
 
-/// The collection: the CDs, records and downloads you own, what you added lately and the CDs still to rip, with Find
-/// to look one up by its label. From an iPhone before the collection, the albums you bought instead.
+/// The physical collection (titled "Physical"): the CDs and records you own (with a count of the downloads you bought),
+/// what you added lately and the CDs still to rip, with Find to look one up by its label. From an iPhone before the
+/// collection, the albums you bought instead.
 struct ShelfPage: View {
     let glance: Glance
 
@@ -23,19 +24,19 @@ struct ShelfPage: View {
                 if let collection = glance.collection {
                     collectionContent(collection)
                 } else {
-                    UpdateIPhoneNote(text: "Update the iPhone app to see your whole collection.")
+                    UpdateIPhoneNote(text: "Update the iPhone app to see your physical collection.")
                     ownedContent(glance.owned)
                 }
             }
         }
-        .navigationTitle("Shelf")
+        .navigationTitle("Physical")
         .containerBackground(Color.green.gradient, for: .tabView)
     }
 
     @ViewBuilder
     private func collectionContent(_ c: Glance.Collection) -> some View {
         if Self.isEmpty(c) {
-            Text("Add CDs, records and downloads in Music Library on your Mac.")
+            Text("Add CDs and records in Music Library on your Mac.")
                 .font(.footnote).foregroundStyle(.secondary)
         } else {
             VStack(alignment: .leading, spacing: 0) {
@@ -83,11 +84,12 @@ struct ShelfPage: View {
         return parts.joined(separator: " · ")
     }
 
-    /// "97 downloads · 3 records to digitize"; nil when there are neither.
+    /// "3 records to digitize · 97 owned downloads" (downloads are digital, so they come last, said as such); nil when
+    /// there are neither.
     static func moreCounts(_ c: Glance.Collection) -> String? {
         var parts: [String] = []
-        if let downloads = c.downloads, downloads > 0 { parts.append(GlanceFormat.count(downloads, "download")) }
         if let vinyl = c.vinylToDigitize, vinyl > 0 { parts.append("\(GlanceFormat.count(vinyl, "record")) to digitize") }
+        if let downloads = c.downloads, downloads > 0 { parts.append("\(downloads.formatted()) owned \(downloads == 1 ? "download" : "downloads")") }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
@@ -238,7 +240,7 @@ struct WatchFindPage: View {
             }
         } else {
             ContentUnavailableView {
-                Label("No Shelf Yet", systemImage: "number")
+                Label("No Labels Yet", systemImage: "number")
             } description: {
                 Text("Open Music Library on your iPhone, and your labeled CDs and records come over to the watch.")
             }

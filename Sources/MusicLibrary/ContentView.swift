@@ -124,8 +124,9 @@ struct SidebarView: View {
     var body: some View {
         @Bindable var model = model
         List(selection: $model.sidebar) {
-            Section("Collection") {
-                ForEach(CollectionScope.allCases, id: \.self) { scope in
+            Section("Physical Collection") {
+                // Downloads are listed with the digital collection below.
+                ForEach(CollectionScope.allCases.filter { $0 != .downloads }, id: \.self) { scope in
                     let count = model.collection.count(scope)
                     // To Digitize only while something is waiting (or it's the page showing).
                     if scope != .toDigitize || count > 0 || model.sidebar == .collection(.toDigitize) {
@@ -133,10 +134,15 @@ struct SidebarView: View {
                     }
                 }
             }
-            Section("Library") {
+            Section("Digital Collection") {
                 Label("Songs", systemImage: "music.note").sidebarBadge(model.tracks.count).tag(SidebarItem.songs)
                 Label("Albums", systemImage: "square.stack").sidebarBadge(model.albums.count).tag(SidebarItem.albums)
                 Label("Artists", systemImage: "music.mic").sidebarBadge(model.artists.count).tag(SidebarItem.artists)
+                Label(CollectionScope.downloads.title, systemImage: CollectionScope.downloads.symbol)
+                    .sidebarBadge(model.collection.count(.downloads))
+                    .tag(SidebarItem.collection(.downloads))
+            }
+            Section("Explore") {
                 Label("Insights", systemImage: "chart.bar.xaxis").tag(SidebarItem.insights)
                 Label("Music DNA", systemImage: "point.3.connected.trianglepath.dotted").tag(SidebarItem.musicDNA)
                 Label("Concerts", systemImage: "ticket").tag(SidebarItem.concerts)
@@ -151,8 +157,8 @@ struct SidebarView: View {
                         .tag(SidebarItem.cd(disc.id))
                 }
             }
-            Section("Library Catalog") {
-                Label("Library CDs", systemImage: "building.columns").tag(SidebarItem.catalog)
+            Section("Local Library") {
+                Label("Local Library CDs", systemImage: "building.columns").tag(SidebarItem.catalog)
                 Label("My Checkouts", systemImage: "books.vertical")
                     .sidebarBadge(model.catalog.cdCheckouts.count)
                     .tag(SidebarItem.catalogCheckouts)

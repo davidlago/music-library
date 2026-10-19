@@ -431,7 +431,7 @@ struct AlbumDetail: View {
                 SectionHeader(title: "Tracks")
                 Spacer()
                 if missing > 0 {
-                    Text("\(playable.count) of \(rows.count) in your library").font(.callout).foregroundStyle(.subtext)
+                    Text("\(playable.count) of \(rows.count) in your digital collection").font(.callout).foregroundStyle(.subtext)
                 }
             }
             VStack(spacing: 0) {
@@ -455,7 +455,7 @@ struct AlbumDetail: View {
             .background(RoundedRectangle(cornerRadius: 14).fill(theme.card.opacity(0.72)))
             .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(theme.separator.opacity(0.5), lineWidth: 0.5))
             if missing > 0 {
-                Text("Greyed-out tracks are on this release but not in your library.").font(.caption).foregroundStyle(.subtext)
+                Text("Greyed-out tracks are on this release but not in your digital collection.").font(.caption).foregroundStyle(.subtext)
             }
         }
     }
@@ -542,7 +542,7 @@ struct AlbumTrackRow: View {
             Text(showsPositions ? entry.displayPosition : String(entry.number)).monospacedDigit().frame(width: 24)
             Text(entry.title).lineLimit(1)
             Spacer()
-            Text("Not in library").font(.caption2)
+            Text("Not in digital collection").font(.caption2)
                 .padding(.horizontal, 6).padding(.vertical, 2)
                 .background(Capsule().strokeBorder(theme.separator, lineWidth: 0.5))
             Text(entry.duration.map(formatTime) ?? "").monospacedDigit().frame(width: 46, alignment: .trailing)

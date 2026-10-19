@@ -29,8 +29,8 @@ struct CollectionRoutePage: View {
 
 // MARK: Tab
 
-/// The Collection tab: the CDs, records and downloads you own, with or without songs in the library. Read-only; the
-/// collection is edited in Music Library on the Mac.
+/// The Physical tab: the CDs and records you own, with or without songs in the library (downloads are on the Digital
+/// tab). Read-only; the collection is edited in Music Library on the Mac.
 struct CollectionTab: View {
     @Environment(PhoneModel.self) private var model
 
@@ -38,11 +38,11 @@ struct CollectionTab: View {
         LibraryStack(opener: PendingItemOpener()) {
             Group {
                 if let library = model.library {
-                    if model.collection.items.isEmpty {
+                    if model.collection.count(.all) == 0 {
                         ContentUnavailableView {
                             Label("Your Shelf Is Empty", systemImage: "books.vertical")
                         } description: {
-                            Text("Add the CDs, records and downloads you own in Music Library on your Mac, then sync. They show up here, ripped or not.")
+                            Text("Add the CDs and records you own in Music Library on your Mac, then sync. They show up here, ripped or not.")
                         } actions: {
                             Button("Check Again") { model.reload() }
                         }
@@ -53,7 +53,7 @@ struct CollectionTab: View {
                     LibraryStatusView()
                 }
             }
-            .navigationTitle("Collection")
+            .navigationTitle("Physical Collection")
         }
     }
 }
@@ -92,7 +92,7 @@ struct CollectionHome: View {
             VStack(alignment: .leading, spacing: 20) {
                 if model.isSample { sampleNote }
                 FindByLabelCard()
-                tiles(collection)
+                tiles(collection, ready: ready)
                 rows(collection, ready: ready)
                 recentlyAdded(collection)
                 footnotes(collection)
@@ -110,7 +110,7 @@ struct CollectionHome: View {
             Image(systemName: "sparkles").foregroundStyle(Color.accentColor).font(.title3)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Sample Library").font(.headline)
-                Text("A made-up collection of CDs, records and a download, so you can try the app. Your own replaces it after your first sync.")
+                Text("A made-up physical collection of CDs and records, so you can try the app. Your own replaces it after your first sync.")
                     .font(.subheadline).foregroundStyle(.secondary)
                 Button("Hide Sample Library") { model.hideSample() }.font(.subheadline.weight(.medium)).padding(.top, 2)
             }
@@ -120,22 +120,23 @@ struct CollectionHome: View {
         .card()
     }
 
-    private func tiles(_ c: MusicCollection) -> some View {
+    private func tiles(_ c: MusicCollection, ready: [CollectionItem]) -> some View {
         let toDigitize = c.items(in: .toDigitize)
         let toRip = toDigitize.count { $0.medium == .cd }
         return StatGrid {
-            tile(.cds, value: c.count(.cds), label: "CDs", icon: "opticaldisc",
+            tile(.scope(.cds), value: c.count(.cds), label: "CDs", icon: "opticaldisc",
                  detail: c.count(.cds) > 0 ? "Next label: CD #\(c.nextNumber(in: .cd))" : nil)
-            tile(.vinyl, value: c.count(.vinyl), label: "Vinyl", icon: "record.circle",
+            tile(.scope(.vinyl), value: c.count(.vinyl), label: "Vinyl", icon: "record.circle",
                  detail: c.count(.vinyl) > 0 ? "Next label: Vinyl #\(c.nextNumber(in: .vinyl))" : nil)
-            tile(.downloads, value: c.count(.downloads), label: "Downloads", icon: "arrow.down.circle", detail: nil)
-            tile(.toDigitize, value: toDigitize.count, label: "To Digitize", icon: "waveform.slash",
+            tile(.scope(.toDigitize), value: toDigitize.count, label: "To Digitize", icon: "waveform.slash",
                  detail: toDigitize.isEmpty ? "Everything's digitized" : (toRip > 0 ? "\(toRip) CD\(toRip == 1 ? "" : "s") to rip" : nil))
+            tile(.readyToDownload, value: ready.count, label: "Ready to Download", icon: "icloud.and.arrow.down",
+                 detail: ready.isEmpty ? nil : "Not on this iPhone yet")
         }
     }
 
-    private func tile(_ scope: CollectionScope, value: Int, label: String, icon: String, detail: String?) -> some View {
-        NavigationLink(value: CollectionRoute.scope(scope)) {
+    private func tile(_ route: CollectionRoute, value: Int, label: String, icon: String, detail: String?) -> some View {
+        NavigationLink(value: route) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
                     Image(systemName: icon).font(.callout).foregroundStyle(Color.accentColor)
@@ -157,14 +158,11 @@ struct CollectionHome: View {
 
     private func rows(_ c: MusicCollection, ready: [CollectionItem]) -> some View {
         VStack(spacing: 0) {
-            scopeRow(.all, "Shelf", systemImage: "books.vertical", count: c.items.count, detail: "Everything you own")
+            scopeRow(.all, "Shelf", systemImage: "books.vertical", count: c.count(.all), detail: "Every CD and record you own")
             divider
             scopeRow(.cds, "CDs", systemImage: "opticaldisc", count: c.count(.cds), detail: "Ripped or not")
             divider
             scopeRow(.vinyl, "Vinyl", systemImage: "record.circle", count: c.count(.vinyl), detail: "Records, digitized or not")
-            divider
-            scopeRow(.downloads, "Downloads", systemImage: "arrow.down.circle", count: c.count(.downloads),
-                     detail: "Albums and songs you bought")
             divider
             scopeRow(.toDigitize, "To Digitize", systemImage: "waveform.slash", count: c.count(.toDigitize),
                      detail: "No digital copy yet")
@@ -205,7 +203,7 @@ struct CollectionHome: View {
 
     @ViewBuilder
     private func recentlyAdded(_ c: MusicCollection) -> some View {
-        let recent = Array(CollectionSort.added.sorted(c.items).prefix(12))
+        let recent = Array(CollectionSort.added.sorted(c.items(in: .all)).prefix(12))
         if !recent.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Recently Added")
@@ -246,7 +244,7 @@ struct CollectionHome: View {
                       systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
             }
-            Text("Edit your collection in Music Library on your Mac.").foregroundStyle(.secondary)
+            Text("Edit your physical collection in Music Library on your Mac.").foregroundStyle(.secondary)
         }
         .font(.footnote)
     }
@@ -338,7 +336,7 @@ struct CollectionStatusMark: View {
             AvailabilityMark(availability: model.availability(tracks), pending: model.isDownloadPending(tracks))
         } else if state == .missing {
             Image(systemName: "exclamationmark.circle").font(.caption).foregroundStyle(.secondary)
-                .accessibilityLabel("Digital copy no longer in the library")
+                .accessibilityLabel("Digital copy no longer in your digital collection")
         } else if item.medium.isPhysical {
             Image(systemName: item.medium == .vinyl ? "record.circle" : item.medium == .cd ? "opticaldisc" : "shippingbox")
                 .font(.caption).foregroundStyle(.secondary)
@@ -372,7 +370,7 @@ struct DigitalStatusLabel: View {
         switch state {
         case .digitized:
             if compact { return nil }
-            return (item.medium == .download ? "In your library" : item.medium == .cd ? "Ripped" : "Digitized", "checkmark.circle")
+            return (item.medium == .download ? "In your digital collection" : item.medium == .cd ? "Ripped" : "Digitized", "checkmark.circle")
         case .partial(let have, let total):
             return ("\(have) of \(total)", "circle.lefthalf.filled")
         case .otherCopy(_, let from):
@@ -615,7 +613,7 @@ struct CollectionListPage: View {
 
 // MARK: Ready to Download
 
-/// Items with a digital copy whose songs aren't all on this iPhone, and Download All, which asks the Mac for each
+/// CDs and records with a digital copy whose songs aren't all on this iPhone, and Download All, which asks the Mac for each
 /// album (`SyncRequest`s, kept until a sync, so it works before pairing too).
 struct ReadyToDownloadPage: View {
     @Environment(PhoneModel.self) private var model
@@ -654,7 +652,7 @@ struct ReadyToDownloadPage: View {
         .overlay {
             if items.isEmpty {
                 ContentUnavailableView("All Here", systemImage: "checkmark.circle",
-                                       description: Text("The digital copies of everything in your collection are on this iPhone."))
+                                       description: Text("Every CD and record you've digitized is on this iPhone."))
             }
         }
         .navigationTitle("Ready to Download")

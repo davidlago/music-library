@@ -395,6 +395,7 @@ final class AppModel {
             player.root = libraryRoot
             artistInfo.open(database: database, root: libraryRoot)
             albumInfo.open(database: database)
+            albumInfo.onFetched = { [weak self] in self?.rebuildCollection() }
             catalog.open(database: database)
             reloadLibrary()
             Task { await backfillAudioFormats() }
@@ -482,7 +483,6 @@ final class AppModel {
         Task.detached(priority: .userInitiated) {
             let covers = CoverLookup(root: root)
             let index = SearchIndex(tracks: all, hasCover: covers.hasCover)
-            let graph = CollaborationGraph(tracks: all)
             let ownership = Self.catalogOwnership(albums: albumList, tracks: all)
             var built: (collection: MusicCollection, index: CollectionIndex)?
             if var request = collectionRequest {
@@ -496,6 +496,8 @@ final class AppModel {
                 built = Self.buildCollection(request.read, songs: request.songs, tracks: all, infos: request.infos, index: index)
             }
             let current = built
+            // Music DNA spans both collections: CDs and records with no digital copy add their releases' people.
+            let graph = CollaborationGraph(tracks: all, physical: Self.physicalSongs(built?.collection, infos: collectionRequest?.infos))
             let counts = Dictionary(uniqueKeysWithValues: smart.map { p in
                 (p.id, current.map { LibrarySearch.tracks(matching: p.query, index: index, collectionIndex: $0.index, collection: $0.collection) }?.count
                     ?? index.tracks(matching: SearchQuery.parse(p.query)).count)
@@ -718,7 +720,9 @@ final class AppModel {
         albumInfo.refresh([albumRequest(album)], fetcher: artistFetcher)
     }
 
-    /// Gives the album a new cover (JPEG): its `cover.jpg` and, with `embed`, the art inside its files.
+    /// Gives the album a new cover (JPEG): its `cover.jpg` and, with `embed`, the art inside its files. The CDs and
+    /// records its songs came from show it too: one with a cover of its own drops it (the file is removed once saved).
+    /// A copy whose music came from elsewhere keeps its own art.
     func replaceCover(of album: AlbumSummary, with jpeg: Data, embed: Bool,
                       progress: @escaping @Sendable (Int, Int) -> Void) async throws -> AlbumCoverWriter.Result {
         let writer = AlbumCoverWriter(root: libraryRoot, tools: tools)
@@ -728,9 +732,16 @@ final class AppModel {
             player.reloadCover()
             reloadLibrary()
         }
-        return try await Task.detached(priority: .userInitiated) {
+        let result = try await Task.detached(priority: .userInitiated) {
             try await writer.apply(jpeg, to: albumTracks, embed: embed, progress: progress)
         }.value
+        for item in collection.copies(albumKey: AlbumInfoStore.key(album)) where item.coverFile != nil && item.isEditable {
+            switch collection.digitalState(item) {
+            case .digitized, .partial: changeItem(id: item.id) { $0.coverFile = nil }
+            case .otherCopy, .none, .missing: break
+            }
+        }
+        return result
     }
 
     func album(forKey key: String) -> AlbumSummary? {
@@ -847,6 +858,12 @@ final class AppModel {
 
     /// Opens the Shelf (or one of its scopes) filtered by `query`, in the collection query language.
     func showShelf(query: String = "", scope: CollectionScope = .all) {
+        var scope = scope
+        // Downloads aren't on the Shelf: a filter that finds only downloads (an Insights row, say) opens Downloads.
+        if scope == .all, !query.isEmpty {
+            let found = collectionIndex.search(query)
+            if !found.isEmpty, !found.contains(where: { $0.medium.isPhysical }) { scope = .downloads }
+        }
         nowPlayingExpanded = false
         if !searchText.isEmpty { searchText = "" }
         if sidebar != .collection(scope) { sidebar = .collection(scope) }
@@ -1041,11 +1058,19 @@ final class AppModel {
         let index = indexIsCurrent ? self.index : nil
         Task.detached(priority: .userInitiated) {
             let built = Self.buildCollection(request.read, songs: request.songs, tracks: all, infos: request.infos, index: index)
+            let graph = CollaborationGraph(tracks: all, physical: Self.physicalSongs(built.collection, infos: request.infos))
             await MainActor.run { [weak self] in
                 guard let self, request.generation == self.collectionGeneration else { return }
+                self.collaborations = graph
                 self.setCollection(built, settling: request.unsettled)
             }
         }
+    }
+
+    nonisolated private static func physicalSongs(_ collection: MusicCollection?, infos: [String: AlbumInfo]?)
+        -> [CollaborationGraph.PhysicalSong] {
+        guard let collection else { return [] }
+        return CollaborationGraph.physicalSongs(collection: collection, albumInfos: infos ?? [:])
     }
 
     nonisolated private static func buildCollection(_ read: CollectionRead, songs: [Int64: TrackPurchase], tracks: [Track],
@@ -1062,11 +1087,11 @@ final class AppModel {
         for (id, change) in unsettled where unsettledItems[id] == change { unsettledItems.removeValue(forKey: id) }
         catalog.collection = collection
         refreshCollectionPlaylistCounts()
-        // The app opens on the Shelf once there's anything on it (D19), unless something else was picked already
-        // (a page opened or a search typed while it loaded counts too).
+        // The app opens on the Shelf once there's anything on it (D19; downloads aren't on the Shelf), unless
+        // something else was picked already (a page opened or a search typed while it loaded counts too).
         if !appliedDefaultSidebar {
             appliedDefaultSidebar = true
-            if !sidebarChosen, searchText.isEmpty, navigationPath.isEmpty, !collection.items.isEmpty { sidebar = .collection(.all) }
+            if !sidebarChosen, searchText.isEmpty, navigationPath.isEmpty, collection.count(.all) > 0 { sidebar = .collection(.all) }
         }
         if !collectionLoaded {
             collectionLoaded = true
@@ -1659,7 +1684,7 @@ final class AppModel {
         if let current = exportDestination { panel.directoryURL = current }
         guard panel.runModal() == .OK, let dest = panel.url else { return }
         if dest.standardizedFileURL.path == libraryRoot.standardizedFileURL.path {
-            errorMessage = "Choose a folder other than the library itself."
+            errorMessage = "Choose a folder other than the library folder itself."
             return
         }
         exportDestination = dest

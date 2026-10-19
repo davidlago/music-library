@@ -7,7 +7,7 @@ enum LibraryRoute: Hashable {
     case smartPlaylist(Int64)
 }
 
-/// The Library tab lists the whole library or only what's on this iPhone.
+/// The Digital tab lists the whole digital collection or only what's on this iPhone.
 enum LibraryScope: String, CaseIterable, Identifiable {
     case all = "All Music", onPhone = "On This iPhone"
     var id: Self { self }
@@ -20,14 +20,14 @@ struct LibraryTab: View {
     var body: some View {
         LibraryStack(opener: PendingAlbumOpener()) {
             Group {
-                // A collection without songs yet is a library too (its albums show up as they're ripped).
+                // A physical collection without songs yet is a library too (its albums show up as they're ripped).
                 if let library = model.library, !library.isEmpty {
                     LibraryHome(library: library)
                 } else {
                     LibraryStatusView()
                 }
             }
-            .navigationTitle("Library")
+            .navigationTitle("Digital Collection")
             .toolbar {
                 Button("Settings", systemImage: "gearshape") { showSettings = true }
             }
@@ -105,7 +105,24 @@ private struct LibraryHome: View {
                 if !model.likedDates.isEmpty {
                     NavigationLink(value: LibraryRoute.liked) { row("Liked Songs", systemImage: "heart", count: counts.liked, tint: .pink) }
                 }
-                NavigationLink(value: DNARoute(name: nil)) { Label("Music DNA", systemImage: "point.3.connected.trianglepath.dotted") }
+                // Albums and songs you bought as downloads (owned items, so the collection's list and item pages).
+                let downloads = model.collection.count(.downloads)
+                if downloads > 0 {
+                    NavigationLink(value: CollectionRoute.scope(.downloads)) {
+                        HStack {
+                            Label {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("Downloads")
+                                    Text("Albums and songs you bought").font(.caption).foregroundStyle(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: "arrow.down.circle")
+                            }
+                            Spacer()
+                            CountPill(count: downloads, tint: .accentColor)
+                        }
+                    }
+                }
             }
             let playlists = library.playlists.filter { scope == .all || model.availability($0.tracks) != .notOnPhone }
             if !playlists.isEmpty || !library.smartPlaylists.isEmpty {
@@ -252,7 +269,8 @@ struct ArtistList: View {
     }
 }
 
-/// Which library albums the Albums grid shows, by whether you own a copy (as the Mac's).
+/// Which albums of the digital collection the Albums grid shows, by whether you own a copy (a CD, record or download;
+/// as the Mac's).
 enum AlbumCollectionFilter: String, CaseIterable, Identifiable {
     case all, inCollection, notInCollection
     var id: Self { self }
@@ -260,8 +278,8 @@ enum AlbumCollectionFilter: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .all: "All Albums"
-        case .inCollection: "In Your Collection"
-        case .notInCollection: "Not in Your Collection"
+        case .inCollection: "Albums You Own"
+        case .notInCollection: "Albums You Don't Own"
         }
     }
 
@@ -279,7 +297,7 @@ struct AlbumGrid: View {
     let albums: [AlbumSummary]
     let library: LibrarySnapshot
     @AppStorage("albumsCollectionFilter") private var filter = AlbumCollectionFilter.all
-    /// Before the collection: only albums you own. Read once as In Your Collection.
+    /// Before the collection: only albums you own. Read once as Albums You Own.
     @AppStorage("albumsOwnedOnly") private var ownedOnly = false
     /// The Mac's orders (`AlbumSort`).
     @AppStorage("albumSort") private var sort = AlbumSort.artist
@@ -307,11 +325,11 @@ struct AlbumGrid: View {
         .overlay {
             if filter != .all, shown.isEmpty, !albums.isEmpty {
                 if filter == .inCollection {
-                    ContentUnavailableView("Nothing in Your Collection", systemImage: "books.vertical",
-                                           description: Text("Albums you add to your collection in Music Library on your Mac show up here."))
+                    ContentUnavailableView("No Albums You Own", systemImage: "books.vertical",
+                                           description: Text("Albums you add as CDs, records or downloads in Music Library on your Mac show up here."))
                 } else {
                     ContentUnavailableView("You Own Them All", systemImage: "books.vertical",
-                                           description: Text("Every album in your library is in your collection."))
+                                           description: Text("You own a copy of every album in your digital collection."))
                 }
             }
         }
@@ -327,7 +345,7 @@ struct AlbumGrid: View {
                     ForEach(AlbumSort.allCases) { Text($0.label).tag($0) }
                 }
                 Section {
-                    Picker("Collection", selection: $filter) {
+                    Picker("Ownership", selection: $filter) {
                         ForEach(AlbumCollectionFilter.allCases) { Label($0.label, systemImage: $0.icon).tag($0) }
                     }
                 }

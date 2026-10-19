@@ -43,21 +43,21 @@ struct InsightsView: View {
     @AppStorage("insightsPane") private var pane = Pane.owned
     @AppStorage("listeningPeriod") private var period = ListeningStats.Period.month
 
-    /// The raw values are saved (`@AppStorage`, `GlanceLink.insights`): the Collection pane is still "Owned".
+    /// The raw values are saved (`@AppStorage`, `GlanceLink.insights`), so the Digital Collection pane is still "Library".
     enum Pane: String, CaseIterable, Identifiable {
         case owned = "Owned", library = "Library", listening = "Listening"
         var id: String { rawValue }
-        var title: String { self == .owned ? "Collection" : rawValue }
+        var title: String { self == .library ? "Digital Collection" : rawValue }
     }
 
     var body: some View {
         Group {
             if model.totalTracks == 0 && model.collection.items.isEmpty {
                 ContentUnavailableView("No Insights Yet", systemImage: "chart.bar.xaxis",
-                                       description: Text("Add what you own to your collection, or import some music, and this page fills in with stats about it."))
+                                       description: Text("Add the CDs, records and downloads you own, or import some music, and this page fills in with stats about it."))
             } else if model.totalTracks == 0 && pane != .owned {
                 ContentUnavailableView("No Music Yet", systemImage: "music.note",
-                                       description: Text("Import some music, or rip a CD from your collection, and this pane fills in with stats about your library."))
+                                       description: Text("Import some music, or rip one of your CDs, and this pane fills in with stats about your digital collection."))
             } else {
                 switch pane {
                 case .library:
@@ -86,7 +86,7 @@ struct InsightsView: View {
             ToolbarItem(placement: .principal) {
                 Picker("Insights", selection: $pane) { ForEach(Pane.allCases) { Text($0.title).tag($0) } }
                     .pickerStyle(.segmented).labelsHidden().fixedSize()
-                    .help("What you own and what you paid, the music in your library, or what you listen to")
+                    .help("What you own and what you paid, the music in your digital collection, or what you listen to")
             }
         }
         .onAppear(perform: load)
@@ -569,14 +569,14 @@ struct GrowthCard: View {
     @State private var hovered: LibraryStats.GrowthPoint?
 
     var body: some View {
-        InsightCard(title: "Library Growth", subtitle: subtitle) {
+        InsightCard(title: "Growth", subtitle: subtitle) {
             if stats.growth.count >= 2 {
                 VStack(alignment: .leading, spacing: 6) {
                     Group {
                         if let h = hovered {
                             Text("\(period(h.date)) · +\(h.added.formatted()) → \(songCount(h.total))").foregroundStyle(.primary)
                         } else {
-                            Text("Songs in your library over time").foregroundStyle(.subtext)
+                            Text("Songs in your digital collection over time").foregroundStyle(.subtext)
                         }
                     }
                     .font(.caption).monospacedDigit()
@@ -822,7 +822,7 @@ struct FunFactsCard: View {
             out.append(FunFact(icon: "flame", title: "Busiest year", value: String(y.year), detail: "\(songCount(y.count)) released that year", query: "year:\(y.year)"))
         }
         if let a = stats.artistsByAlbums.first, a.count > 1 {
-            out.append(FunFact(icon: "person.2", title: "Most albums", value: a.name, detail: "\(a.count) albums in your library",
+            out.append(FunFact(icon: "person.2", title: "Most albums", value: a.name, detail: "\(a.count) albums in your digital collection",
                                query: SearchFilterKey.token("albumartist", a.name)))
         }
         if let w = stats.titleWords.first {

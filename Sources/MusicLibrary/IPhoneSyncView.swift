@@ -19,7 +19,7 @@ struct IPhoneSyncView: View {
             if store.selection.isEmpty {
                 ContentUnavailableView(store.phones.contains { store.collectionScope(for: $0) != .off } ? "Nothing Else on the List" : "Nothing to Sync Yet",
                                        systemImage: "iphone",
-                                       description: Text("Add albums, artists, playlists or songs with Add to iPhone in their menus, or tap Download on the iPhone. The iPhone keeps exactly this list, plus the digital copies its Collection on iPhone setting adds. Your whole collection, with its covers, always goes to the iPhone."))
+                                       description: Text("Add albums, artists, playlists or songs with Add to iPhone in their menus, or tap Download on the iPhone. The iPhone keeps exactly this list, plus the digital copies its Owned Music on iPhone setting adds. Everything you own is always listed on the iPhone, with its covers."))
                     .frame(maxHeight: .infinity)
             } else {
                 List(selection: $selection) {
@@ -161,7 +161,7 @@ struct IPhoneSyncView: View {
     private func footer(songs: Int) -> String {
         let size = totalBytes.map { " · " + ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? ""
         let scoped = model.iPhone.phones.contains { model.iPhone.collectionScope(for: $0) != .off }
-        return "\(songs) \(songs == 1 ? "song" : "songs")\(size)\(scoped ? " with Collection on iPhone" : "")"
+        return "\(songs) \(songs == 1 ? "song" : "songs")\(size)\(scoped ? " with Owned Music on iPhone" : "")"
     }
 
     private func progressText(_ p: SyncProgress) -> String {
@@ -181,8 +181,8 @@ struct IPhoneSyncView: View {
     }
 }
 
-/// Collection on iPhone for one phone: Off, the digital copies of your CDs, of your records, or of everything in
-/// your collection, added to its list (Remove from iPhone still wins; new rips join at the next sync), and what that
+/// Owned Music on iPhone for one phone: Off, the digital copies of your CDs, of your records, or of everything you
+/// own, added to its list (Remove from iPhone still wins; new rips join at the next sync), and what that
 /// comes to: "Digital copies of 330 of your 399 CDs: 4,210 songs, 98 GB".
 struct CollectionOnIPhoneRow: View {
     @Environment(AppModel.self) private var model
@@ -194,7 +194,7 @@ struct CollectionOnIPhoneRow: View {
         let scope = store.collectionScope(for: phone)
         let songs = scope == .off ? [] : songs(scope)
         HStack(spacing: 8) {
-            Picker("Collection on iPhone", selection: Binding(get: { scope }, set: { store.setCollectionScope($0, for: phone) })) {
+            Picker("Owned Music on iPhone", selection: Binding(get: { scope }, set: { store.setCollectionScope($0, for: phone) })) {
                 ForEach(CollectionSyncScope.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             .fixedSize()

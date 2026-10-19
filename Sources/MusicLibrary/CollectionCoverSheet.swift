@@ -5,7 +5,10 @@ import SwiftUI
 /// Change Cover… for an item: a Cover Art Archive front (its own release and release group first, then releases found
 /// on MusicBrainz), a file, a dragged image or the clipboard, saved as the item's own cover in
 /// `Music/Collection Covers` (`AppModel.changeItem(id:cover:)`, a new file each time). An item with a cover of its own
-/// can go back to its library album's. The album's files and cover.jpg are never touched.
+/// can go back to its library album's. When the item's album is in the digital collection, the new cover can go to that
+/// album instead (`AppModel.replaceCover`: its cover.jpg and, as on the album page, the art in its files), and the item
+/// then shows the album's: on by default when this copy is where the music came from, off when it came from another
+/// copy (a record whose music is the CD's rip may have different art).
 struct CollectionCoverSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -36,6 +39,10 @@ struct CollectionCoverSheet: View {
     @State private var message: String?
     @State private var searchMessage: String?
     @State private var dropTargeted = false
+    @State private var alsoAlbum: Bool?
+    @State private var applying = false
+    @State private var progress: (done: Int, total: Int)?
+    @AppStorage("embedCoverInFiles") private var embed = true
 
     private var shown: [Candidate] { candidates.filter { !noArt.contains($0.id) } }
 
@@ -79,7 +86,7 @@ struct CollectionCoverSheet: View {
             if let item = model.item(id: itemID), item.coverFile != nil, model.linkedAlbum(for: item) != nil {
                 Button("Use the Album's Cover") { useAlbumCover() }
                     .buttonStyle(.link)
-                    .help("Show the cover of its album in your library instead of its own")
+                    .help("Show the cover of its album in your digital collection instead of its own")
             }
             Text("Or drop an image file here.").font(.caption).foregroundStyle(.subtext)
             if let message { Text(message).font(.caption).foregroundStyle(.red).multilineTextAlignment(.center) }
@@ -141,13 +148,46 @@ struct CollectionCoverSheet: View {
 
     // MARK: Footer
 
+    /// The album in the digital collection the cover can also go to, and whether this copy is where its music came from.
+    private var digitalAlbum: (album: AlbumSummary, fromThisCopy: Bool)? {
+        guard let item = model.item(id: itemID), let album = model.linkedAlbum(for: item) else { return nil }
+        switch model.collection.digitalState(item) {
+        case .digitized, .partial: return (album, true)
+        case .otherCopy: return (album, false)
+        case .none, .missing: return nil
+        }
+    }
+
     private var footer: some View {
-        HStack {
+        let target = digitalAlbum
+        let updatesAlbum = target.map { alsoAlbum ?? $0.fromThisCopy } ?? false
+        let embeddable = target.map { AlbumCoverWriter.embeddable(model.tracks(of: $0.album)).count } ?? 0
+        return HStack(alignment: .center, spacing: 14) {
+            if let target {
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("Also use it for “\(target.album.album)” in your digital collection",
+                           isOn: Binding(get: { updatesAlbum }, set: { alsoAlbum = $0 }))
+                        .help(target.fromThisCopy ? "Its songs came from this copy: give the album the same cover"
+                                                  : "Its songs came from another copy, whose cover may differ")
+                    if updatesAlbum, embeddable > 0 {
+                        Toggle("Also embed it in the album’s \(embeddable == 1 ? "file" : "\(embeddable) files")", isOn: $embed)
+                            .padding(.leading, 20)
+                    }
+                }
+                .controlSize(.small)
+            }
             Spacer()
-            Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-            Button("Use This Cover", action: apply)
+            if applying {
+                if let progress, progress.total > 0 {
+                    ProgressView(value: Double(progress.done), total: Double(progress.total)).frame(width: 120)
+                } else {
+                    ProgressView().controlSize(.small)
+                }
+            }
+            Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction).disabled(applying)
+            Button("Use This Cover") { Task { await apply(toAlbum: updatesAlbum ? target?.album : nil, embedFiles: embed && embeddable > 0) } }
                 .keyboardShortcut(.defaultAction)
-                .disabled(image == nil || downloading)
+                .disabled(image == nil || downloading || applying)
         }
     }
 
@@ -250,15 +290,36 @@ struct CollectionCoverSheet: View {
         }
     }
 
-    private func apply() {
+    private func apply(toAlbum album: AlbumSummary?, embedFiles: Bool) async {
         guard let image, let jpeg = CoverImage.jpeg(from: image) else {
             message = "That image couldn't be converted to JPEG."
             return
         }
-        guard model.changeItem(id: itemID, cover: jpeg, { _ in }) != nil else {
-            message = "Couldn't save the cover."
+        guard let album else {
+            guard model.changeItem(id: itemID, cover: jpeg, { _ in }) != nil else {
+                message = "Couldn't save the cover."
+                return
+            }
+            dismiss()
             return
         }
+        // The album gets the cover, as from its own page; the item then shows the album's instead of a copy of it.
+        applying = true
+        defer { applying = false; progress = nil }
+        if embedFiles { progress = (0, AlbumCoverWriter.embeddable(model.tracks(of: album)).count) }
+        do {
+            let result = try await model.replaceCover(of: album, with: jpeg, embed: embedFiles) { done, total in
+                Task { @MainActor in progress = (done, total) }
+            }
+            if !result.failures.isEmpty {
+                let names = result.failures.prefix(3).map(\.file).joined(separator: ", ")
+                model.errorMessage = "The cover was saved, but \(result.failures.count) file\(result.failures.count == 1 ? "" : "s") kept the old embedded art (\(names)\(result.failures.count > 3 ? "…" : "")): \(result.failures[0].message)"
+            }
+        } catch {
+            message = "Couldn't save the album's cover: \(error.localizedDescription)"
+            return
+        }
+        if model.item(id: itemID)?.coverFile != nil { model.changeItem(id: itemID) { $0.coverFile = nil } }
         dismiss()
     }
 

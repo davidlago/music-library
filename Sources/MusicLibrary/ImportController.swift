@@ -154,7 +154,7 @@ final class ImportController {
                 entry.price = model.trackPurchases[dup.id]?.price
                 entry.purchasedOn = model.trackPurchases[dup.id]?.purchasedOn
                 entry.status = .duplicate
-                entry.note = "Already in library as \(item.duplicateOf?.path ?? "")"
+                entry.note = "Already in your digital collection as \(item.duplicateOf?.path ?? "")"
                 return
             }
             if item.tags.title.isEmpty {

@@ -1,7 +1,7 @@
 import MusicLibraryCore
 import SwiftUI
 
-/// Find by Label, at the top of the Collection tab: pick CD or Vinyl, type a number (or step with ‹ ›), and see what
+/// Find by Label, at the top of the Physical tab: pick CD or Vinyl, type a number (or step with ‹ ›), and see what
 /// has that label and what sits on either side of it on the shelf, so you can go and grab it. Tapping the result opens
 /// the item. The series and number are remembered.
 struct FindByLabelCard: View {

@@ -139,7 +139,7 @@ private struct ArtistPageContent: View {
         return StatGrid {
             StatTile(value: tracks.count.formatted(), label: tracks.count == 1 ? "Song" : "Songs", icon: "music.note")
             StatTile(value: albums.count.formatted(), label: albums.count == 1 ? "Album" : "Albums", icon: "square.stack")
-            StatTile(value: formatLongDuration(total), label: "In your library", icon: "clock")
+            StatTile(value: formatLongDuration(total), label: "Total length", icon: "clock")
             StatTile(value: formatListened(p.listened), label: "Time listened", icon: "headphones")
             StatTile(value: p.plays.formatted(), label: p.plays == 1 ? "Play" : "Plays", icon: "play.circle")
             StatTile(value: p.lastPlayed.map { $0.formatted(.relative(presentation: .named)) } ?? "Never",
@@ -152,13 +152,13 @@ private struct ArtistPageContent: View {
 
     // MARK: Collection, albums and songs
 
-    /// Everything of theirs you own, ripped or not.
+    /// Their CDs and records you own, ripped or not (downloads are digital: they're among the albums below).
     @ViewBuilder
     private var collectionSection: some View {
-        let items = model.collection.items(artist: artistName)
+        let items = model.collection.items(artist: artistName).filter(\.medium.isPhysical)
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
-                SectionHeader(title: "In Your Collection")
+                SectionHeader(title: "In Your Physical Collection")
                 ScrollView(.horizontal) {
                     LazyHStack(alignment: .top, spacing: 14) {
                         ForEach(items) { item in
@@ -178,7 +178,7 @@ private struct ArtistPageContent: View {
 
     private var albumsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Albums in Your Library")
+            SectionHeader(title: "In Your Digital Collection")
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: 14) {
                     ForEach(albums) { a in

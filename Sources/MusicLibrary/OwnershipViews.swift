@@ -90,7 +90,7 @@ struct YourCopiesSection: View {
                 addMenu
             }
             if copies.isEmpty {
-                Label("Not in your collection", systemImage: "arrow.left.arrow.right")
+                Label("You don't own a copy", systemImage: "arrow.left.arrow.right")
                     .font(.callout).foregroundStyle(.subtext)
                     .help("Borrowed, or not added yet: add the copy you own")
             } else {
@@ -127,9 +127,9 @@ struct YourCopiesSection: View {
                 Button("Download") { add(.download) }
             }
             .fixedSize()
-            .help("Add the copy you own to your collection, linked to this album")
+            .help("Add the copy you own (a CD, a record or a download), linked to this album")
             Button("Add Existing Item…") { linkingExisting = true }
-                .help("Link an item in your collection that has no music yet to this album")
+                .help("Link an item you own that has no music yet to this album")
         }
         .controlSize(.small)
     }
@@ -187,9 +187,9 @@ struct AddExistingItemSheet: View {
         let (suggested, others) = candidates
         VStack(alignment: .leading, spacing: 12) {
             Text("Add Existing Item").font(.title2.bold())
-            Text("Which item in your collection is a copy of “\(album.album)”? Items with music of their own aren't listed.")
+            Text("Which item you own is a copy of “\(album.album)”? Items with music of their own aren't listed.")
                 .font(.callout).foregroundStyle(.subtext)
-            TextField("Search your collection", text: $query, prompt: Text("Search your collection"))
+            TextField("Search what you own", text: $query, prompt: Text("Search what you own"))
                 .textFieldStyle(.roundedBorder)
             List(selection: $selection) {
                 if !suggested.isEmpty { Section("Suggestions") { ForEach(suggested) { row($0) } } }
@@ -198,7 +198,7 @@ struct AddExistingItemSheet: View {
             .frame(minHeight: 260)
             .overlay {
                 if suggested.isEmpty && others.isEmpty {
-                    Text("Every item in your collection has music in the library.").foregroundStyle(.subtext)
+                    Text("Everything you own has music in your digital collection.").foregroundStyle(.subtext)
                 }
             }
             if let item = selectedItem {

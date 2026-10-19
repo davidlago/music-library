@@ -4,7 +4,7 @@ import SwiftUI
 
 // MARK: Pane
 
-/// The Collection pane of Insights (saved as "Owned"): everything you own (CDs, records, downloads, ripped or not),
+/// The Owned pane of Insights: everything you own (CDs, records, downloads, ripped or not),
 /// how much of it is digitized, your label series, what it cost and what it's been worth. A port of the Mac's pane;
 /// rows open items, and drill-downs open the collection, never a song search.
 struct CollectionInsightsPane: View {
@@ -12,7 +12,7 @@ struct CollectionInsightsPane: View {
 
     var body: some View {
         if stats.itemCount == 0 {
-            ContentUnavailableView("Nothing in Your Collection Yet", systemImage: "books.vertical",
+            ContentUnavailableView("Nothing Owned Yet", systemImage: "books.vertical",
                                    description: Text("Add the CDs, records and downloads you own in Music Library on your Mac, with when you bought them and what you paid, and this page fills in."))
                 .padding(.top, 40)
         } else {
@@ -47,7 +47,7 @@ struct CollectionInsightsPane: View {
     }
 }
 
-/// Labels and counts for the Collection pane.
+/// Labels and counts for the Owned pane.
 enum InsightCollection {
     static func itemCount(_ n: Int) -> String { n == 1 ? "1 item" : "\(n.formatted()) items" }
     static func albumCount(_ n: Int) -> String { n == 1 ? "1 album" : "\(n.formatted()) albums" }
@@ -96,7 +96,7 @@ struct CollectionInsightTiles: View {
         let year = Calendar.current.component(.year, from: Date()).formatted(.number.grouping(.never))
         InsightTileGrid {
             InsightTile(value: stats.itemCount.formatted(), label: stats.itemCount == 1 ? "Item" : "Items", icon: "books.vertical",
-                        detail: "\(InsightCollection.albumCount(stats.albumsOwned)) · \(stats.notInCollection.formatted()) in the library you don't own")
+                        detail: "\(InsightCollection.albumCount(stats.albumsOwned)) · \(stats.notInCollection.formatted()) in your digital collection you don't own")
             DigitizedTile(stats: stats)
             NavigationLink(value: CollectionRoute.scope(.toDigitize)) {
                 InsightTile(value: stats.toDigitizeCount.formatted(), label: "To digitize", icon: "waveform.slash",
@@ -252,13 +252,13 @@ struct CollectionShelvesCard: View {
 
 // MARK: How you own it
 
-/// A bar per medium split by digital state (digitized, partly, from another copy, to digitize), and the library albums
-/// that aren't yours.
+/// A bar per medium split by digital state (digitized, partly, from another copy, to digitize), and the albums of the
+/// digital collection that aren't yours.
 struct CollectionMediaCard: View {
     let stats: CollectionStats
 
     var body: some View {
-        InsightCard(title: "How You Own It", subtitle: "Each medium by whether it's in your library, and the albums you have that aren't yours") {
+        InsightCard(title: "How You Own It", subtitle: "Each medium by whether it's in your digital collection, and the albums you have that aren't yours") {
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(stats.media) { share in
                     NavigationLink(value: CollectionRoute.query(SearchFilterKey.token("own", share.medium.rawValue),
@@ -271,8 +271,8 @@ struct CollectionMediaCard: View {
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         Image(systemName: "arrow.left.arrow.right").foregroundStyle(.secondary).frame(width: 20)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("Not in your collection")
-                            Text("Library albums you don't own a copy of: borrowed, or from elsewhere").font(.caption).foregroundStyle(.secondary)
+                            Text("Not owned")
+                            Text("Albums in your digital collection you don't own a copy of: borrowed, or from elsewhere").font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer(minLength: 8)
                         Text(InsightCollection.albumCount(stats.notInCollection)).monospacedDigit()
@@ -512,7 +512,7 @@ struct CollectionListsCard: View {
         case .toDigitize: "CDs and records with no digital copy, oldest bought first"
         case .priciest: "What you paid most for"
         case .value: "Lowest cost per play"
-        case .wrapper: "In your library, never played"
+        case .wrapper: "In your digital collection, never played"
         case .details: "Missing a purchase date, a price or a label"
         case .label: "In label order"
         }
@@ -665,10 +665,10 @@ struct CollectionFactsCard: View {
         }
         if !stats.stillInWrapper.isEmpty {
             out.append(InsightFact(icon: "gift", title: "Still in the wrapper", value: stats.stillInWrapper.count.formatted(),
-                                   detail: "item\(stats.stillInWrapper.count == 1 ? "" : "s") in your library you haven't played yet"))
+                                   detail: "item\(stats.stillInWrapper.count == 1 ? "" : "s") in your digital collection you haven't played yet"))
         }
         if stats.runtime > 0 {
-            out.append(InsightFact(icon: "infinity", title: "Your collection, back to back", value: formatLongDuration(stats.runtime),
+            out.append(InsightFact(icon: "infinity", title: "Everything you own, back to back", value: formatLongDuration(stats.runtime),
                                    detail: "across \(InsightCollection.albumCount(stats.runtimeAlbums, of: stats.albumsOwned))"))
         }
         if !stats.needsDetails.isEmpty {

@@ -141,8 +141,8 @@ public struct CatalogSearchQuery: Equatable, Sendable {
 
     /// Catalog-only keys and the help shown for them.
     public static let keys: [(name: String, example: String, help: String)] = [
-        ("is", "is:owned", "owned (in your library), available (on the shelf), out, onlist"),
-        ("own", "own:vinyl", "In your collection: any, cd, vinyl, download, none"),
+        ("is", "is:owned", "owned (in your digital collection), available (on the local library's shelf), out, onlist"),
+        ("own", "own:vinyl", "What you own (your physical collection and downloads): any, cd, vinyl, download, none"),
         ("library", "library:acton", "Owned by this library"),
         ("rating", "rating:>=4", "MusicBrainz community rating, 0–5"),
     ]

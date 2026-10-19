@@ -376,7 +376,9 @@ public enum CopyMark: Hashable, Sendable {
     }
 }
 
-/// The views of the collection: the whole shelf, one medium, or the physical items without a digital copy.
+/// The views of the collection: the Shelf (the whole physical collection: CDs, records and media a newer version
+/// added), one medium, or the physical items without a digital copy. Downloads are their own view, shown with the
+/// digital collection. The raw values are stored (sidebar selections), so `.all` keeps its name.
 public enum CollectionScope: String, CaseIterable, Hashable, Sendable {
     case all, cds, vinyl, downloads, toDigitize
 
@@ -393,7 +395,7 @@ public enum CollectionScope: String, CaseIterable, Hashable, Sendable {
     /// The same items in the collection query language.
     public var query: String {
         switch self {
-        case .all: ""
+        case .all: "own:physical"
         case .cds: "own:cd"
         case .vinyl: "own:vinyl"
         case .downloads: "own:download"
@@ -403,7 +405,7 @@ public enum CollectionScope: String, CaseIterable, Hashable, Sendable {
 
     func contains(_ item: CollectionItem, state: DigitalState) -> Bool {
         switch self {
-        case .all: true
+        case .all: item.medium.isPhysical
         case .cds: item.medium == .cd
         case .vinyl: item.medium == .vinyl
         case .downloads: item.medium == .download
@@ -426,7 +428,7 @@ public enum CollectionSyncScope: String, CaseIterable, Codable, Sendable {
         case .off: "Off"
         case .cds: "Digitized CDs"
         case .vinyl: "Digitized vinyl"
-        case .all: "Everything digitized in my collection"
+        case .all: "Everything I own that's digitized"
         }
     }
 }
@@ -668,11 +670,11 @@ public struct MusicCollection: Sendable {
     }
 
     public func count(_ scope: CollectionScope) -> Int {
-        scope == .all ? items.count : items.reduce(0) { $0 + (scope.contains($1, state: digitalState($1)) ? 1 : 0) }
+        items.reduce(0) { $0 + (scope.contains($1, state: digitalState($1)) ? 1 : 0) }
     }
 
     public func items(in scope: CollectionScope) -> [CollectionItem] {
-        scope == .all ? items : items.filter { scope.contains($0, state: digitalState($0)) }
+        items.filter { scope.contains($0, state: digitalState($0)) }
     }
 
     /// Every item's artist, trackless items included, once each (case-insensitively), A to Z.

@@ -26,7 +26,7 @@ struct CDCollectionPanel: View {
             }
             if let id = disc.catalogedItemID, let item = model.item(id: id) {
                 HStack(spacing: 6) {
-                    Label("Saved in your collection as \(item.sticker?.text ?? "a CD")", systemImage: "checkmark.circle.fill")
+                    Label("Saved in your physical collection as \(item.sticker?.text ?? "a CD")", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                     Button("Open") { model.showItem(id: id) }.buttonStyle(.link)
                 }
@@ -45,7 +45,7 @@ struct CDCollectionPanel: View {
     /// linked to it."
     private var statusLine: String? {
         guard case .existing(let id)? = disc.collectionChoice, let item = model.item(id: id) else { return nil }
-        let name = item.sticker.map { "\($0.text) in your collection" } ?? "your CD of “\(item.album)”"
+        let name = item.sticker.map { "\($0.text) in your physical collection" } ?? "your CD of “\(item.album)”"
         let state = model.collection.digitalState(item)
         if state.needsDigitizing { return "This is \(name), not ripped yet. This rip will be linked to it." }
         return "This is \(name), ripped."
@@ -67,10 +67,10 @@ struct CDCollectionChoiceControl: View {
                 }
                 Divider()
                 Text(disc.createdItemID != nil ? "A new copy" : "A new copy (CD #\(next))").tag(CDCollectionChoice?.some(.new))
-                Text("Not in my collection").tag(CDCollectionChoice?.some(.none))
+                Text("Not in my physical collection").tag(CDCollectionChoice?.some(.none))
             }
             .fixedSize()
-            .help("The CD in your collection this disc is: ripping links the rip to it")
+            .help("The CD in your physical collection this disc is: ripping links the rip to it")
         } else if disc.collectionChoice == nil {
             Text("Is this CD yours?").font(.callout.weight(.semibold))
             Picker("Is this CD yours?", selection: Binding(get: { disc.collectionChoice }, set: { model.cd.setChoice(disc, $0) })) {
@@ -78,15 +78,15 @@ struct CDCollectionChoiceControl: View {
                 Text("No").tag(CDCollectionChoice?.some(.none))
             }
             .pickerStyle(.segmented).labelsHidden().fixedSize()
-            .help("A CD you own is added to your collection, with its label number")
+            .help("A CD you own is added to your physical collection, with its label number")
         } else {
             Toggle(isOn: Binding(get: { disc.collectionChoice == .new }, set: { model.cd.setChoice(disc, $0 ? .new : CDCollectionChoice.none) })) {
-                Text(disc.createdItemID != nil ? "In your collection" : "Add to your collection as CD #\(next)")
+                Text(disc.createdItemID != nil ? "In your physical collection" : "Add to your physical collection as CD #\(next)")
                     .font(.callout.weight(.semibold))
             }
             .toggleStyle(.switch).controlSize(.small)
-            .help(disc.createdItemID != nil ? "Switching off removes the CD this page added to your collection"
-                  : "Add this CD to your collection when ripping starts")
+            .help(disc.createdItemID != nil ? "Switching off removes the CD this page added to your physical collection"
+                  : "Add this CD to your physical collection when ripping starts")
         }
     }
 
@@ -165,7 +165,7 @@ struct CDCollectionSheet: View {
                     }
                 }
             }
-            Text("It's added to your collection when ripping starts. You can change it later on its page.")
+            Text("It's added to your physical collection when ripping starts. You can change it later on its page.")
                 .font(.caption).foregroundStyle(.subtext)
             HStack {
                 Spacer()

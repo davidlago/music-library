@@ -243,9 +243,9 @@ private struct GlanceBuilder {
             case .other: break
             }
         }
-        // Recently Added is by when each went into the collection, like the iPhone's (`CollectionSort.added`): an old
-        // CD cataloged today comes first, whatever day it was bought.
-        let recent = collection.items.sorted { $0.createdAt != $1.createdAt ? $0.createdAt > $1.createdAt : $0.id < $1.id }
+        // Recently Added is the physical collection's (downloads are digital), by when each went into it, like the
+        // iPhone's (`CollectionSort.added`): an old CD cataloged today comes first, whatever day it was bought.
+        let recent = collection.items.filter(\.medium.isPhysical).sorted { $0.createdAt != $1.createdAt ? $0.createdAt > $1.createdAt : $0.id < $1.id }
         c.recent = recent.prefix(limit).map { glanceItem($0, in: collection, calendar: calendar) }
         // What's waited longest to be ripped: undated items by when they were added, noon on the purchase day otherwise.
         func when(_ item: CollectionItem) -> Date {

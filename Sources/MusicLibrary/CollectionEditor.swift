@@ -394,7 +394,7 @@ struct LinkAlbumPicker: View {
             content(item)
         } else {
             VStack {
-                ContentUnavailableView("Not in your collection", systemImage: "books.vertical")
+                ContentUnavailableView("Copy Not Found", systemImage: "books.vertical")
                 Button("Close") { dismiss() }.keyboardShortcut(.cancelAction)
             }
             .padding(20).frame(width: 480, height: 300)
@@ -404,9 +404,9 @@ struct LinkAlbumPicker: View {
     private func content(_ item: CollectionItem) -> some View {
         let matching = matches
         return VStack(alignment: .leading, spacing: 12) {
-            Text("Link to a Library Album").font(.title2.bold())
+            Text("Link the Digital Copy").font(.title2.bold())
             HStack(spacing: 6) {
-                Text("Which album in your library is the digital copy of").foregroundStyle(.subtext)
+                Text("Which album in your digital collection is the digital copy of").foregroundStyle(.subtext)
                 if let s = item.sticker { StickerPill(sticker: s, size: 10) }
                 Text("“\(item.album)”?").lineLimit(1)
             }
@@ -433,7 +433,7 @@ struct LinkAlbumPicker: View {
                 }
                 .disabled(!model.canUnlink(item))
                 .help(model.canUnlink(item) || model.collection.libraryTracks(item).isEmpty
-                      ? "No longer link it to a library album" : "Songs titled like it are in your library: link it to another album instead")
+                      ? "No longer link it to an album in your digital collection" : "Songs titled like it are in your digital collection: link it to another album instead")
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Link") { link(item) }
@@ -544,8 +544,8 @@ struct BulkAddSheet: View {
     var body: some View {
         let next = (cd: model.nextNumber(in: .cd), vinyl: model.nextNumber(in: .vinyl))
         VStack(alignment: .leading, spacing: 12) {
-            Text("Add Library Albums").font(.title2.bold())
-            Text("Check the albums in your library that you own, and say how. Albums already in your collection aren't listed.")
+            Text("Add Albums You Own").font(.title2.bold())
+            Text("Check the albums in your digital collection that you own on CD, on vinyl or as a download, and say how. Albums you already own aren't listed.")
                 .font(.callout).foregroundStyle(.subtext)
             HStack {
                 TextField("Filter", text: $filter, prompt: Text("Filter albums"))

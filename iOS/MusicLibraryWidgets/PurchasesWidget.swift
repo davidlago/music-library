@@ -2,7 +2,7 @@ import MusicLibraryGlance
 import SwiftUI
 import WidgetKit
 
-/// Your collection: the CDs, records and downloads you added lately, how many need ripping and the next free labels.
+/// Your physical collection: the CDs and records (and downloads, said as such) you added lately, how many need ripping and the next free labels.
 /// Its kind is still "Purchases", so widgets placed before the collection keep working. From an iPhone app that sends
 /// no collection (an older summary), it shows the albums you bought lately, as before.
 struct PurchasesWidget: Widget {
@@ -11,8 +11,8 @@ struct PurchasesWidget: Widget {
             PurchasesWidgetView(entry: entry)
                 .widgetBackground()
         }
-        .configurationDisplayName("Collection")
-        .description("The CDs, records and downloads you added lately, what's left to rip and your next labels.")
+        .configurationDisplayName("Physical Collection")
+        .description("Your CDs and records: what you added lately, what's left to rip and your next labels.")
         .supportedFamilies(Self.families)
         .contentMarginsDisabled()
     }
@@ -34,7 +34,7 @@ struct PurchasesWidgetView: View {
         content.widgetURL(url)
     }
 
-    /// The small widget opens what it shows; the others open the Collection pane of Insights (their items are links).
+    /// The small widget opens what it shows; the others open the Owned pane of Insights (their items are links).
     private var url: URL {
         #if os(iOS)
         if family == .systemSmall, let glance = entry.glance {
@@ -78,10 +78,10 @@ struct PurchasesWidgetView: View {
         }
     }
 
-    /// "312 CDs · 48 vinyl"
+    /// "312 CDs · 48 vinyl"; with neither, the physical items of other kinds (downloads aren't counted).
     static func counts(_ c: Glance.Collection) -> String {
         let cds = c.cds ?? 0, vinyl = c.vinyl ?? 0
-        if cds == 0 && vinyl == 0 { return GlanceFormat.count(c.items ?? 0, "item") }
+        if cds == 0 && vinyl == 0 { return GlanceFormat.count(max(0, (c.items ?? 0) - (c.downloads ?? 0)), "item") }
         return [cds > 0 || vinyl == 0 ? GlanceFormat.count(cds, "CD") : nil, vinyl > 0 ? "\(vinyl.formatted()) vinyl" : nil]
             .compactMap { $0 }.joined(separator: " · ")
     }
@@ -105,10 +105,10 @@ struct PurchasesWidgetView: View {
 
     private func collectionEmpty() -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            WidgetHeader(title: "Collection", systemImage: "books.vertical", tint: Self.tint)
+            WidgetHeader(title: "Physical", systemImage: "books.vertical", tint: Self.tint)
             Spacer(minLength: 0)
-            Text("Nothing in your collection yet").font(.headline)
-            Text("Add CDs, records and downloads in Music Library on your Mac.")
+            Text("Nothing in your physical collection yet").font(.headline)
+            Text("Add CDs and records in Music Library on your Mac.")
                 .font(.caption2).foregroundStyle(.secondary).lineLimit(3)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -126,7 +126,7 @@ struct PurchasesWidgetView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Spacer(minLength: 0)
                 Text(latest.title).font(.caption.weight(.semibold)).lineLimit(1)
-                Text(latest.stickerText.map { "\($0) · \(latest.artist)" } ?? latest.artist)
+                Text(latest.shelfCaption.map { "\($0) · \(latest.artist)" } ?? latest.artist)
                     .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                 if let added = latest.addedText() {
                     Text(added).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
@@ -155,7 +155,7 @@ struct PurchasesWidgetView: View {
         } else {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 8) {
-                    WidgetHeader(title: "Collection", systemImage: "books.vertical", tint: Self.tint)
+                    WidgetHeader(title: "Physical", systemImage: "books.vertical", tint: Self.tint)
                     Spacer(minLength: 0)
                     countStats(c)
                     Text(Self.nextLabels(c)).font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
@@ -167,7 +167,7 @@ struct PurchasesWidgetView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 ShelfArt(item: item, height: 58)
                                 Text(item.title).font(.caption2.weight(.semibold)).lineLimit(1)
-                                Text(item.stickerText ?? item.artist).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                                Text(item.shelfCaption ?? item.artist).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                             }
                         }
                         Spacer(minLength: 0)
@@ -184,7 +184,7 @@ struct PurchasesWidgetView: View {
         let owned = glance.owned
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                WidgetHeader(title: "Collection", systemImage: "books.vertical", tint: Self.tint)
+                WidgetHeader(title: "Physical", systemImage: "books.vertical", tint: Self.tint)
                 Spacer()
                 Text(Self.nextLabels(c)).font(.caption2.weight(.medium)).foregroundStyle(.secondary).lineLimit(1)
             }
@@ -192,7 +192,7 @@ struct PurchasesWidgetView: View {
             Divider()
             let recent = Array((c.recent ?? []).prefix(4))
             if recent.isEmpty {
-                Text("Add CDs, records and downloads in Music Library on your Mac.")
+                Text("Add CDs and records in Music Library on your Mac.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             ForEach(recent) { item in
@@ -215,8 +215,9 @@ struct PurchasesWidgetView: View {
                 }
             }
             Spacer(minLength: 0)
-            Text("\(glance.money(owned.spentThisYear, whole: owned.spentThisYear >= 1000)) spent this year · \(GlanceFormat.count(owned.boughtThisYear, "purchase"))")
-                .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            // Spending covers everything you own, downloads too, so it says so.
+            Text("\(glance.money(owned.spentThisYear, whole: owned.spentThisYear >= 1000)) · \(GlanceFormat.count(owned.boughtThisYear, "purchase")) this year, downloads included")
+                .font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
         }
     }
 

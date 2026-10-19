@@ -37,8 +37,8 @@ enum CollectionShow: String, CaseIterable, Identifiable {
     }
 }
 
-/// The Shelf (or one of its scopes: CDs, Vinyl, Downloads, To Digitize): everything you own, with or without songs
-/// in the library, filtered by `AppModel.shelfQuery` in the collection query language. A header counts the shelf,
+/// The Shelf (or one of its scopes: CDs, Vinyl, To Digitize), the physical collection, with or without songs in the
+/// library; or Downloads, the albums bought as downloads (listed with the digital collection). Filtered by `AppModel.shelfQuery` in the collection query language. A header counts the shelf,
 /// finds a label (Go to) and points out free and duplicate labels; the items show as a grid of cases and sleeves
 /// (in sections of a hundred labels when sorted by label) or as a table.
 struct CollectionView: View {
@@ -67,8 +67,9 @@ struct CollectionView: View {
     var body: some View {
         let items = shown
         VStack(spacing: 0) {
-            if model.collection.items.isEmpty {
-                emptyShelf
+            // The Shelf's scopes are empty without CDs or records, whatever the downloads; Downloads without downloads.
+            if model.collection.count(isDownloads ? .downloads : .all) == 0 {
+                if isDownloads { emptyDownloads } else { emptyShelf }
             } else {
                 header.padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 10)
                 if let found {
@@ -86,7 +87,8 @@ struct CollectionView: View {
                     ContentUnavailableView {
                         Label("Nothing here", systemImage: scope.symbol)
                     } description: {
-                        Text(model.shelfQuery.isEmpty && show == .any ? "No items in \(scope.title)." : "No items match the filter.")
+                        Text(model.shelfQuery.isEmpty && show == .any ? (scope == .all ? "Nothing on the Shelf." : "No items in \(scope.title).")
+                             : "No items match the filter.")
                     } actions: {
                         if !model.shelfQuery.isEmpty || show != .any {
                             Button("Clear Filter") { model.shelfQuery = ""; show = .any }
@@ -107,9 +109,11 @@ struct CollectionView: View {
         .toolbar { toolbar }
     }
 
+    private var isDownloads: Bool { scope == .downloads }
+
     private func subtitle(_ shown: Int) -> String {
         let total = model.collection.count(scope)
-        let noun = total == 1 ? "item" : "items"
+        let noun = isDownloads ? (total == 1 ? "download" : "downloads") : (total == 1 ? "item" : "items")
         return shown == total ? "\(total.formatted()) \(noun)" : "\(shown.formatted()) of \(total.formatted()) \(noun)"
     }
 
@@ -129,27 +133,29 @@ struct CollectionView: View {
 
     // MARK: Header
 
+    /// Downloads have no labels, so their header is just the filter.
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                counts
-                Spacer(minLength: 12)
-                labelCheckLink
+            if !isDownloads {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    counts
+                    Spacer(minLength: 12)
+                    labelCheckLink
+                }
             }
             HStack(spacing: 12) {
                 filterField
-                goTo
+                if !isDownloads { goTo }
             }
         }
     }
 
-    /// "312 CDs · 48 vinyl · 97 downloads · 9 to digitize", each opening its scope.
+    /// "312 CDs · 48 vinyl · 9 to digitize", each opening its scope (downloads are with the digital collection).
     private var counts: some View {
         let c = model.collection
         let parts: [(CollectionScope, String)] = [
             (.cds, c.count(.cds) == 1 ? "1 CD" : "\(c.count(.cds).formatted()) CDs"),
             (.vinyl, "\(c.count(.vinyl).formatted()) vinyl"),
-            (.downloads, c.count(.downloads) == 1 ? "1 download" : "\(c.count(.downloads).formatted()) downloads"),
             (.toDigitize, "\(c.count(.toDigitize).formatted()) to digitize"),
         ]
         return HStack(spacing: 6) {
@@ -190,7 +196,8 @@ struct CollectionView: View {
         @Bindable var model = model
         return HStack(spacing: 6) {
             Image(systemName: "line.3.horizontal.decrease").foregroundStyle(.subtext)
-            TextField("Filter", text: $model.shelfQuery, prompt: Text("Filter: jazz, own:vinyl, ripped:no, bought:2024, #12…"))
+            TextField("Filter", text: $model.shelfQuery,
+                      prompt: Text(isDownloads ? "Filter: jazz, bought:2024, paid:>10…" : "Filter: jazz, own:vinyl, ripped:no, bought:2024, #12…"))
                 .textFieldStyle(.plain)
                 .onSubmit {
                     // A label on its own jumps to it.
@@ -208,7 +215,8 @@ struct CollectionView: View {
         .padding(.horizontal, 10).padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: 8).fill(theme.fill))
         .frame(maxWidth: 460)
-        .help("Search the collection: words match titles, artists, record labels, notes and track titles; keys like own:, ripped:, sticker:, bought:, paid: filter")
+        .help(isDownloads ? "Search your downloads: words match titles, artists, record labels, notes and track titles; keys like bought: and paid: filter"
+              : "Search your physical collection: words match titles, artists, record labels, notes and track titles; keys like own:, ripped:, sticker:, bought:, paid: filter")
     }
 
     /// Go to: a series and a number ("cd 12" and "v12" work too), scrolling to the item and showing its card.
@@ -357,7 +365,7 @@ struct CollectionView: View {
                 Label("List", systemImage: "list.bullet").tag(CollectionLayout.list)
             }
             .pickerStyle(.segmented)
-            .help("Show the shelf as a grid or a list")
+            .help(isDownloads ? "Show your downloads as a grid or a list" : "Show the shelf as a grid or a list")
             Menu {
                 Picker("Sort By", selection: $sort) {
                     ForEach(CollectionSort.allCases) { Text($0.title).tag($0) }
@@ -381,11 +389,11 @@ struct CollectionView: View {
                 Button("Add Vinyl…") { model.addToCollection(medium: .vinyl) }
                 Button("Add Download…") { model.addToCollection(medium: .download) }
                 Divider()
-                Button("Add Library Albums…") { model.collectionSheet = .addLibraryAlbums }
+                Button("Add Albums You Own…") { model.collectionSheet = .addLibraryAlbums }
             } label: {
-                Label("Add to Collection", systemImage: "plus")
+                Label("Add", systemImage: "plus")
             }
-            .help("Add something you own to your collection")
+            .help("Add a CD, record or download you own")
         }
     }
 
@@ -395,12 +403,27 @@ struct CollectionView: View {
         ContentUnavailableView {
             Label("Your shelf is empty", systemImage: "books.vertical")
         } description: {
-            Text("Catalog the CDs, records and downloads you own, ripped or not, with the label number on each case.")
+            Text("Catalog the CDs and records you own, ripped or not, with the label number on each case.")
         } actions: {
-            Button("Add to Collection…") { model.addToCollection() }
+            Button("Add to Physical Collection…") { model.addToCollection() }
                 .buttonStyle(.borderedProminent)
             if !model.albums.isEmpty {
-                Button("Add Albums You Own from Your Library…") { model.collectionSheet = .addLibraryAlbums }
+                Button("Add Albums You Own from Your Digital Collection…") { model.collectionSheet = .addLibraryAlbums }
+            }
+        }
+        .frame(maxHeight: .infinity)
+    }
+
+    private var emptyDownloads: some View {
+        ContentUnavailableView {
+            Label("No downloads yet", systemImage: CollectionScope.downloads.symbol)
+        } description: {
+            Text("Keep track of the albums you bought as downloads, with when you bought them and what you paid.")
+        } actions: {
+            Button("Add Download…") { model.addToCollection(medium: .download) }
+                .buttonStyle(.borderedProminent)
+            if !model.albums.isEmpty {
+                Button("Add Albums You Own from Your Digital Collection…") { model.collectionSheet = .addLibraryAlbums }
             }
         }
         .frame(maxHeight: .infinity)
@@ -450,7 +473,7 @@ struct CollectionItemMenu: View {
         let state = model.collection.digitalState(item)
         Button("Open") { model.showItem(id: item.id) }
         if state.hasMusic, let album = model.linkedAlbum(for: item) {
-            Button("Open Album in Library") { model.nowPlayingExpanded = false; model.navigationPath.append(album) }
+            Button("Open in Digital Collection") { model.nowPlayingExpanded = false; model.navigationPath.append(album) }
             Divider()
             Button("Play") { model.play(item: item) }
             Button("Shuffle") { model.play(item: item, shuffled: true) }
@@ -462,7 +485,7 @@ struct CollectionItemMenu: View {
             Button("Rip This CD") { model.cd.show(disc, for: item) }
         }
         if item.isEditable {
-            Button("Link to Library Album…") { model.collectionSheet = .link(itemID: item.id) }
+            Button("Link Digital Copy…") { model.collectionSheet = .link(itemID: item.id) }
             Button("Change Cover…") { model.collectionSheet = .cover(itemID: item.id, request: CoverSheetRequest()) }
         }
         if item.medium == .cd {
@@ -473,7 +496,9 @@ struct CollectionItemMenu: View {
         }
         if item.isEditable {
             Divider()
-            Button("Remove from Collection…", role: .destructive) { model.confirmItemRemoval(item) }
+            Button(item.medium.isPhysical ? "Remove from Physical Collection…" : "Remove from Downloads…", role: .destructive) {
+                model.confirmItemRemoval(item)
+            }
         }
     }
 }
@@ -577,20 +602,23 @@ extension View {
     func collectionRemovalConfirmation(_ model: AppModel) -> some View {
         let item = model.pendingItemRemoval
         let title = item.map { item in
-            item.sticker.map { "Remove \($0.text)?" } ?? "Remove “\(item.album.isEmpty ? "Unknown Album" : item.album)” from your collection?"
+            item.sticker.map { "Remove \($0.text)?" } ?? "Remove “\(item.album.isEmpty ? "Unknown Album" : item.album)” from your \(item.medium.isPhysical ? "physical collection" : "downloads")?"
         } ?? ""
         return confirmationDialog(title, isPresented: Binding(get: { model.pendingItemRemoval != nil },
                                                               set: { if !$0 { model.pendingItemRemoval = nil } }),
                                   titleVisibility: .visible, presenting: item) { item in
-            Button("Remove from Collection", role: .destructive) { model.deleteItem(id: item.id) }
+            Button(item.medium.isPhysical ? "Remove from Physical Collection" : "Remove from Downloads", role: .destructive) {
+                model.deleteItem(id: item.id)
+            }
             Button("Cancel", role: .cancel) {}
         } message: { item in
             let name = "“\(item.album.isEmpty ? "Unknown Album" : item.album)”\(item.artist.isEmpty ? "" : " by \(item.artist)")"
-            let songs = model.collection.digitalState(item).hasMusic ? " Its songs stay in your library." : ""
+            let songs = model.collection.digitalState(item).hasMusic ? " Its songs stay in your digital collection." : ""
+            let place = item.medium.isPhysical ? "your physical collection" : "your downloads"
             if item.sticker != nil {
-                Text("\(name) leaves your collection, and its number becomes free.\(songs)")
+                Text("\(name) leaves \(place), and its number becomes free.\(songs)")
             } else {
-                Text("\(name) leaves your collection.\(songs)")
+                Text("\(name) leaves \(place).\(songs)")
             }
         }
     }
@@ -607,7 +635,7 @@ struct LabelCheckSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Label Check").font(.title2.bold())
-            Text("Numbers missing from each series, and numbers on more than one item. Saving a number already used is refused, so duplicates come from older versions or other copies of the library.")
+            Text("Numbers missing from each series, and numbers on more than one item. Saving a number already used is refused, so duplicates come from older versions of the app or other copies of your library folder.")
                 .font(.callout).foregroundStyle(.subtext).fixedSize(horizontal: false, vertical: true)
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {

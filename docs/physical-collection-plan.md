@@ -630,6 +630,17 @@ before the download.
 
 ## 5. Mac UX
 
+> **Renamed after the plan (naming pass, 1.21).** "Collection", "Library" and "Library CDs" read as the same thing, so
+> every user-visible string now uses three names: the **Physical Collection** (CDs and records: Shelf, CDs, Vinyl, To
+> Digitize; the sidebar section that was COLLECTION), the **Digital Collection** (the music files: Songs, Albums,
+> Artists, and **Downloads**, which moved here from the collection section because a download is a file, though it is
+> still an owned item in Your Copies and in spending), and **Local Library CDs** (the public library catalog; section
+> LIBRARY CATALOG → **Local Library**, Settings ▸ Library → **Local Library**). Insights' panes are **Owned** (CDs,
+> records and downloads, so not "Physical"), **Digital Collection** and **Listening**. The Shelf (`CollectionScope.all`)
+> now means physical media only (query `own:physical`), and the app opens on it once there's a CD or record. Code
+> identifiers, raw values (`InsightsView.Pane.owned`, `CollectionScope`), stored keys and widget kinds are unchanged, so
+> stored choices and older versions keep working. The text below is the plan as written, with the old names.
+
 ### 5.1 Sidebar and commands
 
 ```
@@ -825,6 +836,12 @@ Rows push `CollectionItemRoute`. Drill-downs open the Shelf with a collection qu
 - **Theme rules**: secondary text uses `.subtext`, and sheets use `.themedSheet()`.
 
 ## 6. iPhone UX (read-only)
+
+> **Renamed after the plan (see the note at the top of §5).** The tabs are **Physical** (the Physical Collection, was
+> Collection) and **Digital** (the Digital Collection, was Library), short forms for the tab bar; navigation titles use
+> the full names. The Downloads tile moved from the Collection home to the Digital tab. **Collection on iPhone** on the
+> Mac's iPhone page is **Owned Music on iPhone** (Off, Digitized CDs, Digitized vinyl, Everything I own that's
+> digitized), since it covers downloads too. The text below keeps the old names.
 
 - **Tabs.** **Collection** (`books.vertical`), then Library, Insights, Sync and Search. `RootView.Tabs` gains
   `.collection`. The first launch with items opens Collection; after that, `@SceneStorage` remembers the tab.
@@ -1594,6 +1611,8 @@ legacy-reader assertions ("unknown format reads as CD", the pre-label-number sna
   series you have.
 - **Visuals (§5.9).** The CD hinge sticker reads "CD 12" and its number scales with the strip; the vinyl disc has a
   light rim; grid cells drop the status mark the status line already states.
+- **Naming (§5, §6).** After implementation, the user-visible names became Physical Collection, Digital Collection
+  (with Downloads) and Local Library CDs, and the Insights pane is Owned again; see the notes at the top of §5 and §6.
 - **Docs (§11, P4).** The README, site, privacy page, App Store copy (proposed, marked "to review"), CHANGELOG and
   AGENTS.md are updated; the new screenshots (`collection.png`, `collection-item.png`, `iphone-collection.png`, the
   watch Find screen) and the site's Collection screenshot tab wait for a real library window, so the site's collection

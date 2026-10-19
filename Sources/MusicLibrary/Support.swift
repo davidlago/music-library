@@ -161,14 +161,14 @@ struct CopyBadge: View {
     init?(mark: CopyMark, coverSide: CGFloat) {
         switch mark {
         case .notInCollection:
-            self.init(symbol: "arrow.left.arrow.right", label: "Borrowed: not in your collection", coverSide: coverSide)
+            self.init(symbol: "arrow.left.arrow.right", label: "Borrowed: you don't own a copy", coverSide: coverSide)
         case .download(let partial, _):
             self.init(symbol: "dollarsign", label: partial ? "Some songs bought as downloads" : "Bought as a download",
                       coverSide: coverSide)
         case .cd(_, false, _):
-            self.init(symbol: "waveform.slash", label: "Not ripped yet: no digital copy in your library", coverSide: coverSide)
+            self.init(symbol: "waveform.slash", label: "Not ripped yet: no digital copy", coverSide: coverSide)
         case .vinyl(_, false, _):
-            self.init(symbol: "waveform.slash", label: "Not digitized yet: no digital copy in your library", coverSide: coverSide)
+            self.init(symbol: "waveform.slash", label: "Not digitized yet: no digital copy", coverSide: coverSide)
         case .other: self.init(symbol: "shippingbox", label: "Added by a newer version of Music Library", coverSide: coverSide)
         case .cd, .vinyl: return nil
         }
@@ -211,7 +211,7 @@ struct CoverCopyMark: View {
 }
 
 /// An item's digital copy in a word or two, with an icon unless it's digitized: "Not ripped", "8 of 12 songs",
-/// "From your CD #142", "Missing from library".
+/// "From your CD #142", "Digital copy missing".
 struct DigitalStatusLabel: View {
     let state: DigitalState
     let medium: CollectionMedium
@@ -252,14 +252,14 @@ struct DigitalStatusLabel: View {
         case .otherCopy:
             if let sticker = from?.sticker { return "From your \(sticker.text)" }
             if let from { return "From your \(from.medium.name.lowercased())" }
-            return "Same album in library"
+            return "Same album, from elsewhere"
         case .none:
             switch medium {
             case .cd: return "Not ripped"
-            case .download: return "Not in library"
+            case .download: return "Not imported"
             case .vinyl, .other: return "Not digitized"
             }
-        case .missing: return "Missing from library"
+        case .missing: return "Digital copy missing"
         }
     }
 }

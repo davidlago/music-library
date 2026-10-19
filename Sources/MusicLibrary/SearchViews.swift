@@ -95,7 +95,7 @@ struct CollectionHitsStrip: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("In Your Collection").font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.subtext)
+                Text("What You Own").font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.subtext)
                 Spacer()
                 Button(total > 12 ? "Show All \(total)" : "Show on Shelf") { model.showShelf(query: model.searchText) }
                     .buttonStyle(.link).font(.caption)
@@ -146,7 +146,7 @@ struct SearchHeader: View {
                 Button { model.newSmartPlaylist(query: model.searchText) } label: {
                     Label("Save as Smart Playlist", systemImage: "gearshape")
                 }
-                .help("Keep this search in the sidebar; it updates as your library grows")
+                .help("Keep this search in the sidebar; it updates as your digital collection grows")
                 Button { showHelp.toggle() } label: { Image(systemName: "questionmark.circle") }
                     .buttonStyle(.borderless)
                     .help("Search syntax")
@@ -199,11 +199,11 @@ struct RefineMenus: View {
                 Button("Last year") { model.refineSearch(with: "added:1y") }
                 Button("Over a year ago") { model.refineSearch(with: "added:>1y") }
             }
-            Menu("Collection") {
+            Menu("Owned") {
                 Button("On CD") { model.refineSearch(with: "own:cd") }
                 Button("On Vinyl") { model.refineSearch(with: "own:vinyl") }
                 Button("Download") { model.refineSearch(with: "own:download") }
-                Button("Not in Collection") { model.refineSearch(with: "own:none") }
+                Button("Not Owned") { model.refineSearch(with: "own:none") }
                 Divider()
                 Button("Not Ripped") { model.refineSearch(with: "ripped:no") }
             }
@@ -324,7 +324,7 @@ struct SearchHelpView: View {
                 Text("Numbers accept comparisons and ranges: year:>2000, year:1990-1999, time:3:00..5:00")
                     .font(.caption).foregroundStyle(.subtext)
                 Divider()
-                Text("Collection").font(.headline)
+                Text("What You Own").font(.headline)
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
                     ForEach(CollectionSearchQuery.keys, id: \.key) { k in
                         GridRow {
@@ -337,7 +337,7 @@ struct SearchHelpView: View {
                         }
                     }
                 }
-                Text("Collection filters apply to the whole search: own:vinyl genre:jazz finds the songs of your jazz records. A label (#12, cd 12, vinyl 12) also shows what's at it on your shelf. iPhones with a version before 1.21 show smart playlists with these filters empty (or unfiltered when one is negated, like -own:vinyl).")
+                Text("These filters apply to the whole search: own:vinyl genre:jazz finds the songs of your jazz records. A label (#12, cd 12, vinyl 12) also shows what's at it on your shelf. iPhones with a version before 1.21 show smart playlists with these filters empty (or unfiltered when one is negated, like -own:vinyl).")
                     .font(.caption).foregroundStyle(.subtext).fixedSize(horizontal: false, vertical: true)
             }
             .padding(16)
@@ -387,7 +387,7 @@ struct SmartPlaylistEditor: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 if query.isEmpty {
-                    Text("Use the same syntax as the search field. The playlist updates itself as your library changes.")
+                    Text("Use the same syntax as the search field. The playlist updates itself as your digital collection changes.")
                 } else {
                     Text("Currently matches \(songCount(preview.tracks.count)) · \(formatLongDuration(preview.totalDuration))")
                 }

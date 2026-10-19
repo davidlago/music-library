@@ -14,11 +14,11 @@ struct CollectionContent: View {
     var body: some View {
         if stats.itemCount == 0 {
             VStack(spacing: 14) {
-                ContentUnavailableView("Your Collection Is Empty", systemImage: "books.vertical",
+                ContentUnavailableView("Nothing Owned Yet", systemImage: "books.vertical",
                                        description: Text("Add the CDs, records and downloads you own: by barcode or by name, from an album page, or when you rip a CD. Add when you bought them and what you paid, and this page fills in."))
                 HStack {
-                    Button("Add to Collection…") { model.addToCollection() }
-                    Button("Add Albums You Own from Your Library…") { model.collectionSheet = .addLibraryAlbums }
+                    Button("Add to Physical Collection…") { model.addToCollection() }
+                    Button("Add Albums You Own from Your Digital Collection…") { model.collectionSheet = .addLibraryAlbums }
                         .disabled(model.albums.isEmpty)
                 }
             }
@@ -254,12 +254,12 @@ struct HowYouOwnItCard: View {
     }
 
     var body: some View {
-        InsightCard(title: "How You Own It", subtitle: "Each medium, and how much of it is in your library") {
+        InsightCard(title: "How You Own It", subtitle: "Each medium, and how much of it is in your digital collection") {
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(stats.media) { share in
                     Button { model.showShelf(query: share.medium.query) } label: { mediumRow(share) }
                         .buttonStyle(.plain)
-                        .help("Show your \(share.medium.plural.lowercased()) on the Shelf")
+                        .help(share.medium.isPhysical ? "Show your \(share.medium.plural.lowercased()) on the Shelf" : "Show your downloads")
                 }
                 legend
                 if stats.notInCollection > 0 {
@@ -267,8 +267,8 @@ struct HowYouOwnItCard: View {
                         HStack(alignment: .firstTextBaseline, spacing: 10) {
                             Image(systemName: "arrow.left.arrow.right").foregroundStyle(theme.neutral).frame(width: 18)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text("Not in your collection")
-                                Text("Library albums with no copy you own: borrowed, or not added yet").font(.caption).foregroundStyle(.subtext)
+                                Text("Not owned")
+                                Text("Albums in your digital collection with no copy you own: borrowed, or not added yet").font(.caption).foregroundStyle(.subtext)
                             }
                             Spacer(minLength: 8)
                             Text(stats.notInCollection == 1 ? "1 album" : "\(stats.notInCollection.formatted()) albums").monospacedDigit()
@@ -542,7 +542,7 @@ struct CollectionListsCard: View {
         case .toDigitize: "CDs and records with no digital copy, longest waiting first"
         case .priciest: "What you paid most for"
         case .value: "Lowest cost per play"
-        case .wrapper: "In your library, never played here"
+        case .wrapper: "In your digital collection, never played here"
         case .details: "Without a purchase date, a price or a label"
         case .label: "In the order of their labels"
         }
@@ -726,7 +726,7 @@ struct CollectionFactsCard: View {
                                itemID: r.item.id))
         }
         if stats.runtime > 0 {
-            out.append(FunFact(icon: "infinity", title: "Your collection, back to back", value: formatLongDuration(stats.runtime),
+            out.append(FunFact(icon: "infinity", title: "Everything you own, back to back", value: formatLongDuration(stats.runtime),
                                detail: "across \(runtimeAlbumsText) you own"))
         }
         if stats.waitingForTurntable > 0 {
@@ -736,7 +736,7 @@ struct CollectionFactsCard: View {
         }
         if !stats.stillInWrapper.isEmpty {
             out.append(FunFact(icon: "gift", title: "Still in the wrapper", value: stats.stillInWrapper.count.formatted(),
-                               detail: "item\(stats.stillInWrapper.count == 1 ? "" : "s") in your library you haven't played here yet"))
+                               detail: "item\(stats.stillInWrapper.count == 1 ? "" : "s") in your digital collection you haven't played here yet"))
         }
         if !stats.needsDetails.isEmpty {
             out.append(FunFact(icon: "pencil", title: "Needs details", value: stats.needsDetails.count.formatted(),

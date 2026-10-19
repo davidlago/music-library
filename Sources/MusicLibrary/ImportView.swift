@@ -117,7 +117,7 @@ struct ImportDetail: View {
         // An imported song's price is elsewhere only when it went to an item; one still waiting follows its batch.
         if entry.status == .done ? entry.pricedOnItem : importer.songsPricedElsewhere && entry.status != .duplicate {
             Text(importer.boughtAsAlbum && importer.effectiveLinkItem == nil
-                 ? "Bought as a whole album: what you paid is below the list." : "What you paid is on your copy in the collection.")
+                 ? "Bought as a whole album: what you paid is below the list." : "What you paid is on your copy's page.")
                 .font(.caption).foregroundStyle(.subtext)
         } else {
             songPurchase
@@ -271,7 +271,7 @@ struct ImportBatchPurchaseBar: View {
         let count = importer.batch.count
         VStack(alignment: .leading, spacing: 8) {
             if importer.songsPricedElsewhere, let item = importer.effectiveLinkItem {
-                Text("What you paid is on \(item.sticker?.text ?? "your \(item.medium.name.lowercased())")'s page in your collection.")
+                Text("What you paid is on \(item.sticker?.text ?? "your \(item.medium.name.lowercased())")'s page.")
                     .font(.caption).foregroundStyle(.subtext)
             } else {
                 if importer.canBuyAsAlbum {
@@ -282,7 +282,7 @@ struct ImportBatchPurchaseBar: View {
                             Text("Whole album").tag(true)
                         }
                         .pickerStyle(.segmented).labelsHidden().fixedSize()
-                        .help("A whole album is saved as one download in your collection, with its date and price")
+                        .help("A whole album is saved as one album download, listed in Downloads, with its date and price")
                     }
                 }
                 if importer.boughtAsAlbum && importer.canBuyAsAlbum {
@@ -401,7 +401,7 @@ struct ImportLinkPicker: View {
             TextNormalizer.normalize("\($0.album) \($0.artist) \($0.sticker?.text ?? "")").contains(q)
         }
         VStack(alignment: .leading, spacing: 8) {
-            TextField("Search your collection", text: $query, prompt: Text("Search CDs and records not digitized"))
+            TextField("Search your physical collection", text: $query, prompt: Text("Search CDs and records not digitized"))
                 .textFieldStyle(.roundedBorder)
             List {
                 Button("None") { importer.chooseLink(nil); done() }.buttonStyle(.plain)

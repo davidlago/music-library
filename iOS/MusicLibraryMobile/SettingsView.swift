@@ -30,25 +30,25 @@ struct SettingsView: View {
                 if model.isSample {
                     Section {
                         if !model.collection.items.isEmpty {
-                            LabeledContent("Collection", value: collectionSummary)
+                            LabeledContent("Owned", value: collectionSummary)
                         }
                         Button("Hide Sample Library") { model.hideSample() }
                     } header: {
-                        Text("Library")
+                        Text("Music Library")
                     } footer: {
-                        Text("The sample library's artists and albums are fictional. Your own library replaces it after your first sync.")
+                        Text("The sample library's artists and albums are fictional. Your own music replaces it after your first sync.")
                     }
                 } else if let library = model.library {
-                    Section("Library") {
+                    Section("Music Library") {
                         LabeledContent("Songs on this iPhone", value: "\(library.presentIDs.count) of \(library.tracks.count)")
                         if !model.collection.items.isEmpty {
-                            LabeledContent("Collection", value: collectionSummary)
+                            LabeledContent("Owned", value: collectionSummary)
                         }
                         LabeledContent("Folder", value: library.root.lastPathComponent)
-                        Button("Reload Library") { model.reload() }
+                        Button("Reload Music Library") { model.reload() }
                     }
                 } else if PhoneModel.sampleRoot != nil {
-                    Section("Library") {
+                    Section("Music Library") {
                         Button("Explore a Sample Library") { model.showSample() }
                     }
                 }

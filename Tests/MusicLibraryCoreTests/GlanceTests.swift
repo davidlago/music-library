@@ -269,10 +269,9 @@ extension GlanceTests {
         #expect(c.toRip == 2 && c.vinylToDigitize == 1)
         #expect(c.nextCD == 5 && c.nextVinyl == 5)
         let recent = try #require(c.recent)
-        #expect(recent.count == 7)
+        #expect(recent.count == 6, "the physical collection's: the download isn't listed")
         // By when each was added, not bought: the record bought in 2025 and cataloged yesterday comes first.
-        #expect(recent.map(\.id) == ["ok-lp", "ril-lp", "ok-cd", "blue-lp", "train-cd", "dup-cd",
-                                      CollectionItem.songsID(albumKey: SearchIndex.albumKey(album: "Computer World", artist: "Kraftwerk"))])
+        #expect(recent.map(\.id) == ["ok-lp", "ril-lp", "ok-cd", "blue-lp", "train-cd", "dup-cd"])
         #expect(recent[0].purchasedOn == "2025-01-10" && recent[0].addedOn == PurchaseDay(now.addingTimeInterval(-86_400), calendar: calendar).string)
         #expect(c.toRipList?.map(\.id) == ["dup-cd", "train-cd"])
 

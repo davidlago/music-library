@@ -2,7 +2,7 @@ import MusicLibraryCore
 import SwiftUI
 
 /// The Mac app's search: the same query language (`artist:`, `decade:90s`, `format:flac`, `own:vinyl`…) and
-/// spelling correction, over the whole library and the collection (songs that aren't on the phone are dimmed and can
+/// spelling correction, over the digital and physical collections (songs that aren't on the phone are dimmed and can
 /// be downloaded). A label ("142", "cd 142", "v12") also shows the items that have it.
 struct SearchTab: View {
     @Environment(PhoneModel.self) private var model
@@ -14,7 +14,7 @@ struct SearchTab: View {
             Group {
                 if let library = model.library, !library.isEmpty {
                     if text.trimmingCharacters(in: .whitespaces).isEmpty {
-                        ContentUnavailableView("Search Your Library", systemImage: "magnifyingglass",
+                        ContentUnavailableView("Search Your Music", systemImage: "magnifyingglass",
                                                description: Text("Try “radiohead”, “decade:90s”, “format:flac”, “own:vinyl” or a label like “cd 12”."))
                     } else {
                         SearchResultsList(results: results, text: text, library: library)
@@ -109,7 +109,7 @@ struct SearchResultsList: View {
                     }
                 }
                 if !items.isEmpty {
-                    Section("Collection") {
+                    Section("Owned") {
                         ForEach(items.prefix(showAllItems ? 200 : 6)) { item in
                             NavigationLink(value: CollectionItemRoute(id: item.id)) { CollectionRow(item: item) }
                         }

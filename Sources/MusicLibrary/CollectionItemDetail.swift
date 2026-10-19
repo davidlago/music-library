@@ -19,8 +19,8 @@ struct CollectionItemDetail: View {
         if let item = model.item(id: id) {
             page(item)
         } else {
-            ContentUnavailableView("Not in your collection", systemImage: "books.vertical",
-                                   description: Text("This item was removed from your collection."))
+            ContentUnavailableView("Copy Not Found", systemImage: "books.vertical",
+                                   description: Text("This copy was removed from what you own."))
         }
     }
 
@@ -113,7 +113,7 @@ struct CollectionItemDetail: View {
                 if let album {
                     Button("Open Album") { model.navigationPath.append(album) }
                         .buttonStyle(.bordered)
-                        .help("Go to the album in your library")
+                        .help("Go to the album in your digital collection")
                 }
                 moreMenu(item, album: album)
             }
@@ -185,7 +185,7 @@ struct CollectionItemDetail: View {
         Menu {
             if item.isEditable {
                 Button("Change Cover…") { changeCover(item) }
-                Button("Link to Library Album…") { model.collectionSheet = .link(itemID: item.id) }
+                Button("Link Digital Copy…") { model.collectionSheet = .link(itemID: item.id) }
                 Menu("Digital Copy") {
                     Picker("Digital Copy", selection: Binding(get: { item.digitalSource }, set: { source in
                         model.changeItem(id: item.id) { $0.digitalSource = source }
@@ -212,11 +212,11 @@ struct CollectionItemDetail: View {
             }
             if item.isEditable {
                 Divider()
-                Button("Remove from Collection…", role: .destructive) { model.confirmItemRemoval(item) }
+                Button(item.medium.isPhysical ? "Remove from Physical Collection…" : "Remove from Downloads…", role: .destructive) { model.confirmItemRemoval(item) }
             }
         } label: { Image(systemName: "ellipsis") }
             .menuStyle(.button).buttonStyle(.bordered).menuIndicator(.hidden).fixedSize()
-            .help("Cover, link to the library, the digital copy, the queue, shopping and removing")
+            .help("Cover, link to the digital collection, the digital copy, the queue, shopping and removing")
     }
 
     /// ‹ Previous on Shelf / Next on Shelf › (⌘[ / ⌘]): the labeled items either side in the same series.
@@ -264,10 +264,10 @@ struct CollectionItemDetail: View {
             VStack(alignment: .leading, spacing: 10) {
                 switch state {
                 case .digitized:
-                    status("checkmark.circle.fill", "In your library · \(songsLine(songs))")
+                    status("checkmark.circle.fill", "In your digital collection · \(songsLine(songs))")
                     albumButton(album)
                 case .partial(let have, let of):
-                    status("circle.lefthalf.filled", "\(have) of \(of) songs in your library · \(formatLongDuration(songs.reduce(0) { $0 + $1.duration }))")
+                    status("circle.lefthalf.filled", "\(have) of \(of) songs in your digital collection · \(formatLongDuration(songs.reduce(0) { $0 + $1.duration }))")
                     HStack {
                         albumButton(album)
                         if let disc { Button("Rip the Rest") { model.cd.show(disc, for: item) } }
@@ -276,7 +276,7 @@ struct CollectionItemDetail: View {
                     let from = fromID.flatMap { model.item(id: $0) }
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.triangle.2.circlepath").foregroundStyle(.subtext)
-                        Text("Same album in your library, from").fixedSize()
+                        Text("Same album in your digital collection, from").fixedSize()
                         if let from {
                             Button(from.sticker.map { "your \($0.text)" } ?? "your \(from.medium.name.lowercased())") {
                                 go(to: from)
@@ -292,7 +292,7 @@ struct CollectionItemDetail: View {
                 case .none:
                     noCopy(item, disc: disc)
                 case .missing:
-                    status("exclamationmark.triangle.fill", "Digital copy no longer in your library")
+                    status("exclamationmark.triangle.fill", "The linked album is no longer in your digital collection")
                     if item.isEditable {
                         HStack {
                             Button("Unlink") { model.unlink(itemID: item.id) }
@@ -332,7 +332,7 @@ struct CollectionItemDetail: View {
             status("waveform.slash", "No digital copy yet")
             actions(item, importTitle: "Import a Transfer…")
         case .download:
-            status("arrow.down.circle", "Not in your library")
+            status("arrow.down.circle", "Not in your digital collection yet")
             actions(item, importTitle: "Import Files…")
         }
     }
@@ -344,7 +344,7 @@ struct CollectionItemDetail: View {
                 Button(importTitle) { model.importFiles(for: item) }
                     .help("Import the files of this \(item.medium == .vinyl ? "record's transfer" : "album"), linked to this copy")
                 Button("Link…") { model.collectionSheet = .link(itemID: item.id) }
-                    .help("It's already in your library: link it to that album")
+                    .help("It's already in your digital collection: link it to that album")
             }
         }
     }
@@ -383,7 +383,7 @@ struct CollectionItemDetail: View {
                 SectionHeader(title: "Tracks")
                 Spacer()
                 if missing > 0, !playable.isEmpty {
-                    Text("\(playable.count) of \(rows.count) in your library").font(.callout).foregroundStyle(.subtext)
+                    Text("\(playable.count) of \(rows.count) in your digital collection").font(.callout).foregroundStyle(.subtext)
                 }
             }
             if rows.isEmpty {
@@ -421,8 +421,8 @@ struct CollectionItemDetail: View {
                 .background(RoundedRectangle(cornerRadius: 14).fill(theme.card.opacity(0.72)))
                 .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(theme.separator.opacity(0.5), lineWidth: 0.5))
                 if missing > 0 {
-                    Text(playable.isEmpty ? "The release's tracks. None of them is in your library yet."
-                         : "Greyed-out tracks are on this release but not in your library.")
+                    Text(playable.isEmpty ? "The release's tracks. None of them is in your digital collection yet."
+                         : "Greyed-out tracks are on this release but not in your digital collection.")
                         .font(.caption).foregroundStyle(.subtext)
                 }
             }

@@ -9,14 +9,14 @@ struct RootView: View {
     @Environment(PhonePlayer.self) private var player
     @Environment(\.scenePhase) private var scenePhase
     @State private var showNowPlaying = false
-    /// The tab last chosen, kept when the app is swiped away (scene storage isn't). Until one is chosen, the collection
-    /// when there is one, else the library, settled once the library has loaded (`settleDefaultTab`) so the tab
-    /// never changes by itself afterwards.
+    /// The tab last chosen, kept when the app is swiped away (scene storage isn't). Until one is chosen, the physical
+    /// collection when there is one, else the digital collection, settled once the library has loaded
+    /// (`settleDefaultTab`) so the tab never changes by itself afterwards.
     @AppStorage("selectedTab") private var chosenTab: Tabs?
     @AppStorage("insightsPane") private var insightsPane = InsightsPane.owned
 
     private var tab: Tabs {
-        get { chosenTab ?? Self.defaultTab(loaded: isLoaded, collectionIsEmpty: model.collection.items.isEmpty) }
+        get { chosenTab ?? Self.defaultTab(loaded: isLoaded, collectionIsEmpty: model.collection.count(.all) == 0) }
         nonmutating set { chosenTab = newValue }
     }
 
@@ -24,8 +24,8 @@ struct RootView: View {
         if case .loaded = model.state { true } else { false }
     }
 
-    /// While loading, the Collection tab (it shows the same progress as the Library tab), so a library with a
-    /// collection doesn't switch tabs when it arrives.
+    /// While loading, the Physical tab (it shows the same progress as the Digital tab), so a library with a physical
+    /// collection doesn't switch tabs when it arrives. Downloads alone don't count: they're on the Digital tab.
     static func defaultTab(loaded: Bool, collectionIsEmpty: Bool) -> Tabs {
         loaded && collectionIsEmpty ? .library : .collection
     }
@@ -33,15 +33,15 @@ struct RootView: View {
     /// The first time a library loads with no tab chosen yet, the default becomes the choice.
     private func settleDefaultTab() {
         guard chosenTab == nil, isLoaded else { return }
-        chosenTab = Self.defaultTab(loaded: true, collectionIsEmpty: model.collection.items.isEmpty)
+        chosenTab = Self.defaultTab(loaded: true, collectionIsEmpty: model.collection.count(.all) == 0)
     }
 
     var body: some View {
         TabView(selection: Binding(get: { tab }, set: { tab = $0 })) {
-            Tab("Collection", systemImage: "books.vertical", value: .collection) {
+            Tab("Physical", systemImage: "books.vertical", value: .collection) {
                 CollectionTab()
             }
-            Tab("Library", systemImage: "square.stack", value: .library) {
+            Tab("Digital", systemImage: "square.stack", value: .library) {
                 LibraryTab()
             }
             Tab("Insights", systemImage: "chart.bar.xaxis", value: .insights) {
@@ -105,21 +105,21 @@ struct RootView: View {
     }
 }
 
-/// What the Collection, Library and Search tabs show until the library has loaded.
+/// What the Physical, Digital and Search tabs show until the library has loaded.
 struct LibraryStatusView: View {
     @Environment(PhoneModel.self) private var model
 
     var body: some View {
         switch model.state {
         case .loading:
-            ProgressView("Loading Library…")
+            ProgressView("Loading Your Music…")
         case .missing:
             ContentUnavailableView {
-                Label("No Library Yet", systemImage: "music.note.house")
+                Label("No Music Library Yet", systemImage: "music.note.house")
             } description: {
                 Text("""
-                Pair with Music Library on your Mac in the Sync tab and sync: your whole library shows up here, and you \
-                choose what to download. Or export from the Mac to a folder named “\(LibraryLocation.phoneFolderName)” \
+                Pair with Music Library on your Mac in the Sync tab and sync: your digital and physical collections show \
+                up here, and you choose what to download. Or export from the Mac to a folder named “\(LibraryLocation.phoneFolderName)” \
                 with the database backup on, and drag it onto Music Library in the Finder's Files tab for this iPhone.
                 """)
             } actions: {
@@ -131,7 +131,7 @@ struct LibraryStatusView: View {
             }
         case .failed(let message):
             ContentUnavailableView {
-                Label("Couldn't Open the Library", systemImage: "exclamationmark.triangle")
+                Label("Couldn't Open the Music Library", systemImage: "exclamationmark.triangle")
             } description: {
                 Text(message)
             } actions: {
@@ -141,7 +141,7 @@ struct LibraryStatusView: View {
             ContentUnavailableView {
                 Label("No Music Yet", systemImage: "music.note")
             } description: {
-                Text("The library on this iPhone is empty. Add music or your CDs and records on the Mac, then sync.")
+                Text("Your digital and physical collections are empty on this iPhone. Add music or your CDs and records on the Mac, then sync.")
             } actions: {
                 Button("Check Again") { model.reload() }
             }

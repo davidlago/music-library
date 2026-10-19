@@ -70,9 +70,9 @@ final class PhoneModel {
 
     /// The song whose details are shown (Song Info).
     var infoTrack: Track?
-    /// An album a widget opened (`SearchIndex.albumKey`), pushed on the Library tab once the library has loaded.
+    /// An album a widget opened (`SearchIndex.albumKey`), pushed on the Digital tab once the library has loaded.
     var pendingAlbumKey: String?
-    /// A collection item a widget opened (`GlanceLink.item(id:)`), pushed on the Collection tab once the library has loaded.
+    /// A collection item a widget opened (`GlanceLink.item(id:)`), pushed on the Physical tab once the library has loaded.
     var pendingItemID: String?
     /// A link to open as if a widget had been tapped (Siri and Shortcuts), handled by `RootView`.
     var pendingLink: GlanceLink?
@@ -397,12 +397,13 @@ final class PhoneModel {
         album(for: item).map { .album(album: $0.album, artist: $0.artist) }
     }
 
-    /// Items with a digital copy whose songs aren't all on this iPhone, one per album, in shelf order.
+    /// CDs and records (the Physical tab's; downloads are digital already) with a digital copy whose songs aren't all
+    /// on this iPhone, one per album, in shelf order.
     var readyToDownload: [CollectionItem] {
         guard library != nil, !isSample else { return [] }
         var seen = Set<String>()
         return collection.items.filter { item in
-            guard collection.digitalState(item).hasMusic, !seen.contains(item.albumKey) else { return false }
+            guard item.medium.isPhysical, collection.digitalState(item).hasMusic, !seen.contains(item.albumKey) else { return false }
             let tracks = collection.libraryTracks(item)
             guard !tracks.isEmpty, availability(tracks) != .onPhone else { return false }
             seen.insert(item.albumKey)
@@ -511,7 +512,7 @@ final class PhoneModel {
         }
     }
 
-    /// The Collection pane: computed off the main thread when the library, the collection or the history changed.
+    /// The Owned pane: computed off the main thread when the library, the collection or the history changed.
     func loadCollectionStats() {
         let key = (library: libraryVersion, collection: collectionVersion, history: historyVersion)
         if let k = collectionKey, k == key, collectionStats != nil { return }
@@ -594,7 +595,7 @@ final class PhoneModel {
     /// Runs a command from a widget button or the watch.
     func perform(_ command: GlanceCommand) async -> GlanceCommandResult {
         await ensureLoaded()
-        guard let library else { return .failed("There's no library on the iPhone yet.") }
+        guard let library else { return .failed("Nothing has synced to the iPhone yet.") }
         switch command {
         case .playPause:
             guard player.currentTrack != nil else { return .failed("Nothing is queued on the iPhone.") }
@@ -609,12 +610,12 @@ final class PhoneModel {
         case .playAlbum(var key):
             // A collection item's link: its album.
             if let id = GlanceLink.album(key: key).itemID {
-                guard let item = collection.item(id: id) else { return .failed("That isn't in your collection anymore.") }
+                guard let item = collection.item(id: id) else { return .failed("You don't own that anymore.") }
                 key = item.albumKey
             }
             guard let album = albumsByKey[key] ?? library.album(forKey: key) else {
                 // On the shelf, with no songs in the library (a CD not ripped yet, a record).
-                return .failed(collection.copies(albumKey: key).isEmpty ? "That album isn't in the library anymore." : "No digital copy")
+                return .failed(collection.copies(albumKey: key).isEmpty ? "That album isn't in your digital collection anymore." : "No digital copy")
             }
             let tracks = library.playable(library.tracks(album: album))
             guard !tracks.isEmpty else { return .failed("“\(album.album)” isn't on the iPhone.") }

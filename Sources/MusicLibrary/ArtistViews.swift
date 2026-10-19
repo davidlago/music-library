@@ -214,7 +214,7 @@ struct ArtistDetail: View {
                 if let bio = info?.bio { about(bio, info!) }
                 if let links = info?.links.filter(\.url.isWebLink), !links.isEmpty { linksSection(links) }
                 ArtistConcertsSection(artist: artistName, mbid: info?.mbid)
-                if !items.isEmpty { collectionSection }
+                if items.contains(where: \.medium.isPhysical) { collectionSection }
                 if !albums.isEmpty { albumsSection }
                 if !tracks.isEmpty { songsSection }
             }
@@ -257,19 +257,20 @@ struct ArtistDetail: View {
         items = model.collection.items(artist: artistName)
     }
 
-    /// In Your Collection: every item by the artist, with or without songs in the library.
+    /// The artist's CDs and records you own, with or without songs in the digital collection. Downloads are digital:
+    /// they're among the albums below.
     private var collectionSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                SectionHeader(title: "In Your Collection")
+                SectionHeader(title: "In Your Physical Collection")
                 Spacer()
-                Button("Show on Shelf") { model.showShelf(query: SearchFilterKey.token("artist", artistName)) }
+                Button("Show on Shelf") { model.showShelf(query: SearchFilterKey.token("artist", artistName), scope: .all) }
                     .buttonStyle(.link)
-                    .help("Open the Shelf with only \(name)'s items")
+                    .help("Open the Shelf with only \(name)'s CDs and records")
             }
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: 18) {
-                    ForEach(items) { item in
+                    ForEach(items.filter(\.medium.isPhysical)) { item in
                         NavigationLink(value: CollectionItemRoute(id: item.id)) { CollectionCell(item: item, width: 140) }
                             .buttonStyle(.plain)
                             .contextMenu { CollectionItemMenu(model: model, item: item) }
@@ -304,7 +305,7 @@ struct ArtistDetail: View {
                                         .background(Capsule().fill(theme.fill))
                                 }
                                 .buttonStyle(.plain)
-                                .help("Search your library for \(g)")
+                                .help("Search your digital collection for \(g)")
                             }
                         }
                     }
@@ -378,9 +379,9 @@ struct ArtistDetail: View {
             StatTile(value: tracks.count.formatted(), label: tracks.count == 1 ? "Song" : "Songs", icon: "music.note")
             StatTile(value: albums.count.formatted(), label: albums.count == 1 ? "Album" : "Albums", icon: "square.stack")
             if !items.isEmpty {
-                StatTile(value: items.count.formatted(), label: "In your collection", icon: "books.vertical")
+                StatTile(value: items.count.formatted(), label: items.count == 1 ? "Copy you own" : "Copies you own", icon: "books.vertical")
             }
-            StatTile(value: formatLongDuration(total), label: "In your library", icon: "clock")
+            StatTile(value: formatLongDuration(total), label: "In your digital collection", icon: "clock")
             StatTile(value: formatListened(p.listened), label: "Time listened", icon: "headphones")
             StatTile(value: p.plays.formatted(), label: p.plays == 1 ? "Play" : "Plays", icon: "play.circle")
             StatTile(value: p.lastPlayed.map { $0.formatted(.relative(presentation: .named)) } ?? "Never",
@@ -443,7 +444,7 @@ struct ArtistDetail: View {
 
     private var albumsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Albums in Your Library")
+            SectionHeader(title: "In Your Digital Collection")
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 18)], alignment: .leading, spacing: 18) {
                 ForEach(albums) { a in
                     NavigationLink(value: a) {

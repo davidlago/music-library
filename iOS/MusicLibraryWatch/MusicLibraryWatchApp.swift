@@ -47,7 +47,7 @@ struct ContentView: View {
                 ContentUnavailableView {
                     Label("Open on iPhone", systemImage: "iphone")
                 } description: {
-                    Text("Open Music Library on your iPhone once, and your collection, listening and what's playing show up here.")
+                    Text("Open Music Library on your iPhone once, and your physical collection, listening and what's playing show up here.")
                 }
             }
         }

@@ -192,7 +192,8 @@ public struct Glance: Codable, Hashable, Sendable {
         /// The next free label number of each series.
         public var nextCD: Int?
         public var nextVinyl: Int?
-        /// Newest first (by purchase day, else when added), any medium, trackless ones included.
+        /// The physical collection's latest additions (CDs and records, trackless ones included), by when each was
+        /// added, newest first. Downloads aren't listed (they're digital); older phones listed them.
         public var recent: [Item]?
         /// CDs with no digital copy, oldest bought first.
         public var toRipList: [Item]?

@@ -134,7 +134,8 @@ public struct LibrarySnapshot: Sendable {
         self.collectionIndex = CollectionIndex(collection: collection, tracks: all, albumInfos: albumInfos, index: index)
         self.artistImageFiles = imageFiles
         self.artistPhotos = photos
-        self.collaborations = CollaborationGraph(tracks: all)
+        // Both collections: CDs and records with no digital copy add their releases' people.
+        self.collaborations = CollaborationGraph(tracks: all, physical: CollaborationGraph.physicalSongs(collection: collection, albumInfos: albumInfos))
         self.albumTracks = albumTracks
         self.trackByID = byID
     }

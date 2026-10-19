@@ -191,6 +191,9 @@ extension Glance.Collection.Item {
 
     var mediumKind: String { Self.kind(of: medium) }
 
+    /// Its label ("CD #12"), or "Download" for a download (an owned digital copy, never labeled); nil otherwise.
+    var shelfCaption: String? { stickerText ?? (mediumKind == "download" ? ShelfArt.mediumName(medium) : nil) }
+
     /// "CD label 12", for VoiceOver.
     var spokenSticker: String? {
         guard let sticker else { return nil }

@@ -18,8 +18,8 @@ struct CollectionItemPage: View {
         } else if model.library == nil {
             LibraryStatusView()
         } else {
-            ContentUnavailableView("Not in Your Collection", systemImage: "books.vertical",
-                                   description: Text("It was removed from the collection on the Mac."))
+            ContentUnavailableView("No Longer Owned", systemImage: "books.vertical",
+                                   description: Text("It was removed in Music Library on the Mac."))
         }
     }
 }
@@ -59,7 +59,7 @@ private struct CollectionItemContent: View {
                         LinkChips(links: reviews)
                     }
                 }
-                Text("Edit your collection in Music Library on your Mac.")
+                Text("Edit what you own in Music Library on your Mac.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 20)
@@ -120,10 +120,11 @@ private struct CollectionItemContent: View {
     }
 
     /// The items on either side on the shelf: by label in the item's series; for one without a label, among the others
-    /// without one, by artist and title (the end of the Shelf sorted by label).
+    /// without one, by artist and title (the end of the Shelf sorted by label). Downloads aren't on the shelf.
     private var shelfNeighbors: (previous: CollectionItem?, next: CollectionItem?) {
         if let sticker = item.sticker { return collection.neighbors(of: sticker) }
-        let unlabeled = CollectionSort.sticker.sorted(collection.items.filter { $0.sticker == nil })
+        guard item.medium.isPhysical else { return (nil, nil) }
+        let unlabeled = CollectionSort.sticker.sorted(collection.items.filter { $0.sticker == nil && $0.medium.isPhysical })
         guard let i = unlabeled.firstIndex(where: { $0.id == item.id }) else { return (nil, nil) }
         return (i > 0 ? unlabeled[i - 1] : nil, i + 1 < unlabeled.count ? unlabeled[i + 1] : nil)
     }
@@ -180,12 +181,12 @@ private struct CollectionItemContent: View {
         let missing = state == .missing
         let text: String
         if missing {
-            text = "Digital copy no longer in the library."
+            text = "Its digital copy is no longer in your digital collection."
         } else {
             switch item.medium {
             case .cd: text = "No digital copy yet. Rip it with Music Library on your Mac."
             case .vinyl: text = "No digital copy yet. Digitize it with Music Library on your Mac."
-            default: text = "Its files aren't in the library."
+            default: text = "Its files aren't in your digital collection."
             }
         }
         return HStack(spacing: 12) {
@@ -202,7 +203,7 @@ private struct CollectionItemContent: View {
     private func withMusic(_ state: DigitalState) -> some View {
         let playable = model.playable(tracks)
         let album = model.album(for: item)
-        // Digitized, but only on the Mac: dimmed, like the Library tab's albums.
+        // Digitized, but only on the Mac: dimmed, like the Digital tab's albums.
         DigitalStatusLine(item: item, state: state, collection: collection, tracks: tracks)
             .opacity(model.availability(tracks) == .notOnPhone && !model.isSample ? 0.55 : 1)
         if let exportItem = model.exportItem(for: item) {
@@ -333,8 +334,8 @@ private struct CollectionItemContent: View {
     }
 }
 
-/// "In your library · 12 songs · 46 min · FLAC 16/44.1", "8 of 12 songs", "Same album in your library, from your
-/// CD #142".
+/// "In your digital collection · 12 songs · 46 min · FLAC 16/44.1", "8 of 12 songs", "Same album in your digital
+/// collection, from your CD #142".
 private struct DigitalStatusLine: View {
     let item: CollectionItem
     let state: DigitalState
@@ -350,13 +351,13 @@ private struct DigitalStatusLine: View {
 
     private var headline: String {
         switch state {
-        case .partial(let have, let total): return "\(have) of \(total) songs in your library"
+        case .partial(let have, let total): return "\(have) of \(total) songs in your digital collection"
         case .otherCopy(_, let from):
             if let from = from.flatMap(collection.item(id:)) {
-                return "Same album in your library, from your " + (from.sticker?.text ?? from.medium.name.lowercased())
+                return "Same album in your digital collection, from your " + (from.sticker?.text ?? from.medium.name.lowercased())
             }
-            return "Same album in your library, from elsewhere"
-        default: return "In your library"
+            return "Same album in your digital collection, from elsewhere"
+        default: return "In your digital collection"
         }
     }
 

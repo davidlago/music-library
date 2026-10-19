@@ -97,7 +97,7 @@ struct SongsView: View {
     }
 }
 
-/// The Albums grid's Collection menu: every album, or only those you have (or don't have) a copy of.
+/// The Albums grid's Owned menu: every album, or only those you have (or don't have) a copy of.
 enum AlbumsCollectionFilter: String, CaseIterable, Identifiable {
     case all, inCollection, notInCollection
 
@@ -106,8 +106,8 @@ enum AlbumsCollectionFilter: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .all: "All Albums"
-        case .inCollection: "In Your Collection"
-        case .notInCollection: "Not in Your Collection"
+        case .inCollection: "Albums You Own"
+        case .notInCollection: "Albums You Don't Own"
         }
     }
 }
@@ -125,7 +125,7 @@ struct AlbumsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Picker("Collection", selection: $filter) {
+                    Picker("Owned", selection: $filter) {
                         ForEach(AlbumsCollectionFilter.allCases) { Text($0.title).tag($0) }
                     }
                     .fixedSize()
@@ -165,11 +165,11 @@ struct AlbumsView: View {
                 }
                 if shown.isEmpty, !model.albums.isEmpty {
                     // Below the controls, not over them, so the filter can be switched back.
-                    ContentUnavailableView(filter == .inCollection ? "No Albums in Your Collection" : "No Albums",
+                    ContentUnavailableView(filter == .inCollection ? "No Albums You Own" : "No Albums",
                                            systemImage: "opticaldisc",
                                            description: Text(filter == .inCollection
-                                                             ? "Add a copy on an album's page, or right-click an album and choose Add to Collection."
-                                                             : "Every album in your library is in your collection."))
+                                                             ? "Add a copy on an album's page, or right-click an album and choose I Own This."
+                                                             : "You own a copy of every album in your digital collection."))
                         .padding(.top, 40)
                 }
             }
@@ -215,9 +215,9 @@ struct AlbumsView: View {
         }
     }
 
-    /// Add to Collection ▸ As CD / As Vinyl / As Download, each with the next label in its series; ⌘Z undoes it.
+    /// I Own This ▸ As CD / As Vinyl / As Download, each with the next label in its series; ⌘Z undoes it.
     private func addToCollectionMenu(_ a: AlbumSummary) -> some View {
-        Menu("Add to Collection") {
+        Menu("I Own This") {
             ForEach(CollectionMedium.known, id: \.self) { medium in
                 let next = medium.series.map { " (\($0.name) #\(model.nextNumber(in: $0)))" } ?? ""
                 Button("As \(medium.name)\(next)") { addCopy(of: a, medium: medium) }
@@ -236,7 +236,7 @@ struct AlbumsView: View {
                 }
             }
         }
-        undoManager?.setActionName("Add to Collection")
+        undoManager?.setActionName("Add Copy")
     }
 
     private func key(_ a: AlbumSummary) -> String { AlbumInfoStore.key(a) }
@@ -307,7 +307,7 @@ struct PlaylistView: View {
         .overlay {
             if tracks.isEmpty {
                 ContentUnavailableView("Empty Playlist", systemImage: "music.note.list",
-                                       description: Text("Right-click songs in your library and choose Add to Playlist."))
+                                       description: Text("Right-click songs in your digital collection and choose Add to Playlist."))
                     .allowsHitTesting(false)
             }
         }
@@ -352,14 +352,14 @@ struct AlbumMenuButtons: View {
     }
 }
 
-/// "Remove from Library…" for songs or a whole album; `removeFromLibraryConfirmation` asks before anything goes.
+/// "Remove from Digital Collection…" for songs or a whole album; `removeFromLibraryConfirmation` asks before anything goes.
 struct RemoveFromLibraryButton: View {
     @Environment(AppModel.self) private var model
     var tracks: [Track] = []
     var album: AlbumSummary?
 
     var body: some View {
-        Button("Remove from Library…", role: .destructive) {
+        Button("Remove from Digital Collection…", role: .destructive) {
             if let album {
                 model.confirmRemoval(model.tracks(of: album), title: album.album.isEmpty ? "Unknown Album" : album.album)
             } else {
@@ -370,19 +370,22 @@ struct RemoveFromLibraryButton: View {
 }
 
 extension View {
-    /// " Your copy CD #12 stays in your collection, marked not ripped.", for the items whose album leaves the library.
+    /// " Your copy CD #12 stays in your physical collection, marked not ripped.", for the items whose album leaves the
+    /// library.
     fileprivate static func keptCopies(_ items: [CollectionItem]) -> String {
         guard let first = items.first else { return "" }
         func name(_ item: CollectionItem) -> String { item.sticker?.text ?? item.medium.name.lowercased() }
         func marked(_ item: CollectionItem) -> String {
             switch item.medium {
             case .cd: "not ripped"
-            case .download: "not in the library"
+            case .download: "not in your digital collection"
             case .vinyl, .other: "not digitized"
             }
         }
-        if items.count == 1 { return " Your copy \(name(first)) stays in your collection, marked \(marked(first))." }
-        return " Your \(items.count) copies (\(items.prefix(3).map(name).joined(separator: ", "))\(items.count > 3 ? "…" : "")) stay in your collection."
+        let place = items.allSatisfy(\.medium.isPhysical) ? "your physical collection"
+            : items.allSatisfy({ $0.medium == .download }) ? "your downloads" : "what you own"
+        if items.count == 1 { return " Your copy \(name(first)) stays in \(place), marked \(marked(first))." }
+        return " Your \(items.count) copies (\(items.prefix(3).map(name).joined(separator: ", "))\(items.count > 3 ? "…" : "")) stay in \(place)."
     }
 
     /// Asks before removing `model.pendingRemoval` from the library. Shown once, by `ContentView`.
@@ -392,7 +395,7 @@ extension View {
         let what = request?.title.map { "“\($0)”" }
             ?? (count == 1 ? request.map { "“\($0.tracks[0].title)”" } ?? "1 song" : "\(count) songs")
         return confirmationDialog(
-            "Remove \(what) from the library?",
+            "Remove \(what) from your digital collection?",
             isPresented: Binding(get: { model.pendingRemoval != nil }, set: { if !$0 { model.pendingRemoval = nil } }),
             titleVisibility: .visible,
             presenting: request
