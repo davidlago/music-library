@@ -10,6 +10,8 @@ struct FindByLabelPanel: View {
     @AppStorage("findLabelSeries") private var series = StickerSeries.cd
     @State private var text = ""
     @FocusState private var focused: Bool
+    /// The label to open on (typed elsewhere, like the Collection pane's Find a label field).
+    var initial: Sticker? = nil
 
     /// The label typed; "v12" or "cd 12" also pick the series.
     private var sticker: Sticker? {
@@ -59,7 +61,10 @@ struct FindByLabelPanel: View {
         }
         .padding(20)
         .frame(width: 560)
-        .onAppear { focused = true }
+        .onAppear {
+            if let initial { set(initial) }
+            focused = true
+        }
         .onChange(of: text) {
             // "v12" or "cd 12" typed: the series switches, and the number stays.
             if let form = Sticker.parse(text), let s = form.series {

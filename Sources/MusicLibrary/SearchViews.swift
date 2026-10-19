@@ -360,12 +360,22 @@ struct SmartPlaylistEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: SmartPlaylistDraft
     @State private var showHelp = false
+    /// A saved playlist's rules as they were: kept byte for byte unless edited (in one saved before the collection,
+    /// "#1" is text, which `canonical` would turn into a label).
+    private let original: String?
 
-    init(draft: SmartPlaylistDraft) { _draft = State(initialValue: draft) }
+    init(draft: SmartPlaylistDraft) {
+        _draft = State(initialValue: draft)
+        original = draft.id == nil ? nil : draft.query
+    }
+
+    /// The rules as they'll be saved: the #12 shorthand typed here becomes sticker:12.
+    private var savedQuery: String {
+        draft.query == original ? draft.query : CollectionSearchQuery.canonical(draft.query)
+    }
 
     var body: some View {
-        // As saved: the #12 shorthand becomes sticker:12.
-        let preview = LibrarySearch.run(CollectionSearchQuery.canonical(draft.query), index: model.index, collectionIndex: model.collectionIndex,
+        let preview = LibrarySearch.run(savedQuery, index: model.index, collectionIndex: model.collectionIndex,
                                         collection: model.collection, autocorrect: false).library
         let query = draft.query.trimmingCharacters(in: .whitespaces)
         VStack(alignment: .leading, spacing: 14) {
@@ -397,7 +407,7 @@ struct SmartPlaylistEditor: View {
                 Button("Save") {
                     var d = draft
                     if d.name.trimmingCharacters(in: .whitespaces).isEmpty { d.name = query }
-                    d.query = CollectionSearchQuery.canonical(d.query)
+                    d.query = savedQuery
                     model.saveSmartPlaylist(d)
                     dismiss()
                 }

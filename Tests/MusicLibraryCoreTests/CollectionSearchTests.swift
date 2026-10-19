@@ -230,6 +230,20 @@ import Testing
         #expect(shared.search("has:cover", now: now).map(\.id) == ["cd1", "cd12", "v12", "ppm"])
     }
 
+    /// How You Own It: each part of a medium's bar opens a Shelf listing exactly the items it counts (a partial copy
+    /// isn't in Digitized; a missing rip is counted once in To digitize).
+    @Test func ownershipBarPartsOpenWhatTheyCount() {
+        let stats = CollectionStats(collection: collection, tracks: tracks, playTotals: [:], albumInfos: albumInfos, now: now)
+        #expect(!stats.media.isEmpty)
+        for share in stats.media {
+            for part in CollectionStats.MediumShare.Part.allCases {
+                #expect(ids(share.query(part)).count == share.count(part), "\(share.medium) \(part)")
+            }
+        }
+        let cd = stats.media.first { $0.medium == .cd }
+        #expect(cd?.count(.digitized) == 2 && cd?.count(.partial) == 1 && cd?.count(.toDigitize) == 1)
+    }
+
     @Test func collectionFilters() {
         #expect(ids("own:vinyl") == ["v12", "v13"])
         #expect(ids("own:cd") == ["cd1", "cd2", "cd12", "ppm"])

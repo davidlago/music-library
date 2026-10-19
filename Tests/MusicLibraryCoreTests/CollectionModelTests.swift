@@ -26,6 +26,33 @@ import Testing
 
     // MARK: Labels
 
+    /// Songs imported as a record's digital copy put what they cost on it only where it has nothing of its own, and
+    /// say so only when it went there (else each song keeps its own purchase, so nothing typed is lost).
+    @Test func songsPurchaseGoesOnTheItemOnlyWhereItHasNone() {
+        let day = PurchaseDay(year: 2025, month: 3, day: 1)!, other = PurchaseDay(year: 2020, month: 1, day: 1)!
+        var dated = item("v4", .vinyl, 4)
+        dated.purchasedOn = other
+        // A date but no price: the price goes there, its date stays.
+        let onDated = dated.takeSongsPurchase(price: 25, day: day)
+        #expect(onDated && dated.price == 25 && dated.purchasedOn == other)
+        // A price already: nothing replaced, and the songs keep theirs.
+        var priced = item("v5", .vinyl, 5)
+        priced.price = 30
+        let onPriced = priced.takeSongsPurchase(price: 25, day: day)
+        #expect(!onPriced && priced.price == 30 && priced.purchasedOn == day)
+        // Blank: both go there.
+        var blank = item("v6", .vinyl, 6)
+        let onBlank = blank.takeSongsPurchase(price: 25, day: day)
+        #expect(onBlank && blank.price == 25 && blank.purchasedOn == day)
+        // No price typed: on the item when its date is the songs' (or was blank), not when it's another.
+        var noPrice = item("v7", .vinyl, 7)
+        noPrice.purchasedOn = other
+        let otherDay = noPrice.takeSongsPurchase(price: nil, day: day)
+        let sameDay = noPrice.takeSongsPurchase(price: nil, day: other)
+        let noDay = noPrice.takeSongsPurchase(price: nil, day: nil)
+        #expect(!otherDay && noPrice.purchasedOn == other && sameDay && noDay)
+    }
+
     @Test func stickersParseInEveryForm() {
         for (text, number) in [("12", 12), ("#12", 12), (" # 12 ", 12), ("9999999", 9_999_999)] {
             let p = Sticker.parse(text)

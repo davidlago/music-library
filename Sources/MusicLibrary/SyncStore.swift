@@ -15,6 +15,9 @@ struct SyncContext {
     var tracks: (ExportItem) -> [Track]
     /// What you own, for each phone's Collection on iPhone.
     var collection: MusicCollection
+    /// False until `collection` has been built for the open library: it's empty until then, so what each phone's
+    /// Collection on iPhone adds isn't known yet.
+    var collectionReady = true
 }
 
 /// Wi-Fi sync to the iPhone app: phones nearby, pairing, what to keep on the phone (its own selection, apart from the
@@ -151,13 +154,24 @@ final class SyncStore {
     /// Puts the items on the phone at the next sync, even where a later rule kept them off.
     func add(_ items: [ExportItem]) {
         guard let context = context() else { return }
+        guard context.collectionReady else {
+            // Not tidied yet (that could drop a Remove from iPhone only the scope makes matter): `dropMissing` does it
+            // once the collection is loaded.
+            for item in items {
+                selection.rules.removeAll { $0.item == item }
+                selection.rules.append(SyncSelection.Rule(item: item, include: true))
+            }
+            return
+        }
         let implicit = implicitForAll(context)
         for item in items { selection.apply(item, include: true, tracks: { Set(context.tracks($0).map(\.id)) }, implicit: implicit) }
     }
 
-    /// Drops albums, artists and songs that left the library from the list (they'd stay there with no songs).
+    /// Drops albums, artists and songs that left the library from the list (they'd stay there with no songs). Not
+    /// while the collection is loading: a Remove from iPhone of an album only Collection on iPhone adds would look
+    /// like it decides nothing and be dropped.
     func dropMissing() {
-        guard let context = context(), !context.library.isEmpty else { return }
+        guard let context = context(), !context.library.isEmpty, context.collectionReady else { return }
         var pruned = selection
         pruned.dropMissing(tracks: { Set(context.tracks($0).map(\.id)) }, implicit: implicitForAll(context))
         if pruned != selection { selection = pruned }
@@ -325,6 +339,20 @@ final class SyncStore {
         let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("MusicLibrarySync", isDirectory: true)
         task = Task {
             defer { activity = .idle }
+            // Right after the Mac opens a library its collection is still being built: a sync planned before that
+            // would leave out (and delete from the phone) everything Collection on iPhone adds. Wait for it (within
+            // the phone's time to connect), else turn the sync down.
+            guard await waitForCollection() else {
+                let message = "The Mac is still loading the library. Try again in a moment."
+                if fromPhone {
+                    try? await connection.open()
+                    try? await connection.send(.failure(message))
+                    await connection.close()
+                } else {
+                    lastError = message
+                }
+                return
+            }
             do {
                 let (_, summary) = try await SyncMacSession.sync(
                     connection, identity: identity,
@@ -343,6 +371,18 @@ final class SyncStore {
             } catch {
                 lastError = "Sync with \(phone.name) failed: \(Self.describe(error, pairing: false))"
             }
+        }
+    }
+
+    /// True once the open library's collection is loaded, waiting up to `limit` for it.
+    private func waitForCollection(limit: Duration = .seconds(8)) async -> Bool {
+        let clock = ContinuousClock()
+        let deadline = clock.now + limit
+        while true {
+            guard let context = context() else { return false }
+            if context.collectionReady { return true }
+            guard clock.now < deadline, !Task.isCancelled else { return false }
+            try? await Task.sleep(for: .milliseconds(100))
         }
     }
 

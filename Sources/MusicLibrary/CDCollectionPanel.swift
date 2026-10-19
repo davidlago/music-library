@@ -39,7 +39,6 @@ struct CDCollectionPanel: View {
         .font(.callout)
         .padding(.horizontal, 14).padding(.vertical, 8)
         .background(Color.secondary.opacity(0.06))
-        .onChange(of: model.collectionVersion) { model.cd.matchCollectionItem(disc) }
     }
 
     /// What happens to the existing copy: "This is CD #37 in your collection, not ripped yet. This rip will be

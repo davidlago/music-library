@@ -160,10 +160,17 @@ final class LibraryCatalogStore {
     var collection = MusicCollection.empty {
         didSet {
             collectionMatcher = CatalogCollectionMatcher(collection.items)
+            // Matching every downloaded title again is slow: only when what it goes by changed (not on each edit of
+            // a price or a note).
+            let keys = collection.items.map(CatalogMatchKey.init)
+            guard keys != collectionMatchKeys else { return }
+            collectionMatchKeys = keys
             refreshOwned()
         }
     }
     private(set) var collectionMatcher = CatalogCollectionMatcher([])
+    /// What the matching of catalog titles to your copies went by when the owned badges were last worked out.
+    @ObservationIgnored private var collectionMatchKeys: [CatalogMatchKey] = []
 
     // MARK: Downloaded catalog
 
@@ -764,6 +771,21 @@ final class LibraryCatalogStore {
     }
 
     func webURL(_ path: String) -> URL? { client.url(for: path) }
+}
+
+/// What `CatalogCollectionMatcher` and the media of your copies (`collectionMedia`) use of an item.
+struct CatalogMatchKey: Equatable {
+    var id: String
+    var releaseID: String?
+    var releaseGroupID: String?
+    var album: String
+    var artist: String
+    var medium: CollectionMedium
+
+    init(_ item: CollectionItem) {
+        id = item.id; releaseID = item.releaseID; releaseGroupID = item.releaseGroupID
+        album = item.album; artist = item.artist; medium = item.medium
+    }
 }
 
 /// Finds the items in your collection a catalog title or a shop's CD may be: by release, by release group, else by

@@ -491,7 +491,7 @@ final class ImportController {
         if let item = linkItem(of: group) {
             if let linked = group.linkedKey {
                 // The batch's item is linked already: only songs of that album are its digital copy.
-                entry.pricedOnItem = group.linkChosen && linked == key
+                entry.pricedOnItem = group.linkChosen && linked == key && group.linkPriced
                 return
             }
             guard item.isEditable, item.albumKey == key || model.collection.libraryTracks(item).isEmpty,
@@ -500,24 +500,24 @@ final class ImportController {
                 entry.note = "Not linked to \(item.sticker?.text ?? "your \(item.medium.name.lowercased())"): this song is from another album"
                 return
             }
-            let source = group.linkSource
+            let source = item.medium.isPhysical ? group.linkSource : .download
             // What the album's songs cost goes to the item picked for them, where it has none (nothing typed is
             // dropped). Songs of another album in the batch keep their own purchases.
             let songs = batch(of: group).filter { albumKey(of: $0) == key }
             let price = group.linkChosen ? total(of: songs) : nil
             let day = group.linkChosen ? day(of: songs) : nil
+            // Where the item already has a price, the songs keep their own purchases (`takeSongsPurchase`).
+            var priced = false
             guard model.changeItem(id: item.id, {
                 $0.albumKey = key
                 $0.digitalSource = source
-                if $0.price == nil, $0.purchasedOn == nil, price != nil || day != nil {
-                    $0.price = price
-                    $0.purchasedOn = day
-                }
+                priced = $0.takeSongsPurchase(price: price, day: day)
             }) != nil else { return }
             // The first linked song decides: the item stays even once it's digitized and no longer suggested.
             group.linkedItemID = item.id
             group.linkedKey = key
-            entry.pricedOnItem = group.linkChosen
+            group.linkPriced = priced
+            entry.pricedOnItem = group.linkChosen && priced
         } else if group.boughtAsAlbum {
             entry.pricedOnItem = saveAlbumDownload(key: key, track: track, group: group)
         }
@@ -623,6 +623,9 @@ final class ImportGroup {
     /// The item its first song was linked to, and that song's album: later songs of that album are its copy too.
     var linkedItemID: String?
     var linkedKey: String?
+    /// What the songs cost went onto that item (it had no price or date of its own to keep): false, each song keeps
+    /// its own purchase.
+    var linkPriced = false
     var boughtAsAlbum = false
     var albumPrice: Decimal?
     var albumDay: PurchaseDay?

@@ -219,7 +219,7 @@ struct AddToCollectionSheet: View {
     @State private var link = true
     /// The library album the item would be linked to, and whether that's a sure match (same key, release or release
     /// group) rather than one by title.
-    @State private var libraryMatch: (album: AlbumSummary, sure: Bool)?
+    @State private var libraryMatch: (album: AlbumSummary, sure: Bool, ownKey: Bool)?
     @State private var cover: Data?
     @State private var coverSource: String?
     /// The cover is one the user chose (not the Cover Art Archive's), so it's kept whatever is linked.
@@ -348,7 +348,15 @@ struct AddToCollectionSheet: View {
                         }
                     }
                     .font(.callout)
-                    if let match = libraryMatch {
+                    if let match = libraryMatch, match.ownKey {
+                        // The songs under this title and artist are always its digital copy: there's nothing to turn off.
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label("Linked to “\(match.album.album)” in your library (\(songCount(match.album.trackCount)))", systemImage: "link")
+                            Text("Your library's songs under this title and artist are its digital copy.")
+                                .font(.caption).foregroundStyle(.subtext)
+                        }
+                        .help(Self.linkHelp(chosenMedium))
+                    } else if let match = libraryMatch {
                         Toggle(isOn: $link) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Link to “\(match.album.album)” in your library (\(songCount(match.album.trackCount)))")
@@ -395,7 +403,7 @@ struct AddToCollectionSheet: View {
     }
 
     private func coverWell(_ draft: CollectionItem) -> some View {
-        let linkedCover = link ? libraryMatch.flatMap { model.coverURL(forAlbum: $0.album) } : nil
+        let linkedCover = libraryMatch.flatMap { link || $0.ownKey ? model.coverURL(forAlbum: $0.album) : nil }
         return VStack(spacing: 6) {
             Group {
                 if cover == nil, let linkedCover {
@@ -506,14 +514,14 @@ struct AddToCollectionSheet: View {
         }
         guard let draft = makeItem(numbered: false, linking: false) else { libraryMatch = nil; return }
         if let album = model.album(forKey: draft.albumKey) {
-            libraryMatch = (album, true)
+            libraryMatch = (album, true, true)
         } else if let first = CollectionLinker.suggestions(for: draft, albums: model.albums, tracks: model.tracks).first {
             let tracks = model.tracks(of: first)
             let sure = tracks.contains { t in
                 (draft.releaseID != nil && t.metadata.mbReleaseId == draft.releaseID)
                     || (draft.releaseGroupID != nil && t.metadata.extended.mbReleaseGroupId == draft.releaseGroupID)
             }
-            libraryMatch = (first, sure)
+            libraryMatch = (first, sure, false)
         } else {
             libraryMatch = nil
         }
@@ -543,7 +551,8 @@ struct AddToCollectionSheet: View {
         item.purchasedOn = purchasedOn
         item.price = price
         item.notes = Self.field(notes)
-        if linking, link, let match = libraryMatch {
+        // A match under the item's own key is linked either way (its songs are its digital copy).
+        if linking, let match = libraryMatch, link || match.ownKey {
             item.albumKey = AlbumInfoStore.key(match.album)
             item.digitalSource = LinkAlbumPicker.defaultSource(chosenMedium)
         }

@@ -789,3 +789,16 @@ public enum CollectionLinker {
         return ranked.sorted { $0.rank != $1.rank ? $0.rank < $1.rank : $0.offset < $1.offset }.map(\.album)
     }
 }
+
+extension CollectionItem {
+    /// Puts what songs imported as this item's digital copy cost on it: the price and the date each only where the
+    /// item has none, so nothing it had is replaced. True when the songs' purchase is on the item now (their price went
+    /// there, or with no price, their date did or is the item's already); false, the songs keep their own purchases,
+    /// or what was typed would be lost.
+    public mutating func takeSongsPurchase(price: Decimal?, day: PurchaseDay?) -> Bool {
+        let taken = price != nil ? self.price == nil : (day == nil || purchasedOn == nil || purchasedOn == day)
+        if self.price == nil, let price { self.price = price }
+        if purchasedOn == nil, let day { purchasedOn = day }
+        return taken
+    }
+}

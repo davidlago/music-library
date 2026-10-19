@@ -222,15 +222,17 @@ struct ShelvesCard: View {
         return parts.isEmpty ? "No gaps" : parts.joined(separator: " · ")
     }
 
-    /// Opens the item at the label typed ("12" is a CD's), else Find by Label.
+    /// Opens the item at the label typed (a bare number in either series, CDs first, as the search does), else Find
+    /// by Label on that label, which says it's free and shows its neighbors.
     private func go() {
         guard let form = Sticker.parse(find), let sticker = Sticker(series: form.series ?? .cd, number: form.number) else { return }
-        if let item = model.collection.items(at: sticker).first {
+        let items = form.series == nil ? model.collection.items(number: form.number) : model.collection.items(at: sticker)
+        if let item = items.first {
             model.showItem(id: item.id)
-            find = ""
         } else {
-            model.findByLabel()
+            model.findByLabel(sticker)
         }
+        find = ""
     }
 }
 
@@ -282,12 +284,15 @@ struct HowYouOwnItCard: View {
     }
 
     private func parts(_ s: CollectionStats.MediumShare) -> [Part] {
-        let q = s.medium.query
+        // Each segment opens exactly the items it counts.
+        func part(_ name: String, _ p: CollectionStats.MediumShare.Part, _ color: Color) -> Part {
+            Part(name: name, count: s.count(p), color: color, query: s.query(p))
+        }
         return [
-            Part(name: "Digitized", count: s.digitized, color: theme.tier(.hiRes), query: "\(q) ripped:yes"),
-            Part(name: "Partly", count: s.partial, color: theme.tier(.cd), query: "\(q) ripped:partial"),
-            Part(name: "From another copy", count: s.otherCopy, color: theme.tier(.lossyHigh), query: "\(q) ripped:other"),
-            Part(name: "To digitize", count: s.toDigitize + s.missing, color: theme.neutral, query: "\(q) ripped:no"),
+            part("Digitized", .digitized, theme.tier(.hiRes)),
+            part("Partly", .partial, theme.tier(.cd)),
+            part("From another copy", .otherCopy, theme.tier(.lossyHigh)),
+            part("To digitize", .toDigitize, theme.neutral),
         ].filter { $0.count > 0 }
     }
 

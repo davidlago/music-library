@@ -26,16 +26,21 @@ struct MusicLibraryApp: App {
             CommandGroup(replacing: .newItem) {
                 Button("Add to Collection…") { model.addToCollection() }
                     .keyboardShortcut("n", modifiers: [.command, .shift])
+                    .disabled(model.collectionSheet != nil || model.smartPlaylistDraft != nil)
                 Button("Import…") { model.chooseFilesToImport() }
                     .keyboardShortcut("o", modifiers: .command)
             }
             CommandMenu("Collection") {
                 // Also in the File menu, which has its shortcut (one key equivalent per command).
-                Button("Add to Collection…") { model.addToCollection() }
-                Button("Add Library Albums…") { model.collectionSheet = .addLibraryAlbums }
-                Divider()
-                Button("Find by Label…") { model.findByLabel() }
-                    .keyboardShortcut("l", modifiers: .command)
+                // Not over a sheet that's showing, which would be replaced (and what's entered in it lost).
+                Group {
+                    Button("Add to Collection…") { model.addToCollection() }
+                    Button("Add Library Albums…") { model.addLibraryAlbums() }
+                    Divider()
+                    Button("Find by Label…") { model.findByLabel() }
+                        .keyboardShortcut("l", modifiers: .command)
+                }
+                .disabled(model.collectionSheet != nil || model.smartPlaylistDraft != nil)
             }
             CommandGroup(after: .toolbar) {
                 Button(model.showsQueue ? "Hide Queue" : "Show Queue") { model.showsQueue.toggle() }

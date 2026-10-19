@@ -369,7 +369,8 @@ struct ImportCollectionBar: View {
                 .popover(isPresented: $picking, arrowEdge: .trailing) {
                     ImportLinkPicker(importer: importer, model: model) { picking = false }
                 }
-                if let linked {
+                // A download is always its own digital copy: only a CD or record asks how it was digitized.
+                if let linked, linked.medium.isPhysical {
                     Picker("Source", selection: $importer.linkSource) {
                         Text(linked.medium == .cd ? "Ripped from this CD" : "Digitized from this record").tag(DigitalSource.rip)
                         Text("Came with it as a download").tag(DigitalSource.download)

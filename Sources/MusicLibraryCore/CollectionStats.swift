@@ -27,6 +27,34 @@ public struct CollectionStats: Sendable {
         public var averagePrice: Decimal? { priced == 0 ? nil : spent / Decimal(priced) }
 
         public init(medium: CollectionMedium) { self.medium = medium }
+
+        /// The parts of the medium's bar in How You Own It, by digital state.
+        public enum Part: CaseIterable, Sendable {
+            case digitized, partial, otherCopy, toDigitize
+        }
+
+        /// The items in a part: `toDigitize` is every item that needs digitizing (`missing` included, and downloads
+        /// not in the library), which is what `ripped:no` lists.
+        public func count(_ part: Part) -> Int {
+            switch part {
+            case .digitized: digitized
+            case .partial: partial
+            case .otherCopy: otherCopy
+            case .toDigitize: items - digitized - partial - otherCopy
+            }
+        }
+
+        /// The Shelf filter listing exactly the items `count(part)` counts (`ripped:yes` alone also matches partial
+        /// copies).
+        public func query(_ part: Part) -> String {
+            let own = "own:\(medium.rawValue)"
+            switch part {
+            case .digitized: return "\(own) ripped:yes -ripped:partial"
+            case .partial: return "\(own) ripped:partial"
+            case .otherCopy: return "\(own) ripped:other"
+            case .toDigitize: return "\(own) ripped:no"
+            }
+        }
     }
 
     /// One label series: CDs or records.

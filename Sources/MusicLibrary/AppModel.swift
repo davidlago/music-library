@@ -16,7 +16,8 @@ enum SidebarItem: Hashable {
 /// The collection's sheets, shown by `ContentView` from anywhere (menus, the Shelf, album pages).
 enum CollectionSheet: Identifiable {
     case add(medium: CollectionMedium?, prefill: CollectionPrefill?)
-    case findByLabel
+    /// Find by Label, opened on a label when one is given.
+    case findByLabel(Sticker?)
     case addLibraryAlbums
     /// Gaps and duplicates in the label series.
     case labelCheck
@@ -138,7 +139,17 @@ final class AppModel {
     private(set) var searchLabelHits: [CollectionItem] = []
     private(set) var recentSearches: [String]
     /// All tracks in library order.
-    private(set) var tracks: [Track] = []
+    private(set) var tracks: [Track] = [] {
+        didSet {
+            var byKey: [String: [Track]] = [:]
+            for t in tracks { byKey[SearchIndex.albumKey(album: t.album, artist: t.effectiveAlbumArtist), default: []].append(t) }
+            tracksByAlbumKey = byKey.mapValues { list in
+                list.sorted { (($0.metadata.discNo ?? 1), ($0.trackNo ?? 0)) < (($1.metadata.discNo ?? 1), ($1.trackNo ?? 0)) }
+            }
+        }
+    }
+    /// `tracks` by album key, each album's in disc and track order (`tracks(ofAlbumKey:)`).
+    private var tracksByAlbumKey: [String: [Track]] = [:]
     /// Rebuilt in the background whenever the library changes.
     private(set) var index = SearchIndex.empty
     /// Bumped whenever `index` is replaced, so views can refresh derived data.
@@ -190,6 +201,11 @@ final class AppModel {
     /// Items saved (or, as nil, deleted) since the last rebuild started, so lookups right after a change see it.
     @ObservationIgnored private var unsettledItems: [String: CollectionItem?] = [:]
     @ObservationIgnored private var appliedDefaultSidebar = false
+    /// False until the open library's collection has been built once: until then `collection` is empty, so what
+    /// Collection on iPhone adds isn't known (the iPhone selection isn't tidied and syncs wait).
+    @ObservationIgnored private var collectionLoaded = false
+    /// The album keys and artists of the collection that info was last fetched for (`syncArtistInfo`).
+    @ObservationIgnored private var infoSyncedKeys: Set<String>?
     /// False while a reload rebuilds `index`, which is then of other tracks than `tracks`.
     @ObservationIgnored private var indexIsCurrent = false
     /// The songs you bought (entered when importing).
@@ -423,7 +439,7 @@ final class AppModel {
         index = .empty; searchResults = SearchResults(); stats = nil; statsVersion = -1
         listening = nil; listeningRequest = nil
         trackPurchases = [:]
-        collection = .empty; collectionIndex = .empty; collectionStats = nil; collectionStatsRequest = nil
+        collection = .empty; collectionIndex = .empty; collectionStats = nil; collectionStatsRequest = nil; collectionLoaded = false
         unsettledItems = [:]; searchItems = []; searchLabelHits = []; collectionVersion += 1
         openLibrary()
     }
@@ -493,6 +509,7 @@ final class AppModel {
                 self.smartPlaylistCounts = counts
                 self.libraryVersion += 1
                 if let current, let request = collectionRequest, request.generation == self.collectionGeneration {
+                    self.infoSyncedKeys = nil
                     self.setCollection(current, settling: request.unsettled)
                 } else {
                     self.runSearch()
@@ -657,10 +674,7 @@ final class AppModel {
 
     func tracks(of album: AlbumSummary) -> [Track] { tracks(ofAlbumKey: AlbumInfoStore.key(album)) }
 
-    func tracks(ofAlbumKey key: String) -> [Track] {
-        tracks.filter { SearchIndex.albumKey(album: $0.album, artist: $0.effectiveAlbumArtist) == key }
-            .sorted { (($0.metadata.discNo ?? 1), ($0.trackNo ?? 0)) < (($1.metadata.discNo ?? 1), ($1.trackNo ?? 0)) }
-    }
+    func tracks(ofAlbumKey key: String) -> [Track] { tracksByAlbumKey[key] ?? [] }
 
     /// The release and release group most of the album's tracks were matched to.
     private func albumRequest(_ album: AlbumSummary) -> AlbumInfoStore.Request {
@@ -842,11 +856,26 @@ final class AppModel {
 
     /// Add to Collection… (⇧⌘N), optionally for a medium and prefilled (e.g. from a catalog or shop listing).
     func addToCollection(medium: CollectionMedium? = nil, prefill: CollectionPrefill? = nil) {
-        collectionSheet = .add(medium: medium, prefill: prefill)
+        presentCollectionSheet(.add(medium: medium, prefill: prefill))
     }
 
-    /// Find by Label (⌘L).
-    func findByLabel() { collectionSheet = .findByLabel }
+    /// Find by Label (⌘L), optionally opened on a label.
+    func findByLabel(_ sticker: Sticker? = nil) { presentCollectionSheet(.findByLabel(sticker)) }
+
+    /// Add Library Albums…
+    func addLibraryAlbums() { presentCollectionSheet(.addLibraryAlbums) }
+
+    /// A sheet is showing in a window (a collection sheet, the smart playlist editor, an export, or a page's own
+    /// sheet): the collection's menu commands do nothing then, rather than replace it and lose what's entered.
+    var isShowingSheet: Bool {
+        collectionSheet != nil || smartPlaylistDraft != nil || exportState != nil
+            || NSApp.windows.contains { $0.attachedSheet != nil }
+    }
+
+    private func presentCollectionSheet(_ sheet: CollectionSheet) {
+        guard !isShowingSheet else { return }
+        collectionSheet = sheet
+    }
 
     /// Changes one stored item as it is saved now (not as some view last saw it), so only what `change` sets is
     /// written. Nothing happens for an item that's gone, read-only, or unchanged. Returns the item as saved.
@@ -1033,13 +1062,26 @@ final class AppModel {
         for (id, change) in unsettled where unsettledItems[id] == change { unsettledItems.removeValue(forKey: id) }
         catalog.collection = collection
         refreshCollectionPlaylistCounts()
-        // The app opens on the Shelf once there's anything on it (D19), unless something else was picked already.
+        // The app opens on the Shelf once there's anything on it (D19), unless something else was picked already
+        // (a page opened or a search typed while it loaded counts too).
         if !appliedDefaultSidebar {
             appliedDefaultSidebar = true
-            if !sidebarChosen, !collection.items.isEmpty { sidebar = .collection(.all) }
+            if !sidebarChosen, searchText.isEmpty, navigationPath.isEmpty, !collection.items.isEmpty { sidebar = .collection(.all) }
         }
+        if !collectionLoaded {
+            collectionLoaded = true
+            // Skipped while the collection was empty, since what Collection on iPhone adds wasn't known.
+            iPhone.dropMissing()
+        }
+        // A disc looked up while the collection was loading (or changing) is matched to its items again.
+        cd?.collectionChanged()
         runSearch()
-        syncArtistInfo()
+        // Info is fetched after a reload, and after an edit only for albums or artists new to the collection.
+        let infoKeys = Set(collection.items.filter { $0.origin == .stored }.map(\.albumKey) + collection.artists.map { "artist:" + ArtistInfoStore.key($0) })
+        if infoSyncedKeys.map({ !infoKeys.isSubset(of: $0) }) ?? true {
+            infoSyncedKeys = infoKeys
+            syncArtistInfo()
+        }
     }
 
     /// Persists what the linker found after a reload, keeping only what's still right for the items as they are now
@@ -1581,7 +1623,8 @@ final class AppModel {
                                                   ticketmasterKey: concerts.ticketmasterKey, jambaseKey: concerts.jambaseKey)
         }
         return SyncContext(libraryRoot: libraryRoot, database: database, lastFM: lastFM, concerts: concertSettings,
-                           library: tracks, tracks: { [unowned self] in self.tracks(for: $0) }, collection: collection)
+                           library: tracks, tracks: { [unowned self] in self.tracks(for: $0) }, collection: collection,
+                           collectionReady: collectionLoaded)
     }
 
     /// The collection's own covers (`Music/Collection Covers`), which go with a database backup.

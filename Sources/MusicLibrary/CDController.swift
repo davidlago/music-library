@@ -51,6 +51,8 @@ final class CDDisc: Identifiable {
     var newPrice: Decimal?
     /// Set once a label number was suggested for a new copy, so clearing it doesn't bring it back.
     var stickerSuggested = false
+    /// The number suggested (`newSticker` while the user hasn't changed it), suggested again if another item takes it.
+    var suggestedSticker: Int?
     /// The item this disc's page added (when ripping or cataloging started): the only one switching off removes.
     var createdItemID: String?
     /// Set once ripping or cataloging has started: from then on changes to the choice are saved right away.
@@ -279,9 +281,21 @@ final class CDController {
         if disc.collectionChoice == .new { suggestLabel(disc) }
     }
 
+    /// Matches every disc in the drives again after the collection changed (or first loaded: a disc looked up before
+    /// that was matched against an empty collection).
+    func collectionChanged() {
+        for disc in discs where !disc.removed { matchCollectionItem(disc) }
+    }
+
     /// Opens a disc's page from its item's (Rip Now): the rip goes with that item, unless ripping or cataloging
     /// already saved another choice.
     func show(_ disc: CDDisc, for item: CollectionItem) {
+        // The matches may be from before the item was added or changed.
+        matchCollectionItem(disc)
+        if !disc.collectionSaved, disc.release != nil, item.medium == .cd, item.isEditable, !disc.matches.contains(where: { $0.id == item.id }) {
+            // Saved a moment ago (not in the rebuilt collection yet): it's the item this disc was found for.
+            disc.matches.insert(item, at: 0)
+        }
         if !disc.collectionSaved, disc.matches.contains(where: { $0.id == item.id }) {
             disc.collectionChoice = .existing(item.id)
             disc.choiceTouched = true
@@ -295,11 +309,20 @@ final class CDController {
         return model.nextNumber(in: .cd, pending: pending)
     }
 
-    /// A new copy gets the next label number the first time.
+    /// A new copy gets the next label number the first time, and again when the number suggested (and left as it
+    /// is) turns out to be another item's: suggested while the collection was loading, or taken since.
     func suggestLabel(_ disc: CDDisc) {
-        guard disc.collectionChoice == .new, !disc.stickerSuggested else { return }
+        guard disc.collectionChoice == .new else { return }
+        if disc.stickerSuggested {
+            guard disc.createdItemID == nil, let n = disc.newSticker, n == disc.suggestedSticker,
+                  let sticker = Sticker(series: .cd, number: n), model.itemLabeled(sticker, excluding: nil) != nil else { return }
+            disc.newSticker = nil
+        }
         disc.stickerSuggested = true
-        if disc.newSticker == nil { disc.newSticker = nextLabelNumber(for: disc) }
+        if disc.newSticker == nil {
+            disc.newSticker = nextLabelNumber(for: disc)
+            disc.suggestedSticker = disc.newSticker
+        }
     }
 
     /// Changes which copy the CD is. Moving away from a new copy this page saved removes that one item (never an
@@ -379,6 +402,9 @@ final class CDController {
         if item.releaseID == nil { item.releaseID = MBID.validated(release.id) }
         if item.releaseGroupID == nil { item.releaseGroupID = MBID.validated(release.releaseGroupId) }
         if item.year == nil, let y = release.year ?? release.originalYear, (1000...9999).contains(y) { item.year = y }
+        // The edition's own details only on an item of this edition (or of none yet): an item that names another
+        // release keeps its own (Change Edition changes them).
+        guard sameRelease else { return }
         if item.barcode == nil {
             let digits = release.barcode.filter { ("0"..."9").contains($0) }
             if (6...20).contains(digits.count) { item.barcode = digits }

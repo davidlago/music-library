@@ -92,7 +92,7 @@ struct MainWindow: View {
         .sheet(item: $model.collectionSheet) { sheet in
             switch sheet {
             case .add(let medium, let prefill): AddToCollectionSheet(medium: medium, prefill: prefill).themedSheet()
-            case .findByLabel: FindByLabelPanel().themedSheet()
+            case .findByLabel(let sticker): FindByLabelPanel(initial: sticker).themedSheet()
             case .addLibraryAlbums: BulkAddSheet().themedSheet()
             case .labelCheck: LabelCheckSheet().themedSheet()
             case .link(let id): LinkAlbumPicker(itemID: id).themedSheet()
