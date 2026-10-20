@@ -7,6 +7,15 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- **CDs MusicBrainz doesn't know can be ripped as you name them.** When macOS has names for a disc (the ones Finder
+  shows, from its CD-Text or Gracenote), its page lists the song titles instead of "Track 1, Track 2…" and fills in
+  the album and artist (a disc named "Placido Domingo Popular Favorites" becomes Popular Favorites by Plácido Domingo,
+  using the artists in your collections or MusicBrainz). Fix any of them on the page (click a song title to change
+  it), pick a cover with **Choose Cover…** (covers found on the Cover Art Archive, a file, the clipboard, or an image
+  dropped on it, also from a web page), and **Rip** puts the songs straight into your digital collection with those
+  names and that cover. The disc can also go in your physical collection: its page asks whether it's yours, with its
+  label, purchase date and price, and **Catalog Without Ripping** works. **Rip to Import Queue** is still there, and
+  now names and tags each file with its title.
 - **A new look for Listening in Insights**, on the Mac and the iPhone, inspired by Last.fm's listening reports. A
   banner shows the period's plays over a blurred photo of your top artist, with each day's plays next to the same span
   before and how much more or less you listened. **Top Charts** puts your #1 artist, album and song up big with their

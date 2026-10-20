@@ -475,6 +475,16 @@ extension MusicBrainzClient {
                         .init(name: "fmt", value: "json"), .init(name: "limit", value: "8")]
         return try ArtistInfoParser.parseArtistSearch(try await fetchData(c.url!))
     }
+
+    /// Artists MusicBrainz finds for words that may hold an artist's name among others (a disc title like "Placido
+    /// Domingo Popular Favorites"), best match first.
+    public func searchArtists(in text: String) async throws -> [MBArtist] {
+        let words = Self.luceneEscape(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard !words.isEmpty else { return [] }
+        var c = URLComponents(string: "\(Self.baseURL)/artist")!
+        c.queryItems = [.init(name: "query", value: words), .init(name: "fmt", value: "json"), .init(name: "limit", value: "8")]
+        return try ArtistInfoParser.parseArtistSearch(try await fetchData(c.url!))
+    }
 }
 
 extension LastFMClient {

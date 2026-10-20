@@ -1,7 +1,7 @@
 import MusicLibraryCore
 import SwiftUI
 
-/// On a matched disc's page, above its tracks: the copy in your collection the CD is. An item already there ("This
+/// On a disc's page (matched, or unknown to MusicBrainz and named by the page's album and artist), above its tracks: the copy in your collection the CD is. An item already there ("This
 /// is CD #37 in your collection, not ripped yet. This rip will be linked to it."; a picker when several match),
 /// else adding it as a new CD with the next label, or the question "Is this CD yours?" when Settings ▸ Collection
 /// asks. An existing item's date, price and label are edited on it at once; a new one's are saved when ripping or
@@ -143,6 +143,8 @@ struct CDCollectionSheet: View {
             Text("Is this CD yours?").font(.title3.bold())
             if let release = disc.release {
                 Text("\(release.album) — \(release.albumArtist)").foregroundStyle(.subtext)
+            } else if !disc.searchAlbum.isEmpty {
+                Text([disc.searchAlbum, disc.searchArtist].filter { !$0.isEmpty }.joined(separator: " — ")).foregroundStyle(.subtext)
             }
             Picker("Is this CD yours?", selection: Binding(get: { disc.collectionChoice }, set: { model.cd.setChoice(disc, $0) })) {
                 Text("Yes").tag(CDCollectionChoice?.some(.new))
