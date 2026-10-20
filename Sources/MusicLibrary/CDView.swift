@@ -6,6 +6,8 @@ struct CDView: View {
     @Bindable var disc: CDDisc
     @State private var showWrongAlbum = false
     @State private var askOwnership = false
+    @State private var coverTargeted = false
+    @State private var showCoverSheet = false
 
     private var hasExactMatch: Bool { disc.candidates.contains { $0.exactMatch } }
 
@@ -21,12 +23,13 @@ struct CDView: View {
             }
             lookupStatus
             if disc.lookup == .matched { wrongAlbumSection }
-            if disc.release != nil { CDCollectionPanel(disc: disc) }
+            if disc.release != nil || disc.isUnmatched { CDCollectionPanel(disc: disc) }
             trackList
             Divider()
             footer.padding(12)
         }
         .navigationTitle(disc.title)
+        .sheet(isPresented: $showCoverSheet) { CDCoverSheet(disc: disc).themedSheet() }
         .onAppear { showWrongAlbum = disc.lookup == .matched && !hasExactMatch }
         .onChange(of: disc.lookup) { _, new in
             if new == .matched { showWrongAlbum = !hasExactMatch }
@@ -58,15 +61,35 @@ struct CDView: View {
 
     // MARK: Header
 
+    private func setCover(from url: URL) async {
+        switch await ImageInput.load(url) {
+        case .success(let image): model.cd.setCover(disc, image.data)
+        case .failure(let failure): disc.message = failure.message
+        }
+    }
+
     private var header: some View {
         HStack(alignment: .top, spacing: 16) {
-            DataImage(data: disc.cover, size: 160)
+            if disc.isUnmatched {
+                // No release to take a cover from: a file, or an image dropped here.
+                DataImage(data: disc.cover, size: 160)
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: coverTargeted ? 3 : 0))
+                    .dropDestination(for: URL.self) { urls, _ in
+                        guard let url = urls.first else { return false }
+                        Task { await setCover(from: url) }
+                        return true
+                    } isTargeted: { coverTargeted = $0 }
+                    .help("Drop an image here for this CD's cover")
+            } else {
+                DataImage(data: disc.cover, size: 160)
+            }
             VStack(alignment: .leading, spacing: 6) {
-                Text(disc.release?.album ?? disc.volume.name).font(.title2.bold()).lineLimit(2)
+                Text(disc.title).font(.title2.bold()).lineLimit(2)
                 if let release = disc.release {
                     Text(release.albumArtist).font(.title3).foregroundStyle(.subtext)
                     Text(details(release)).font(.callout).foregroundStyle(.subtext)
                 } else {
+                    if !disc.searchArtist.isEmpty { Text(disc.searchArtist).font(.title3).foregroundStyle(.subtext) }
                     Text("Audio CD · \(disc.volume.toc.audioTracks.count) tracks · \(formatTime(totalDuration))")
                         .font(.callout).foregroundStyle(.subtext)
                 }
@@ -74,6 +97,10 @@ struct CDView: View {
                 Spacer(minLength: 0)
                 HStack {
                     Button("Eject", systemImage: "eject") { model.cd.eject(disc) }.disabled(disc.isRipping)
+                    if disc.isUnmatched {
+                        Button(disc.cover == nil ? "Choose Cover…" : "Change Cover…", systemImage: "photo") { showCoverSheet = true }
+                            .help("Find a cover online, pick an image, or drop one on the cover")
+                    }
                 }
             }
             Spacer(minLength: 0)
@@ -138,8 +165,12 @@ struct CDView: View {
     private var notFoundPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("This disc isn't in MusicBrainz yet.").font(.headline)
-            Text("Search for the album by name, submit this disc so it is known next time, or rip the tracks to the import queue and match them there.")
+            Text("Search for the album by name, or rip it as you name it here: the album and artist below, the song titles in the list (click one to change it) and the cover go into the files. Submit this disc so it is known next time.")
                 .font(.callout).foregroundStyle(.subtext)
+            if !disc.volume.names.titles.isEmpty {
+                Label("The song titles start as the names macOS shows for this disc.", systemImage: "text.quote")
+                    .font(.callout).foregroundStyle(.subtext)
+            }
             searchControls
         }
         .padding(14)
@@ -186,8 +217,15 @@ struct CDView: View {
                         .labelsHidden()
                         .disabled(disc.isRipping || row.status.isFinished)
                     Text("\(row.id)").monospacedDigit().foregroundStyle(.subtext).frame(width: 28, alignment: .trailing)
-                    Text(row.title).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-                    Text(row.artist).lineLimit(1).foregroundStyle(.subtext).frame(width: 180, alignment: .leading)
+                    if disc.isUnmatched, !disc.isRipping, !row.status.isFinished {
+                        // No release to name the songs: they're ripped with the titles typed here.
+                        TextField("Title", text: $row.title).textFieldStyle(.plain).lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        Text(row.title).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    Text(row.artist.isEmpty && disc.isUnmatched ? disc.searchArtist : row.artist)
+                        .lineLimit(1).foregroundStyle(.subtext).frame(width: 180, alignment: .leading)
                     Text(formatTime(row.duration)).monospacedDigit().foregroundStyle(.subtext).frame(width: 50, alignment: .trailing)
                     statusView(row).frame(width: 250, alignment: .leading)
                 }
@@ -310,14 +348,16 @@ struct CDView: View {
                         .help("Rip the checked tracks to FLAC and match them in the Import queue")
                 }
                 Button("Catalog Without Ripping") { model.cd.catalog(disc) }
-                    .disabled(disc.release == nil)
+                    .disabled(disc.release == nil && !disc.isUnmatched)
                     .help(model.ejectAfterCataloging ? "Save this CD in your physical collection without ripping it, then eject it"
                           : "Save this CD in your physical collection without ripping it")
                 Button("Rip \(disc.selectedCount) Track\(disc.selectedCount == 1 ? "" : "s")") {
                     if disc.collectionChoice == nil { askOwnership = true } else { model.cd.rip(disc) }
                 }
                     .buttonStyle(.borderedProminent)
-                    .disabled(disc.release == nil || disc.selectedCount == 0 || !model.ffmpegAvailable)
+                    .disabled((disc.release == nil && !disc.canRipUnmatched) || disc.selectedCount == 0 || !model.ffmpegAvailable)
+                    .help(disc.release == nil && disc.isUnmatched && !disc.canRipUnmatched
+                          ? "Type the album's name above to rip this disc into your digital collection" : "")
             }
         }
     }

@@ -134,14 +134,94 @@ extension CDTOC {
     }
 }
 
+/// The names macOS gives a disc, from its CD-Text or from Apple's Gracenote lookup: it names the volume after the
+/// album (often the artist and the album run together: "Placido Domingo Popular Favorites") and the track files
+/// after the songs ("1 Somewhere, My Love.aiff"); a disc it knows nothing about is "Audio CD" with "1 Audio
+/// Track.aiff" files. The names come from the disc and the drive, so they're untrusted: control characters are
+/// dropped and lengths capped (they still have to go through `Organizer.sanitize` before becoming a path).
+public struct CDNames: Sendable, Equatable {
+    /// The volume name: the album, the artist and the album, or whatever else the disc is called.
+    public var title: String?
+    /// Song titles by track number.
+    public var titles: [Int: String]
+
+    public init(title: String? = nil, titles: [Int: String] = [:]) {
+        self.title = title; self.titles = titles
+    }
+
+    public var isEmpty: Bool { title == nil && titles.isEmpty }
+
+    static let maxLength = 200
+
+    /// `trackFileNames` are the volume's track files by number, extension included.
+    public static func read(volumeName: String, trackFileNames: [Int: String]) -> CDNames {
+        let generic = try! NSRegularExpression(pattern: #"^Audio CD( \d+)?$"#, options: .caseInsensitive)
+        let name = clean(volumeName)
+        let title = name.flatMap { n in generic.firstMatch(in: n, range: NSRange(n.startIndex..., in: n)) == nil ? n : nil }
+        let numbered = try! NSRegularExpression(pattern: #"^\d+\s+"#)
+        var titles: [Int: String] = [:]
+        for (n, file) in trackFileNames {
+            let stem = (file as NSString).deletingPathExtension
+            let range = numbered.firstMatch(in: stem, range: NSRange(stem.startIndex..., in: stem)).flatMap { Range($0.range, in: stem) }
+            if let title = clean(range.map { String(stem[$0.upperBound...]) } ?? stem) { titles[n] = title }
+        }
+        // macOS's own name for a track it has no name for ("Audio Track", or the same words in another language on
+        // every track).
+        let distinct = Set(titles.values.map { $0.lowercased() })
+        if distinct == ["audio track"] || (titles.count > 1 && distinct.count == 1) { titles = [:] }
+        return CDNames(title: title, titles: titles)
+    }
+
+    /// Splits a disc title that runs the artist and the album together ("Placido Domingo Popular Favorites") where it
+    /// starts with one of `artists` (compared without case, accents or punctuation; the longest first), giving the
+    /// artist as `artists` spells it ("Plácido Domingo"). "Artist - Album" splits at the dash. Nil when neither fits
+    /// or nothing would be left for the album.
+    public static func split(_ title: String, artists: [String]) -> (artist: String, album: String)? {
+        var known: [String: String] = [:]
+        for a in artists {
+            let key = TextNormalizer.normalize(a)
+            if !key.isEmpty, known[key] == nil { known[key] = a }
+        }
+        let words = title.split(whereSeparator: \.isWhitespace).map(String.init)
+        if words.count > 1 {
+            for k in stride(from: min(words.count - 1, 8), through: 1, by: -1) {
+                guard let artist = known[TextNormalizer.normalize(words[..<k].joined(separator: " "))] else { continue }
+                let album = words[k...].joined(separator: " ").trimmingCharacters(in: CharacterSet(charactersIn: "-–—:/ "))
+                if !album.isEmpty { return (artist, album) }
+            }
+        }
+        for dash in [" - ", " – ", " — ", " / "] {
+            guard let r = title.range(of: dash) else { continue }
+            let artist = title[..<r.lowerBound].trimmingCharacters(in: .whitespaces)
+            let album = title[r.upperBound...].trimmingCharacters(in: .whitespaces)
+            if !artist.isEmpty, !album.isEmpty { return (artist, album) }
+        }
+        return nil
+    }
+
+    static func clean(_ text: String) -> String? {
+        var out = ""
+        for scalar in text.precomposedStringWithCanonicalMapping.unicodeScalars {
+            switch scalar.properties.generalCategory {
+            case .control, .format, .lineSeparator, .paragraphSeparator: out.unicodeScalars.append(" ")
+            default: out.unicodeScalars.append(scalar)
+            }
+        }
+        let words = out.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return words.isEmpty ? nil : String(words.prefix(maxLength))
+    }
+}
+
 public struct AudioCDVolume: Sendable {
     public var url: URL
     public var name: String
     public var toc: CDTOC
     public var trackFiles: [Int: URL]
+    /// The names macOS gives the disc and its tracks.
+    public var names: CDNames
 
-    public init(url: URL, name: String, toc: CDTOC, trackFiles: [Int: URL]) {
-        self.url = url; self.name = name; self.toc = toc; self.trackFiles = trackFiles
+    public init(url: URL, name: String, toc: CDTOC, trackFiles: [Int: URL], names: CDNames = CDNames()) {
+        self.url = url; self.name = name; self.toc = toc; self.trackFiles = trackFiles; self.names = names
     }
 
     /// Returns nil when `url` has no `.TOC.plist` (not an audio CD).
@@ -158,7 +238,26 @@ public struct AudioCDVolume: Sendable {
                   let r = Range(m.range(at: 1), in: name), let n = Int(name[r]) else { continue }
             files[n] = url.appendingPathComponent(name)
         }
-        return AudioCDVolume(url: url, name: url.lastPathComponent, toc: toc, trackFiles: files)
+        let names = CDNames.read(volumeName: url.lastPathComponent, trackFileNames: files.mapValues(\.lastPathComponent))
+        return AudioCDVolume(url: url, name: url.lastPathComponent, toc: toc, trackFiles: files, names: names)
+    }
+}
+
+extension TrackMetadata {
+    /// A song of a disc MusicBrainz doesn't know, tagged as its page names it: the album and its artist (also the
+    /// song's), the song's title (else "Track N"), its number of `total`, on disc 1 of 1. Names are cleaned like the
+    /// disc's own (`CDNames.clean`).
+    public static func unmatchedDisc(album: String, artist: String, title: String, track: Int, of total: Int) -> TrackMetadata {
+        var m = TrackMetadata()
+        m.album = CDNames.clean(album) ?? ""
+        m.artist = CDNames.clean(artist) ?? ""
+        m.albumArtist = m.artist
+        m.title = CDNames.clean(title) ?? "Track \(track)"
+        m.trackNo = track
+        m.trackTotal = total > 0 ? total : nil
+        m.discNo = 1
+        m.discTotal = 1
+        return m
     }
 }
 
@@ -229,6 +328,17 @@ public struct CDImporter: Sendable {
         volume: AudioCDVolume, cdTrack: Int, release: ReleaseInfo, releaseTrack: ReleaseTrack, cover: Data?,
         service: ImportService, workDir: URL, progress: @escaping @Sendable (Double) -> Void
     ) async throws -> Track {
+        var metadata = TrackMetadata()
+        release.apply(releaseTrack, to: &metadata)
+        return try await ripAndImport(volume: volume, cdTrack: cdTrack, metadata: metadata, cover: cover, service: service,
+                                      workDir: workDir, progress: progress)
+    }
+
+    /// Rips a track and imports it with `metadata` as its tags (a disc MusicBrainz doesn't know, named on its page).
+    public func ripAndImport(
+        volume: AudioCDVolume, cdTrack: Int, metadata: TrackMetadata, cover: Data?,
+        service: ImportService, workDir: URL, progress: @escaping @Sendable (Double) -> Void
+    ) async throws -> Track {
         guard let source = volume.trackFiles[cdTrack], let cd = volume.toc.tracks.first(where: { $0.number == cdTrack }) else {
             throw CDError.missingTrackFile(cdTrack)
         }
@@ -236,8 +346,6 @@ public struct CDImporter: Sendable {
         let temp = workDir.appendingPathComponent(String(format: "%02d.flac", cdTrack))
         defer { try? FileManager.default.removeItem(at: temp) }
         try await CDRipper(tools: tools).rip(source, to: temp, expectedDuration: volume.toc.duration(of: cd), progress: progress)
-        var metadata = TrackMetadata()
-        release.apply(releaseTrack, to: &metadata)
         let item = try await service.prepare(temp)
         return try await service.commit(item, metadata: metadata, cover: cover)
     }

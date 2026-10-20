@@ -110,6 +110,64 @@ func makeSimulatedCD(trackCount: Int = 2, seconds: Double = 1) async throws -> A
         #expect(v.toc.discID == vectorDiscID)
     }
 
+    @Test func discWithoutNamesHasNone() async throws {
+        let v = try await makeSimulatedCD()
+        #expect(v.names.isEmpty)
+        #expect(CDNames.read(volumeName: "Audio CD 1", trackFileNames: [1: "1 Audio Track.aiff"]).isEmpty)
+        // Another language's name for an unnamed track, the same on every track.
+        #expect(CDNames.read(volumeName: "Audio CD", trackFileNames: [1: "1 Piste audio.aiff", 2: "2 Piste audio.aiff"]).titles.isEmpty)
+    }
+
+    @Test func readsNamesFromTheVolume() throws {
+        // As macOS mounted a real disc (Placido Domingo, Popular Favorites).
+        let text = CDNames.read(volumeName: "Placido Domingo Popular Favorites", trackFileNames: [
+            1: "1 Somewhere, My Love.aiff", 8: "8 Menendez: Aquellos Ojos Verdes.aiff", 10: "10 Martinez: Adiós.aiff",
+        ])
+        #expect(text.title == "Placido Domingo Popular Favorites")
+        #expect(text.titles == [1: "Somewhere, My Love", 8: "Menendez: Aquellos Ojos Verdes", 10: "Martinez: Adiós"])
+        // The same title on one track only is still a title.
+        #expect(CDNames.read(volumeName: "Single", trackFileNames: [1: "1 Hello.aiff"]).titles == [1: "Hello"])
+    }
+
+    @Test func namesAreCleaned() throws {
+        let long = String(repeating: "é", count: 300)
+        let text = CDNames.read(volumeName: "  Line\none\u{2028}two\t ", trackFileNames: [
+            1: "1 Bad\u{0}Title\u{202E}.aiff", 2: "2   .aiff", 3: "3 \(long).aiff", 4: "../4 Up.aiff",
+        ])
+        #expect(text.title == "Line one two")
+        #expect(text.titles[1] == "Bad Title")
+        #expect(text.titles[2] == nil)
+        #expect(text.titles[3]?.count == CDNames.maxLength)
+        #expect(text.titles[4] == "../4 Up")
+        // NFC, so it compares with what the user types.
+        #expect(CDNames.read(volumeName: "Adio\u{301}s", trackFileNames: [:]).title == "Adiós")
+    }
+
+    @Test func splitsArtistFromAlbum() throws {
+        // The artist in your collections (or MusicBrainz's), in its spelling, the longest that fits.
+        let s = try #require(CDNames.split("Placido Domingo Popular Favorites", artists: ["Placido", "Plácido Domingo", "Sting"]))
+        #expect(s.artist == "Plácido Domingo" && s.album == "Popular Favorites")
+        #expect(CDNames.split("Simon & Garfunkel Bookends", artists: ["Simon & Garfunkel"])?.album == "Bookends")
+        #expect(CDNames.split("Sting: Ten Summoner's Tales", artists: ["Sting"])?.album == "Ten Summoner's Tales")
+        // A dash splits even without a known artist.
+        let dashed = try #require(CDNames.split("Norah Jones - Feels Like Home", artists: []))
+        #expect(dashed.artist == "Norah Jones" && dashed.album == "Feels Like Home")
+        // Nothing left for the album, an artist only in the middle, or nothing known: no split.
+        #expect(CDNames.split("Plácido Domingo", artists: ["Placido Domingo"]) == nil)
+        #expect(CDNames.split("The Best of Sting", artists: ["Sting"]) == nil)
+        #expect(CDNames.split("Popular Favorites", artists: []) == nil)
+    }
+
+    @Test func tagsSongsOfAnUnmatchedDisc() {
+        let m = TrackMetadata.unmatchedDisc(album: " Popular  Favorites ", artist: "Plácido Domingo", title: "Somewhere, My Love",
+                                            track: 1, of: 10)
+        #expect(m.album == "Popular Favorites" && m.artist == "Plácido Domingo" && m.albumArtist == "Plácido Domingo")
+        #expect(m.title == "Somewhere, My Love" && m.trackNo == 1 && m.trackTotal == 10 && m.discNo == 1 && m.discTotal == 1)
+        // A song without a name keeps its number; control characters never reach the tags.
+        let blank = TrackMetadata.unmatchedDisc(album: "A\nB", artist: "", title: "  ", track: 7, of: 10)
+        #expect(blank.title == "Track 7" && blank.album == "A B" && blank.artist.isEmpty)
+    }
+
     @Test func nonCDDirectoryIsNil() throws {
         #expect(try AudioCDVolume.load(at: try TestSupport.tempDir()) == nil)
     }

@@ -78,12 +78,16 @@ final class CDDisc: Identifiable {
     init(volume: AudioCDVolume) {
         self.volume = volume
         id = volume.url.path
+        // The names macOS gives the disc (its CD-Text or Gracenote's) until (or unless) MusicBrainz knows it.
         rows = volume.toc.audioTracks.map {
-            Row(id: $0.number, title: "Track \($0.number)", artist: "", duration: volume.toc.duration(of: $0), selected: true, status: .pending)
+            Row(id: $0.number, title: volume.names.titles[$0.number] ?? "Track \($0.number)", artist: "",
+                duration: volume.toc.duration(of: $0), selected: true, status: .pending)
         }
+        searchAlbum = volume.names.title ?? ""
     }
 
-    var title: String { release?.album ?? volume.name }
+    /// The release's album, else the album on the page (for a disc MusicBrainz doesn't know), else the volume's name.
+    var title: String { release?.album ?? (searchAlbum.isEmpty ? volume.name : searchAlbum) }
     var selectedCandidate: DiscRelease? { candidates.first { $0.id == selectedCandidateID } }
     var selectedCount: Int { rows.filter { $0.selected && !$0.status.isFinished }.count }
     /// The library album the matched release is imported as (`SearchIndex.albumKey`).
@@ -91,6 +95,17 @@ final class CDDisc: Identifiable {
     var remainingCount: Int {
         rows.filter { $0.selected && ($0.status == .pending || $0.status.isActive) }.count
     }
+    /// MusicBrainz doesn't know the disc (or couldn't be asked): it can still be cataloged and ripped to the import
+    /// queue, named by the page's album and artist (`searchAlbum`/`searchArtist`, seeded from the disc's names).
+    var isUnmatched: Bool {
+        guard release == nil else { return false }
+        switch lookup {
+        case .notFound, .failed: return true
+        case .looking, .matched: return false
+        }
+    }
+    /// An unmatched disc can be ripped into the library once the page names its album.
+    var canRipUnmatched: Bool { isUnmatched && !searchAlbum.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     /// The collection item the rip goes with: the existing copy picked, or the new one once it's saved.
     var itemID: String? {
         switch collectionChoice {
@@ -196,10 +211,32 @@ final class CDController {
                 await select(disc, candidate: first)
             } else {
                 disc.lookup = .notFound
+                matchCollectionItem(disc)
+                await nameDisc(disc)
             }
         } catch {
             disc.lookup = .failed(error.localizedDescription)
+            matchCollectionItem(disc)
+            await nameDisc(disc)
         }
+    }
+
+    /// Fills an unmatched disc's album and artist from the name macOS gives it, which often runs the two together
+    /// ("Placido Domingo Popular Favorites"): split where it starts with an artist in your collections, else with
+    /// one MusicBrainz finds for it, in that artist's spelling ("Plácido Domingo"). Fields already edited are left
+    /// alone.
+    func nameDisc(_ disc: CDDisc) async {
+        guard let title = disc.volume.names.title else { return }
+        func untouched() -> Bool { disc.searchAlbum == title && disc.searchArtist.isEmpty && !disc.removed }
+        guard untouched() else { return }
+        var split = CDNames.split(title, artists: model.allArtists.map(\.name))
+        if split == nil, let best = try? await model.musicBrainz.searchArtists(in: title).first {
+            // Only the best match: weaker ones are often a word of the title ("Placido", "Love").
+            split = CDNames.split(title, artists: [best.name])
+        }
+        guard let split, untouched() else { return }
+        disc.searchArtist = split.artist
+        disc.searchAlbum = split.album
     }
 
     func select(_ disc: CDDisc, candidate: DiscRelease) async {
@@ -236,7 +273,7 @@ final class CDController {
             }
             disc.libraryTracks[t.number] = match
             let inLibrary = match != nil
-            return CDDisc.Row(id: t.number, title: mb?.title ?? "Track \(t.number)", artist: mb?.artist ?? "",
+            return CDDisc.Row(id: t.number, title: mb?.title ?? disc.volume.names.titles[t.number] ?? "Track \(t.number)", artist: mb?.artist ?? "",
                               duration: disc.volume.toc.duration(of: t), selected: !inLibrary,
                               status: inLibrary ? .inLibrary : .pending)
         }
@@ -270,7 +307,15 @@ final class CDController {
     /// match) is chosen, else a new copy, or the question when Settings ▸ Collection asks. Nothing is matched again
     /// once ripping or cataloging has saved the choice. Records and downloads are never matched.
     func matchCollectionItem(_ disc: CDDisc) {
-        guard !disc.collectionSaved, let release = disc.release else { return }
+        guard !disc.collectionSaved else { return }
+        guard let release = disc.release else {
+            // A disc MusicBrainz doesn't know has no copy to find, but it can still be yours: a new CD.
+            guard disc.isUnmatched, !disc.choiceTouched else { return }
+            disc.matches = []
+            disc.collectionChoice = model.askCDOwnership ? nil : .new
+            if disc.collectionChoice == .new { suggestLabel(disc) }
+            return
+        }
         disc.matches = model.collection.matches(releaseID: release.id, releaseGroupID: release.releaseGroupId, albumKey: disc.albumKey,
                                                 barcode: release.barcode, medium: .cd)
         if disc.choiceTouched {
@@ -352,7 +397,7 @@ final class CDController {
     /// added with its label and purchase. Not yours (or unanswered) saves nothing. With `cataloging`, an item with no
     /// cover of its own and no music takes the disc's cover. False (with `collectionMessage`) when it can't be saved.
     func saveCollection(_ disc: CDDisc, cataloging: Bool) -> Bool {
-        guard let release = disc.release, let key = disc.albumKey else { return false }
+        guard let release = disc.release, let key = disc.albumKey else { return disc.isUnmatched && saveUnmatched(disc) }
         let cover = cataloging ? disc.cover.flatMap(CoverImage.jpeg(from:)) : nil
         switch disc.collectionChoice {
         case .existing(let id)?:
@@ -382,6 +427,66 @@ final class CDController {
         disc.collectionMessage = nil
         disc.collectionSaved = true
         return true
+    }
+
+    /// Saves an unmatched disc's copy: a new CD named by the page's album and artist, with the disc's track count and
+    /// the cover chosen on the page (an existing copy picked is left as it is, but takes that cover if it has none and
+    /// no music). False (with `collectionMessage`) when there's no album name or the label is taken.
+    private func saveUnmatched(_ disc: CDDisc) -> Bool {
+        let album = String(disc.searchAlbum.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1000))
+        let artist = String(disc.searchArtist.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1000))
+        let cover = disc.cover.flatMap(CoverImage.jpeg(from:))
+        switch disc.collectionChoice {
+        case .existing(let id)?:
+            guard let current = model.item(id: id), current.isEditable, current.medium == .cd else { break }
+            if let cover, current.coverFile == nil, model.collection.libraryTracks(current).isEmpty {
+                remember(disc, before: current, after: model.changeItem(id: id, cover: cover) { _ in })
+            }
+        case .new?:
+            guard !album.isEmpty else {
+                disc.collectionMessage = "Type the album's name above to add this CD to your physical collection."
+                return false
+            }
+            let key = SearchIndex.albumKey(album: album, artist: artist)
+            if let created = disc.createdItemID, let current = model.item(id: created) {
+                let noMusic = model.collection.libraryTracks(current).isEmpty
+                model.changeItem(id: created) {
+                    $0.album = album
+                    $0.artist = artist
+                    if noMusic { $0.albumKey = key }
+                }
+                break
+            }
+            if let n = disc.newSticker, let sticker = Sticker(series: .cd, number: n), let other = model.itemLabeled(sticker, excluding: nil) {
+                disc.collectionMessage = "\(sticker.text) is taken by “\(other.album)”. Pick another number."
+                return false
+            }
+            var item = CollectionItem(medium: .cd, album: album, artist: artist, albumKey: key)
+            item.stickerNumber = disc.newSticker
+            item.purchasedOn = disc.newPurchasedOn
+            item.price = disc.newPrice
+            let tracks = disc.volume.toc.audioTracks.count
+            item.trackCount = (1...999).contains(tracks) ? tracks : nil
+            item.discCount = 1
+            guard let saved = model.saveItem(item, cover: cover) else { return false }
+            disc.createdItemID = saved.id
+        case .none?, nil:
+            break
+        }
+        disc.collectionMessage = nil
+        disc.collectionSaved = true
+        return true
+    }
+
+    /// A cover for a disc MusicBrainz doesn't know (a file, or an image dropped on it): shown on the page, and the
+    /// cover of the CD this page adds to your collection (at once when it's already added).
+    func setCover(_ disc: CDDisc, _ data: Data) {
+        guard let jpeg = CoverImage.jpeg(from: data) else {
+            disc.message = "That isn't an image the app can read."
+            return
+        }
+        disc.cover = jpeg
+        if let id = disc.createdItemID, model.item(id: id) != nil { model.changeItem(id: id, cover: jpeg) { _ in } }
     }
 
     /// The release's details on a CD item: the album key it's ripped as (unless the item is the digital copy of
@@ -457,7 +562,7 @@ final class CDController {
     /// Catalog Without Ripping: saves the CD in your collection (the copy matched, else a new one) with the disc's
     /// cover, and ejects it when Settings ▸ Collection says so, showing its page.
     func catalog(_ disc: CDDisc) {
-        guard !disc.isRipping, disc.release != nil else { return }
+        guard !disc.isRipping, disc.release != nil || disc.isUnmatched else { return }
         if disc.collectionChoice == nil || disc.collectionChoice == CDCollectionChoice.none {
             setChoice(disc, disc.matches.first.map { .existing($0.id) } ?? .new)
         }
@@ -481,8 +586,7 @@ final class CDController {
     func cancel(_ disc: CDDisc) { disc.task?.cancel() }
 
     func rip(_ disc: CDDisc) {
-        guard !disc.isRipping, let release = disc.release, let service = model.importService else { return }
-        let mapping = CDTrackMapping.map(audioTracks: disc.volume.toc.audioTracks, release: release, medium: disc.medium)
+        guard !disc.isRipping, let service = model.importService, let tags = tagging(disc) else { return }
         let work = FileManager.default.temporaryDirectory.appendingPathComponent("MusicLibrary-CD-\(UUID().uuidString)")
         let importer = CDImporter(tools: model.tools)
         let volume = disc.volume
@@ -496,7 +600,7 @@ final class CDController {
                 if Task.isCancelled { break }
                 guard let idx = disc.rows.firstIndex(where: { $0.id == number }) else { continue }
                 disc.statusLine = "Ripping track \(n + 1) of \(targets.count)"
-                guard let mb = mapping[number] else {
+                guard let metadata = tags(number) else {
                     disc.rows[idx].status = .failed("No matching track in this edition")
                     failures += 1
                     continue
@@ -521,7 +625,7 @@ final class CDController {
                 }
                 do {
                     let track = try await importer.ripAndImport(
-                        volume: volume, cdTrack: number, release: release, releaseTrack: mb, cover: cover, service: service, workDir: work
+                        volume: volume, cdTrack: number, metadata: metadata, cover: cover, service: service, workDir: work
                     ) { fraction in
                         Task { @MainActor in
                             guard let i = disc.rows.firstIndex(where: { $0.id == number }), disc.rows[i].status.isActive else { return }
@@ -552,6 +656,25 @@ final class CDController {
             // A misread track can be ripped again while the disc is still in.
             if failures == 0, !self.hasInaccurateTracks(disc), self.model.ejectAfterRip { self.eject(disc) }
         }
+    }
+
+    /// What each of the disc's tracks is tagged with when ripped: its song of the matched release, or (a disc
+    /// MusicBrainz doesn't know) the album, artist and song title on the page. Nil when there's nothing to tag with yet.
+    func tagging(_ disc: CDDisc) -> ((Int) -> TrackMetadata?)? {
+        if let release = disc.release {
+            let mapping = CDTrackMapping.map(audioTracks: disc.volume.toc.audioTracks, release: release, medium: disc.medium)
+            return { number in
+                mapping[number].map { mb in
+                    var m = TrackMetadata()
+                    release.apply(mb, to: &m)
+                    return m
+                }
+            }
+        }
+        guard disc.isUnmatched, disc.canRipUnmatched else { return nil }
+        let album = disc.searchAlbum, artist = disc.searchArtist, total = disc.volume.toc.audioTracks.count
+        let titles = Dictionary(disc.rows.map { ($0.id, $0.title) }, uniquingKeysWith: { a, _ in a })
+        return { number in .unmatchedDisc(album: album, artist: artist, title: titles[number] ?? "", track: number, of: total) }
     }
 
     // MARK: Checking with AccurateRip
@@ -736,8 +859,11 @@ final class CDController {
                       let source = volume.trackFiles[number], let cd = volume.toc.tracks.first(where: { $0.number == number }) else { continue }
                 disc.statusLine = "Ripping track \(n + 1) of \(targets.count)"
                 disc.rows[idx].status = .ripping(0)
-                let dest = folder.appendingPathComponent(String(format: "%02d - Track %02d.flac", number, number))
-                var meta = ["track": "\(number)/\(total)", "title": ""]
+                // The disc's own title (as macOS names it), not the row's: here the release, if any, may be the wrong album.
+                let title = volume.names.titles[number] ?? ""
+                let name = Organizer.sanitize(title).isEmpty ? String(format: "Track %02d", number) : Organizer.sanitize(title)
+                let dest = folder.appendingPathComponent(String(format: "%02d - ", number) + name + ".flac")
+                var meta = ["track": "\(number)/\(total)", "title": title]
                 meta["album"] = album
                 meta["artist"] = artist
                 do {
@@ -760,7 +886,7 @@ final class CDController {
             disc.statusLine = ""
             guard let self, !files.isEmpty else { return }
             // The files are the rip of the CD picked on this page: the Import page links them to it (D4).
-            if disc.release != nil, self.saveCollection(disc, cataloging: false), let id = disc.itemID { self.model.importLinkItemID = id }
+            if self.saveCollection(disc, cataloging: false), let id = disc.itemID { self.model.importLinkItemID = id }
             self.model.importURLs(files)
         }
     }
