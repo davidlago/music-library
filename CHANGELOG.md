@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.22.0
+
 - **CDs MusicBrainz doesn't know can be ripped as you name them.** When macOS has names for a disc (the ones Finder
   shows, from its CD-Text or Gracenote), its page lists the song titles instead of "Track 1, Track 2…" and fills in
   the album and artist (a disc named "Placido Domingo Popular Favorites" becomes Popular Favorites by Plácido Domingo,
