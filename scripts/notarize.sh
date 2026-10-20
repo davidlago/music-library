@@ -27,6 +27,20 @@ if [[ "$(codesign -dv --verbose=2 "$APP" 2>&1)" != *$'\nAuthority=Developer ID A
     exit 1
 fi
 
+# Runs a command up to three times, waiting 10 s and then 30 s in between (NOTARIZE_RETRY_DELAYS overrides the
+# waits). Stapling and checking the ticket ask Apple's servers again after notarization succeeded, and a dropped
+# connection there (stapler's "Error 68") shouldn't fail the release. Fails with the command's last status.
+retry() {
+    local delays=(${NOTARIZE_RETRY_DELAYS-10 30}) attempt=0 status
+    while true; do
+        "$@" && return 0 || status=$?
+        (( attempt < ${#delays[@]} )) || return "$status"
+        echo "warning: '$*' failed (status $status); trying again in ${delays[attempt]} s…" >&2
+        sleep "${delays[attempt]}"
+        attempt=$((attempt + 1))
+    done
+}
+
 ZIP_DIR="$(mktemp -d)"
 trap 'rm -rf "$ZIP_DIR"' EXIT
 ZIP="$ZIP_DIR/MusicLibrary.zip"
@@ -42,7 +56,7 @@ if [[ "$STATUS" != "Accepted" ]]; then
     exit 1
 fi
 
-xcrun stapler staple "$APP"
-xcrun stapler validate "$APP"
-spctl --assess --type execute --verbose=2 "$APP"
+retry xcrun stapler staple "$APP"
+retry xcrun stapler validate "$APP"
+retry spctl --assess --type execute --verbose=2 "$APP"
 echo "Notarized $APP ($ID)"
