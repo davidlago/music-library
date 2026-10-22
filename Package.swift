@@ -11,7 +11,7 @@ let testSwiftSettings: [SwiftSetting] = usesCommandLineTools && FileManager.defa
 
 let package = Package(
     name: "MusicLibrary",
-    platforms: [.macOS(.v14), .iOS("27.0"), .watchOS("26.0")],
+    platforms: [.macOS(.v14), .iOS("26.0"), .watchOS("26.0")],
     products: [
         .executable(name: "MusicLibrary", targets: ["MusicLibrary"]),
         .library(name: "MusicLibraryCore", targets: ["MusicLibraryCore"]),

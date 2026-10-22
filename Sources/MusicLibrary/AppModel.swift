@@ -7,6 +7,8 @@ enum SidebarItem: Hashable {
     /// The Shelf (`.all`), one medium, or To Digitize.
     case collection(CollectionScope)
     case songs, albums, artists, insights, musicDNA, concerts, importQueue, exportList, iPhone, catalog, catalogCheckouts, catalogList, cdShop
+    /// Digitize Vinyl: recording a record and cutting it into tracks.
+    case digitizeVinyl
     case likedSongs
     case playlist(Int64)
     case smartPlaylist(Int64)
@@ -290,6 +292,7 @@ final class AppModel {
     @ObservationIgnored private(set) var importer: ImportController!
     @ObservationIgnored private(set) var cd: CDController!
     @ObservationIgnored private(set) var rips: RipChecker!
+    @ObservationIgnored private(set) var vinyl: VinylController!
     @ObservationIgnored private var keyMonitor: Any?
 
     init() {
@@ -348,11 +351,13 @@ final class AppModel {
         importer = ImportController(model: self)
         cd = CDController(model: self)
         rips = RipChecker(model: self)
+        vinyl = VinylController(model: self)
         let matcher = outputMatcher
         terminationObserver = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.finishPlay()
                 self?.savePlayerState()
+                self?.vinyl.finish()
             }
             matcher.restoreAll()
         }
@@ -402,6 +407,7 @@ final class AppModel {
             albumInfo.onFetched = { [weak self] in self?.rebuildCollection() }
             catalog.open(database: database)
             reloadLibrary()
+            vinyl?.libraryOpened()
             Task { await backfillAudioFormats() }
         } catch {
             database = nil
@@ -1796,8 +1802,10 @@ final class AppModel {
                   !(NSApp.keyWindow?.firstResponder is NSText) else { return event }
             MainActor.assumeIsolated {
                 guard let self else { return }
-                // A catalog preview, while one is loaded, else the library's player.
-                if self.previews.current != nil { self.previews.togglePlayPause() } else { self.player.togglePlayPause() }
+                // A vinyl recording on its page, a catalog preview while one is loaded, else the library's player.
+                if self.sidebar == .digitizeVinyl, self.vinyl.recording != nil, !self.vinyl.isBusy, !self.isSearching {
+                    self.vinyl.togglePreview()
+                } else if self.previews.current != nil { self.previews.togglePlayPause() } else { self.player.togglePlayPause() }
             }
             return nil
         }

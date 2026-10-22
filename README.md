@@ -15,7 +15,7 @@
   <a href="https://github.com/davidlago/music-library/actions/workflows/ci.yml"><img src="https://github.com/davidlago/music-library/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-blue" alt="macOS 14+">
   <a href="https://apps.apple.com/us/app/daves-music-library/id6822005512"><img src="https://img.shields.io/badge/App%20Store-iPhone%20app-blue?logo=apple" alt="iPhone app on the App Store"></a>
-  <img src="https://img.shields.io/badge/iOS-27%2B-blue" alt="iOS 27+">
+  <img src="https://img.shields.io/badge/iOS-26%2B-blue" alt="iOS 26+">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
 </p>
 
@@ -60,6 +60,14 @@
   same as other people's rips of the CD was misread, and **Rip Again** replaces it, keeping its plays and likes. Albums
   ripped earlier can be checked from their files too (**Check with AccurateRip** on the album page). The disc can be
   ejected when it's done.
+- **Digitize your records.** **Digitize Vinyl** (under Import) records a record from your turntable's preamp, USB
+  turntable or audio interface, at the sample rate and bit depth you choose (up to 24-bit / 192 kHz), with a level
+  meter and a clip light. Record a side, pause to turn it over, and go on; then **Detect Tracks** finds the songs from
+  the gaps between them and names them from the record's track list on MusicBrainz (matching their lengths, so a side B
+  recording is named B1, B2…). Click the waveform to move the playhead and press Space to listen, drag a cut's edges to
+  fix it, split or add tracks at the playhead. **Save** puts each track in your digital collection as FLAC, like a
+  ripped CD, and links it to the record. Save a few tracks now and the rest another time: the recording is kept, also
+  after quitting, until you discard it.
 
 **Explore it**
 
@@ -156,8 +164,8 @@ the free numbers and any duplicates in each series.
   first free one offered instead.
 - **Ripped or not.** A CD or record doesn't need any music in your digital collection. Its page says whether it's
   digitized (and from which copy), partly ripped, not ripped yet, or no longer in your digital collection, and offers
-  what fits: **Rip Now** when the CD is in a drive, **Import a Transfer…** for a record you digitized yourself, or
-  **Link Digital Copy…**.
+  what fits: **Rip Now** when the CD is in a drive, **Digitize…** to record a record (**Digitize the Rest…** when some
+  of its songs are in), **Import a Transfer…** for a record you digitized elsewhere, or **Link Digital Copy…**.
 - **Adding things.** **Add to Physical Collection…** (⇧⌘N, in the File and Physical Collection menus, or the Shelf's
   **+**) asks for the medium (CD, Vinyl or Download) and then the barcode on the case, or a few words of the album and
   artist, and lists the matching editions on MusicBrainz (year, country, record label, catalog number, format,
@@ -348,14 +356,14 @@ from the App Store (see [iPhone app](#iphone-app)).
 The iPhone app shows your whole physical and digital collections and plays a copy of part of your digital collection,
 offline. Get it free on the App Store as
 [Dave's Music Library](https://apps.apple.com/us/app/daves-music-library/id6822005512)
-(iOS 27 or later; the Apple Watch app comes with it). To try it without the Mac app, tap **Explore a Sample Library** on
+(iOS 26 or later; the Apple Watch app comes with it). To try it without the Mac app, tap **Explore a Sample Library** on
 the screen it opens on (or its Digital tab): fictional albums built into the app, replaced by your own library after
 your first sync.
 
 **Build it yourself (optional)**
 
 To run your own build instead, install it on your phone from Xcode, which takes a few one-time steps.
-You need a Mac with Xcode 27 or later, an iPhone on iOS 27 or later with a USB cable, and an Apple ID (a free one works).
+You need a Mac with Xcode 27 or later, an iPhone on iOS 26 or later with a USB cable, and an Apple ID (a free one works).
 
 1. On the iPhone, turn on **Settings ▸ Privacy & Security ▸ Developer Mode** (the phone restarts), then connect it to the
    Mac and tap **Trust**.

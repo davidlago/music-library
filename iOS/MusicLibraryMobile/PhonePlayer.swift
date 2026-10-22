@@ -366,27 +366,51 @@ final class PhonePlayer {
 
     private func observeAudioSession() {
         let center = NotificationCenter.default
-        observers.append(center.addObserver(forName: AVAudioSession.didBecomeInactiveNotification, object: nil, queue: .main) { [weak self] note in
-            // The player deactivates the session itself to change the output rate (`configureSession`), right before
-            // it starts the song: only the system's deactivations (a call, another app) interrupt playback.
-            let context = note.userInfo?[AVAudioSession.deactivationContextKey] as? AVAudioSession.DeactivationContext
-            guard context?.source != .app else { return }
-            MainActor.assumeIsolated {
-                guard let self, self.isPlaying else { return }
-                self.interrupted = true
-                self.isPlaying = false
-                self.updateNowPlaying()
-            }
-        })
-        observers.append(center.addObserver(forName: AVAudioSession.resumptionRecommendationNotification, object: nil, queue: .main) { [weak self] note in
-            let context = note.userInfo?[AVAudioSession.resumptionContextKey] as? AVAudioSession.ResumptionContext
-            let resume = context?.recommendation == .shouldResume
-            MainActor.assumeIsolated {
-                guard let self, self.interrupted else { return }
-                self.interrupted = false
-                if resume && !self.isPlaying { self.togglePlayPause() }
-            }
-        })
+        if #available(iOS 27, *) {
+            observers.append(center.addObserver(forName: AVAudioSession.didBecomeInactiveNotification, object: nil, queue: .main) { [weak self] note in
+                // The player deactivates the session itself to change the output rate (`configureSession`), right before
+                // it starts the song: only the system's deactivations (a call, another app) interrupt playback.
+                let context = note.userInfo?[AVAudioSession.deactivationContextKey] as? AVAudioSession.DeactivationContext
+                guard context?.source != .app else { return }
+                MainActor.assumeIsolated {
+                    guard let self, self.isPlaying else { return }
+                    self.interrupted = true
+                    self.isPlaying = false
+                    self.updateNowPlaying()
+                }
+            })
+            observers.append(center.addObserver(forName: AVAudioSession.resumptionRecommendationNotification, object: nil, queue: .main) { [weak self] note in
+                let context = note.userInfo?[AVAudioSession.resumptionContextKey] as? AVAudioSession.ResumptionContext
+                let resume = context?.recommendation == .shouldResume
+                MainActor.assumeIsolated {
+                    guard let self, self.interrupted else { return }
+                    self.interrupted = false
+                    if resume && !self.isPlaying { self.togglePlayPause() }
+                }
+            })
+        } else {
+            // iOS 26 has only the interruption notification, which isn't posted for the app's own deactivations.
+            observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
+                let type = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt).flatMap(AVAudioSession.InterruptionType.init)
+                let options = AVAudioSession.InterruptionOptions(rawValue: note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0)
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    switch type {
+                    case .began:
+                        guard self.isPlaying else { return }
+                        self.interrupted = true
+                        self.isPlaying = false
+                        self.updateNowPlaying()
+                    case .ended:
+                        guard self.interrupted else { return }
+                        self.interrupted = false
+                        if options.contains(.shouldResume) && !self.isPlaying { self.togglePlayPause() }
+                    default:
+                        break
+                    }
+                }
+            })
+        }
         observers.append(center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] note in
             let reason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt).flatMap(AVAudioSession.RouteChangeReason.init)
             MainActor.assumeIsolated { self?.routeChanged(reason) }

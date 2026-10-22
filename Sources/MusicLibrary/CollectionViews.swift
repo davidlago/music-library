@@ -484,6 +484,9 @@ struct CollectionItemMenu: View {
         if let disc = model.discInDrive(for: item) {
             Button("Rip This CD") { model.cd.show(disc, for: item) }
         }
+        if item.medium == .vinyl, item.isEditable {
+            Button("Digitize This Record…") { model.vinyl.show(item) }
+        }
         if item.isEditable {
             Button("Link Digital Copy…") { model.collectionSheet = .link(itemID: item.id) }
             Button("Change Cover…") { model.collectionSheet = .cover(itemID: item.id, request: CoverSheetRequest()) }

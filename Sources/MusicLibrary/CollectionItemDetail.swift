@@ -203,6 +203,10 @@ struct CollectionItemDetail: View {
                 QueueMenuButtons(player: model.player) { model.collection.libraryTracks(item) }
                 AddToExportListButton(album: album)
             }
+            if item.medium == .vinyl, item.isEditable {
+                Divider()
+                Button("Digitize This Record…", systemImage: "waveform.badge.mic") { model.vinyl.show(item) }
+            }
             if item.medium == .cd {
                 Divider()
                 Button("Shop for This CD", systemImage: "cart") {
@@ -216,7 +220,7 @@ struct CollectionItemDetail: View {
             }
         } label: { Image(systemName: "ellipsis") }
             .menuStyle(.button).buttonStyle(.bordered).menuIndicator(.hidden).fixedSize()
-            .help("Cover, link to the digital collection, the digital copy, the queue, shopping and removing")
+            .help("Cover, link to the digital collection, the digital copy, the queue, digitizing, shopping and removing")
     }
 
     /// ‹ Previous on Shelf / Next on Shelf › (⌘[ / ⌘]): the labeled items either side in the same series.
@@ -271,6 +275,10 @@ struct CollectionItemDetail: View {
                     HStack {
                         albumButton(album)
                         if let disc { Button("Rip the Rest") { model.cd.show(disc, for: item) } }
+                        if item.medium == .vinyl, item.isEditable {
+                            Button("Digitize the Rest…") { model.vinyl.show(item) }
+                                .help("Record the songs that aren't in your digital collection yet")
+                        }
                     }
                 case .otherCopy(_, let fromID):
                     let from = fromID.flatMap { model.item(id: $0) }
@@ -302,6 +310,10 @@ struct CollectionItemDetail: View {
                                     .disabled(disc == nil)
                                     .help(disc == nil ? "Insert this CD to rip it again" : "Rip the CD in the drive")
                             }
+                            if item.medium == .vinyl {
+                                Button("Digitize Again…") { model.vinyl.show(item) }
+                                    .help("Record this record and save its tracks again")
+                            }
                             Button("Link…") { model.collectionSheet = .link(itemID: item.id) }
                         }
                     }
@@ -328,7 +340,17 @@ struct CollectionItemDetail: View {
                 status("waveform.slash", "Not ripped yet. Insert this CD to rip it.")
                 actions(item, importTitle: "Import Files…")
             }
-        case .vinyl, .other:
+        case .vinyl:
+            status("waveform.slash", "No digital copy yet")
+            HStack {
+                if item.isEditable {
+                    Button("Digitize…") { model.vinyl.show(item) }
+                        .buttonStyle(.borderedProminent)
+                        .help("Record this record from your turntable and save its tracks as FLAC")
+                }
+                actions(item, importTitle: "Import a Transfer…")
+            }
+        case .other:
             status("waveform.slash", "No digital copy yet")
             actions(item, importTitle: "Import a Transfer…")
         case .download:

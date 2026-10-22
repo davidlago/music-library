@@ -124,7 +124,7 @@ jobs:
 
   ios:
     name: Build for iOS
-    # The iPhone app targets iOS 27 and uses its APIs, so it needs Xcode 27 (GitHub's `xcode-27` image, in preview).
+    # The iPhone app runs on iOS 26 but uses iOS 27 APIs where available, so it needs the iOS 27 SDK: Xcode 27 (GitHub's `xcode-27` image, in preview).
     runs-on: xcode-27
     steps:
       - uses: actions/checkout@v7
