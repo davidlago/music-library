@@ -152,6 +152,8 @@ struct SidebarView: View {
                 Label("Import", systemImage: "square.and.arrow.down")
                     .sidebarBadge(model.importer.pendingCount)
                     .tag(SidebarItem.importQueue)
+                Label("Digitize Vinyl", systemImage: "waveform.badge.mic")
+                    .tag(SidebarItem.digitizeVinyl)
                 ForEach(model.cd.discs) { disc in
                     Label(disc.title, systemImage: "opticaldisc")
                         .sidebarBadge(disc.isRipping ? disc.remainingCount : 0)
@@ -278,6 +280,7 @@ struct DetailRouter: View {
         case .albums: AlbumsView()
         case .artists: ArtistsView()
         case .importQueue: ImportView()
+        case .digitizeVinyl: VinylDigitizeView()
         case .exportList: ExportListView()
         case .iPhone: IPhoneSyncView()
         case .catalog: CatalogView()

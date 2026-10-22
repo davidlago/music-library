@@ -143,7 +143,7 @@ Themes use `Themes.swift` palettes with an iOS port of `.themedRoot` and the sam
 
 ## Repo and build changes
 
-- **`Package.swift`:** `platforms: [.macOS(.v14), .iOS("27.0")]`. Wrap the macOS-only parts listed above in `#if os(macOS)`. The `MusicLibrary` executable target stays macOS-only.
+- **`Package.swift`:** `platforms: [.macOS(.v14), .iOS("26.0")]`. Wrap the macOS-only parts listed above in `#if os(macOS)`. The `MusicLibrary` executable target stays macOS-only.
 - **iOS app:** add an Xcode project at `iOS/MusicLibraryMobile.xcodeproj`, depending on the local package (`..`) for the `MusicLibraryCore` product. SwiftPM can't build an iOS app bundle, so this is the one Xcode project in the repo. The Mac app stays SwiftPM-only.
   - Bundle id e.g. `io.github.davidlago.MusicLibraryMobile`.
   - Info.plist: `UIBackgroundModes: audio`, `NSLocalNetworkUsageDescription`, `NSBonjourServices: [_musiclib-sync._tcp]`, `UIFileSharingEnabled` and `LSSupportsOpeningDocumentsInPlace`.
@@ -194,6 +194,6 @@ Themes use `Themes.swift` palettes with an iOS port of `.themedRoot` and the sam
 ## Decisions (confirmed 2026-10-11)
 
 1. **Signing:** free Apple ID (Personal Team) for now. Apps installed from Xcode expire after 7 days and must be reinstalled; the Apple Developer Program ($99/year) can come later.
-2. **Minimum iOS:** 27. The app is just for one phone, which runs iOS 27.
+2. **Minimum iOS:** 26 (first 27, for one phone on iOS 27; lowered to 26 so more people can install it: only the audio session notifications of iOS 27 are used, with the interruption notification on 26).
 3. **Mirror:** the phone mirrors the sync selection; files no longer selected are deleted (with confirmation the first time).
 4. **Phone storage:** `Documents/Music Library/`, visible in Finder and Files for seeding and recovery.

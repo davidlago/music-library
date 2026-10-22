@@ -18,11 +18,11 @@ public enum CoreAudioError: Error, LocalizedError {
 }
 
 public enum CoreAudioOutput {
-    private static func address(_ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> AudioObjectPropertyAddress {
+    static func address(_ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> AudioObjectPropertyAddress {
         AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
     }
 
-    private static func getValue<T: BitwiseCopyable>(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal, initial: T) throws -> T {
+    static func getValue<T: BitwiseCopyable>(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal, initial: T) throws -> T {
         var addr = address(selector, scope: scope)
         var value = initial
         var size = UInt32(MemoryLayout<T>.size)
@@ -31,7 +31,7 @@ public enum CoreAudioOutput {
         return value
     }
 
-    private static func getArray<T: BitwiseCopyable>(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal, element: T) throws -> [T] {
+    static func getArray<T: BitwiseCopyable>(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal, element: T) throws -> [T] {
         var addr = address(selector, scope: scope)
         var size: UInt32 = 0
         var status = AudioObjectGetPropertyDataSize(object, &addr, 0, nil, &size)
@@ -43,7 +43,7 @@ public enum CoreAudioOutput {
         return result
     }
 
-    private static func setValue<T: BitwiseCopyable>(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal, _ value: T) throws {
+    static func setValue<T: BitwiseCopyable>(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal, _ value: T) throws {
         var addr = address(selector, scope: scope)
         var v = value
         let status = AudioObjectSetPropertyData(object, &addr, 0, nil, UInt32(MemoryLayout<T>.size), &v)
@@ -54,7 +54,7 @@ public enum CoreAudioOutput {
         try getValue(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultOutputDevice, initial: AudioObjectID(0))
     }
 
-    private static func stringProperty(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector) -> String {
+    static func stringProperty(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector) -> String {
         var addr = address(selector)
         var str: Unmanaged<CFString>?
         var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
