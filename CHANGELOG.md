@@ -7,15 +7,19 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.23.0
+
 - **Digitize your records.** A new **Digitize Vinyl** page under Import records a record you own (add it to your
   Physical Collection first; the page points you there) from the input you choose, at the sample rate and bit depth
-  you choose, with a level meter, and **Listen** plays the input through your speakers or headphones while you check levels or record (what's recorded isn't changed). Record continuously, pausing to turn the record over, then cut the recording into
-  tracks on its waveform: **Detect Tracks** finds the songs from the gaps and names them from the record's MusicBrainz
-  track list, and you can listen from any point, drag a track's start and end, split and delete. **Save** adds them to
-  your digital collection as lossless FLAC, tagged and filed like a ripped CD, and marks the record digitized. You can
-  save a few tracks at a time; the recording is kept, even after quitting, until you discard it. A record's page has
-  **Digitize…** (or **Digitize the Rest…**), and its … menu and the Shelf's context menu have **Digitize This Record…**.
-  The first recording asks for permission to use the microphone (the input).
+  you choose (up to 24-bit / 192 kHz), with a level meter. **Listen** plays the input through your speakers or
+  headphones while you check levels or record, without changing what's recorded. Record continuously, pausing to turn
+  the record over, then cut the recording into tracks on its waveform: **Detect Tracks** finds the songs from the gaps
+  and names them from the record's MusicBrainz track list, and you can listen from any point, drag a track's start and
+  end, split and delete. **Save** adds them to your digital collection as lossless FLAC, tagged and filed like a ripped
+  CD, and marks the record digitized. You can save a few tracks at a time; the recording is kept, even after quitting,
+  until you discard it. A record's page has **Digitize…** (or **Digitize the Rest…**), and its … menu and the Shelf's
+  context menu have **Digitize This Record…**. The first recording asks for permission to use the microphone (the
+  input).
 - **The iPhone app now runs on iOS 26**, not only iOS 27.
 
 ## 1.22.0
