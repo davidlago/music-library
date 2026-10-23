@@ -59,6 +59,8 @@ final class VinylController {
     var playhead = 0
     var selectedSegmentID: String?
     private(set) var isPreviewing = false
+    /// The cut Mark Track started last while recording: it ends where the recording does, for now.
+    @ObservationIgnored private var openCutID: String?
 
     // The record's release on MusicBrainz, for naming the tracks.
     private(set) var release: ReleaseInfo?
@@ -333,6 +335,7 @@ final class VinylController {
 
     private func finishRecording() {
         refreshRecording()
+        openCutID = nil
         persist()
     }
 
@@ -348,6 +351,7 @@ final class VinylController {
         }
         recording = nil
         session = nil
+        openCutID = nil
         frameCount = 0
         envelope = VinylEnvelope(sampleRate: 44_100)
         playhead = 0
@@ -359,6 +363,8 @@ final class VinylController {
     func finish() {
         capture?.sink = nil
         stopCapture()
+        refreshRecording()
+        openCutID = nil
         recording?.close()
         persist()
     }
@@ -366,6 +372,9 @@ final class VinylController {
     private func refreshRecording() {
         guard let recording else { return }
         frameCount = recording.frameCount
+        if let id = openCutID, let i = session?.segments.firstIndex(where: { $0.id == id }) {
+            session?.segments[i].end = frameCount
+        }
         envelope = recording.envelope
         waveformGain = 1 / max(0.05, envelope.peaks.max() ?? 1)
     }
@@ -502,6 +511,26 @@ final class VinylController {
     // MARK: Cutting
 
     var minimumLength: Int { (session?.format.sampleRate ?? 44_100) / 2 }
+
+    /// Mark Track, while recording: a track starts here, and the one marked before ends here. The newest one grows
+    /// with the recording until the next mark or Stop.
+    func markTrack() {
+        guard state == .recording || state == .paused, let recording, var session else { return }
+        let f = recording.frameCount
+        if let id = openCutID, let i = session.segments.firstIndex(where: { $0.id == id }) {
+            guard f - session.segments[i].start >= minimumLength else { return }
+            session.segments[i].end = f
+        }
+        // Never over a cut made earlier (Record More after cutting).
+        guard !session.segments.contains(where: { $0.id != openCutID && $0.end > f }) else { return }
+        let seg = VinylSegment(start: f, end: f)
+        session.segments.append(seg)
+        session.segments.sort { $0.start < $1.start }
+        openCutID = seg.id
+        selectedSegmentID = seg.id
+        self.session = session
+        persist()
+    }
 
     /// Split at Playhead: cuts the cut there in two, or (between cuts) adds one from there to the next cut, pause
     /// or the end.

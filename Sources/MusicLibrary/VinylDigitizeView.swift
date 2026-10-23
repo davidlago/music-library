@@ -468,9 +468,14 @@ private struct VinylWaveformEditor: View {
             Text("\(VinylText.time(Double(vinyl.playhead) / rate)) / \(VinylText.time(duration))")
                 .font(.callout.monospacedDigit())
             Spacer()
-            Button("Split at Playhead") { vinyl.splitAtPlayhead() }
-                .disabled(!canEdit)
-                .help("Cuts the track at the playhead in two, or starts a new track there")
+            if vinyl.state == .recording || vinyl.state == .paused {
+                Button("Mark Track") { vinyl.markTrack() }
+                    .help("Starts a new track at this point of the recording (and ends the one you marked before)")
+            } else {
+                Button("Split at Playhead") { vinyl.splitAtPlayhead() }
+                    .disabled(!canEdit)
+                    .help("Cuts the track at the playhead in two, or starts a new track there")
+            }
             Button("Delete Cut") { if let selected { vinyl.deleteSegment(selected.id) } }
                 .disabled(!canEdit || selected == nil || selected?.isSaved == true)
             Divider().frame(height: 16)
@@ -714,7 +719,9 @@ private struct VinylCutList: View {
                 }
             }
             if vinyl.segments.isEmpty {
-                Text("No tracks yet. Move the playhead to a song's start and Split at Playhead.")
+                Text(vinyl.state == .recording || vinyl.state == .paused
+                     ? "No tracks yet. Press Mark Track as each song starts, or cut the recording after you stop."
+                     : "No tracks yet. Move the playhead to a song's start and Split at Playhead.")
                     .font(.callout).foregroundStyle(.subtext)
             } else {
                 VStack(spacing: 0) {
@@ -773,16 +780,19 @@ private struct VinylCutList: View {
             } else if twice, !seg.isSaved {
                 Text("Chosen for another cut too").font(.caption).foregroundStyle(.orange)
             }
-            Button { vinyl.playPreview(from: seg.start, to: seg.end) } label: { Image(systemName: "play.fill") }
-                .help("Play this track from its start")
-            Button { vinyl.playEnd(of: seg) } label: { Image(systemName: "forward.end.fill") }
-                .help("Play its last 5 seconds")
-            Button { vinyl.deleteSegment(seg.id) } label: { Image(systemName: "trash") }
-                .disabled(seg.isSaved)
-                .help("Delete this cut")
+            // The track can be chosen while recording; listening and deleting wait for Stop.
+            Group {
+                Button { vinyl.playPreview(from: seg.start, to: seg.end) } label: { Image(systemName: "play.fill") }
+                    .help("Play this track from its start")
+                Button { vinyl.playEnd(of: seg) } label: { Image(systemName: "forward.end.fill") }
+                    .help("Play its last 5 seconds")
+                Button { vinyl.deleteSegment(seg.id) } label: { Image(systemName: "trash") }
+                    .disabled(seg.isSaved)
+                    .help("Delete this cut")
+            }
+            .disabled(vinyl.state == .recording || vinyl.state == .paused)
         }
         .buttonStyle(.borderless)
-        .disabled(vinyl.state == .recording || vinyl.state == .paused)
         .padding(.horizontal, 10).padding(.vertical, 7)
         .background(selected ? theme.accent.opacity(0.14) : Color.clear)
         .contentShape(Rectangle())
