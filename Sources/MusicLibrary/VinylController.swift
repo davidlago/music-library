@@ -224,6 +224,8 @@ final class VinylController {
         let gone = CoreAudioOutput.deviceID(forUID: device.uid) == nil
         guard gone || CoreAudioInput.sampleRate(capture.device) != capture.sampleRate else { return }
         let wasRecording = state == .recording || state == .paused
+        capture.sink = nil
+        refreshRecording()
         stopCapture()
         state = .idle
         if wasRecording { finishRecording() }
@@ -317,8 +319,8 @@ final class VinylController {
     func pause() {
         guard state == .recording else { return }
         capture?.sink = nil
-        state = .paused
         refreshRecording()
+        state = .paused
         persist()
     }
 
@@ -326,6 +328,7 @@ final class VinylController {
     func stop() {
         guard state == .recording || state == .paused else { return }
         capture?.sink = nil
+        refreshRecording()
         stopCapture()
         state = .idle
         finishRecording()
@@ -334,7 +337,6 @@ final class VinylController {
     private func finishRecording() {
         refreshRecording()
         persist()
-        if segments.isEmpty, frameCount > 0 { detectTracks() }
     }
 
     /// Discard Recording: deletes it and its cuts (songs already saved stay in the library).
@@ -360,6 +362,7 @@ final class VinylController {
     func finish() {
         capture?.sink = nil
         stopCapture()
+        refreshRecording()
         recording?.close()
         persist()
     }
@@ -367,6 +370,12 @@ final class VinylController {
     private func refreshRecording() {
         guard let recording else { return }
         frameCount = recording.frameCount
+        // While recording, the last cut ends where the recording does, for now: one made on this side (since the
+        // last pause), so the side before keeps its end.
+        if state == .recording, let segs = session?.segments, let last = segs.indices.last, !segs[last].isSaved,
+           segs[last].start >= (session?.pauses.max() ?? 0) {
+            session?.segments[last].end = frameCount
+        }
         envelope = recording.envelope
         waveformGain = 1 / max(0.05, envelope.peaks.max() ?? 1)
     }
@@ -504,52 +513,19 @@ final class VinylController {
 
     var minimumLength: Int { (session?.format.sampleRate ?? 44_100) / 2 }
 
-    /// Detect Tracks: replaces the cuts not saved yet with the songs found between gaps (at most `count`), named
-    /// after the release's tracks they most likely are.
-    func detectTracks(count: Int? = nil) {
-        guard let session else { return }
-        let saved = session.segments.filter(\.isSaved)
-        let found = VinylTrackFinder.tracks(in: envelope, frameCount: frameCount, sampleRate: session.format.sampleRate,
-                                            pauses: session.pauses, count: count)
-        var fresh: [VinylSegment] = []
-        for r in found {
-            // Around saved cuts only what's left over.
-            var start = r.lowerBound, end = r.upperBound
-            for s in saved {
-                if s.start <= start && start < s.end { start = s.end }
-                if s.start < end && end <= s.end { end = s.start }
-            }
-            guard end - start >= minimumLength, !saved.contains(where: { $0.start >= start && $0.end <= end }) else { continue }
-            fresh.append(VinylSegment(start: start, end: end))
-        }
-        self.session?.segments = (saved + fresh).sorted { $0.start < $1.start }
-        selectedSegmentID = fresh.first?.id
-        autoName(fresh.map(\.id))
-        persist()
-        if found.isEmpty { message = "No songs were found: the recording is silent. Check the input and its level." }
-    }
-
-    /// Names cuts after the run of the release's tracks whose lengths are closest (a side, say).
-    private func autoName(_ ids: [String]) {
-        let cuts = segments.filter { ids.contains($0.id) && $0.target == nil }
-        guard !cuts.isEmpty, let rate = session?.format.sampleRate else { return }
-        let tracks = targetOptions
-        guard !tracks.isEmpty else { return }
-        let durations = cuts.map { Double($0.end - $0.start) / Double(rate) }
-        guard let k = VinylTrackMatcher.start(for: durations, tracks: tracks.map { ($0.duration, $0.isDone) }) else { return }
-        for (j, cut) in cuts.enumerated() where k + j < tracks.count {
-            setTarget(cut.id, tracks[k + j].target)
-        }
-    }
-
     /// Split at Playhead: cuts the cut there in two, or (between cuts) adds one from there to the next cut, pause
     /// or the end.
     func splitAtPlayhead() {
+        // While recording, the last cut is brought up to the recording's end first, and a cut that ends there may
+        // be short for now: it grows.
+        refreshRecording()
         guard var session else { return }
         let f = playhead
+        let growing = state == .recording
         if let i = session.segments.firstIndex(where: { $0.start < f && f < $0.end }) {
             let seg = session.segments[i]
-            guard !seg.isSaved, f - seg.start >= minimumLength, seg.end - f >= minimumLength else { return }
+            guard !seg.isSaved, f - seg.start >= minimumLength,
+                  seg.end - f >= minimumLength || (growing && seg.end == frameCount) else { return }
             session.segments[i].end = f
             let next = VinylSegment(start: f, end: seg.end)
             session.segments.insert(next, at: i + 1)
@@ -557,7 +533,7 @@ final class VinylController {
         } else {
             let end = min(session.segments.map(\.start).filter { $0 > f }.min() ?? frameCount,
                           session.pauses.filter { $0 > f + minimumLength }.min() ?? frameCount)
-            guard end - f >= minimumLength else { return }
+            guard end - f >= minimumLength || (growing && end == frameCount && end > f) else { return }
             let seg = VinylSegment(start: f, end: end)
             session.segments.append(seg)
             session.segments.sort { $0.start < $1.start }
