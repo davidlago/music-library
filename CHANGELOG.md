@@ -7,6 +7,9 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- On the Mac, the app no longer crashes on macOS 27 when it opens with the queue showing, or when you show the queue.
+  The queue is now a fixed-width pane at the right of the window.
+
 ## 1.23.1
 
 - On the Mac, seeking in a FLAC file (by dragging the scrubber, or by resuming a song where you left off) now lands

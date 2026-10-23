@@ -21,15 +21,24 @@ struct MainWindow: View {
         // The player bar spans the window below the split view. Pages pushed onto a NavigationStack draw over
         // anything else in their column on macOS, so the bar must live outside the column to stay visible.
         VStack(spacing: 0) {
-            splitView
-                .accessibilityHidden(expanded)
-                // Same reason as the bar: inside the detail column it would sit under pushed pages.
-                .overlay {
-                    if expanded {
-                        NowPlayingView()
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
+            // The queue is a pane beside the split view, not an `.inspector`: on macOS 27 a NavigationSplitView with an
+            // inspector can loop through constraint passes until AppKit throws (showing it, or restoring the window at
+            // launch, crashed the app).
+            HStack(spacing: 0) {
+                splitView
+                if model.showsQueue {
+                    Divider()
+                    QueueView().frame(width: 300)
                 }
+            }
+            .accessibilityHidden(expanded)
+            // Same reason as the bar: inside the detail column it would sit under pushed pages.
+            .overlay {
+                if expanded {
+                    NowPlayingView()
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
             if !expanded {
                 Divider()
                 NowPlayingBar()
@@ -63,9 +72,6 @@ struct MainWindow: View {
                 }
             }
             .background(theme.isThemed ? theme.background : Color.clear)
-        }
-        .inspector(isPresented: $model.showsQueue) {
-            QueueView().inspectorColumnWidth(min: 260, ideal: 320, max: 460)
         }
         .toolbarBackground(theme.toolbar, for: .windowToolbar)
         .toolbarBackground(theme.isThemed ? .visible : .automatic, for: .windowToolbar)
