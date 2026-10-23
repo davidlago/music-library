@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- On the Mac, seeking in a FLAC file (by dragging the scrubber, or by resuming a song where you left off) now lands where the clock says. Before, songs such as digitized records could play on past their length.
+
 ## 1.23.0
 
 - **Digitize your records.** A new **Digitize Vinyl** page under Import records a record you own (add it to your

@@ -164,7 +164,9 @@ final class Player {
     }
 
     private func start(url: URL, at position: Double) {
-        let item = AVPlayerItem(url: url)
+        // Without precise timing AVFoundation estimates positions in FLAC files without a seek table, so a seek
+        // lands seconds away from where the clock says and the song runs past its length.
+        let item = AVPlayerItem(asset: AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true]))
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         endObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.trackEnded() }
