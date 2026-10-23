@@ -62,10 +62,9 @@
   ejected when it's done.
 - **Digitize your records.** **Digitize Vinyl** (under Import) records a record from your turntable's preamp, USB
   turntable or audio interface, at the sample rate and bit depth you choose (up to 24-bit / 192 kHz), with a level
-  meter and a clip light. Record a side, pause to turn it over, and go on; then **Detect Tracks** finds the songs from
-  the gaps between them and names them from the record's track list on MusicBrainz (matching their lengths, so a side B
-  recording is named B1, B2…). Click the waveform to move the playhead and press Space to listen, drag a cut's edges to
-  fix it, split or add tracks at the playhead. **Save** puts each track in your digital collection as FLAC, like a
+  meter and a clip light. Record a side, pause to turn it over, and go on; then cut it into tracks yourself: click the
+  waveform to move the playhead and press Space to listen, split or add tracks at the playhead, drag a cut's edges to
+  fix it, and pick each one's song from the record's track list on MusicBrainz. **Save** puts each track in your digital collection as FLAC, like a
   ripped CD, and links it to the record. Save a few tracks now and the rest another time: the recording is kept, also
   after quitting, until you discard it.
 

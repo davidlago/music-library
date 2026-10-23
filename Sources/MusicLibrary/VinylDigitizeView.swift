@@ -468,14 +468,6 @@ private struct VinylWaveformEditor: View {
             Text("\(VinylText.time(Double(vinyl.playhead) / rate)) / \(VinylText.time(duration))")
                 .font(.callout.monospacedDigit())
             Spacer()
-            Menu("Detect Tracks") {
-                ForEach(2...24, id: \.self) { n in Button("Into \(n) Tracks") { vinyl.detectTracks(count: n) } }
-            } primaryAction: {
-                vinyl.detectTracks()
-            }
-            .fixedSize()
-            .disabled(!canEdit)
-            .help("Finds the songs from the gaps between them (replaces the cuts not saved yet). Choose a number of tracks when it finds too many.")
             Button("Split at Playhead") { vinyl.splitAtPlayhead() }
                 .disabled(!canEdit)
                 .help("Cuts the track at the playhead in two, or starts a new track there")
@@ -722,7 +714,7 @@ private struct VinylCutList: View {
                 }
             }
             if vinyl.segments.isEmpty {
-                Text("No tracks yet. Detect Tracks finds them from the gaps between songs, or move the playhead to a song's start and Split at Playhead.")
+                Text("No tracks yet. Move the playhead to a song's start and Split at Playhead.")
                     .font(.callout).foregroundStyle(.subtext)
             } else {
                 VStack(spacing: 0) {

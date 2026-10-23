@@ -334,7 +334,6 @@ final class VinylController {
     private func finishRecording() {
         refreshRecording()
         persist()
-        if segments.isEmpty, frameCount > 0 { detectTracks() }
     }
 
     /// Discard Recording: deletes it and its cuts (songs already saved stay in the library).
@@ -503,44 +502,6 @@ final class VinylController {
     // MARK: Cutting
 
     var minimumLength: Int { (session?.format.sampleRate ?? 44_100) / 2 }
-
-    /// Detect Tracks: replaces the cuts not saved yet with the songs found between gaps (at most `count`), named
-    /// after the release's tracks they most likely are.
-    func detectTracks(count: Int? = nil) {
-        guard let session else { return }
-        let saved = session.segments.filter(\.isSaved)
-        let found = VinylTrackFinder.tracks(in: envelope, frameCount: frameCount, sampleRate: session.format.sampleRate,
-                                            pauses: session.pauses, count: count)
-        var fresh: [VinylSegment] = []
-        for r in found {
-            // Around saved cuts only what's left over.
-            var start = r.lowerBound, end = r.upperBound
-            for s in saved {
-                if s.start <= start && start < s.end { start = s.end }
-                if s.start < end && end <= s.end { end = s.start }
-            }
-            guard end - start >= minimumLength, !saved.contains(where: { $0.start >= start && $0.end <= end }) else { continue }
-            fresh.append(VinylSegment(start: start, end: end))
-        }
-        self.session?.segments = (saved + fresh).sorted { $0.start < $1.start }
-        selectedSegmentID = fresh.first?.id
-        autoName(fresh.map(\.id))
-        persist()
-        if found.isEmpty { message = "No songs were found: the recording is silent. Check the input and its level." }
-    }
-
-    /// Names cuts after the run of the release's tracks whose lengths are closest (a side, say).
-    private func autoName(_ ids: [String]) {
-        let cuts = segments.filter { ids.contains($0.id) && $0.target == nil }
-        guard !cuts.isEmpty, let rate = session?.format.sampleRate else { return }
-        let tracks = targetOptions
-        guard !tracks.isEmpty else { return }
-        let durations = cuts.map { Double($0.end - $0.start) / Double(rate) }
-        guard let k = VinylTrackMatcher.start(for: durations, tracks: tracks.map { ($0.duration, $0.isDone) }) else { return }
-        for (j, cut) in cuts.enumerated() where k + j < tracks.count {
-            setTarget(cut.id, tracks[k + j].target)
-        }
-    }
 
     /// Split at Playhead: cuts the cut there in two, or (between cuts) adds one from there to the next cut, pause
     /// or the end.
