@@ -7,8 +7,14 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
-- On the Mac, seeking in a FLAC file (by dragging the scrubber, or by resuming a song where you left off) now lands where the clock says. Before, songs such as digitized records could play on past their length.
-- **Digitize Vinyl** no longer cuts a recording into tracks for you. **Detect Tracks** is gone, along with the cuts it made when you stopped recording: it could split a long track at a soft passage. You make the cuts yourself with **Split at Playhead** and by dragging their edges, also while you record: click the waveform where a song starts and split there (the last track grows with the recording), and pick each track's song as you go.
+## 1.23.1
+
+- On the Mac, seeking in a FLAC file (by dragging the scrubber, or by resuming a song where you left off) now lands
+  where the clock says. Before, songs such as digitized records could play on past their length.
+- **Digitize Vinyl** no longer cuts a recording into tracks for you. **Detect Tracks** is gone, along with the cuts it
+  made when you stopped recording: it could split a long track at a soft passage. You make the cuts yourself with
+  **Split at Playhead** and by dragging their edges, also while you record: click the waveform where a song starts and
+  split there (the last track grows with the recording), and pick each track's song as you go.
 
 ## 1.23.0
 
