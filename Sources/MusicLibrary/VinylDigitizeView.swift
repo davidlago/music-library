@@ -439,9 +439,12 @@ private struct VinylWaveformEditor: View {
             .frame(height: 34)
             .clipShape(RoundedRectangle(cornerRadius: 6))
         }
-        .onChange(of: vinyl.frameCount) { _, _ in
-            // While recording, the end stays in view.
-            if vinyl.state == .recording { visibleStart = max(0, vinyl.duration - visibleLength * 0.9) }
+        .onChange(of: vinyl.frameCount) { old, _ in
+            // While recording, the end stays in view, unless you've scrolled back to place the playhead.
+            guard vinyl.state == .recording, let rate = vinyl.session?.format.sampleRate else { return }
+            if Double(old) / Double(rate) <= visibleStart + visibleLength + 0.5 {
+                visibleStart = max(0, vinyl.duration - visibleLength * 0.9)
+            }
         }
         .onChange(of: vinyl.playhead) { _, frame in
             // Playing past the right edge turns the page.
@@ -468,14 +471,8 @@ private struct VinylWaveformEditor: View {
             Text("\(VinylText.time(Double(vinyl.playhead) / rate)) / \(VinylText.time(duration))")
                 .font(.callout.monospacedDigit())
             Spacer()
-            if vinyl.state == .recording || vinyl.state == .paused {
-                Button("Mark Track") { vinyl.markTrack() }
-                    .help("Starts a new track at this point of the recording (and ends the one you marked before)")
-            } else {
-                Button("Split at Playhead") { vinyl.splitAtPlayhead() }
-                    .disabled(!canEdit)
-                    .help("Cuts the track at the playhead in two, or starts a new track there")
-            }
+            Button("Split at Playhead") { vinyl.splitAtPlayhead() }
+                .help("Cuts the track at the playhead in two, or starts a new track there (while recording, the last track grows with the recording)")
             Button("Delete Cut") { if let selected { vinyl.deleteSegment(selected.id) } }
                 .disabled(!canEdit || selected == nil || selected?.isSaved == true)
             Divider().frame(height: 16)
@@ -720,7 +717,7 @@ private struct VinylCutList: View {
             }
             if vinyl.segments.isEmpty {
                 Text(vinyl.state == .recording || vinyl.state == .paused
-                     ? "No tracks yet. Press Mark Track as each song starts, or cut the recording after you stop."
+                     ? "No tracks yet. Click the waveform where a song starts and Split at Playhead: the last track grows with the recording."
                      : "No tracks yet. Move the playhead to a song's start and Split at Playhead.")
                     .font(.callout).foregroundStyle(.subtext)
             } else {
