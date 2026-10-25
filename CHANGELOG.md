@@ -7,6 +7,12 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.25.1
+
+- Fixed: the Radio DJ could link an album you don't own to the Wikipedia article of a different album with the same
+  name (Lisa Stansfield's *Affection* opened Koda Kumi's). Without knowing the artist it now links only when a single
+  album has that name, and the DJ names the artist more often.
+
 ## 1.25.0
 
 - New: **Shop for CDs** is now **Shop**, for CDs and vinyl. Pick **CD** or **Vinyl** next to the search fields to find
