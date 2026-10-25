@@ -7,6 +7,10 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- Fixed: refreshing a downloaded library catalog (Local Library CDs) while the library's website was struggling could
+  forget most of its CDs: a page that came back empty or short ended the scan as if it were complete, and every title
+  not yet read was dropped. Such a page is now read again after a pause (or the refresh stops and resumes later), and
+  titles are only dropped after a scan that really read the whole catalog.
 - New: a **Radio DJ** who tells you about the album or artist you're looking at. Add a Claude API key in Settings ▸
   Radio DJ on the Mac, then press **On Air** in the toolbar of an album, artist or collection item page (on iPhone, the
   radio button at the top of the page). The DJ opens with the story behind the music, the people who made it and how it
