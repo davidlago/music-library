@@ -69,10 +69,13 @@ final class RadioDJStore {
         return name.isEmpty ? nil : name
     }
 
-    /// `library`: the collection the DJ can search while talking; `linker`: links its words to what you own.
-    func makeSession(_ subject: RadioDJSubject, library: RadioDJLibrary?, linker: RadioDJLinker?) -> RadioDJSession {
+    /// `library`: the collection the DJ can search while talking; `linker`: links its words to what you own; `shop`:
+    /// opens the Shop on an album (`open_shop`).
+    func makeSession(_ subject: RadioDJSubject, library: RadioDJLibrary?, linker: RadioDJLinker?,
+                     shop: (@MainActor (RadioDJShopRequest) async -> String)?) -> RadioDJSession {
         RadioDJSession(name: displayName, subject: subject, client: ClaudeClient(apiKey: trimmedKey), library: library,
-                       linker: linker, listenerName: trimmedListenerName, wikipedia: WikipediaArticleFinder()) { [weak self] tally in
+                       linker: linker, listenerName: trimmedListenerName, wikipedia: WikipediaArticleFinder(),
+                       shop: shop) { [weak self] tally in
             self?.record(tally)
         }
     }
@@ -178,7 +181,17 @@ extension AppModel {
     /// Puts the DJ on the air about `subject`, with the collection to search and link to.
     func startRadioDJ(_ subject: RadioDJSubject) {
         let linker = RadioDJLinker(tracks: tracks, collection: collection, subject: subject)
-        radioDJ.begin(radioDJ.makeSession(subject, library: radioDJLibrary, linker: linker))
+        radioDJ.begin(radioDJ.makeSession(subject, library: radioDJLibrary, linker: linker) { [weak self] request in
+            guard let self else { return "The app closed." }
+            return await self.openShop(for: request)
+        })
+    }
+
+    /// The DJ's `open_shop`: shows the Shop (the DJ stays on the air beside it) searching for the album.
+    func openShop(for request: RadioDJShopRequest) async -> String {
+        nowPlayingExpanded = false
+        sidebar = .cdShop
+        return await cdShop.find(request)
     }
 
     /// A link in the DJ's words: pages open as usual (the DJ stays on the air beside them); songs play in their album.
@@ -264,6 +277,7 @@ struct RadioDJPanel: View {
                                             speaking: session.activity == .speaking && line.id == session.lines.last?.id)
                                 .id(line.id)
                         }
+                        suggestionChips
                         if let status = statusText { RadioDJStatusRow(text: status).id("status") }
                         if let error = session.error { errorRow(error) }
                         Color.clear.frame(height: 1).id(Self.bottom)
@@ -304,6 +318,27 @@ struct RadioDJPanel: View {
         .background(theme.card.opacity(0.6))
     }
 
+    /// The questions to start with, under the greeting (gone once one is asked, or when you've moved elsewhere,
+    /// where "Tell me about…" takes over).
+    @ViewBuilder
+    private var suggestionChips: some View {
+        if !session.suggestions.isEmpty, !session.isBusy, !session.isElsewhere(dj.hereTopic) {
+            FlowLayout(spacing: 6) {
+                ForEach(session.suggestions, id: \.self) { question in
+                    Button { session.send(question, page: dj.here) } label: {
+                        Text(question)
+                            .font(.callout)
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(Capsule().fill(theme.fill))
+                            .overlay(Capsule().strokeBorder(theme.accent.opacity(question == session.suggestions.first ? 0.6 : 0), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Ask \(session.name) this")
+                }
+            }
+        }
+    }
+
     private var statusText: String? {
         switch session.activity {
         case .idle, .speaking: return nil
@@ -311,6 +346,7 @@ struct RadioDJPanel: View {
         case .searching(let q): return q.isEmpty ? "Digging through the crates…" : "Digging through the crates: “\(q)”"
         case .reading(let host): return host.isEmpty ? "Reading up…" : "Reading up on \(host)…"
         case .browsing(let q): return q.isEmpty ? "Flipping through your shelves…" : "Flipping through your shelves: \(q)"
+        case .shopping(let album): return album.isEmpty ? "Heading to the record store…" : "Heading to the record store for \(album)…"
         }
     }
 
@@ -409,6 +445,7 @@ private struct RadioDJLineView: View {
                         .font(.body)
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
+                        .modifier(IconLinks())
                         .contextMenu {
                             Button("Copy") {
                                 NSPasteboard.general.clearContents()
@@ -502,7 +539,8 @@ struct EqualizerBars: View {
 /// The DJ's words in one `Text` (so they select and wrap as one): links to the collection, and songs to play with a
 /// play icon before them. Links to what you own are in the accent color, the rest (previews, web pages) in `outside`.
 enum RadioDJText {
-    static let outside = Color.purple
+    /// The light red at the top of the On Air sign's gradient.
+    static let outside = Color(red: 1, green: 0.42, blue: 0.39)
 
     /// What the line says, without links (for Copy).
     static func plain(_ segments: [RadioDJSegment]) -> String {
@@ -519,20 +557,85 @@ enum RadioDJText {
             case .text(let words):
                 return Text("\(text)\(words)")
             case .play(let title):
-                let icon = Text(Image(systemName: "play.circle.fill")).foregroundStyle(accent)
+                let icon = linked(Text(Image(systemName: "play.circle.fill")).foregroundStyle(accent), to: title)
                 return Text("\(text)\(icon)\u{202F}\(title)")
             case .preview(var title):
                 // Not yours: a 30-second sample, in headphones rather than the play button, in the not-yours color.
                 title.foregroundColor = outside
-                let icon = Text(Image(systemName: "headphones.circle")).foregroundStyle(outside)
+                let icon = linked(Text(Image(systemName: "headphones.circle")).foregroundStyle(outside), to: title)
                 return Text("\(text)\(icon)\u{202F}\(title)")
             case .external(var title):
                 // Not yours: opens a page on the web.
                 title.foregroundColor = outside
-                let icon = Text(Image(systemName: "arrow.up.right.square")).font(.caption).foregroundStyle(outside)
+                let icon = linked(Text(Image(systemName: "arrow.up.right.square")).font(.caption).foregroundStyle(outside), to: title)
                 return Text("\(text)\(title)\u{202F}\(icon)")
             }
         }
+    }
+
+    /// An icon goes where its title's link does (`IconLinks`): a symbol in a `Text` can't carry a link itself.
+    private static func linked(_ icon: Text, to title: AttributedString) -> Text {
+        guard #available(macOS 15, *), let url = title.runs.first?.link else { return icon }
+        return icon.customAttribute(IconLink(url: url))
+    }
+}
+
+/// Where an icon's run in the DJ's text links to.
+@available(macOS 15, *)
+struct IconLink: TextAttribute {
+    let url: URL
+}
+
+/// Makes the icons beside the DJ's links (play, preview, web page) clickable like the links: the text is drawn as
+/// usual while noting where those icons are, and a click on one opens its link (with `openURL`, as the links do).
+/// Before macOS 15 only the words are links.
+struct IconLinks: ViewModifier {
+    @Environment(\.openURL) private var openURL
+    @State private var icons = IconLinkFrames()
+    @State private var overIcon = false
+
+    func body(content: Content) -> some View {
+        if #available(macOS 15, *) {
+            content
+                .textRenderer(IconLinkRenderer(icons: icons))
+                .simultaneousGesture(SpatialTapGesture().onEnded { tap in
+                    if let url = icons.url(at: tap.location) { openURL(url) }
+                })
+                .onContinuousHover { phase in
+                    // The pointing hand over an icon, as over a link; the cursor is left alone elsewhere (links set theirs).
+                    var over = false
+                    if case .active(let p) = phase { over = icons.url(at: p) != nil }
+                    if over { NSCursor.pointingHand.set() } else if overIcon { NSCursor.arrow.set() }
+                    overIcon = over
+                }
+        } else {
+            content
+        }
+    }
+}
+
+/// The icons' frames as last drawn (a reference, so drawing doesn't update the view).
+final class IconLinkFrames {
+    var frames: [(rect: CGRect, url: URL)] = []
+
+    func url(at point: CGPoint) -> URL? {
+        frames.first { $0.rect.insetBy(dx: -2, dy: -2).contains(point) }?.url
+    }
+}
+
+@available(macOS 15, *)
+private struct IconLinkRenderer: TextRenderer {
+    let icons: IconLinkFrames
+
+    func draw(layout: Text.Layout, in ctx: inout GraphicsContext) {
+        var frames: [(rect: CGRect, url: URL)] = []
+        for line in layout {
+            for run in line {
+                if let link = run[IconLink.self] { frames.append((run.typographicBounds.rect, link.url)) }
+                ctx.draw(run)
+            }
+        }
+        icons.frames = frames
     }
 }
 
@@ -675,7 +778,7 @@ extension AppModel {
         case .catalog?: return .page("their public library's CD catalog")
         case .catalogCheckouts?: return .page("their public library checkouts")
         case .catalogList?: return .page("their public library list")
-        case .cdShop?: return .page("Shop for CDs")
+        case .cdShop?: return cdShop.radioDJPage
         case .cd?: return .page("the page of the CD in the drive")
         case nil: return .page("Music Library")
         }

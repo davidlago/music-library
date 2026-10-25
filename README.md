@@ -50,8 +50,8 @@ playback, and a Claude-powered radio DJ who tells you the story behind every rec
 - **Play it properly.** Each song at its own sample rate and bit depth, a real play queue, playlists and smart playlists,
   and Last.fm scrobbling. [Playback →](docs/guide/playback.md)
 - **Find more music.** Concerts near you by your artists, your public library's CD catalog downloaded and searchable,
-  and new and used CDs compared across stores. [Concerts →](docs/guide/concerts.md) ·
-  [Local Library CDs →](docs/guide/local-library.md) · [Shop for CDs →](docs/guide/shop-for-cds.md)
+  and new and used CDs and records compared across stores. [Concerts →](docs/guide/concerts.md) ·
+  [Local Library CDs →](docs/guide/local-library.md) · [Shop →](docs/guide/shop.md)
 - **Take it with you.** The iPhone app browses both collections and plays what you sync to it, offline and through a USB
   DAC at each song's rate, with widgets and an Apple Watch app. Export to a USB player or back up to a drive.
   [iPhone app →](docs/guide/iphone.md) · [Widgets and Apple Watch →](docs/guide/widgets-and-watch.md) ·
@@ -93,7 +93,7 @@ every feature: [Getting started](docs/guide/getting-started.md), [Physical Colle
 [Digitizing vinyl](docs/guide/digitizing-vinyl.md), [Albums and artists](docs/guide/albums-and-artists.md),
 [Search](docs/guide/search.md), [Insights](docs/guide/insights.md), [Music DNA](docs/guide/music-dna.md),
 [Radio DJ](docs/guide/radio-dj.md), [Concerts](docs/guide/concerts.md), [Playback](docs/guide/playback.md),
-[Local Library CDs](docs/guide/local-library.md), [Shop for CDs](docs/guide/shop-for-cds.md),
+[Local Library CDs](docs/guide/local-library.md), [Shop](docs/guide/shop.md),
 [Export and backup](docs/guide/export-and-backup.md), [iPhone app](docs/guide/iphone.md),
 [Widgets and Apple Watch](docs/guide/widgets-and-watch.md), [Settings](docs/guide/settings.md),
 [Privacy](docs/guide/privacy.md), [Troubleshooting](docs/guide/troubleshooting.md) and

@@ -43,8 +43,9 @@ You make the cuts yourself; the app doesn't guess where songs start (gaps on a r
 passage would split a long track).
 
 - Click the waveform to move the playhead, and press **Space** to listen from there.
-- **Split at Playhead** cuts at that point. While recording, the last track grows with the recording, so you can cut
-  as you go.
+- **Split at Playhead** cuts at that point.
+- **While recording**, the playhead follows the recording and clicking doesn't move it: press **Split at Playhead** as
+  a song starts and a new track begins right then, growing with the recording. Fine-tune the cuts afterwards.
 - Drag a cut's edge to move it; cuts that meet move together. Drag elsewhere to scroll, and ⌘-scroll or pinch to zoom
   (**Fit** shows it all).
 - **Delete Cut** removes one.

@@ -284,6 +284,7 @@ final class VinylController {
             if let recording, recording.frameCount > 0 { session?.pauses.append(recording.frameCount) }
             capture?.sink = recording
             state = .recording
+            playhead = frameCount
             persist()
             return
         }
@@ -306,6 +307,7 @@ final class VinylController {
                 persist()
                 capture.sink = recording
                 state = .recording
+                playhead = frameCount
             } catch {
                 message = "The recording couldn't be started: \(error.localizedDescription)"
                 stopCapture()
@@ -370,6 +372,7 @@ final class VinylController {
     private func refreshRecording() {
         guard let recording else { return }
         frameCount = recording.frameCount
+        if state == .recording { playhead = frameCount }
         // While recording, the last cut ends where the recording does, for now: one made on this side (since the
         // last pause), so the side before keeps its end.
         if state == .recording, let segs = session?.segments, let last = segs.indices.last, !segs[last].isSaved,
@@ -454,7 +457,8 @@ final class VinylController {
             }
             if state == .recording, ticks % 8 == 0 { refreshRecording() }
             if ticks % 30 == 0 { checkInput() }
-            if state == .recording, let recording { frameCount = recording.frameCount }
+            // While recording, the playhead is where the recording is.
+            if state == .recording, let recording { frameCount = recording.frameCount; playhead = frameCount }
         }
         if isPreviewing {
             if let p = preview.position { playhead = min(p, frameCount) }
@@ -497,8 +501,9 @@ final class VinylController {
         if isPreviewing { stopPreview() } else { playPreview() }
     }
 
-    /// Moves the playhead (and playing, when it is).
+    /// Moves the playhead (and playing, when it is). While recording it stays with the recording.
     func seek(to frame: Int) {
+        guard state != .recording else { return }
         let f = max(0, min(frame, frameCount))
         if isPreviewing { playPreview(from: f) } else { playhead = f }
     }
@@ -513,32 +518,16 @@ final class VinylController {
 
     var minimumLength: Int { (session?.format.sampleRate ?? 44_100) / 2 }
 
-    /// Split at Playhead: cuts the cut there in two, or (between cuts) adds one from there to the next cut, pause
-    /// or the end.
+    /// Split at Playhead (`VinylSession.split`): while recording the playhead is the recording's end, so a new track
+    /// starts now.
     func splitAtPlayhead() {
-        // While recording, the last cut is brought up to the recording's end first, and a cut that ends there may
-        // be short for now: it grows.
+        // While recording, the last cut is brought up to the recording's end first.
         refreshRecording()
         guard var session else { return }
-        let f = playhead
-        let growing = state == .recording
-        if let i = session.segments.firstIndex(where: { $0.start < f && f < $0.end }) {
-            let seg = session.segments[i]
-            guard !seg.isSaved, f - seg.start >= minimumLength,
-                  seg.end - f >= minimumLength || (growing && seg.end == frameCount) else { return }
-            session.segments[i].end = f
-            let next = VinylSegment(start: f, end: seg.end)
-            session.segments.insert(next, at: i + 1)
-            selectedSegmentID = next.id
-        } else {
-            let end = min(session.segments.map(\.start).filter { $0 > f }.min() ?? frameCount,
-                          session.pauses.filter { $0 > f + minimumLength }.min() ?? frameCount)
-            guard end - f >= minimumLength || (growing && end == frameCount && end > f) else { return }
-            let seg = VinylSegment(start: f, end: end)
-            session.segments.append(seg)
-            session.segments.sort { $0.start < $1.start }
-            selectedSegmentID = seg.id
-        }
+        let recording = state == .recording
+        guard let id = session.split(at: recording ? frameCount : playhead, frameCount: frameCount, recording: recording,
+                                     minimumLength: minimumLength) else { return }
+        selectedSegmentID = id
         self.session = session
         persist()
     }

@@ -369,6 +369,35 @@ public struct VinylSession: Codable, Hashable, Sendable {
         }
         return s
     }
+
+    /// Split at Playhead: cuts the cut at `frame` in two, or (between cuts) adds one from there to the next cut,
+    /// pause or the recording's end. Returns the new cut's id, nil when nothing was cut (a saved cut, or one that
+    /// would be shorter than `minimumLength`).
+    ///
+    /// While `recording`, `frame` is the recording's end (`frameCount`): a new track starts now. The cut growing
+    /// with the recording ends there and the new one starts empty, to grow in its place; with no cut growing, the
+    /// new one starts there and grows.
+    public mutating func split(at frame: Int, frameCount: Int, recording: Bool, minimumLength: Int) -> String? {
+        let f = frame
+        if let i = segments.firstIndex(where: { $0.start < f && (f < $0.end || (recording && f == $0.end && f == frameCount)) }) {
+            let seg = segments[i]
+            guard !seg.isSaved, f - seg.start >= minimumLength,
+                  seg.end - f >= minimumLength || (recording && seg.end == frameCount) else { return nil }
+            segments[i].end = f
+            let next = VinylSegment(start: f, end: seg.end)
+            segments.insert(next, at: i + 1)
+            return next.id
+        }
+        // A cut starting right here already is the new track.
+        guard !segments.contains(where: { $0.start == f }) else { return nil }
+        let end = min(segments.map(\.start).filter { $0 > f }.min() ?? frameCount,
+                      pauses.filter { $0 > f + minimumLength }.min() ?? frameCount)
+        guard end - f >= minimumLength || (recording && end == frameCount) else { return nil }
+        let seg = VinylSegment(start: f, end: end)
+        segments.append(seg)
+        segments.sort { $0.start < $1.start }
+        return seg.id
+    }
 }
 
 #if os(macOS)

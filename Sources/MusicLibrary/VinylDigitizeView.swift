@@ -133,7 +133,9 @@ private struct VinylSessionPage: View {
                 if vinyl.session != nil, vinyl.frameCount > 0 {
                     card("Tracks") {
                         VStack(alignment: .leading, spacing: 14) {
-                            Text("Click the waveform to move the playhead and press Space to listen. Drag a cut's edge to move it, or drag elsewhere to scroll; ⌘-scroll or pinch to zoom.")
+                            Text(vinyl.state == .recording
+                                 ? "While recording, the playhead follows the recording: Split at Playhead starts a new track now. Drag elsewhere to scroll; ⌘-scroll or pinch to zoom."
+                                 : "Click the waveform to move the playhead and press Space to listen. Drag a cut's edge to move it, or drag elsewhere to scroll; ⌘-scroll or pinch to zoom.")
                                 .font(.caption).foregroundStyle(.subtext)
                             VinylWaveformEditor(vinyl: vinyl)
                             VinylCutList(vinyl: vinyl, item: item)
@@ -409,7 +411,8 @@ private struct VinylRecordPanel: View {
 // MARK: Waveform
 
 /// The recording's waveform: an overview of all of it with the part shown, and that part, zoomable, with the cuts,
-/// pauses and the playhead. Clicking moves the playhead; dragging a cut's edge moves it, elsewhere scrolls.
+/// pauses and the playhead. Clicking moves the playhead (not while recording, when it follows the recording); dragging
+/// a cut's edge moves it, elsewhere scrolls.
 private struct VinylWaveformEditor: View {
     @Environment(\.theme) private var theme
     let vinyl: VinylController
@@ -418,6 +421,8 @@ private struct VinylWaveformEditor: View {
     @State private var visibleLength = 60.0
     @State private var drag: DragMode?
     @State private var zoomBase: Double?
+    /// How far a click may move and still be a click (not a scroll).
+    private static let clickSlop: CGFloat = 4
 
     private enum DragMode {
         case edge(String, VinylController.Edge)
@@ -472,7 +477,9 @@ private struct VinylWaveformEditor: View {
                 .font(.callout.monospacedDigit())
             Spacer()
             Button("Split at Playhead") { vinyl.splitAtPlayhead() }
-                .help("Cuts the track at the playhead in two, or starts a new track there (while recording, the last track grows with the recording)")
+                .help(vinyl.state == .recording
+                      ? "Starts a new track now: the playhead follows the recording, and the new track grows with it"
+                      : "Cuts the track at the playhead in two, or starts a new track there")
             Button("Delete Cut") { if let selected { vinyl.deleteSegment(selected.id) } }
                 .disabled(!canEdit || selected == nil || selected?.isSaved == true)
             Divider().frame(height: 16)
@@ -562,15 +569,19 @@ private struct VinylWaveformEditor: View {
                     }
                     switch drag {
                     case .edge(let id, let edge): vinyl.move(id, edge, to: frame(value.location.x))
-                    case .pan(let origin): pan(to: origin - Double(value.translation.width) / pointsPerSecond, duration: duration)
+                    // A click wobbles a point or two: it only scrolls past that, so the playhead lands where you clicked.
+                    case .pan(let origin) where abs(value.translation.width) >= Self.clickSlop:
+                        pan(to: origin - Double(value.translation.width) / pointsPerSecond, duration: duration)
+                    case .pan: break
                     case nil: break
                     }
                 }
                 .onEnded { value in
                     defer { drag = nil }
                     if case .edge = drag { vinyl.commitMoves(); return }
-                    guard abs(value.translation.width) < 3 else { return }
-                    let f = frame(value.location.x)
+                    guard abs(value.translation.width) < Self.clickSlop else { return }
+                    // Where the press was: the view hasn't scrolled, and the pointer may have slipped since.
+                    let f = frame(value.startLocation.x)
                     vinyl.seek(to: f)
                     vinyl.selectedSegmentID = vinyl.segment(at: f)?.id
                 }

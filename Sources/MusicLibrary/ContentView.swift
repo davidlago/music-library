@@ -189,7 +189,7 @@ struct SidebarView: View {
                     .tag(SidebarItem.catalogList)
             }
             Section("Shopping") {
-                Label("Shop for CDs", systemImage: "cart").tag(SidebarItem.cdShop)
+                Label("Shop", systemImage: "cart").tag(SidebarItem.cdShop)
             }
             Section("Export") {
                 Label("Export List", systemImage: "externaldrive")

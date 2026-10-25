@@ -34,10 +34,14 @@ public final class RadioDJSession {
         case reading(String)
         /// Looking through the listener's own collection (`search_collection`).
         case browsing(String)
+        /// Opening the Shop on an album (`open_shop`).
+        case shopping(String)
         case speaking
     }
 
     public let name: String
+    /// Questions to start with, until the first is asked (the first is about what's on screen).
+    public private(set) var suggestions: [String] = []
     /// What the conversation is about: the page it started on, then the last page the listener asked from.
     public private(set) var subject: RadioDJSubject
     public private(set) var lines: [Line] = []
@@ -59,8 +63,11 @@ public final class RadioDJSession {
     @ObservationIgnored private var history: [ClaudeMessage] = []
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var started = false
+    /// The page the DJ came on from, told (with the time then) before the first question.
+    @ObservationIgnored private var openedFrom: RadioDJSubject?
     /// The last request that failed, to try again.
     @ObservationIgnored private var failed: (text: String, display: String?)?
+    @ObservationIgnored private var countedSegment = false
     /// A tool ran since the last words: the next words start a new paragraph.
     @ObservationIgnored private var breakBeforeText = false
     @ObservationIgnored private let client: ClaudeClient
@@ -71,19 +78,27 @@ public final class RadioDJSession {
     @ObservationIgnored private let listenerName: String?
     /// Checks articles before they're linked (nil: none are).
     @ObservationIgnored private let wikipedia: WikipediaArticleFinder?
+    /// Opens the Shop for `open_shop` and says what it found (nil: no tool, as on the phone).
+    @ObservationIgnored private let shop: (@MainActor (RadioDJShopRequest) async -> String)?
     @ObservationIgnored private var checkedWeb = Set<String>()
     /// The system prompt, fixed for the whole conversation: the API ties the model's thinking to it, so a changed one
     /// makes every earlier turn invalid ("bound to a different conversation"). Later pages go in the messages.
     @ObservationIgnored private let system: [String]
     @ObservationIgnored private let onUsage: @MainActor (RadioDJTally) -> Void
 
+    /// `now`: the time the opener tells the DJ (it greets for the time of day).
     public init(name: String, subject: RadioDJSubject, client: ClaudeClient, library: RadioDJLibrary? = nil,
                 linker: RadioDJLinker? = nil, listenerName: String? = nil, wikipedia: WikipediaArticleFinder? = nil,
+                shop: (@MainActor (RadioDJShopRequest) async -> String)? = nil, now: @escaping () -> Date = Date.init,
                 onUsage: @escaping @MainActor (RadioDJTally) -> Void) {
         self.name = name; self.subject = subject; self.client = client; self.library = library
-        self.linker = linker; self.listenerName = listenerName; self.wikipedia = wikipedia; self.onUsage = onUsage
-        system = [RadioDJ.persona(name: name, listener: listenerName, canSearchCollection: library != nil), subject.context]
+        self.linker = linker; self.listenerName = listenerName; self.wikipedia = wikipedia; self.shop = shop
+        self.now = now; self.onUsage = onUsage
+        system = [RadioDJ.persona(name: name, listener: listenerName, canSearchCollection: library != nil, canShop: shop != nil),
+                  subject.context]
     }
+
+    @ObservationIgnored private let now: () -> Date
 
     /// A DJ line as text with links to the collection and play buttons (a reference still being written at the end
     /// of the line streaming in is hidden).
@@ -93,14 +108,13 @@ public final class RadioDJSession {
         return RadioDJLinker.plain(line.text, streaming: streaming)
     }
 
-    /// Opens the segment (once).
+    /// Goes on the air (once): the app's greeting and suggested questions, with no request until one is asked.
     public func start() {
         guard !started else { return }
         started = true
-        var segment = RadioDJTally()
-        segment.segments = 1
-        onUsage(segment)
-        run(RadioDJ.opener(subject), display: nil)
+        openedFrom = subject
+        lines.append(Line(role: .dj, text: RadioDJ.greeting(name: name, listener: listenerName, subject: subject, at: now())))
+        suggestions = RadioDJ.suggestions(for: subject, canSearchCollection: library != nil, canShop: shop != nil)
     }
 
     /// Whether `page` is another album or artist than the conversation is about.
@@ -134,13 +148,25 @@ public final class RadioDJSession {
         task = nil
     }
 
-    /// Sends `text`; `display` is what shows as the listener's line (nil: nothing, for the hidden opener).
+    /// Sends `text`; `display` is what shows as the listener's line (nil: nothing). The first question carries the
+    /// opener, and counts the segment.
     private func run(_ text: String, display: String?, repeating: Bool = false) {
         error = nil
         failed = nil
+        suggestions = []
         if let display, !repeating { lines.append(Line(role: .listener, text: display)) }
         let turnStart = history.count
-        history.append(.user(text))
+        if history.isEmpty, let openedFrom {
+            history.append(.user(RadioDJ.opener(openedFrom, at: now()) + "\n\n" + text))
+            if !countedSegment {
+                countedSegment = true
+                var segment = RadioDJTally()
+                segment.segments = 1
+                onUsage(segment)
+            }
+        } else {
+            history.append(.user(text))
+        }
         let line = Line(role: .dj, text: "")
         lines.append(line)
         activity = .warmingUp
@@ -166,6 +192,7 @@ public final class RadioDJSession {
     /// searches and sends their results back until the DJ has answered.
     private func reply(into lineID: UUID) async throws {
         let tools = RadioDJ.tools + (library == nil ? [] : [RadioDJLibrary.tool, RadioDJLibrary.statsTool])
+            + (shop == nil ? [] : [RadioDJShopRequest.tool])
         var resuming = false
         breakBeforeText = false
         for _ in 0..<RadioDJ.maxRounds {
@@ -221,7 +248,7 @@ public final class RadioDJSession {
         }
     }
 
-    /// One `tool_result` per call, all in one message. Collection searches run off the main thread.
+    /// One `tool_result` per call, all in one message. Collection searches run off the main thread; the Shop opens on it.
     private func runTools(_ calls: [JSONValue]) async -> [JSONValue] {
         var results: [JSONValue] = []
         for call in calls {
@@ -232,6 +259,11 @@ public final class RadioDJSession {
                 output = await Task.detached(priority: .userInitiated) { library.run(input) }.value
             } else if call["name"]?.string == RadioDJLibrary.statsToolName, let library {
                 output = await Task.detached(priority: .userInitiated) { library.runStats(input) }.value
+            } else if call["name"]?.string == RadioDJShopRequest.toolName, let shop {
+                switch RadioDJShopRequest.parse(input) {
+                case .success(let request): output = (await shop(request), false)
+                case .failure(let error): output = ("Invalid input: \(error.message).", true)
+                }
             } else {
                 output = ("Unknown tool.", true)
             }
@@ -256,6 +288,7 @@ public final class RadioDJSession {
             activity = switch name {
             case "web_fetch": .reading("")
             case RadioDJLibrary.toolName, RadioDJLibrary.statsToolName: .browsing("")
+            case RadioDJShopRequest.toolName: .shopping("")
             default: .searching("")
             }
         case .toolInput(let name, let input):
@@ -263,6 +296,7 @@ public final class RadioDJSession {
             case "web_fetch": activity = .reading(input["url"]?.string.flatMap { URL(string: $0)?.host() } ?? "")
             case RadioDJLibrary.toolName: activity = .browsing(input["query"]?.string ?? "")
             case RadioDJLibrary.statsToolName: activity = .browsing(input["section"]?.string.map { "your \($0) stats" } ?? "")
+            case RadioDJShopRequest.toolName: activity = .shopping(input["album"]?.string ?? "")
             default: activity = .searching(input["query"]?.string ?? "")
             }
         }

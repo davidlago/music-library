@@ -237,31 +237,39 @@ func textReply(_ text: String, stop: String = "end_turn", model: String = "claud
         for _ in 0..<200 where session.isBusy { try? await Task.sleep(for: .milliseconds(10)) }
     }
 
-    @Test func opensThenTalksAndResumesPausedTurns() async throws {
+    @Test func greetsWithSuggestionsThenTalksAndResumesPausedTurns() async throws {
         let transport = ScriptedClaudeTransport([
-            .lines(textReply("Good evening, ")),
+            .lines(textReply("The story of Blue.")),
             .lines(textReply("this is Max.", stop: "pause_turn")),
             .lines(textReply(" On with the show.")),
         ])
         var tallies: [RadioDJTally] = []
         let session = RadioDJSession(name: "Max", subject: subject, client: ClaudeClient(apiKey: "k", transport: transport)) { tallies.append($0) }
         session.start()
+        // Going on the air costs nothing: the app greets and suggests questions.
+        #expect(transport.bodies.isEmpty && tallies.isEmpty && !session.isBusy)
+        #expect(session.lines.count == 1 && session.lines.first?.role == .dj)
+        #expect(session.lines.first?.text.contains("Max here, on the air with [Blue](album) by [Joni Mitchell](artist) on the turntable.") == true)
+        #expect(session.suggestions.first == "Tell me about Blue")
+
+        session.send(session.suggestions[0])
         await waitIdle(session)
-        #expect(session.lines.map(\.text) == ["Good evening, "])
-        #expect(session.lines.first?.role == .dj)
+        #expect(session.suggestions.isEmpty)
+        #expect(Array(session.lines.map(\.text).dropFirst()) == ["Tell me about Blue", "The story of Blue."])
 
         session.send("Who played on it?")
         await waitIdle(session)
-        #expect(session.lines.map(\.role) == [.dj, .listener, .dj])
+        #expect(session.lines.map(\.role) == [.dj, .listener, .dj, .listener, .dj])
         #expect(session.lines.last?.text == "this is Max. On with the show.")
         #expect(session.error == nil)
 
         let bodies = transport.bodies
         #expect(bodies.count == 3)
-        // The hidden opener, then the opener's reply (thinking block with its signature) sent back unchanged.
+        // The first question carries where the DJ came on; the reply (thinking block with its signature) goes back unchanged.
         let second = try #require(bodies[1]["messages"]?.array)
         #expect(second.count == 3)
-        #expect(second[0]["content"]?.array?.first?["text"]?.string?.contains("Open the segment") == true)
+        let first = try #require(second[0]["content"]?.array?.first?["text"]?.string)
+        #expect(first.hasPrefix("(The listener just switched you on from the album page for *Blue* by Joni Mitchell.") && first.hasSuffix("\n\nTell me about Blue"))
         #expect(second[1]["content"]?.array?.first?["signature"]?.string == "sig-1")
         #expect(second[2]["content"]?.array?.first?["text"]?.string == "Who played on it?")
         // The paused turn is resumed by sending its partial reply back, with no new user message.
@@ -270,21 +278,19 @@ func textReply(_ text: String, stop: String = "end_turn", model: String = "claud
         #expect(third[3]["role"]?.string == "assistant")
         #expect(bodies[2]["system"]?.array?.first?["text"]?.string?.contains("You are Max") == true)
 
-        #expect(tallies.first?.segments == 1)
+        #expect(tallies.first?.segments == 1 && tallies.filter { $0.segments == 1 }.count == 1)
         #expect(tallies.filter { $0.requests == 1 }.count == 3)
         #expect(session.cost > 0)
     }
 
     @Test func failedQuestionsRollBackAndRetry() async throws {
         let transport = ScriptedClaudeTransport([
-            .lines(textReply("Hello there.")),
             .failure(.overloaded),
             .lines(textReply("Here's the story.")),
             .lines(textReply("", stop: "refusal")),
         ])
         let session = RadioDJSession(name: "Max", subject: subject, client: ClaudeClient(apiKey: "k", transport: transport)) { _ in }
         session.start()
-        await waitIdle(session)
         session.send("Tell me more")
         await waitIdle(session)
         #expect(session.error == ClaudeError.overloaded.localizedDescription)
@@ -293,10 +299,10 @@ func textReply(_ text: String, stop: String = "end_turn", model: String = "claud
         session.retry()
         await waitIdle(session)
         #expect(session.error == nil)
-        #expect(session.lines.map(\.text) == ["Hello there.", "Tell me more", "Here's the story."])
-        // The retry sent the question once, after the opener's reply.
-        let retried = try #require(transport.bodies[2]["messages"]?.array)
-        #expect(retried.count == 3)
+        #expect(Array(session.lines.map(\.text).dropFirst()) == ["Tell me more", "Here's the story."])
+        // The retry sent the question once, still with the opener.
+        let retried = try #require(transport.bodies[1]["messages"]?.array)
+        #expect(retried.count == 1 && retried[0]["content"]?.array?.first?["text"]?.string?.hasPrefix("(The listener just switched you on") == true)
 
         session.send("Something it won't answer")
         await waitIdle(session)
@@ -305,7 +311,7 @@ func textReply(_ text: String, stop: String = "end_turn", model: String = "claud
         session.retry()
         await waitIdle(session)
         let last = try #require(transport.bodies.last?["messages"]?.array)
-        #expect(last.count == 5)
+        #expect(last.count == 3)
     }
 }
 
@@ -478,7 +484,8 @@ func textReply(_ text: String, stop: String = "end_turn", model: String = "claud
         let session = RadioDJSession(name: "Max", subject: RadioDJSubject(kind: .artist, title: "X"),
                                      client: ClaudeClient(apiKey: "k", transport: transport)) { _ in }
         session.start()
-        for _ in 0..<300 where session.isBusy || session.lines.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+        session.send("Hi")
+        for _ in 0..<300 where session.isBusy || session.lines.count < 3 { try await Task.sleep(for: .milliseconds(10)) }
         for _ in 0..<300 where session.isBusy { try await Task.sleep(for: .milliseconds(10)) }
         #expect(transport.bodies.first?["tools"]?.array?.count == 2)
         #expect(transport.bodies.first?["system"]?.array?.first?["text"]?.string?.contains("search_collection") == false)
@@ -614,7 +621,7 @@ func textReply(_ text: String, stop: String = "end_turn", model: String = "claud
 
 @MainActor @Suite struct RadioDJPageMoveTests {
     @Test func movingToAnotherPageTellsTheDJOnce() async throws {
-        let transport = ScriptedClaudeTransport([.lines(textReply("Hi.")), .lines(textReply("Ah, Coltrane.")), .lines(textReply("More."))])
+        let transport = ScriptedClaudeTransport([.lines(textReply("Ah, Coltrane.")), .lines(textReply("More."))])
         let blue = RadioDJSubject(kind: .album, title: "Kind of Blue", artist: "Miles Davis")
         let train = RadioDJSubject(kind: .album, title: "Blue Train", artist: "John Coltrane", details: ["Label: Blue Note"])
         let session = RadioDJSession(name: "Max", subject: blue, client: ClaudeClient(apiKey: "k", transport: transport)) { _ in }
@@ -633,20 +640,21 @@ func textReply(_ text: String, stop: String = "end_turn", model: String = "claud
         session.send("Tell me about this one.", page: train)
         try await Task.sleep(for: .milliseconds(20)); try await idle()
         #expect(session.subject.topic == train.topic)
-        #expect(session.lines.map(\.text) == ["Hi.", "Tell me about this one.", "Ah, Coltrane."])
-        let moved = try #require(transport.bodies[1]["messages"]?.array?.last?["content"]?.array?.first?["text"]?.string)
-        #expect(moved.hasPrefix("(The listener has moved to the album page for *Blue Train* by John Coltrane.)"))
+        #expect(Array(session.lines.map(\.text).dropFirst()) == ["Tell me about this one.", "Ah, Coltrane."])
+        let moved = try #require(transport.bodies[0]["messages"]?.array?.last?["content"]?.array?.first?["text"]?.string)
+        #expect(moved.hasPrefix("(The listener just switched you on from the album page for *Kind of Blue*"))
+        #expect(moved.contains("\n\n(The listener has moved to the album page for *Blue Train* by John Coltrane.)"))
         #expect(moved.contains("Label: Blue Note"))
         #expect(moved.hasSuffix("\n\nTell me about this one."))
 
         session.send("Who produced it?", page: train)
         try await Task.sleep(for: .milliseconds(20)); try await idle()
-        let same = try #require(transport.bodies[2]["messages"]?.array?.last?["content"]?.array?.first?["text"]?.string)
+        let same = try #require(transport.bodies[1]["messages"]?.array?.last?["content"]?.array?.first?["text"]?.string)
         #expect(same == "Who produced it?")
         // The system prompt never changes mid-conversation (the API binds the model's thinking to it).
         let systems = transport.bodies.map { $0["system"] }
-        #expect(systems.count == 3 && Set(systems.compactMap { $0 }).count == 1)
-        #expect(transport.bodies[2]["system"]?.array?.last?["text"]?.string?.contains("Kind of Blue") == true)
+        #expect(systems.count == 2 && Set(systems.compactMap { $0 }).count == 1)
+        #expect(transport.bodies[1]["system"]?.array?.last?["text"]?.string?.contains("Kind of Blue") == true)
     }
 }
 
@@ -766,8 +774,9 @@ func textReply(_ text: String, stop: String = "end_turn", model: String = "claud
         let session = RadioDJSession(name: "Max", subject: RadioDJSubject(kind: .artist, title: "Lisa Stansfield"),
                                      client: ClaudeClient(apiKey: "k", transport: transport), linker: linker, wikipedia: finder) { _ in }
         session.start()
+        session.send("What should I play next?")
         for _ in 0..<300 where session.webPages.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
-        let line = try #require(session.lines.first)
+        let line = try #require(session.lines.last)
         let external = session.segments(line).compactMap { if case .external(let t) = $0 { t } else { nil } }
         #expect(external.first?.runs.first?.link?.absoluteString == "https://en.wikipedia.org/wiki/Affection_(Lisa_Stansfield_album)")
     }

@@ -18,7 +18,7 @@ An album page has:
 - The cover in the case or sleeve you own it in, with its label.
 - The release: record label, length, format and quality ("FLAC 16/44.1 · Lossless"), the MusicBrainz community rating
   and genres.
-- **Play**, **Shuffle** and **…** (Play Next, Add to Queue, **Check with AccurateRip**, **Shop for This CD**, **Remove
+- **Play**, **Shuffle** and **…** (Play Next, Add to Queue, **Check with AccurateRip**, **Shop for This CD**, **Shop for It on Vinyl**, **Remove
   from Digital Collection…**).
 - Your listening: plays, time listened, last played, the most played song and your Last.fm scrobbles.
 - **Your Copies**: the CDs, records and downloads you own, and what the album has cost you per play.

@@ -20,9 +20,10 @@ iPhone at the next sync, so the DJ works there too. Remove the key on the Mac to
 
 ## On the air
 
-**On Air** is in the window's toolbar on every page. Press it and a panel opens beside the page: the DJ opens a segment
-about where you are, using what the app knows (credits, the track list, the album's description, your copies and your
-plays) and the web. Then ask anything in **Ask … anything…**.
+**On Air** is in the window's toolbar on every page. Press it and a panel opens beside the page: the DJ says hello for
+the time of day and offers a few questions to start with. The first, **Tell me about …**, opens a segment about where
+you are, using what the app knows (credits, the track list, the album's description, your copies and your plays) and the
+web. Or ask anything in **Ask … anything…**. Nothing is sent to Claude, and nothing costs anything, until you ask.
 
 - **It knows where you are**: an album, an artist, a CD or record, the Shelf, Insights, a playlist, your search
   results.
@@ -34,6 +35,9 @@ plays) and the web. Then ask anything in **Ask … anything…**.
 - **It knows your numbers**: "how many minutes of Roy Orbison do I own?", "what did I play most this month?", from the
   same figures as [Insights](insights.md).
 - **It checks the web** (searching and reading pages) and lists its sources under each answer.
+- **It helps you buy a copy** (on the Mac): ask it to find an album on CD or vinyl and it opens the [Shop](shop.md)
+  searching for it, then tells you what came up. You pick the edition and the copy; it never buys anything.
+- **It knows the time of day** where you are, so a 3 PM segment opens with a good afternoon, not a late-night hello.
 - **Off Air** (or the panel's close button) ends the segment.
 
 ![The DJ answering "What else do I own from the people who made this record?" from a search of the collection, with play buttons and links](../screenshots/radio-dj-collection.png)
@@ -45,7 +49,7 @@ plays) and the web. Then ask anything in **Ask … anything…**.
 - **Songs you don't own** get a headphones button that plays a 30-second Apple Music preview.
 - **Artists and albums you don't own** link to their Wikipedia article, but only after the app has checked that the
   article is about them (going through disambiguation pages when needed); otherwise they stay plain text. These links
-  are purple.
+  are light red.
 
 On the Mac, right-click the DJ's text to copy it.
 
@@ -64,11 +68,11 @@ $10 per 1,000): **This month**, **All time**, how many segments and web searches
 spending arrives with its next sync). Months are calendar months in UTC, as Anthropic bills. The panel shows what the
 current segment has cost so far ("This segment: about $0.12").
 
-A typical opening segment with a couple of follow-up questions costs a few tens of cents. Your actual bill is at
+Going on the air is free; a typical opening segment with a couple of follow-up questions costs a few tens of cents. Your actual bill is at
 [platform.claude.com](https://platform.claude.com).
 
 ## Privacy
 
 What the DJ sends to Anthropic: the page's details (the album or artist, its credits, track list and description, your
-copies and plays of it), your questions, and the rows of any collection search it runs. Your library itself never
+copies and plays of it), your questions, the rows of any collection search it runs, and what the Shop found when it opens it for you. Your library itself never
 leaves your device. See [Privacy](privacy.md).

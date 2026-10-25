@@ -7,6 +7,29 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.25.0
+
+- New: **Shop for CDs** is now **Shop**, for CDs and vinyl. Pick **CD** or **Vinyl** next to the search fields to find
+  an album's record editions on MusicBrainz (12", 7", 2×LP…) and compare copies for sale on Discogs, eBay (Records),
+  CDandLP and Alibris, with shipping and a total in dollars. Album pages add **Shop for It on Vinyl** to their … menu,
+  and records in your collection have **Shop for This Record**.
+  [Guide](https://github.com/davidlago/music-library/blob/main/docs/guide/shop.md)
+- New: ask the **Radio DJ** to help you find an album to buy ("can you find me this on vinyl?") and, on the Mac, it
+  opens the Shop searching for it, then tells you what came up and which edition to pick. You choose the edition and
+  the copy; it never buys anything.
+- Fixed: the Radio DJ greeted you as a night owl in the middle of the afternoon. It now knows your local time.
+- Changed: putting the **Radio DJ** on the air is now free. The DJ says hello for the time of day and offers a few
+  questions to start with; the first, **Tell me about …**, gives the same opening segment as before. Nothing is sent to
+  Claude until you pick one or ask your own.
+- Changed: links in the DJ's words to artists, albums and songs you don't own are light red instead of purple.
+- Fixed: in the DJ's words, the icons beside links (the headphones of an Apple Music preview, the play button of a
+  song you own, the arrow of a web page) are clickable too, not only the words (on the Mac, from macOS 15).
+- Changed: while digitizing a record, the playhead follows the recording, so **Split at Playhead** starts a new track
+  right then (clicking the waveform doesn't move the playhead until you stop or pause). After recording, splitting
+  works as before.
+- Fixed: clicking the vinyl waveform sometimes put the playhead a little off from where you clicked (a click that
+  moved a point or two scrolled the view first).
+
 ## 1.24.0
 
 - Fixed: refreshing a downloaded library catalog (Local Library CDs) while the library's website was struggling could

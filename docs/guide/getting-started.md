@@ -74,7 +74,7 @@ The sidebar has two collections and the tools around them:
 | **Explore** | Artists, Insights, Music DNA, Concerts |
 | **Import** | Import, Digitize Vinyl, and any inserted CD |
 | **Local Library** | Local Library CDs, My Checkouts, your library list |
-| **Shopping** | Shop for CDs |
+| **Shopping** | Shop |
 | **Export** | Export List, iPhone |
 | **Playlists** and **Smart Playlists** | Liked Songs and your own |
 

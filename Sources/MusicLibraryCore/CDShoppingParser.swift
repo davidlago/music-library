@@ -15,8 +15,8 @@ public enum CDShopParser {
         switch request.shop {
         case .discogs: return parseDiscogs(html, match: match)
         case .ebay: return parseEBay(html, match: match)
-        case .cdandlp: return parseCDandLP(html, match: match)
-        case .alibris: return parseAlibris(html, match: match)
+        case .cdandlp: return parseCDandLP(html, match: match, format: request.format)
+        case .alibris: return parseAlibris(html, match: match, format: request.format)
         default: return []
         }
     }
@@ -147,9 +147,10 @@ public enum CDShopParser {
 
     // MARK: CDandLP
 
-    /// Search results: one `<div class="… div_item_listing …">` per item. Prices are in euros; shipping is worked
-    /// out in the cart.
-    static func parseCDandLP(_ html: String, match: CDOffer.Match) -> [CDOffer] {
+    /// Search results: one `<div class="… div_item_listing …">` per item, CDs and records alike ("CD", "CD x 2",
+    /// "LP", "LP x 2", "12''", "7''"…), kept when they're `format`. Prices are in euros; shipping is worked out in the
+    /// cart.
+    static func parseCDandLP(_ html: String, match: CDOffer.Match, format wanted: ShopFormat = .cd) -> [CDOffer] {
         fragments(html, marker: "<div class=\"twelve large-20 columns div_item_listing", end: ["paginationBtm", "<footer"]).compactMap { fragment in
             guard let doc = try? HTMLFragment(fragment) else { return nil }
             let base = "https://www.cdandlp.com/"
@@ -158,7 +159,7 @@ public enum CDShopParser {
                   let id = url.pathComponents.last(where: { $0.hasPrefix("r") && Int($0.dropFirst()) != nil }),
                   let price = doc.first("//span[contains(@class,'listingPrice1')]").flatMap({ Money.parse($0.text, defaultCurrency: "EUR") }) else { return nil }
             let format = doc.first("//div[contains(@class,'listingMedia_responsive') and contains(@class,'show-for-medium-up')]")?.text ?? ""
-            guard format.uppercased().hasPrefix("CD") else { return nil }
+            guard isCDandLP(format, wanted) else { return nil }
             let lines = titleLink.textLines
             let title = lines.count > 1 ? "\(lines[0]) – \(lines.dropFirst().joined(separator: " "))" : titleLink.text
             let grading = doc.first("//div[contains(@class,'listingGrading')]//span[@title]")?.attr("title") ?? ""
@@ -181,10 +182,22 @@ public enum CDShopParser {
         }
     }
 
+    /// Whether CDandLP's medium ("CD x 2", "LP", "12''", "Maxi 45 T") is `format`.
+    static func isCDandLP(_ medium: String, _ format: ShopFormat) -> Bool {
+        let m = medium.uppercased().trimmingCharacters(in: .whitespaces)
+        switch format {
+        case .cd: return m.hasPrefix("CD")
+        case .vinyl:
+            return m.hasPrefix("LP") || m.contains("VINYL") || m.contains("''") || m.contains("\"")
+                || m.range(of: #"\b(33|45|78) ?T(OURS)?\b"#, options: .regularExpression) != nil
+        }
+    }
+
     // MARK: Alibris
 
-    /// Music search results: one work per `<div class="work …">`, with its lowest used and new prices.
-    static func parseAlibris(_ html: String, match: CDOffer.Match) -> [CDOffer] {
+    /// Music search results: one work per `<div class="work …">`, with its lowest used and new prices. Records are
+    /// tagged in the title ("[LP]"); CDs aren't, but the recommended copy says CD.
+    static func parseAlibris(_ html: String, match: CDOffer.Match, format: ShopFormat = .cd) -> [CDOffer] {
         fragments(html, marker: "<div class=\"work", end: ["class=\"pagination", "<footer", "id=\"footer"]).flatMap { fragment -> [CDOffer] in
             guard let doc = try? HTMLFragment(fragment) else { return [] }
             let base = "https://www.alibris.com/"
@@ -192,14 +205,21 @@ public enum CDShopParser {
                   let workId = workURL.pathComponents.last, Int(workId) != nil else { return [] }
             let title = titleLink.text
             // "[LP]", "[Cassette]": not a CD. Alibris doesn't mark CDs, but says so for the recommended copy.
-            if let r = title.range(of: #"\[[^\]]*\]"#, options: .regularExpression) {
-                let tag = title[r].lowercased()
-                if !tag.contains("cd") { return [] }
-            }
+            let tag = title.range(of: #"\[[^\]]*\]"#, options: .regularExpression).map { title[$0].lowercased() }
             let artist = doc.first("//p/a[contains(@href,'/artist/')]")?.text ?? ""
             let image = doc.first("//img")?.attr("src")
             let recommended = doc.first("//div[contains(@class,'callout-inner')]/p")?.text ?? ""
-            if !recommended.isEmpty, !recommended.contains("CD") { return [] }
+            var note = recommended
+            switch format {
+            case .cd:
+                if let tag, !tag.contains("cd") { return [] }
+                if !recommended.isEmpty, !recommended.contains("CD") { return [] }
+            case .vinyl:
+                let isRecord = { (s: String) in s.range(of: #"\b(lp|vinyl)\b"#, options: [.regularExpression, .caseInsensitive]) != nil }
+                guard tag.map(isRecord) ?? false || isRecord(recommended) else { return [] }
+                // Records' recommended copies are often called CDs ("New CD, 2016").
+                if !isRecord(recommended) { note = "" }
+            }
             var offers: [CDOffer] = []
             func add(_ kind: String, condition: CDOffer.Condition, priceNode: HTMLNode?, href: String?) {
                 guard let priceNode, let price = Money.parse(priceNode.text),
@@ -207,7 +227,7 @@ public enum CDShopParser {
                 offers.append(CDOffer(id: "alibris-\(workId)-\(kind)", shop: .alibris,
                                       title: [artist, title].filter { !$0.isEmpty }.joined(separator: " – "),
                                       condition: condition,
-                                      conditionText: condition == .new ? "New" : "Used or new", notes: recommended.isEmpty ? "" : "Recommended copy: \(recommended)", price: price,
+                                      conditionText: condition == .new ? "New" : "Used or new", notes: note.isEmpty ? "" : "Recommended copy: \(note)", price: price,
                                       shippingNote: "+ shipping", seller: "Several sellers", saleFormat: "from",
                                       url: url, imageURL: link(image, shop: .alibris, base: base), match: match))
             }

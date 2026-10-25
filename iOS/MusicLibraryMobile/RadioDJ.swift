@@ -280,6 +280,17 @@ struct RadioDJSheet: View {
                                             speaking: session.activity == .speaking && line.id == session.lines.last?.id)
                                 .id(line.id)
                         }
+                        // The questions to start with (gone once one is asked, or when "Tell me about…" takes over).
+                        if !session.suggestions.isEmpty, !session.isBusy, !session.isElsewhere(dj.hereTopic) {
+                            FlowLayout(spacing: 8) {
+                                ForEach(session.suggestions, id: \.self) { question in
+                                    Button(question) { session.send(question, page: dj.here) }
+                                        .font(.subheadline)
+                                        .buttonStyle(.glass)
+                                        .tint(question == session.suggestions.first ? .accentColor : nil)
+                                }
+                            }
+                        }
                         if let status = statusText {
                             HStack(spacing: 10) {
                                 EqualizerBars().frame(width: 28, height: 16)
@@ -336,6 +347,8 @@ struct RadioDJSheet: View {
         case .searching(let q): q.isEmpty ? "Digging through the crates…" : "Digging through the crates: “\(q)”"
         case .reading(let host): host.isEmpty ? "Reading up…" : "Reading up on \(host)…"
         case .browsing(let q): q.isEmpty ? "Flipping through your shelves…" : "Flipping through your shelves: \(q)"
+        // The phone has no Shop, so its DJ never opens one.
+        case .shopping(let album): album.isEmpty ? "Heading to the record store…" : "Heading to the record store for \(album)…"
         }
     }
 
@@ -420,6 +433,7 @@ private struct RadioDJLineView: View {
                         .lineSpacing(3)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
+                        .modifier(IconLinks())
                     if !line.sources.isEmpty {
                         FlowLayout(spacing: 6) {
                             ForEach(line.sources) { source in
@@ -494,7 +508,8 @@ struct EqualizerBars: View {
 /// The DJ's words in one `Text` (so they select and wrap as one): links to the collection, and songs to play with a
 /// play icon before them. Links to what you own are in the accent color, the rest (previews, web pages) in `outside`.
 enum RadioDJText {
-    static let outside = Color.purple
+    /// The light red at the top of the On Air sign's gradient.
+    static let outside = Color(red: 1, green: 0.42, blue: 0.39)
 
     static func text(_ segments: [RadioDJSegment]) -> Text {
         segments.reduce(Text(verbatim: "")) { text, segment in
@@ -502,20 +517,70 @@ enum RadioDJText {
             case .text(let words):
                 return Text("\(text)\(words)")
             case .play(let title):
-                let icon = Text(Image(systemName: "play.circle.fill")).foregroundStyle(Color.accentColor)
+                let icon = linked(Text(Image(systemName: "play.circle.fill")).foregroundStyle(Color.accentColor), to: title)
                 return Text("\(text)\(icon)\u{202F}\(title)")
             case .preview(var title):
                 // Not yours: a 30-second sample, in headphones rather than the play button, in the not-yours color.
                 title.foregroundColor = outside
-                let icon = Text(Image(systemName: "headphones.circle")).foregroundStyle(outside)
+                let icon = linked(Text(Image(systemName: "headphones.circle")).foregroundStyle(outside), to: title)
                 return Text("\(text)\(icon)\u{202F}\(title)")
             case .external(var title):
                 // Not yours: opens a page on the web.
                 title.foregroundColor = outside
-                let icon = Text(Image(systemName: "arrow.up.right.square")).font(.caption).foregroundStyle(outside)
+                let icon = linked(Text(Image(systemName: "arrow.up.right.square")).font(.caption).foregroundStyle(outside), to: title)
                 return Text("\(text)\(title)\u{202F}\(icon)")
             }
         }
+    }
+
+    /// An icon goes where its title's link does (`IconLinks`): a symbol in a `Text` can't carry a link itself.
+    private static func linked(_ icon: Text, to title: AttributedString) -> Text {
+        guard let url = title.runs.first?.link else { return icon }
+        return icon.customAttribute(IconLink(url: url))
+    }
+}
+
+/// Where an icon's run in the DJ's text links to.
+struct IconLink: TextAttribute {
+    let url: URL
+}
+
+/// Makes the icons beside the DJ's links (play, preview, web page) tappable like the links: the text is drawn as
+/// usual while noting where those icons are, and a tap on one opens its link (with `openURL`, as the links do).
+struct IconLinks: ViewModifier {
+    @Environment(\.openURL) private var openURL
+    @State private var icons = IconLinkFrames()
+
+    func body(content: Content) -> some View {
+        content
+            .textRenderer(IconLinkRenderer(icons: icons))
+            .simultaneousGesture(SpatialTapGesture().onEnded { tap in
+                if let url = icons.url(at: tap.location) { openURL(url) }
+            })
+    }
+}
+
+/// The icons' frames as last drawn (a reference, so drawing doesn't update the view).
+final class IconLinkFrames {
+    var frames: [(rect: CGRect, url: URL)] = []
+
+    func url(at point: CGPoint) -> URL? {
+        frames.first { $0.rect.insetBy(dx: -4, dy: -4).contains(point) }?.url
+    }
+}
+
+private struct IconLinkRenderer: TextRenderer {
+    let icons: IconLinkFrames
+
+    func draw(layout: Text.Layout, in ctx: inout GraphicsContext) {
+        var frames: [(rect: CGRect, url: URL)] = []
+        for line in layout {
+            for run in line {
+                if let link = run[IconLink.self] { frames.append((run.typographicBounds.rect, link.url)) }
+                ctx.draw(run)
+            }
+        }
+        icons.frames = frames
     }
 }
 

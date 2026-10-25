@@ -22,7 +22,7 @@ key are kept in your keychain.
 | Apple's geocoder | When you enter a ZIP code | The ZIP code |
 | Your library's catalog website | Only once you open Local Library CDs | Searches, and your card number and PIN if you sign in (sent only to that site) |
 | Apple's iTunes Search | When you open a library CD you don't own, or ask for a song preview | The album, artist or song |
-| Discogs, eBay, CDandLP, Alibris, Frankfurter | Only when you shop for a CD | The CD's barcode, catalog number or names |
+| Discogs, eBay, CDandLP, Alibris, Frankfurter | Only when you shop for a CD or record | Its barcode, catalog number or names |
 | Anthropic (Claude API) | Only with your key, while the Radio DJ is on the air | The page's details, your questions and the rows of collection searches it runs |
 
 Downloading artist and album info can be turned off in **Settings ▸ General**, and looking up library CDs in **Settings ▸

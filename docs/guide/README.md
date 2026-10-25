@@ -36,7 +36,7 @@ pages explain every feature, how it works and how to set it up. For a quick look
 ## Find more music
 
 - [Local Library CDs](local-library.md): your public library's CD catalog, downloaded and searchable.
-- [Shop for CDs](shop-for-cds.md): compare new and used copies of the exact edition you want.
+- [Shop](shop.md): compare new and used copies of the exact CD or record edition you want.
 
 ## Take it with you
 
