@@ -270,6 +270,33 @@ struct SyncFixture {
         #expect(grant?.macID == "mac-id")
     }
 
+    /// The first try can't connect (nothing listens yet, like macOS refusing the Mac app's first local network
+    /// connection after launch); a fresh connection a moment later gets through.
+    @Test func aConnectionThatFailsAtFirstIsRetried() async throws {
+        let key = SyncPairing.newKey()
+        let probe = try SyncAdvertiser(deviceID: "phone-id", name: "probe", key: key, pairing: false, advertise: false, onConnection: { $0.cancel() })
+        probe.start()
+        for _ in 0..<100 where probe.port == nil || probe.port == .any { try await Task.sleep(for: .milliseconds(20)) }
+        let port = try #require(probe.port)
+        probe.stop()
+        try await Task.sleep(for: .milliseconds(200))
+
+        let late = Task {
+            try await Task.sleep(for: .seconds(1.5))
+            let advertiser = try SyncAdvertiser(deviceID: "phone-id", name: "late", key: key, pairing: false, advertise: false, port: port,
+                                                onConnection: { connection in connection.start(queue: .global()) })
+            advertiser.start()
+            try await Task.sleep(for: .seconds(15))
+            advertiser.stop()
+        }
+        defer { late.cancel() }
+        let connection = SyncConnection(endpoint: endpoint(port), key: key)
+        let start = Date()
+        try await connection.open()
+        #expect(Date().timeIntervalSince(start) >= 1)
+        await connection.close()
+    }
+
     @Test func aWrongCodeFails() async throws {
         let phoneRoot = try TestSupport.tempDir().appendingPathComponent("phone")
         let (port, session) = try await listen(key: SyncPairing.pairingKey(code: "AAAAAAAAAA"), root: phoneRoot, pairing: true)

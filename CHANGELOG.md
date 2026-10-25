@@ -7,6 +7,9 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- Fixed: the first sync after opening the Mac app could time out, and work when you tried again. macOS sometimes
+  refuses the app's first local network connection; the Mac now tries again with a new one right away, and says so
+  if macOS keeps blocking it.
 ## 1.23.2
 
 - On the Mac, the app no longer crashes on macOS 27 when it opens with the queue showing, or when you show the queue.

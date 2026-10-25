@@ -68,24 +68,76 @@ public enum SyncPairing {
 
 /// A framed sync connection over `NWConnection`. One task reads at a time.
 public actor SyncConnection {
-    private let connection: NWConnection
+    private var connection: NWConnection
+    /// Makes a fresh connection to the same place, for another try (connections made here; nil for accepted ones).
+    private let remake: (@Sendable () -> NWConnection)?
     private let queue = DispatchQueue(label: "MusicLibrary.sync.connection")
     private var decoder = SyncFrameDecoder()
     private var frames: [SyncFrame] = []
 
-    public init(_ connection: NWConnection) { self.connection = connection }
+    /// How long each try to connect waits. Right after the Mac app starts, macOS can refuse its first local network
+    /// connection ("Local network prohibited") and that connection never recovers, while a new one moments later
+    /// goes through, so a connection made here is retried with a fresh one rather than waited on.
+    public static let attemptTimeouts: [TimeInterval] = [6, 8, 10]
+    /// The pause before each try after the first (a refused connection fails at once).
+    static let retryPauses: [TimeInterval] = [1, 2]
+
+    public init(_ connection: NWConnection) {
+        self.connection = connection
+        remake = nil
+    }
 
     public init(endpoint: NWEndpoint, key: Data) {
         connection = NWConnection(to: endpoint, using: SyncPairing.parameters(key: key))
+        remake = { NWConnection(to: endpoint, using: SyncPairing.parameters(key: key)) }
     }
 
-    /// Starts the connection and waits until it's ready. A connection that can't be made (or a TLS handshake that
-    /// fails because the keys differ) throws instead of waiting.
+    /// Starts the connection and waits until it's ready. One this side makes is tried again with a fresh connection
+    /// when it can't be made (`attemptTimeouts`); a TLS handshake that fails because the keys differ throws at once.
     public func open(timeout: TimeInterval = 15) async throws {
-        let connection = connection
-        let queue = queue
+        guard let remake else {
+            try await Self.attempt(connection, queue: queue, timeout: timeout)
+            return
+        }
+        var lastError: Error = SyncError.connection("timed out")
+        let denied = Flag()
+        for (index, wait) in Self.attemptTimeouts.enumerated() {
+            if index > 0 {
+                try await Task.sleep(for: .seconds(Self.retryPauses[min(index - 1, Self.retryPauses.count - 1)]))
+                connection = remake()
+            }
+            do {
+                try await Self.attempt(connection, queue: queue, timeout: wait, denied: denied)
+                return
+            } catch let error as AttemptError {
+                if case .handshake(let message) = error { throw SyncError.connection(message) }
+                lastError = error.syncError
+            }
+        }
+        throw denied.value ? SyncError.localNetworkDenied : lastError
+    }
+
+    private enum AttemptError: Error {
+        /// The TLS handshake failed: the keys differ, so trying again won't help.
+        case handshake(String)
+        case failed(String)
+
+        var syncError: SyncError {
+            switch self {
+            case .handshake(let m), .failed(let m): SyncError.connection(m)
+            }
+        }
+    }
+
+    /// One try: waits for `connection` to be ready, `timeout` at most. `denied` is set when the system refuses local
+    /// network access on the way.
+    private static func attempt(_ connection: NWConnection, queue: DispatchQueue, timeout: TimeInterval,
+                                denied: Flag = Flag()) async throws {
         let once = Once()
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            connection.pathUpdateHandler = { path in
+                if path.unsatisfiedReason == .localNetworkDenied { denied.set() }
+            }
             connection.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
@@ -93,10 +145,14 @@ public actor SyncConnection {
                 case .failed(let error), .waiting(let error):
                     if once.claim() {
                         connection.cancel()
-                        cont.resume(throwing: SyncError.connection(error.localizedDescription))
+                        if case .tls = error {
+                            cont.resume(throwing: AttemptError.handshake(error.localizedDescription))
+                        } else {
+                            cont.resume(throwing: AttemptError.failed(error.localizedDescription))
+                        }
                     }
                 case .cancelled:
-                    if once.claim() { cont.resume(throwing: SyncError.connection("cancelled")) }
+                    if once.claim() { cont.resume(throwing: AttemptError.failed("cancelled")) }
                 default:
                     break
                 }
@@ -105,7 +161,7 @@ public actor SyncConnection {
             queue.asyncAfter(deadline: .now() + timeout) {
                 if once.claim() {
                     connection.cancel()
-                    cont.resume(throwing: SyncError.connection("timed out"))
+                    cont.resume(throwing: AttemptError.failed("timed out"))
                 }
             }
         }
@@ -163,6 +219,14 @@ public actor SyncConnection {
     public func close() {
         connection.cancel()
     }
+}
+
+/// A flag set from any thread.
+final class Flag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isSet = false
+    var value: Bool { lock.lock(); defer { lock.unlock() }; return isSet }
+    func set() { lock.lock(); isSet = true; lock.unlock() }
 }
 
 /// True the first time `claim()` is called.

@@ -37,6 +37,8 @@ public enum SyncError: Error, LocalizedError, Equatable {
     case remote(String)
     case connection(String)
     case notPaired
+    /// macOS (or iOS) refused the app local network access.
+    case localNetworkDenied
 
     public var errorDescription: String? {
         switch self {
@@ -49,6 +51,7 @@ public enum SyncError: Error, LocalizedError, Equatable {
         case .remote(let m): return m
         case .connection(let m): return "Connection failed: \(m)"
         case .notPaired: return "This iPhone isn't paired with this Mac. Pair them again."
+        case .localNetworkDenied: return "The system is blocking Music Library from the local network. Allow it in System Settings ▸ Privacy & Security ▸ Local Network (on the iPhone: Settings ▸ Privacy & Security ▸ Local Network), then sync again."
         }
     }
 }
