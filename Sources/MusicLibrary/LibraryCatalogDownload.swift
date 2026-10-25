@@ -53,12 +53,11 @@ extension LibraryCatalogStore {
         var state = cache.scanState(library).flatMap { Date().timeIntervalSince($0.startedAt) < 2 * 86_400 ? $0 : nil }
             ?? LibraryCatalogCache.ScanState(library: library, nextPage: 1, seen: [], total: 0,
                                              firstDownload: downloadDates[library] == nil, startedAt: Date())
-        var seen = Set(state.seen)
-        let pageCount = { max(1, (state.total + CatalogPage.pageSize - 1) / CatalogPage.pageSize) }
-        downloadProgress = DownloadProgress(library: library, page: state.nextPage - 1, pages: state.total > 0 ? pageCount() : nil)
-        var limited = 0
-        while state.total == 0 || state.nextPage <= pageCount() {
-            let page = state.nextPage
+        var scan = CatalogScan(nextPage: state.nextPage, seen: Set(state.seen), total: state.total)
+        downloadProgress = DownloadProgress(library: library, page: scan.nextPage - 1, pages: scan.total > 0 ? scan.pageCount : nil)
+        var limited = 0, suspect = 0
+        while !scan.finished {
+            let page = scan.nextPage
             let html: String
             do {
                 html = String(decoding: try await client.get(query.path(page: page), priority: .background), as: UTF8.self)
@@ -72,22 +71,31 @@ extension LibraryCatalogStore {
                 continue
             }
             let result = try await Task.detached { try CatalogParser.parseResults(html, page: page) }.value
+            if scan.add(result) == .suspect {
+                // An empty or shrunken page mid-scan is the site struggling, not the catalog ending: wait and
+                // read it again, then give up (the scan resumes from here next time) rather than prune.
+                suspect += 1
+                guard suspect <= 3 else { throw CatalogError.badResponse("page \(page) came back incomplete") }
+                let until = Date().addingTimeInterval(Double(30 * suspect))
+                downloadProgress?.pausedUntil = until
+                try await Task.sleep(for: .seconds(until.timeIntervalSinceNow))
+                downloadProgress?.pausedUntil = nil
+                continue
+            }
+            suspect = 0
             let changed = CatalogRecord.upsert(records, page: result.items, library: library,
                                                startRank: (page - 1) * CatalogPage.pageSize, firstDownload: state.firstDownload)
             try database?.saveCatalogRecords(changed)
             for record in changed { records[record.id] = record }
-            seen.formUnion(result.items.map(\.id))
-            state.total = result.total
-            state.nextPage = page + 1
-            state.seen = Array(seen)
+            state.total = scan.total
+            state.nextPage = scan.nextPage
+            state.seen = Array(scan.seen)
             cache.saveScanState(state)
-            downloadProgress = DownloadProgress(library: library, page: page, pages: pageCount())
+            downloadProgress = DownloadProgress(library: library, page: page, pages: scan.pageCount)
             if page % 10 == 0 { scheduleIndexRebuild() }
-            if result.items.isEmpty { break }
         }
-        // Only drop titles when the scan saw (nearly) everything the catalog says it has.
-        if seen.count >= state.total - 5 {
-            let pruned = CatalogRecord.prune(records, seen: seen, library: library)
+        // Only drop titles when the scan really saw (nearly) everything the catalog has (`CatalogScan.pruning`).
+        if let pruned = scan.pruning(records, library: library) {
             try database?.saveCatalogRecords(pruned.changed, removing: pruned.removed)
             for record in pruned.changed { records[record.id] = record }
             for id in pruned.removed { records[id] = nil }

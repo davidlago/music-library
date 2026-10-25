@@ -72,6 +72,68 @@ public struct CatalogRecord: Codable, Hashable, Sendable, Identifiable {
     }
 }
 
+/// One library's scan in progress: the next page, the titles seen and how many the catalog says it has.
+/// Pruning drops every title the scan didn't see, so a scan only counts as complete when every page fit the
+/// count it started with. A page from a struggling site (rate limited, an error or challenge page: no result
+/// count and no results, or a much smaller count) parses without error, and taking its count would make a
+/// partial scan look finished.
+public struct CatalogScan: Sendable {
+    public var nextPage: Int
+    public var seen: Set<String>
+    /// The largest count any page reported (0 before the first page).
+    public var total: Int
+    /// The last page has been read.
+    public private(set) var finished = false
+
+    public enum Step: Equatable, Sendable {
+        /// Read `nextPage`.
+        case next
+        /// That was the last page.
+        case finished
+        /// The page doesn't fit the scan so far: it wasn't counted, so read it again later.
+        case suspect
+    }
+
+    public init(nextPage: Int = 1, seen: Set<String> = [], total: Int = 0) {
+        self.nextPage = nextPage; self.seen = seen; self.total = total
+    }
+
+    public var pageCount: Int { max(1, (total + CatalogPage.pageSize - 1) / CatalogPage.pageSize) }
+
+    /// How far a page's count may fall below the scan's before the page is suspect (titles do leave mid-scan).
+    var slack: Int { max(CatalogPage.pageSize, total / 20) }
+
+    /// Takes in the page just read (`nextPage`).
+    public mutating func add(_ page: CatalogPage) -> Step {
+        if page.items.isEmpty {
+            // Empty is the end only when the page itself says it's past the end of a count that fits: a library
+            // with no CDs at all on the first page, or a last page emptied by titles leaving mid-scan.
+            let pastEnd = (page.total == 0 && total == 0 && page.page == 1)
+                || (page.total > 0 && (page.page - 1) * CatalogPage.pageSize >= page.total && page.total + slack >= total)
+            guard pastEnd else { return .suspect }
+            finished = true
+            return .finished
+        }
+        guard page.total > 0, total == 0 || page.total + slack >= total else { return .suspect }
+        seen.formUnion(page.items.map(\.id))
+        total = max(total, page.total)
+        nextPage = page.page + 1
+        if nextPage > pageCount { finished = true }
+        return finished ? .finished : .next
+    }
+
+    /// What a finished scan of `library` drops from `records` (which already hold the pages it read), or nil
+    /// when it isn't safe to drop anything: the scan stopped early, saw well short of the count, or saw less
+    /// than half of what the library had last time (a catalog doesn't lose half its CDs between downloads; a
+    /// site that cut the scan short does).
+    public func pruning(_ records: [String: CatalogRecord], library: String) -> CatalogRecord.MergeResult? {
+        guard finished, seen.count >= total - 5 else { return nil }
+        let stored = records.values.filter { $0.libraries.contains(library) }.count
+        guard seen.count * 2 >= stored else { return nil }
+        return CatalogRecord.prune(records, seen: seen, library: library)
+    }
+}
+
 // MARK: Searching it
 
 /// Orders for the downloaded catalog.

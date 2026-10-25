@@ -36,6 +36,94 @@ import Testing
         #expect(dropped.removed.isEmpty && dropped.changed.first { $0.id == "b" }?.libraries == ["Acton"])
     }
 
+    // MARK: Scans
+
+    /// A library of `total` titles (ids "t0"…), page `n` of it as the catalog lists it.
+    func catalogPage(_ n: Int, total: Int, reported: Int? = nil) -> CatalogPage {
+        let start = (n - 1) * CatalogPage.pageSize
+        let items = (start..<min(start + CatalogPage.pageSize, total)).map { item("t\($0)", "Title \($0)") }
+        return CatalogPage(items: items, total: reported ?? total, page: n)
+    }
+
+    /// Scans pages until the scan finishes or a page is suspect, folding them into `records` as the app does.
+    func scan(_ pages: (Int) -> CatalogPage, into records: inout [String: CatalogRecord]) -> (CatalogScan, CatalogScan.Step) {
+        var scan = CatalogScan()
+        while true {
+            let page = pages(scan.nextPage)
+            let step = scan.add(page)
+            guard step != .suspect else { return (scan, step) }
+            for r in CatalogRecord.upsert(records, page: page.items, library: "Natick", startRank: 0, firstDownload: false, now: now) {
+                records[r.id] = r
+            }
+            if step == .finished { return (scan, step) }
+        }
+    }
+
+    func storedLibrary(_ total: Int) -> [String: CatalogRecord] {
+        Dictionary(uniqueKeysWithValues: (0..<total).map {
+            ("t\($0)", CatalogRecord(item: item("t\($0)", "Title \($0)"), libraries: ["Natick"], firstSeen: nil, lastSeen: now, addedRank: $0))
+        })
+    }
+
+    /// A refresh of Natick's 2,172 CDs while the site was throttling: page 23 came back as a page with no result
+    /// count and no results, which used to end the scan as complete and prune all but the 440 titles seen.
+    @Test func throttledPageDoesNotPrune() throws {
+        let throttled = try CatalogParser.parseResults("<html><head><title>Just a moment...</title></head><body></body></html>", page: 23)
+        #expect(throttled.items.isEmpty && throttled.total == 0)
+        var records = storedLibrary(2172)
+        let (scan, step) = self.scan({ $0 == 23 ? throttled : catalogPage($0, total: 2172) }, into: &records)
+        #expect(step == .suspect && scan.nextPage == 23 && scan.seen.count == 440 && scan.total == 2172 && !scan.finished)
+        #expect(scan.pruning(records, library: "Natick") == nil)
+
+        // A page reporting a much smaller count (with or without results) doesn't shrink the scan either.
+        for shrunk in [catalogPage(23, total: 2172, reported: 440), CatalogPage(items: [], total: 440, page: 23)] {
+            var records = storedLibrary(2172)
+            let (scan, step) = self.scan({ $0 == 23 ? shrunk : catalogPage($0, total: 2172) }, into: &records)
+            #expect(step == .suspect && scan.total == 2172 && scan.pruning(records, library: "Natick") == nil)
+        }
+
+        // Reading the page again once the site recovers finishes the scan, and then nothing is missing.
+        var resumed = scan
+        while !resumed.finished { #expect(resumed.add(catalogPage(resumed.nextPage, total: 2172)) != .suspect) }
+        #expect(resumed.seen.count == 2172 && resumed.pruning(records, library: "Natick")?.removed == [])
+    }
+
+    @Test func completeScansStillPrune() {
+        // One title weeded out (t5 gone, so the catalog lists 2,171).
+        var records = storedLibrary(2172)
+        let weeded: (Int) -> CatalogPage = { n in
+            var page = catalogPage(n, total: 2172, reported: 2171)
+            page.items.removeAll { $0.id == "t5" }
+            return page
+        }
+        let (scan, step) = self.scan(weeded, into: &records)
+        #expect(step == .finished && scan.pageCount == 109)
+        #expect(scan.pruning(records, library: "Natick")?.removed == ["t5"])
+
+        // Titles leaving mid-scan can empty the last page; a page that says it's past the end is the end. Having
+        // seen 2,160 of the 2,172 it started with, the scan leaves pruning to the next one.
+        var shrinking = storedLibrary(2172)
+        let (late, lateStep) = self.scan({ $0 == 109 ? CatalogPage(items: [], total: 2160, page: 109) : catalogPage($0, total: 2172) },
+                                         into: &shrinking)
+        #expect(lateStep == .finished && late.seen.count == 2160 && late.pruning(shrinking, library: "Natick") == nil)
+    }
+
+    @Test func scansFarSmallerThanLastTimeDoNotPrune() {
+        // The site consistently reporting 400 of 2,172 (or nothing at all) is a site problem, not a weeding.
+        var records = storedLibrary(2172)
+        let (scan, step) = self.scan({ catalogPage($0, total: 400) }, into: &records)
+        #expect(step == .finished && scan.pruning(records, library: "Natick") == nil)
+
+        var emptied = storedLibrary(2172)
+        let (none, noneStep) = self.scan({ CatalogPage(items: [], total: 0, page: $0) }, into: &emptied)
+        #expect(noneStep == .finished && none.pruning(emptied, library: "Natick") == nil)
+
+        // A library with nothing downloaded yet and no CDs finishes with nothing to do.
+        var fresh: [String: CatalogRecord] = [:]
+        let (empty, _) = self.scan({ CatalogPage(items: [], total: 0, page: $0) }, into: &fresh)
+        #expect(empty.pruning(fresh, library: "Natick")?.removed == [])
+    }
+
     func index() throws -> (CatalogIndex, [CatalogRecord]) {
         let page = try CatalogParser.parseResults(try TestSupport.html("minlib_results_natick"))
         let records = page.items.enumerated().map { CatalogRecord(item: $1, libraries: ["Natick"], firstSeen: nil, lastSeen: now, addedRank: $0) }
