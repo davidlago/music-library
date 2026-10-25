@@ -491,9 +491,9 @@ struct CollectionItemMenu: View {
             Button("Link Digital Copy…") { model.collectionSheet = .link(itemID: item.id) }
             Button("Change Cover…") { model.collectionSheet = .cover(itemID: item.id, request: CoverSheetRequest()) }
         }
-        if item.medium == .cd {
-            Button("Shop for This CD") {
-                model.cdShop.shop(releaseId: item.releaseID, album: item.album, artist: item.artist)
+        if let format = ShopFormat(medium: item.medium) {
+            Button(format == .cd ? "Shop for This CD" : "Shop for This Record") {
+                model.cdShop.shop(releaseId: item.releaseID, album: item.album, artist: item.artist, format: format)
                 model.sidebar = .cdShop
             }
         }

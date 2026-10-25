@@ -208,10 +208,10 @@ struct CollectionItemDetail: View {
                 Divider()
                 Button("Digitize This Record…", systemImage: "waveform.badge.mic") { model.vinyl.show(item) }
             }
-            if item.medium == .cd {
+            if let format = ShopFormat(medium: item.medium) {
                 Divider()
-                Button("Shop for This CD", systemImage: "cart") {
-                    model.cdShop.shop(releaseId: item.releaseID, album: item.album, artist: item.artist)
+                Button(format == .cd ? "Shop for This CD" : "Shop for This Record", systemImage: "cart") {
+                    model.cdShop.shop(releaseId: item.releaseID, album: item.album, artist: item.artist, format: format)
                     model.sidebar = .cdShop
                 }
             }

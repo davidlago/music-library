@@ -137,11 +137,16 @@ struct AlbumDetail: View {
                         model.cdShop.shop(releaseId: releaseId, album: album.album, artist: album.artist)
                         model.sidebar = .cdShop
                     }
+                    Button("Shop for It on Vinyl", systemImage: "cart") {
+                        // The tagged release is usually the CD's: find the album's records by name.
+                        model.cdShop.shop(releaseId: nil, album: album.album, artist: album.artist, format: .vinyl)
+                        model.sidebar = .cdShop
+                    }
                     Divider()
                     RemoveFromLibraryButton(album: album)
                 } label: { Image(systemName: "ellipsis") }
                     .menuStyle(.button).buttonStyle(.bordered).menuIndicator(.hidden).fixedSize()
-                    .help("Play Next, Add to Queue, check the rip with AccurateRip, shop for the CD or remove the album")
+                    .help("Play Next, Add to Queue, check the rip with AccurateRip, shop for the CD or record, or remove the album")
             }
             .controlSize(.large)
             .disabled(tracks.isEmpty)

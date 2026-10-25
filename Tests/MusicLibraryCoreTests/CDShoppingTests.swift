@@ -58,7 +58,7 @@ import Testing
 
     @Test func editionsOfOtherMediaOnlyWhenAsked() throws {
         let vinyl = try TestSupport.fixture("mb_release_search_vinyl")
-        // The shop stays CD-only: a record isn't an edition to shop for.
+        // A CD search keeps only CDs; a record search only records.
         #expect(try CDEditionParser.parseSearch(vinyl).isEmpty)
         let records = try CDEditionParser.parseSearch(vinyl, medium: .vinyl)
         #expect(records.map(\.id) == ["d6a1f166-8a02-4608-849b-9d623912c3e5"] && records.first?.format == "2×Vinyl")
@@ -85,6 +85,17 @@ import Testing
 
         let editions = try CDEditionParser.parseSearch(try TestSupport.fixture("mb_cd_editions_greenriver"))
         #expect(editions.count == 21 && editions.allSatisfy { $0.releaseGroupTitle == "Green River" })
+    }
+
+    @Test func vinylSearches() {
+        #expect(CDSearchQuery(album: "OK Computer", artist: "Radiohead", format: .vinyl).luceneQuery
+                == "(release:ok* AND release:computer*) AND artist:radiohead* AND format:*vinyl")
+        // "vinyl" and "LP" typed into the album aren't title words.
+        #expect(CDSearchQuery(album: "Rumours LP vinyl", format: .vinyl).luceneQuery == "release:rumours* AND format:*vinyl")
+        // A barcode is the edition, whatever the format.
+        #expect(CDSearchQuery(code: "075992731325", format: .vinyl).luceneQuery == "barcode:(075992731325 OR 0075992731325)")
+        #expect(CDShoppingTarget(byName: CDSearchQuery(album: "Rumours", artist: "Fleetwood Mac", format: .vinyl)).format == .vinyl)
+        #expect(ShopFormat(medium: .vinyl) == .vinyl && ShopFormat(medium: .cd) == .cd && ShopFormat(medium: .download) == nil)
     }
 
     @Test func formatSummaries() {
@@ -129,6 +140,22 @@ import Testing
         #expect(CDShopURLs.browse(.walmart, for: Self.target())?.absoluteString == "https://www.walmart.com/search?q=724385522925")
     }
 
+    @Test func requestsForARecord() {
+        var target = Self.target(edition: nil)
+        target.format = .vinyl
+        let requests = CDShopURLs.requests(for: target)
+        #expect(requests.allSatisfy { $0.format == .vinyl })
+        #expect(requests.first?.kind == .album && requests.first?.url.absoluteString.contains("master=21491&formatName=Vinyl") == true)
+        #expect(requests.contains { $0.shop == .ebay && $0.url.absoluteString.contains("_sacat=176985") })
+        #expect(!requests.contains { $0.url.absoluteString.contains("176984") })
+        #expect(CDShopURLs.browse(.amazon, for: target)?.absoluteString == "https://www.amazon.com/s?k=Radiohead%20OK%20Computer%20vinyl&i=popular")
+        #expect(CDShopURLs.browse(.discogs, for: target)?.absoluteString.contains("master_id=21491&format=Vinyl") == true)
+        // The edition's barcode needs no "vinyl".
+        var edition = Self.target()
+        edition.format = .vinyl
+        #expect(CDShopURLs.browse(.walmart, for: edition)?.absoluteString == "https://www.walmart.com/search?q=724385522925")
+    }
+
     @Test func discogsListings() throws {
         let offers = try Self.offers("shop_discogs_release_okcomputer", .discogs, .edition)
         #expect(offers.count == 25 && offers.allSatisfy { $0.match == .edition && $0.url.host == "www.discogs.com" })
@@ -168,6 +195,28 @@ import Testing
         #expect(first.id == "cdandlp-r1001840369" && first.price == Money(Decimal(string: "17.21")!, "EUR"))
         #expect(first.edition == "Europe · 2016" && first.condition == .new && first.seller == "gsmtools" && first.shipsFrom == "Czech Republic")
         #expect(offers.contains { $0.edition == "Parlophone · 7243 8 55229 2 5 · Europe · 1997" })
+    }
+
+    @Test func recordsFromStoresThatSellBoth() throws {
+        let cdandlp = CDShopParser.parse(try TestSupport.html("shop_cdandlp_okcomputer"),
+                                         request: CDShopRequest(shop: .cdandlp, url: CDShop.cdandlp.home, kind: .keywords, format: .vinyl))
+        #expect(cdandlp.count == 21 && cdandlp.allSatisfy { $0.title.hasSuffix("(LP)") || $0.title.hasSuffix("(LP x 2)") })
+        #expect(CDShopParser.isCDandLP("12''", .vinyl) && CDShopParser.isCDandLP("Maxi 45 T", .vinyl))
+        #expect(!CDShopParser.isCDandLP("CD x 2", .vinyl) && !CDShopParser.isCDandLP("Poster / Display", .vinyl))
+        let alibris = CDShopParser.parse(try TestSupport.html("shop_alibris_okcomputer"),
+                                         request: CDShopRequest(shop: .alibris, url: CDShop.alibris.home, kind: .keywords, format: .vinyl))
+        // "[LP]", "[2 LP]"; Alibris calls their recommended copies CDs, which isn't shown.
+        #expect(alibris.count == 4 && alibris.allSatisfy { $0.title.contains("LP]") && $0.notes.isEmpty })
+    }
+
+    @Test func otherFormatsInTitles() {
+        #expect(ShopFormat.cd.isOtherFormat("Radiohead OK Computer Vinyl LP"))
+        #expect(!ShopFormat.cd.isOtherFormat("Radiohead OK Computer CD + DVD"))
+        #expect(ShopFormat.vinyl.isOtherFormat("OK Computer - Audio CD By RADIOHEAD - GOOD"))
+        #expect(ShopFormat.vinyl.isOtherFormat("Radiohead OK Computer cassette tape"))
+        #expect(!ShopFormat.vinyl.isOtherFormat("Radiohead OK Computer 2xLP 12\" Vinyl + CD"))
+        #expect(!ShopFormat.vinyl.isOtherFormat("RADIOHEAD OK Computer LP Parlophone NODATA 02"))
+        #expect(!ShopFormat.vinyl.isOtherFormat("Radiohead - OK Computer (Capitol Records)"))
     }
 
     @Test func alibrisWorks() throws {
@@ -236,6 +285,13 @@ import Testing
 
         let anyEdition = CDOfferMatcher.filter(raw, for: Self.target(edition: nil), rates: rates)
         #expect(!anyEdition.contains { $0.match == .edition })
+
+        // Shopping for the record drops the CD listings eBay's keyword search found.
+        var record = Self.target(edition: nil)
+        record.format = .vinyl
+        let records = CDOfferMatcher.filter(raw.filter { $0.shop == .ebay && $0.match == .possible }, for: record, rates: rates)
+        #expect(records.count < offers.filter { $0.shop == .ebay && $0.match == .possible }.count)
+        #expect(!records.contains { ShopFormat.vinyl.isOtherFormat($0.title) })
     }
 
     @Test func shoppingByName() {

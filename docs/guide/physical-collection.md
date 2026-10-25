@@ -57,7 +57,7 @@ and **Add**.
 - Albums already in your digital collection can be added from their page (**Your Copies ▸ Add a Copy**), from the Albums
   grid's context menu (**I Own This ▸ As CD/As Vinyl/As Download**), or many at once with **Physical Collection ▸ Add
   Albums You Own…**, numbered in the order shown.
-- [Local Library CDs](local-library.md) and [Shop for CDs](shop-for-cds.md) say when you already have a CD ("In your
+- [Local Library CDs](local-library.md) and [Shop](shop.md) say when you already have a CD ("In your
   physical collection: CD #142") and have **I Own This** to add it.
 
 ## Ripping, digitizing and linking
@@ -95,7 +95,7 @@ Click any CD or record to open its page.
   cover can go to the digital album too.
 - **Your Other Copies**, and the album's description, reviews and links.
 - The **…** menu has **Change Cover…**, **Link Digital Copy…**, the queue and export items, **Digitize This Record…**,
-  **Shop for This CD** and **Remove from Physical Collection…**.
+  **Shop for This CD** (or **Shop for This Record**) and **Remove from Physical Collection…**.
 
 An album page lists **Your Copies** (CDs, records and downloads), with what the album has cost you per play.
 

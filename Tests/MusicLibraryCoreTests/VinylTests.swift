@@ -119,6 +119,38 @@ import Testing
         #expect(VinylSession.files(id: "../x", in: URL(fileURLWithPath: "/tmp")) == nil)
         #expect(VinylSession.files(id: s.id, in: URL(fileURLWithPath: "/tmp"))?.audio.lastPathComponent == "\(s.id).pcm")
     }
+
+    @Test func splittingAfterRecording() {
+        var s = VinylSession(itemID: "x", libraryRoot: "/", format: VinylFormat(sampleRate: 44_100, bitDepth: 16, channels: 2), inputName: "USB")
+        s.pauses = [5000]
+        // Between cuts: a new one up to the next pause.
+        #expect(s.split(at: 1000, frameCount: 9000, recording: false, minimumLength: 100) != nil)
+        #expect(s.segments.map(\.frames) == [1000..<5000])
+        // Inside a cut: in two, wherever the playhead is.
+        let second = s.split(at: 3000, frameCount: 9000, recording: false, minimumLength: 100)
+        #expect(s.segments.map(\.frames) == [1000..<3000, 3000..<5000] && s.segments.last?.id == second)
+        // Too close to an edge, at a cut's start, or in a saved cut: nothing.
+        #expect(s.split(at: 3050, frameCount: 9000, recording: false, minimumLength: 100) == nil)
+        #expect(s.split(at: 3000, frameCount: 9000, recording: false, minimumLength: 100) == nil)
+        s.segments[0].savedTrackID = 7
+        #expect(s.split(at: 2000, frameCount: 9000, recording: false, minimumLength: 100) == nil)
+        #expect(s.segments.count == 2)
+    }
+
+    @Test func splittingWhileRecordingStartsATrackNow() {
+        var s = VinylSession(itemID: "x", libraryRoot: "/", format: VinylFormat(sampleRate: 44_100, bitDepth: 16, channels: 2), inputName: "USB")
+        // No cut yet: one starts at the recording's end, empty, to grow.
+        #expect(s.split(at: 2000, frameCount: 2000, recording: true, minimumLength: 100) != nil)
+        #expect(s.segments.map(\.frames) == [2000..<2000])
+        s.segments[0].end = 6000
+        // The cut growing with the recording ends now and the next one starts.
+        #expect(s.split(at: 6000, frameCount: 6000, recording: true, minimumLength: 100) != nil)
+        #expect(s.segments.map { [$0.start, $0.end] } == [[2000, 6000], [6000, 6000]])
+        // Pressed again straight away: the new track is too short to end yet.
+        s.segments[1].end = 6050
+        #expect(s.split(at: 6050, frameCount: 6050, recording: true, minimumLength: 100) == nil)
+        #expect(s.segments.count == 2)
+    }
 }
 
 /// Records two seconds from a real input whose name contains `MUSICLIB_LIVE_INPUT` (play something into it first):

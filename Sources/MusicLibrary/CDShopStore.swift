@@ -1,9 +1,10 @@
 import Foundation
 import MusicLibraryCore
 
-/// Shop for CDs: find the exact CD on MusicBrainz, then gather copies for sale from marketplaces that ship to
+/// The Shop: find the exact CD or record on MusicBrainz, then gather copies for sale from marketplaces that ship to
 /// the US (`CDShop.searched`), plus links to search a few more. Nothing is signed in to. Results are kept in
-/// memory for half an hour per CD; exchange rates (to compare prices in other currencies) once a day.
+/// memory for half an hour per CD or record; exchange rates (to compare prices in other currencies) once a day.
+/// The Radio DJ can open it on an album too (`find(_:)`).
 @MainActor @Observable
 final class CDShopStore {
     enum SearchState: Equatable {
@@ -29,12 +30,14 @@ final class CDShopStore {
 
     var query = CDSearchQuery()
     private(set) var searchState: SearchState = .idle
+    /// The format of the albums and editions listed (the query's when it was searched).
+    private(set) var format: ShopFormat = .cd
     private(set) var albums: [CDAlbum] = []
     var expandedAlbum: String?
     /// For a search by artist alone: the artists it matched, and the one whose albums are listed.
     private(set) var artists: [CDArtist] = []
     private(set) var artist: CDArtist?
-    /// Albums whose CD editions are being looked up.
+    /// Albums whose editions are being looked up.
     private(set) var loadingEditions: Set<String> = []
     private(set) var editionErrors: [String: String] = [:]
 
@@ -76,6 +79,7 @@ final class CDShopStore {
         let q = query
         searchTask?.cancel()
         searchState = .searching
+        format = q.format
         artists = []
         artist = nil
         editionErrors = [:]
@@ -133,17 +137,19 @@ final class CDShopStore {
         albums = found
     }
 
-    /// Opens or closes an album, looking up its CD editions the first time.
+    /// Opens or closes an album, looking up its editions the first time.
     func toggle(_ album: CDAlbum) {
         if expandedAlbum == album.id { expandedAlbum = nil; return }
         expandedAlbum = album.id
         guard !album.editionsLoaded, !loadingEditions.contains(album.id), let id = album.releaseGroupId, let musicBrainz else { return }
         loadingEditions.insert(album.id)
         editionErrors[album.id] = nil
+        let format = format
         Task {
             defer { loadingEditions.remove(album.id) }
             do {
-                let editions = try await musicBrainz.cdEditions(releaseGroupId: id)
+                let editions = try await musicBrainz.cdEditions(releaseGroupId: id, format: format)
+                guard self.format == format else { return }
                 guard let i = albums.firstIndex(where: { $0.id == album.id }) else { return }
                 albums[i].editions = editions
                 albums[i].editionsLoaded = true
@@ -153,15 +159,17 @@ final class CDShopStore {
         }
     }
 
-    /// Opens one edition straight away (an album page's "Shop for This CD"), falling back to a search.
-    func shop(releaseId: String?, album: String, artist: String) {
-        query = CDSearchQuery(album: album, artist: artist)
-        target = nil
+    /// Opens one edition straight away (an album page's "Shop for This CD"), falling back to a search (also when
+    /// the release isn't on `format`).
+    func shop(releaseId: String?, album: String, artist: String, format: ShopFormat = .cd) {
+        unlock()
+        query = CDSearchQuery(album: album, artist: artist, format: format)
         guard let releaseId, let musicBrainz else { search(); return }
         searchState = .searching
+        self.format = format
         searchTask?.cancel()
         searchTask = Task {
-            if let edition = try? await musicBrainz.cdEdition(releaseId: releaseId) {
+            if let edition = try? await musicBrainz.cdEdition(releaseId: releaseId, format: format) {
                 albums = CDEditionParser.albums([edition])
                 expandedAlbum = albums.first?.id
                 searchState = .done
@@ -172,14 +180,28 @@ final class CDShopStore {
         }
     }
 
-    // MARK: Shopping
-
-    /// Shops for one edition, or (with `edition` nil) any CD edition of the album.
-    func lock(edition: CDEdition?, album: CDAlbum) {
-        lock(CDShoppingTarget(album: album.title, artist: album.artist, releaseGroupId: album.releaseGroupId, edition: edition))
+    /// The DJ's `open_shop`: searches for the album as the page would and, once MusicBrainz answers, says what came up.
+    func find(_ request: RadioDJShopRequest) async -> String {
+        unlock()
+        query = request.query
+        search()
+        await searchTask?.value
+        guard query == request.query else { return "The listener started another search on the Shop page meanwhile." }
+        if case .failed(let message) = searchState {
+            return RadioDJShopRequest.summary([], request: request, error: message)
+        }
+        return RadioDJShopRequest.summary(albums, request: request)
     }
 
-    /// Shops for what was typed, for a CD MusicBrainz doesn't list (new, local or rare releases).
+    // MARK: Shopping
+
+    /// Shops for one edition, or (with `edition` nil) any edition of the album in the format listed.
+    func lock(edition: CDEdition?, album: CDAlbum) {
+        lock(CDShoppingTarget(album: album.title, artist: album.artist, releaseGroupId: album.releaseGroupId, edition: edition,
+                              format: format))
+    }
+
+    /// Shops for what was typed, for a CD or record MusicBrainz doesn't list (new, local or rare releases).
     func shopByName() {
         guard !query.isEmpty else { return }
         lock(CDShoppingTarget(byName: query))
@@ -210,7 +232,7 @@ final class CDShopStore {
 
     private func run(_ initial: CDShoppingTarget, force: Bool) async {
         if !force, let hit = cache.first(where: { key, _ in
-            key.edition == initial.edition && key.releaseGroupId == initial.releaseGroupId
+            key.format == initial.format && key.edition == initial.edition && key.releaseGroupId == initial.releaseGroupId
                 && (!initial.isByName || (key.album == initial.album && key.artist == initial.artist && key.typedBarcode == initial.typedBarcode))
         }),
            Date().timeIntervalSince(hit.value.at) < Self.cacheAge {
@@ -227,7 +249,7 @@ final class CDShopStore {
         do {
             target.links = try await musicBrainz?.cdShopLinks(releaseId: target.edition?.id, releaseGroupId: target.releaseGroupId) ?? CDShopLinks()
         } catch {
-            resolveError = "Couldn't look up the CD's links on MusicBrainz: \(error.localizedDescription)"
+            resolveError = "Couldn't look up the \(target.format.noun)'s links on MusicBrainz: \(error.localizedDescription)"
         }
         isResolving = false
         guard !Task.isCancelled else { return }
@@ -291,6 +313,28 @@ final class CDShopStore {
     }
 
     func count(_ shop: CDShop) -> Int { offers.filter { $0.shop == shop }.count }
+
+    /// What the Shop shows, for the Radio DJ: the search and its albums, or the copies of the CD or record picked
+    /// (the cheapest few). The title names the target, so picking another is a move to another page.
+    var radioDJPage: RadioDJSubject {
+        guard let target else {
+            var details = ["The listener can search MusicBrainz for an album's CD or vinyl editions here, pick one and compare copies for sale on Discogs, eBay, CDandLP and Alibris."]
+            if searchState != .idle {
+                let request = RadioDJShopRequest(album: query.album, artist: query.artist, format: format, code: query.code)
+                details.append(RadioDJShopRequest.summary(albums, request: request))
+            }
+            return .page("the Shop", details: details)
+        }
+        let what = [target.isByName ? "found by name" : target.edition == nil ? "any \(target.format.name) edition" : "one \(target.format.name) edition",
+                    target.edition.map { e in [e.date, e.country, e.label, e.catalogNumber, e.format].filter { !$0.isEmpty }.joined(separator: " · ") }]
+            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ": ")
+        var details = ["Shopping for \(what)", "\(offers.count) copies for sale found so far"]
+        details += offers.prefix(6).map { offer in
+            let price = dollars(offer).map { Money($0, "USD").formatted() } ?? offer.price.formatted()
+            return "\(offer.shop.name): \(offer.title), \(offer.conditionText.isEmpty ? offer.condition.rawValue : offer.conditionText), \(price) (with shipping when the store lists it)"
+        }
+        return .page("the Shop, \(target.format == .cd ? "CDs" : "records") of *\(target.album)* by \(target.artist)", details: details)
+    }
 
     // MARK: Prices
 

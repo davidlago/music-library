@@ -1,13 +1,63 @@
 import Foundation
 
-// Shopping for a CD: MusicBrainz pins down the exact edition (a release whose media are CDs), then marketplaces
-// are searched for copies of it. The pages are read in the app (`CDShopParser`, macOS); this file holds the
-// models, the MusicBrainz side, the stores' URLs, currency conversion and matching, and is platform-neutral.
+// Shopping for a CD or a record: MusicBrainz pins down the exact edition (a release whose media are CDs, or
+// vinyl), then marketplaces are searched for copies of it. Type names keep their CD prefix from when the shop was
+// CD-only; `ShopFormat` says which of the two is wanted. The pages are read in the app (`CDShopParser`, macOS);
+// this file holds the models, the MusicBrainz side, the stores' URLs, currency conversion and matching, and is
+// platform-neutral.
+
+// MARK: Formats
+
+/// What the shop looks for: CDs or records. Each has its own MusicBrainz media, store categories and checks on what
+/// a listing is.
+public enum ShopFormat: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
+    case cd, vinyl
+
+    public var id: String { rawValue }
+    /// "CD", "Vinyl": the picker's and the editions' word.
+    public var name: String { self == .cd ? "CD" : "Vinyl" }
+    /// "CD", "record": one copy.
+    public var noun: String { self == .cd ? "CD" : "record" }
+    public var medium: CollectionMedium { self == .cd ? .cd : .vinyl }
+
+    /// The copy's format for a collection medium (nil for downloads and unknown media).
+    public init?(medium: CollectionMedium) {
+        switch medium {
+        case .cd: self = .cd
+        case .vinyl: self = .vinyl
+        case .download, .other: return nil
+        }
+    }
+
+    /// MusicBrainz's `format` is one keyword per medium: "CD" (as the shop has always searched), and "Vinyl",
+    /// `12" Vinyl`, `7" Vinyl`… for records (a leading wildcard finds them all).
+    var luceneClause: String { self == .cd ? "format:CD" : "format:*vinyl" }
+    /// Discogs' `formatName`/`format` filter.
+    var discogsFormat: String { self == .cd ? "CD" : "Vinyl" }
+    /// eBay's category: Music › CDs, Music › Records.
+    var eBayCategory: String { self == .cd ? "176984" : "176985" }
+
+    /// Whether a listing's title says it's another format ("LP" in a CD search, "CD" in a record search). A title
+    /// naming both (a record with its CD) counts as this format.
+    public func isOtherFormat(_ title: String) -> Bool {
+        let text = " " + title.lowercased() + " "
+        func has(_ pattern: String) -> Bool { text.range(of: pattern, options: .regularExpression) != nil }
+        let others = ["cassette", "8-track", "8 track", "dvd", "blu-ray", "bluray", "minidisc", "reel to reel"]
+        switch self {
+        case .cd:
+            return (["vinyl", " lp", "lp ", "[lp]"] + others).contains(where: text.contains) && !text.contains(" cd")
+        case .vinyl:
+            // 12", 7'', 12 inch, 33 rpm, 45T.
+            let vinyl = #"vinyl|\blps?\b|\b(7|10|12) ?("|''|”|inch|in\b)|\b(33|45) ?(rpm|t\b)"#
+            return (has(#"\b(cds?|sacd|hdcd)\b"#) || others.contains(where: text.contains)) && !has(vinyl)
+        }
+    }
+}
 
 // MARK: Editions
 
-/// One CD edition of an album: a MusicBrainz release with at least one CD medium (or, parsed for another medium,
-/// one of that medium).
+/// One edition of an album: a MusicBrainz release with at least one medium of the format shopped for (CD unless
+/// parsed for another medium).
 public struct CDEdition: Identifiable, Hashable, Codable, Sendable {
     public var id: String
     public var title: String
@@ -17,7 +67,7 @@ public struct CDEdition: Identifiable, Hashable, Codable, Sendable {
     public var label: String
     public var catalogNumber: String
     public var barcode: String
-    /// "CD", "2×CD", "CD + DVD-Video".
+    /// "CD", "2×CD", "CD + DVD-Video", "2×12\" Vinyl".
     public var format: String
     public var trackCount: Int
     public var status: String
@@ -41,7 +91,7 @@ public struct CDEdition: Identifiable, Hashable, Codable, Sendable {
     public var year: Int? { date.count >= 4 ? Int(date.prefix(4)) : nil }
 }
 
-/// An album (MusicBrainz release group) and the CD editions a search found of it.
+/// An album (MusicBrainz release group) and the editions (of the format shopped for) a search found of it.
 public struct CDAlbum: Identifiable, Hashable, Sendable {
     public var id: String
     public var title: String
@@ -51,7 +101,7 @@ public struct CDAlbum: Identifiable, Hashable, Sendable {
     public var secondaryTypes: [String] = []
     public var firstReleaseDate: String = ""
     public var editions: [CDEdition]
-    /// False for an album listed from an artist's discography, until its CD editions are looked up.
+    /// False for an album listed from an artist's discography, until its editions are looked up.
     public var editionsLoaded = true
 
     public var releaseGroupId: String? { MBID.validated(id) }
@@ -131,14 +181,16 @@ public enum CDDiscographyParser {
     }
 }
 
-/// What the user types to find a CD: album and artist, and optionally a barcode or catalog number from the case.
+/// What the user types to find a CD or record: album and artist, and optionally a barcode or catalog number from the
+/// case or sleeve, and which format.
 public struct CDSearchQuery: Hashable, Sendable {
     public var album: String
     public var artist: String
     public var code: String
+    public var format: ShopFormat
 
-    public init(album: String = "", artist: String = "", code: String = "") {
-        self.album = album; self.artist = artist; self.code = code
+    public init(album: String = "", artist: String = "", code: String = "", format: ShopFormat = .cd) {
+        self.album = album; self.artist = artist; self.code = code; self.format = format
     }
 
     public var isEmpty: Bool { [album, artist, code].allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty } }
@@ -168,7 +220,7 @@ public struct CDSearchQuery: Hashable, Sendable {
         }
         if let album = Self.terms("release", album, loose: loose) { parts.append(album) }
         if let artist = Self.terms("artist", artist, loose: loose) { parts.append(artist) }
-        if barcode == nil, !parts.isEmpty { parts.append("format:CD") }
+        if barcode == nil, !parts.isEmpty { parts.append(format.luceneClause) }
         return parts.joined(separator: " AND ")
     }
 
@@ -209,7 +261,7 @@ public enum CDEditionParser {
     }
 
     /// The editions in a MusicBrainz release search with a medium of `medium` (CDs unless told otherwise), in its
-    /// order (best match first). The shop only ever asks for CDs.
+    /// order (best match first). The shop asks for CDs or vinyl.
     public static func parseSearch(_ data: Data, medium: CollectionMedium = .cd) throws -> [CDEdition] {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw NetworkError.badResponse("MusicBrainz search is not a JSON object")
@@ -323,13 +375,13 @@ public struct CDShopLinks: Hashable, Codable, Sendable {
 }
 
 extension MusicBrainzClient {
-    /// CD editions matching a search, at most 100.
+    /// Editions in the query's format matching a search, at most 100.
     public func searchCDEditions(_ query: CDSearchQuery) async throws -> [CDEdition] {
         func search(_ lucene: String) async throws -> [CDEdition] {
             guard !lucene.isEmpty, var c = URLComponents(string: "\(Self.baseURL)/release") else { return [] }
             c.queryItems = [.init(name: "query", value: lucene), .init(name: "fmt", value: "json"), .init(name: "limit", value: "100")]
             guard let url = c.url else { return [] }
-            return try CDEditionParser.parseSearch(try await fetchData(url))
+            return try CDEditionParser.parseSearch(try await fetchData(url), medium: query.format.medium)
         }
         let found = try await search(query.luceneQuery())
         if !found.isEmpty || query.barcode != nil { return found }
@@ -362,20 +414,21 @@ extension MusicBrainzClient {
         return CDDiscographyParser.sorted(albums)
     }
 
-    /// An album's CD editions, oldest first.
-    public func cdEditions(releaseGroupId: String) async throws -> [CDEdition] {
+    /// An album's editions in `format`, oldest first.
+    public func cdEditions(releaseGroupId: String, format: ShopFormat = .cd) async throws -> [CDEdition] {
         guard let id = MBID.validated(releaseGroupId), var c = URLComponents(string: "\(Self.baseURL)/release") else { return [] }
-        c.queryItems = [.init(name: "query", value: "rgid:\(id) AND format:CD"), .init(name: "fmt", value: "json"), .init(name: "limit", value: "100")]
+        c.queryItems = [.init(name: "query", value: "rgid:\(id) AND \(format.luceneClause)"), .init(name: "fmt", value: "json"), .init(name: "limit", value: "100")]
         guard let url = c.url else { return [] }
-        let editions = try CDEditionParser.parseSearch(try await fetchData(url)).filter { $0.releaseGroupId == id }
+        let editions = try CDEditionParser.parseSearch(try await fetchData(url), medium: format.medium).filter { $0.releaseGroupId == id }
         return CDEditionParser.albums(editions).first?.editions ?? []
     }
 
-    /// One edition, by its MusicBrainz release ID (an album page's "Shop for This CD").
-    public func cdEdition(releaseId: String) async throws -> CDEdition? {
+    /// One edition, by its MusicBrainz release ID (an album page's "Shop for This CD"); nil when it has no
+    /// medium of `format`.
+    public func cdEdition(releaseId: String, format: ShopFormat = .cd) async throws -> CDEdition? {
         let url = try Self.lookupURL("release", id: releaseId, query: "inc=artist-credits+labels+release-groups+media&fmt=json")
         guard let o = try JSONSerialization.jsonObject(with: try await fetchData(url)) as? [String: Any] else { return nil }
-        return CDEditionParser.edition(o)
+        return CDEditionParser.edition(o, medium: format.medium)
     }
 
     /// The edition's Discogs release and Amazon ASIN, and its album's Discogs master.
@@ -451,28 +504,31 @@ public enum CDShop: String, Codable, CaseIterable, Sendable, Identifiable {
     }
 }
 
-/// What's being shopped for: one edition, any CD edition of an album, or (for a CD MusicBrainz doesn't list,
-/// `isByName`) whatever the user typed.
+/// What's being shopped for: one edition, any edition of an album in the format, or (for a CD or record MusicBrainz
+/// doesn't list, `isByName`) whatever the user typed.
 public struct CDShoppingTarget: Hashable, Sendable {
     public var album: String
     public var artist: String
     public var releaseGroupId: String?
-    /// nil: any CD edition of the album.
+    /// nil: any edition of the album in `format`.
     public var edition: CDEdition?
     public var links: CDShopLinks
-    /// A barcode the user typed, for a CD found by name.
+    /// A barcode the user typed, for a CD or record found by name.
     public var typedBarcode: String?
+    public var format: ShopFormat
 
-    public init(album: String, artist: String, releaseGroupId: String?, edition: CDEdition?, links: CDShopLinks = CDShopLinks()) {
+    public init(album: String, artist: String, releaseGroupId: String?, edition: CDEdition?, links: CDShopLinks = CDShopLinks(),
+                format: ShopFormat = .cd) {
         self.album = album; self.artist = artist; self.releaseGroupId = releaseGroupId; self.edition = edition; self.links = links
+        self.format = format
     }
 
-    /// The CD as typed, for one that isn't on MusicBrainz: only the stores' own searches find it.
+    /// The CD or record as typed, for one that isn't on MusicBrainz: only the stores' own searches find it.
     public init(byName query: CDSearchQuery) {
         func clean(_ s: String) -> String {
             s.filter { !"\"“”„«»".contains($0) }.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         }
-        self.init(album: clean(query.album), artist: clean(query.artist), releaseGroupId: nil, edition: nil)
+        self.init(album: clean(query.album), artist: clean(query.artist), releaseGroupId: nil, edition: nil, format: query.format)
         typedBarcode = query.barcode
     }
 
@@ -493,7 +549,7 @@ public struct CDShopRequest: Hashable, Sendable {
     public enum Kind: Hashable, Sendable {
         /// Listings of exactly the edition (a Discogs release, an eBay barcode search).
         case edition
-        /// Listings of the album on CD, any edition (a Discogs master).
+        /// Listings of the album in the format, any edition (a Discogs master).
         case album
         /// A keyword search: results need checking against the title.
         case keywords
@@ -502,6 +558,12 @@ public struct CDShopRequest: Hashable, Sendable {
     public var shop: CDShop
     public var url: URL
     public var kind: Kind
+    /// What the listings should be: a store's search may list both formats (CDandLP, Alibris).
+    public var format: ShopFormat
+
+    public init(shop: CDShop, url: URL, kind: Kind, format: ShopFormat = .cd) {
+        self.shop = shop; self.url = url; self.kind = kind; self.format = format
+    }
 }
 
 public enum CDShopURLs {
@@ -514,30 +576,27 @@ public enum CDShopURLs {
     /// The pages the app reads for a target, in the order they're read per store.
     public static func requests(for target: CDShoppingTarget) -> [CDShopRequest] {
         var out: [CDShopRequest] = []
+        let format = target.format
+        func add(_ shop: CDShop, _ url: URL?, _ kind: CDShopRequest.Kind) {
+            if let url { out.append(CDShopRequest(shop: shop, url: url, kind: kind, format: format)) }
+        }
         // A typed title is rarely the store's ("Perspective – Best Of The Live Sessions From Osl…"), and the stores
         // want every word: search by the artist and let the matcher pick the listings that name the album.
         let words = target.isByName && !target.artist.isEmpty ? target.artist : target.keywords
-        // Discogs: the edition's listings, else every CD edition of the album.
-        if target.edition != nil, let id = target.links.discogsRelease,
-           let url = make("https://www.discogs.com/shop/list", [("release", String(id)), ("ships_to", "US"), ("sort", "price"), ("sortOrder", "ascending")]) {
-            out.append(CDShopRequest(shop: .discogs, url: url, kind: .edition))
-        } else if let id = target.links.discogsMaster,
-                  let url = make("https://www.discogs.com/shop/list", [("master", String(id)), ("formatName", "CD"), ("ships_to", "US"), ("sort", "price"), ("sortOrder", "ascending")]) {
-            out.append(CDShopRequest(shop: .discogs, url: url, kind: .album))
+        // Discogs: the edition's listings, else every edition of the album in the format.
+        if target.edition != nil, let id = target.links.discogsRelease {
+            add(.discogs, make("https://www.discogs.com/shop/list", [("release", String(id)), ("ships_to", "US"), ("sort", "price"), ("sortOrder", "ascending")]), .edition)
+        } else if let id = target.links.discogsMaster {
+            add(.discogs, make("https://www.discogs.com/shop/list", [("master", String(id)), ("formatName", format.discogsFormat), ("ships_to", "US"), ("sort", "price"), ("sortOrder", "ascending")]), .album)
         }
-        // eBay's Music CDs category; by barcode (cheapest first, with shipping), and by name.
-        if let barcode = target.barcode,
-           let url = make("https://www.ebay.com/sch/i.html", [("_nkw", barcode), ("_sacat", "176984"), ("_sop", "15")]) {
-            out.append(CDShopRequest(shop: .ebay, url: url, kind: .edition))
+        // eBay's Music CDs (or Records) category; by barcode (cheapest first, with shipping), and by name.
+        if let barcode = target.barcode {
+            add(.ebay, make("https://www.ebay.com/sch/i.html", [("_nkw", barcode), ("_sacat", format.eBayCategory), ("_sop", "15")]), .edition)
         }
-        if !words.isEmpty, let url = make("https://www.ebay.com/sch/i.html", [("_nkw", words), ("_sacat", "176984")]) {
-            out.append(CDShopRequest(shop: .ebay, url: url, kind: .keywords))
-        }
-        if !words.isEmpty, let url = make("https://www.cdandlp.com/en/search/", [("q", words)]) {
-            out.append(CDShopRequest(shop: .cdandlp, url: url, kind: .keywords))
-        }
-        if !words.isEmpty, let url = make("https://www.alibris.com/search/music", [("keyword", words)]) {
-            out.append(CDShopRequest(shop: .alibris, url: url, kind: .keywords))
+        if !words.isEmpty {
+            add(.ebay, make("https://www.ebay.com/sch/i.html", [("_nkw", words), ("_sacat", format.eBayCategory)]), .keywords)
+            add(.cdandlp, make("https://www.cdandlp.com/en/search/", [("q", words)]), .keywords)
+            add(.alibris, make("https://www.alibris.com/search/music", [("keyword", words)]), .keywords)
         }
         return out
     }
@@ -546,30 +605,33 @@ public enum CDShopURLs {
     public static func browse(_ shop: CDShop, for target: CDShoppingTarget) -> URL? {
         let words = target.keywords
         let code = target.barcode ?? words
+        // Stores that sell everything need the format in the words, unless a barcode pins it down.
+        let typed = target.format == .vinyl && target.barcode == nil ? code + " vinyl" : code
+        let format = target.format
         switch shop {
         case .discogs:
             if target.edition != nil, let id = target.links.discogsRelease {
                 return make("https://www.discogs.com/sell/release/\(id)", [("ships_to", "US")])
             }
             if let id = target.links.discogsMaster {
-                return make("https://www.discogs.com/sell/list", [("master_id", String(id)), ("format", "CD"), ("ships_to", "US")])
+                return make("https://www.discogs.com/sell/list", [("master_id", String(id)), ("format", format.discogsFormat), ("ships_to", "US")])
             }
-            return make("https://www.discogs.com/search/", [("q", words), ("type", "release"), ("format_exact", "CD")])
+            return make("https://www.discogs.com/search/", [("q", words), ("type", "release"), ("format_exact", format.discogsFormat)])
         case .ebay:
-            return make("https://www.ebay.com/sch/i.html", [("_nkw", code), ("_sacat", "176984")])
+            return make("https://www.ebay.com/sch/i.html", [("_nkw", code), ("_sacat", format.eBayCategory)])
         case .cdandlp:
             return make("https://www.cdandlp.com/en/search/", [("q", words)])
         case .alibris:
             return make("https://www.alibris.com/search/music", [("keyword", words)])
         case .amazon:
             if let asin = target.edition != nil ? target.links.asin : nil { return URL(string: "https://www.amazon.com/dp/\(asin)") }
-            return make("https://www.amazon.com/s", [("k", code), ("i", "popular")])
+            return make("https://www.amazon.com/s", [("k", typed), ("i", "popular")])
         case .walmart:
-            return make("https://www.walmart.com/search", [("q", code)])
+            return make("https://www.walmart.com/search", [("q", typed)])
         case .halfPriceBooks:
-            return make("https://www.hpb.com/search", [("q", words)])
+            return make("https://www.hpb.com/search", [("q", format == .vinyl ? words + " vinyl" : words)])
         case .barnesAndNoble:
-            return make("https://www.barnesandnoble.com/s/" + (code.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? ""), [])
+            return make("https://www.barnesandnoble.com/s/" + (typed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? ""), [])
         }
     }
 }
@@ -657,7 +719,7 @@ public struct CDOffer: Identifiable, Hashable, Sendable {
     public enum Match: Int, Hashable, Comparable, Sendable {
         /// Found by keywords: probably the album, edition unknown.
         case possible
-        /// The album on CD, another or unknown edition.
+        /// The album in the format, another or unknown edition.
         case album
         /// Listed as this edition (Discogs release, barcode, catalog number).
         case edition
@@ -713,7 +775,7 @@ public struct CDOffer: Identifiable, Hashable, Sendable {
 // MARK: Matching
 
 public enum CDOfferMatcher {
-    static let ignored: Set<String> = ["the", "a", "an", "and", "of", "from", "at", "in", "on", "with", "cd", "album", "edition", "deluxe", "remastered", "remaster"]
+    static let ignored: Set<String> = ["the", "a", "an", "and", "of", "from", "at", "in", "on", "with", "cd", "lp", "vinyl", "album", "edition", "deluxe", "remastered", "remaster"]
 
     static func words(_ s: String) -> [String] {
         TextNormalizer.normalize(s).lowercased().split(separator: " ").map(String.init).filter { !ignored.contains($0) }
@@ -748,15 +810,13 @@ public enum CDOfferMatcher {
         return codes.contains { $0.count >= 5 && hay.contains($0) }
     }
 
-    static let otherFormats = ["vinyl", " lp", "lp ", "[lp]", "cassette", "8-track", "8 track", "dvd", "blu-ray", "bluray", "minidisc", "reel to reel"]
-
     /// Keeps the offers that are for the target and sets how well each matches; best matches first, then cheapest.
     public static func filter(_ offers: [CDOffer], for target: CDShoppingTarget, rates: ExchangeRates) -> [CDOffer] {
         var seen = Set<String>()
         var out: [CDOffer] = []
         for var offer in offers where seen.insert(offer.id).inserted {
             let text = " " + offer.title.lowercased() + " "
-            if offer.match != .edition, otherFormats.contains(where: text.contains), !text.contains(" cd") { continue }
+            if offer.match != .edition, target.format.isOtherFormat(offer.title) { continue }
             // Several albums in one listing.
             if text.range(of: #"\blots?\b|\bbundle\b"#, options: .regularExpression) != nil { continue }
             switch offer.match {
