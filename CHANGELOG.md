@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.25.0
+
 - New: **Shop for CDs** is now **Shop**, for CDs and vinyl. Pick **CD** or **Vinyl** next to the search fields to find
   an album's record editions on MusicBrainz (12", 7", 2×LP…) and compare copies for sale on Discogs, eBay (Records),
   CDandLP and Alibris, with shipping and a total in dollars. Album pages add **Shop for It on Vinyl** to their … menu,
