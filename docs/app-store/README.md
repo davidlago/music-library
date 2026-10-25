@@ -1,23 +1,36 @@
 # App Store listing
 
 What's entered in [App Store Connect](https://appstoreconnect.apple.com) for the iPhone app (with its widgets and
-Apple Watch app), live at https://apps.apple.com/us/app/daves-music-library/id6822005512. Keep it in step with the app and the README; [docs/distribution.md](../distribution.md#the-app-store)
-says how a version is submitted.
+Apple Watch app), live at https://apps.apple.com/us/app/daves-music-library/id6822005512. Keep it in step with the app,
+the README and the [user guide](../guide/README.md); [docs/distribution.md](../distribution.md#the-app-store) says how a
+version is submitted.
 
-Screenshots: `iphone-6.3/` (1206 × 2622, from the iPhone 17 simulator), the required "iPhone with Dynamic Island
-(medium display)" set that App Store Connect scales for every iPhone; `iphone/` (6.9-inch, 1320 × 2868, iPhone 18 Pro Max,
-optional "large display"); and `watch/` (416 × 496, Apple Watch Series 12 46 mm). All are taken from the sample library
-with the status bar set to 9:41. The review demo video is made
-the same way (`xcrun simctl io booted recordVideo`) and isn't committed.
+## Screenshots
+
+All taken from a real library (the developer's own, synced from the Mac app), in light mode, with the status bar set to
+9:41 (`xcrun simctl status_bar … override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4
+--wifiBars 3`) and captured with `xcrun simctl io <device> screenshot`:
+
+- `iphone-6.3/` (1206 × 2622, iPhone 18 Pro simulator): the required "iPhone with Dynamic Island (medium display)" set
+  that App Store Connect scales for every iPhone.
+- `iphone/` (1320 × 2868): the optional 6.9-inch "large display" set, the same screens scaled up (the two sizes have the
+  same proportions). Replace the old 6.9-inch set in App Store Connect too, or delete it there, so large iPhones don't
+  keep showing the old screenshots.
+- `watch/` (416 × 496, the Apple Watch paired with the iPhone 18 Pro simulator; its status bar can't be overridden).
+
+In order: Physical (Find by Label), an item page (CD #14), records to digitize, Albums, an album page, an artist page,
+Listening, Music DNA; on the watch: Now Playing, Physical, Find by Label.
+
+The review demo video is made with `xcrun simctl io booted recordVideo` from the sample library and isn't committed.
 
 ## App information
 
 | Field | Value |
 |---|---|
 | Name | Dave's Music Library |
-| Subtitle | Your music, synced from Mac |
+| Subtitle | Your CDs, vinyl and music |
 | Category | Music |
-| Content rights | Contains third-party content (artist and album descriptions from Wikipedia, photos from Wikimedia Commons and Deezer, covers from the Cover Art Archive, looked up by the Mac app and shown with credit) |
+| Content rights | Contains third-party content (artist and album descriptions from Wikipedia, photos from Wikimedia Commons and Deezer, covers from the Cover Art Archive, looked up by the Mac app and shown with credit; the screenshots show the developer's own albums with their covers) |
 | Age rating | 4+ (every question answered None or No; links open in Safari, so no unrestricted web access) |
 | Privacy policy URL | https://davidlago.github.io/music-library/privacy.html |
 | Support URL | https://davidlago.github.io/music-library/support.html |
@@ -26,9 +39,11 @@ the same way (`xcrun simctl io booted recordVideo`) and isn't committed.
 | Price | Free, all territories |
 | EU trader status | Not a trader |
 
+The subtitle can only change with a new version.
+
 ## App Privacy
 
-The developer collects nothing, but two optional features send data to other companies, so the answers are:
+The developer collects nothing, but optional features send data to other companies, so the answers are:
 
 - **Usage Data ▸ Product Interaction** (music listening data): sent to Last.fm when you connect your account. Linked to
   you (your Last.fm account), used for App Functionality, not for tracking.
@@ -36,55 +51,77 @@ The developer collects nothing, but two optional features send data to other com
   goes to Ticketmaster and JamBase when the Mac has keys for them. Not linked to you, App Functionality, not for
   tracking.
 
+**To decide before submitting 1.24 (the Radio DJ):** with a Claude API key from the user's Mac, the iPhone sends the
+page being viewed (album or artist details, the user's copies and plays of it), the user's questions and the rows of
+collection searches to Anthropic, with the user's own key. That's likely **User Content ▸ Other User Content** (the
+questions) and **Usage Data ▸ Product Interaction** (plays sent as context), linked to the user's own Anthropic account,
+App Functionality, not for tracking. App Review's guideline 5.1.2(i) also asks apps to disclose where personal data goes
+to a third-party AI and get permission first; the DJ only runs when the user presses its button after adding their own
+key, but a one-time notice on the phone ("The DJ sends this page and your questions to Anthropic with your key") may be
+needed if review asks.
+
 Nothing else leaves the phone except to the user's own paired Mac (local network) and watch. No tracking, no ads, no
 analytics. Export compliance: `ITSAppUsesNonExemptEncryption = NO` (only the encryption built into iOS).
 
 ## Version text
 
-**Promotional text** (at most 170 characters; can change at any time without a review):
+**Promotional text** (at most 170 characters; can change at any time without a review, but doesn't carry over to a new
+version):
 
 ```
-Try it right away with the built-in sample library, then sync your own collection from the free Music Library app for Mac: davidlago.github.io/music-library
+New: a radio DJ who tells you the story behind your records. Find any CD or record by its label, and play your music offline, synced from Music Library for Mac.
 ```
 
-**Keywords:**
+**Keywords** (at most 100 characters):
 
 ```
-player,flac,lossless,offline,hi-res,dac,scrobble,lastfm,mac,sync,collection,albums,cd,bitperfect
+cd,vinyl,record,collection,shelf,flac,lossless,offline,hi-res,dac,scrobble,lastfm,dj,musicbrainz
 ```
 
-**Description:**
+**Description** (at most 4,000 characters; changes only with a new version):
 
 ```
-Your own music collection, on your iPhone and Apple Watch. Dave's Music Library is the companion to Music Library for Mac, a free and open-source app for people who keep their music as files: rip your CDs, tag everything from MusicBrainz, and explore your collection in ways streaming apps don't. Get the Mac app at https://davidlago.github.io/music-library/
+Your CDs, your records and your music files, on your iPhone and Apple Watch. Dave's Music Library is the companion to Music Library for Mac, a free and open-source app for people who own their music: catalog your CDs and vinyl with a label number on every case, rip and digitize them, tag everything from MusicBrainz, and explore your collection in ways streaming apps don't.
 
-Browse your whole library
-Every album, artist, cover and artist photo comes over from your Mac, with album and artist info, credits, your playlists and smart playlists. Choose which music to keep on the iPhone; everything else can still be browsed and downloaded when you want it.
+Your shelf, by its label
+Every CD and record you own comes over from your Mac, ripped or not, in its jewel case or sleeve, with its edition, label number, purchase date and price. Find by Label shows what's at a number and what sits on either side of it, so you can go and grab it from the shelf. On Apple Watch, turn the Digital Crown to a label, even away from your iPhone. Or ask Siri: "Find CD 12 in Music Library".
+
+Every album and artist
+Browse your whole digital collection with the Mac's album and artist pages: descriptions, ratings, credits, the full track list, your copies and your plays. Choose which music to keep on the phone; everything else can still be browsed and downloaded when you want it, and Ready to Download lists the CDs and records you've digitized that aren't on the phone yet.
+
+A radio DJ who knows your records
+With your own Claude API key (set up in the Mac app), tap the radio button on any page and a DJ tells you the story behind what you're looking at: who made it, who played on it and how it connects to everything else you own. Ask anything; the DJ checks the web and searches your own collection to answer, with links to your albums and previews of songs you don't have.
 
 Play it properly
-Gapless playback when songs share a sample rate, and with a USB DAC the output switches to each song's own rate. Lock screen and Control Center controls, a play queue with Play Next, and your queue kept between launches.
+Gapless playback when songs share a sample rate, and with a USB DAC the output switches to each song's own rate. Lock screen and Control Center controls, a play queue with Play Next, Liked Songs, and your queue kept between launches.
 
-Insights
-See what you listened to over the last week, month, year or all time: top songs, artists, albums and genres, listening streaks, the hours you listen most, and favorites you've forgotten. See what your library is made of, and what you've spent on the albums you own.
-
-Music DNA
-Follow the people behind your music: who played, wrote and produced with whom, as an interactive map.
+Insights and Music DNA
+See what you own (how much is digitized, your free label numbers, what you've spent and the cost per play), what your music files are made of, and a listening report for the last week, month, year or all time: top artists, albums and songs, what was new to you, your listening clock and forgotten favorites. Music DNA maps who played, wrote and produced with whom.
 
 Widgets and Apple Watch
-Home screen widgets for listening, now playing, recent purchases and albums to rediscover. On Apple Watch, control playback and glance at your stats.
+Home and lock screen widgets for what's playing (with controls), your listening, your physical collection and next labels, your digital collection and albums to rediscover. On Apple Watch: a remote for your iPhone, your listening, and Find by Label.
 
 Your library stays yours
-No account, no ads, no tracking. Your iPhone and Mac sync directly over your Wi-Fi network, encrypted. Plays and likes go back to your Mac, and you can scrobble to Last.fm.
+No account, no ads, no tracking. Your iPhone and Mac sync directly over your Wi-Fi network, encrypted. Plays and likes go back to your Mac, and you can scrobble to Last.fm. What you own is edited in the Mac app and shown read-only on the phone.
 
-No Mac app yet? Tap Explore a Sample Library to try everything with fictional artists and albums.
+No Mac app yet? Tap Explore a Sample Library to try everything with fictional artists, CDs and records.
 
 Get the companion Mac app
-Your music comes from Music Library for Mac (free, macOS 14 or later): it imports and rips your music, then syncs it to your iPhone. Download it, and find help and the source code, on the website: https://davidlago.github.io/music-library/
+Your music comes from Music Library for Mac (free, macOS 14 or later): it catalogs your CDs and records, imports, rips and digitizes your music, then syncs both collections to your iPhone. Download it, and find the full documentation and the source code, at https://davidlago.github.io/music-library/
 ```
 
-The description can only be changed with a new version (the promotional text can change at any time).
+**What's New in 1.24.0** (the live version is 1.23.0; 1.23.1 and 1.23.2 only changed the Mac app):
 
-**What's New** (each version): that version's section of `CHANGELOG.md`, as plain text.
+```
+A radio DJ
+• With a Claude API key added in the Mac app's Settings ▸ Radio DJ (it comes over when you sync), tap the radio button at the top of any page and a DJ tells you the story behind the album or artist you're looking at, then answers your questions, checking facts on the web and showing its sources.
+• It can search your own collection ("what else do I have by them, most played first?"); the search runs on your iPhone and only the matching rows are sent.
+• Albums and artists you own are links, songs on your iPhone play right from the DJ, and songs you don't own play a 30-second preview.
+• Swipe the DJ away to keep browsing while it stays on the air; tap the radio button (red while it's on) to bring it back. Settings shows what it has cost this month.
+
+Also
+• Syncing is more reliable right after opening the Mac app.
+```
 
 ## App Review
 
@@ -93,90 +130,15 @@ The description can only be changed with a new version (the promotional text can
 **Notes:**
 
 ```
-Dave's Music Library is the iPhone companion of Music Library for Mac, a free, open-source macOS app (https://github.com/davidlago/music-library, notarized downloads at https://github.com/davidlago/music-library/releases). The Mac app holds the user's music collection and syncs a copy of it to the iPhone over the local network.
+Dave's Music Library is the iPhone companion of Music Library for Mac, a free, open-source macOS app (https://github.com/davidlago/music-library, notarized downloads at https://github.com/davidlago/music-library/releases, documentation at https://davidlago.github.io/music-library/docs/). The Mac app holds the user's physical collection (the CDs and records they own) and digital collection (their music files) and syncs a copy of them to the iPhone over the local network.
 
-To review without a Mac: on the Library tab, tap "Explore a Sample Library". It opens a library built into the app (fictional artists and albums; the songs were synthesized for it, and the covers and pictures were drawn for it), so every feature can be tried: browsing, playback with lock screen controls, likes, Insights, Music DNA, owned albums, the widgets and the Apple Watch app. Nothing done in the sample is sent anywhere, and the user's own library replaces it after their first sync.
+To review without a Mac: on the first screen, tap "Explore a Sample Library". It opens a library built into the app (fictional artists and albums; the songs were synthesized for it, and the covers and pictures were drawn for it), so nearly every feature can be tried: the Physical tab (CDs and records with label numbers, Find by Label, items with no digital copy, Ready to Download), the Digital tab (browsing, downloads), playback with lock screen controls, likes, Insights, Music DNA, the widgets, the Apple Watch app (Physical page and Find by Label) and the Siri phrase "Find CD 3 in Music Library". Nothing done in the sample is sent anywhere, and the user's own library replaces it after their first sync.
 
 To sync your own music: install the Mac app, open the iPhone's Sync tab and tap "Pair with a Mac", then enter the code it shows in the Mac app (iPhone in the sidebar). Both need to be on the same Wi-Fi network; the app asks for local network access for this. The attached video shows the sample library and the pairing screen.
 
-Optional features need the user's own accounts or keys: Last.fm scrobbling (Settings, with a Last.fm API key) and concerts on artist pages (Ticketmaster or JamBase keys set on the Mac).
+The screenshots show the developer's own library, synced from the Mac app.
+
+Optional features need the user's own accounts or keys, entered by the user: Last.fm scrobbling (Settings, with a Last.fm API key), concerts on artist pages (Ticketmaster or JamBase keys set on the Mac) and the Radio DJ (the user's own Anthropic Claude API key, entered in the Mac app and handed to the phone when they sync; without one, the DJ doesn't appear at all). The DJ runs only when the user taps its button, and sends the page being viewed and the user's questions to Anthropic with the user's own key.
 ```
 
 **Attachment:** the demo video (`build/app-store/review-demo.mp4`).
-
-## Proposed for 1.21: the physical collection and the new names (to review in App Store Connect)
-
-Proposed copy for the version that brings the physical collection (CDs and vinyl with label numbers, Find by Label,
-the Physical tab, widget and watch Shelf) and the new names: **Physical Collection** (CDs and records; the **Physical**
-tab), **Digital Collection** (the music files, downloads included; the **Digital** tab, formerly Library) and **Local
-Library CDs** on the Mac (formerly Library CDs). **To review** before it's entered in App Store Connect: nothing
-below is live yet, and the sections above stay what's entered until then. The promotional text can change at any time;
-the subtitle, keywords and description only with a new version. The sample library now has vinyl (Vinyl #1–#4, two
-never digitized), CDs not ripped yet (CD #7 and #8), one album on both CD and vinyl, and a download, so the screenshots
-and the review can show all of it; new screenshots of the Physical tab, an item page, Find by Label and the watch's
-Find page are still to be taken.
-
-**Subtitle** (at most 30 characters, to review):
-
-```
-Your CDs, vinyl and music
-```
-
-**Promotional text** (at most 170 characters, to review):
-
-```
-Find any CD or record on your shelf by its label, on your iPhone, Apple Watch or with Siri. Try the built-in sample, then sync your own from Music Library for Mac.
-```
-
-**Keywords** (at most 100 characters, to review):
-
-```
-collection,cd,vinyl,record,label,shelf,flac,lossless,offline,hi-res,dac,player,scrobble,lastfm,sync
-```
-
-**Description** (to review):
-
-```
-Your music collections, on your iPhone and Apple Watch: the CDs and records on your shelf, and the music you play. Dave's Music Library is the companion to Music Library for Mac, a free and open-source app for people who own their music: catalog your CDs and vinyl, rip them, tag everything from MusicBrainz, and explore your collection in ways streaming apps don't. Get the Mac app at https://davidlago.github.io/music-library/
-
-Your Physical Collection, by its label
-Every CD and record you own comes over from your Mac, ripped or not, with its cover, edition, label number, purchase date and price. CDs and records each have their own label series, so CD #12 and Vinyl #12 are never mixed up. Browse your CDs, your vinyl and what's left to rip, with each item's track list (a record's with its sides) and its other copies.
-
-Find by Label
-Type a number and see what's at that label and what sits on either side of it, so you can go and grab it from the shelf. On Apple Watch, turn the Digital Crown to a label, even away from your iPhone. Or ask Siri: "Find CD 12 in Music Library".
-
-Browse your Digital Collection
-Every album, artist, cover and artist photo comes over from your Mac, with album and artist info, credits, your playlists and smart playlists, and the albums you bought as downloads. Choose which music to keep on the iPhone; everything else can still be browsed and downloaded when you want it, and Ready to Download lists the CDs and records you've digitized that aren't on the phone yet.
-
-Play it properly
-Gapless playback when songs share a sample rate, and with a USB DAC the output switches to each song's own rate. Lock screen and Control Center controls, a play queue with Play Next, and your queue kept between launches.
-
-Insights
-See what you own: how much is digitized, your free label numbers, what you've spent over time and the cost per play. See what your digital collection is made of. See what you listened to over the last week, month, year or all time: top songs, artists, albums and genres, listening streaks, the hours you listen most, and favorites you've forgotten.
-
-Music DNA
-Follow the people behind your music: who played, wrote and produced with whom, as an interactive map.
-
-Widgets and Apple Watch
-Home and lock screen widgets for your physical collection and your next labels, listening, now playing, and albums to rediscover. On Apple Watch, find a label on your shelf, control playback and glance at your stats.
-
-Your library stays yours
-No account, no ads, no tracking. Your iPhone and Mac sync directly over your Wi-Fi network, encrypted. Plays and likes go back to your Mac, and you can scrobble to Last.fm. What you own is edited in the Mac app and shown read-only on the phone.
-
-No Mac app yet? Tap Explore a Sample Library to try everything with fictional artists, CDs and records.
-
-Get the companion Mac app
-Your music comes from Music Library for Mac (free, macOS 14 or later): it catalogs your CDs and records, imports and rips your music, then syncs both collections to your iPhone. Download it, and find help and the source code, on the website: https://davidlago.github.io/music-library/
-```
-
-**App Review notes** (to review):
-
-```
-Dave's Music Library is the iPhone companion of Music Library for Mac, a free, open-source macOS app (https://github.com/davidlago/music-library, notarized downloads at https://github.com/davidlago/music-library/releases). The Mac app holds the user's physical collection (the CDs and records they own) and digital collection (their music files, downloads included) and syncs a copy of them to the iPhone over the local network.
-
-To review without a Mac: on the first screen (the Physical tab, or the Digital tab), tap "Explore a Sample Library". It opens a library built into the app (fictional artists and albums; the songs were synthesized for it, and the covers and pictures were drawn for it), so every feature can be tried: the Physical tab (CDs and records with label numbers, Find by Label, items with no digital copy, Ready to Download), the Digital tab (browsing, downloads), playback with lock screen controls, likes, Insights, Music DNA, the widgets, the Apple Watch app (Shelf and Find) and the Siri phrase "Find CD 3 in Music Library". Nothing done in the sample is sent anywhere, and the user's own library replaces it after their first sync.
-
-To sync your own music: install the Mac app, open the iPhone's Sync tab and tap "Pair with a Mac", then enter the code it shows in the Mac app (iPhone in the sidebar). Both need to be on the same Wi-Fi network; the app asks for local network access for this. The attached video shows the sample library and the pairing screen.
-
-Optional features need the user's own accounts or keys: Last.fm scrobbling (Settings, with a Last.fm API key) and concerts on artist pages (Ticketmaster or JamBase keys set on the Mac).
-```

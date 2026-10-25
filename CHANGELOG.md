@@ -14,8 +14,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   sources. It can also look through your own collection to answer things like "what else do I have by them, most
   played first?" or "which of these do I own on vinyl?" (the search runs on your device; only the matching rows are
   sent). Name your DJ in Settings; it picks the Claude model itself. It's off until you summon it, then stays on the air
-  while you browse (beside the pages on the Mac; on iPhone, swipe it away and tap ON AIR in the player to bring it
-  back): go to another album or artist and tap "Tell me about…", or just ask. The whole feature stays hidden without a
+  while you browse (beside the pages on the Mac; on iPhone, swipe it away and tap the radio button, red while
+  the DJ is on, to bring it back): go to another album or artist and tap "Tell me about…", or just ask. The whole feature stays hidden without a
   key.
 - Artists and albums the DJ mentions that you own are links to their pages, and songs you own get a play button that
   plays them in their album (on iPhone, songs that are on the phone; others link to their album). Songs you don't own
@@ -33,6 +33,10 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 - The key, the DJ's name and yours go to the iPhone app when you sync (remove the key on the Mac to turn the DJ off on both).
   Settings shows what the DJ has cost this month and in all, estimated at Claude API list prices, on the Mac and on
   each iPhone.
+- **Documentation**: a user guide that explains every feature, how it works and how to set it up, in a new
+  [Docs](https://davidlago.github.io/music-library/docs/) section of the website (and in
+  [docs/guide](https://github.com/davidlago/music-library/tree/main/docs/guide) on GitHub). The README and the website
+  are shorter and up to date, with new screenshots throughout.
 
 ## 1.23.2
 
@@ -113,7 +117,7 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   (edited in place), its digital copy (ripped, partly ripped, not ripped yet, from another copy or no longer in your
   digital collection, with **Rip Now**, **Import a Transfer…** or **Link Digital Copy…**), the track list (a record's
   with its sides), other copies of the album, and **Previous/Next on Shelf** (⌘[ and ⌘]). See [Your physical
-  collection](https://github.com/davidlago/music-library#your-physical-collection).
+  collection](https://davidlago.github.io/music-library/docs/physical-collection.html).
 - **Label numbers per medium.** CDs and vinyl each have their own label series, both starting at 1: the number is on a
   white strip across the top of the jewel case's hinge or down the same edge of the record's sleeve, showing just the
   number: the case or sleeve under it tells CD #12 from Vinyl #12, and labels in text are always written with their
@@ -288,7 +292,7 @@ This release changes how releases are made; the Mac and iPhone apps work as in 1
   just an API key. **Settings ▸ General ▸ Tools** shows "Included with the app". After updating, macOS asks once more to
   allow keychain access; choose **Always Allow**.
 - **The iPhone app is on TestFlight** for invited testers; see the
-  [iPhone app](https://github.com/davidlago/music-library#iphone-app) section of the README. Building it with Xcode still
+  [iPhone app](https://davidlago.github.io/music-library/docs/iphone.html) guide. Building it with Xcode still
   works.
 - When a sync doesn't fit on the iPhone, the iPhone now stops it, before deleting or copying anything, and says how much
   space it needs; it no longer tells the Mac how much space it has free.
@@ -296,7 +300,7 @@ This release changes how releases are made; the Mac and iPhone apps work as in 1
 ## 1.12.0
 
 This release is for the iPhone app; the Mac app is unchanged, and syncing works as in 1.11.0. Rebuild the iPhone app from
-Xcode to get it (see the [iPhone app](https://github.com/davidlago/music-library#iphone-app) section of the README).
+Xcode to get it (see the [iPhone app](https://davidlago.github.io/music-library/docs/iphone.html) guide).
 
 - **iPhone widgets.** Listening (time listened in the past 7 or 30 days, a bar per day, your streak and top artists,
   songs and albums), Now Playing (with play/pause, previous, next and like buttons that work without opening the app),
@@ -306,7 +310,7 @@ Xcode to get it (see the [iPhone app](https://github.com/davidlago/music-library
 - **An Apple Watch app.** A remote for the iPhone's player (play/pause, skip, like, and starting Liked Songs, a shuffle or
   an album), your listening and purchases, and complications for listening time, the song playing and this year's
   purchases. It installs with the iPhone app and needs watchOS 26 or later.
-  [Screenshots](https://github.com/davidlago/music-library#widgets-and-apple-watch).
+  [Screenshots](https://davidlago.github.io/music-library/docs/widgets-and-watch.html).
 - The iPhone app's icon no longer has a white frame around it.
 - To use your own bundle identifier for the iPhone app, set `APP_BUNDLE_ID` (not `PRODUCT_BUNDLE_IDENTIFIER`) in
   `iOS/Local.xcconfig`; the widgets, watch app and app group are named after it.
@@ -351,4 +355,4 @@ Xcode to get it (see the [iPhone app](https://github.com/davidlago/music-library
 - **iPhone app (first version).** Play part of your library offline on an iPhone (iOS 27), through a USB DAC at each
   song's own sample rate, with gapless playback between songs at the same rate, the Mac's search, playlists, Liked Songs
   and covers, lock screen controls, and Last.fm scrobbling. It's installed from Xcode for now; see
-  [iPhone app](https://github.com/davidlago/music-library#iphone-app) in the README.
+  [iPhone app](https://davidlago.github.io/music-library/docs/iphone.html) in the guide.

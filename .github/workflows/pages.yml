@@ -1,6 +1,6 @@
 name: Website
 
-# Builds site/ with scripts/build-site.sh and publishes it on GitHub Pages
+# Builds site/ (and the user guide in docs/guide) with scripts/build-site.sh and publishes it on GitHub Pages
 # (https://davidlago.github.io/music-library/). Pull requests only build it.
 on:
   push:
@@ -8,15 +8,19 @@ on:
     paths:
       - site/**
       - docs/screenshots/**
+      - docs/guide/**
       - Resources/AppIcon-1024.png
       - scripts/build-site.sh
+      - scripts/render-docs.py
       - .github/workflows/pages.yml
   pull_request:
     paths:
       - site/**
       - docs/screenshots/**
+      - docs/guide/**
       - Resources/AppIcon-1024.png
       - scripts/build-site.sh
+      - scripts/render-docs.py
       - .github/workflows/pages.yml
   workflow_dispatch:
 
