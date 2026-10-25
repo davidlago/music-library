@@ -7,9 +7,33 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- New: a **Radio DJ** who tells you about the album or artist you're looking at. Add a Claude API key in Settings ▸
+  Radio DJ on the Mac, then press **On Air** in the toolbar of an album, artist or collection item page (on iPhone, the
+  radio button at the top of the page). The DJ opens with the story behind the music, the people who made it and how it
+  connects to other records, then answers your questions, checking facts on the web as it talks and showing its
+  sources. It can also look through your own collection to answer things like "what else do I have by them, most
+  played first?" or "which of these do I own on vinyl?" (the search runs on your device; only the matching rows are
+  sent). Name your DJ in Settings; it picks the Claude model itself. It's off until you summon it, then stays on the air
+  while you browse (beside the pages on the Mac; on iPhone, swipe it away and tap ON AIR in the player to bring it
+  back): go to another album or artist and tap "Tell me about…", or just ask. The whole feature stays hidden without a
+  key.
+- Artists and albums the DJ mentions that you own are links to their pages, and songs you own get a play button that
+  plays them in their album (on iPhone, songs that are on the phone; others link to their album). Songs you don't own
+  get a headphones button that plays a 30-second Apple Music preview, and artists and albums you don't own link to their
+  Wikipedia article, checked first (through disambiguation pages when needed; no link when there's no article about
+  them); those links are purple, yours are in the accent color.
+- The DJ's button is on every page (in the window's toolbar on the Mac, at the top of every page on iPhone), and the DJ knows
+  where you are: the album or artist, the Shelf, Insights, a playlist, your search. It can answer questions about your
+  numbers too ("how many minutes of Roy Orbison do I own?", "what did I play most this month?") from the same stats
+  as Insights. Tell the DJ your name in
+  Settings ▸ Radio DJ and it'll greet you by it now and then.
 - Fixed: the first sync after opening the Mac app could time out, and work when you tried again. macOS sometimes
   refuses the app's first local network connection; the Mac now tries again with a new one right away, and says so
   if macOS keeps blocking it.
+- The key, the DJ's name and yours go to the iPhone app when you sync (remove the key on the Mac to turn the DJ off on both).
+  Settings shows what the DJ has cost this month and in all, estimated at Claude API list prices, on the Mac and on
+  each iPhone.
+
 ## 1.23.2
 
 - On the Mac, the app no longer crashes on macOS 27 when it opens with the queue showing, or when you show the queue.

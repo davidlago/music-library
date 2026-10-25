@@ -21,13 +21,14 @@ struct MiniPlayer: View {
                 Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").frame(width: 32, height: 32)
             }
             .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
+            .disabled(player.currentTrack == nil)
             Button { player.next() } label: {
                 Image(systemName: "forward.fill").frame(width: 32, height: 32)
             }
             .accessibilityLabel("Next")
+            .disabled(player.currentTrack == nil)
         }
         .buttonStyle(.plain)
-        .disabled(player.currentTrack == nil)
         .padding(.horizontal, 12)
         .contentShape(Rectangle())
         .onTapGesture { if player.currentTrack != nil { open() } }

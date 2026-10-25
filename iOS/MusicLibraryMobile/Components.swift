@@ -35,6 +35,7 @@ extension EnvironmentValues {
 /// A tab's navigation stack, with library pages and `openRoute` wired up. `opener` watches for links to open
 /// (`showRoute`); it sits on the stack itself, not its root page, so it runs while another page is pushed over the root.
 struct LibraryStack<Root: View, Opener: ViewModifier>: View {
+    @Environment(PhoneModel.self) private var model
     var opener: Opener
     @ViewBuilder var root: () -> Root
     @State private var path = NavigationPath()
@@ -50,6 +51,8 @@ struct LibraryStack<Root: View, Opener: ViewModifier>: View {
         }
         .modifier(opener)
         .environment(\.openRoute, OpenRouteAction { value in path.append(value) })
+        // The Radio DJ's links open on the tab showing.
+        .onAppear { let path = $path; model.radioDJ.navigate = { path.wrappedValue.append($0) } }
         .environment(\.showRoute, OpenRouteAction { value in
             var shown = NavigationPath()
             shown.append(value)

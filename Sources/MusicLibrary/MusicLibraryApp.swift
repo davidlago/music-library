@@ -20,7 +20,8 @@ struct MusicLibraryApp: App {
         WindowGroup("Music Library") {
             ContentView()
                 .environment(model)
-                .frame(minWidth: 900, minHeight: 560)
+                // Room for the Radio DJ's pane beside the pages while it's on the air.
+                .frame(minWidth: model.radioDJ.session == nil ? 900 : 900 + RadioDJPanel.width, minHeight: 560)
         }
         .commands {
             CommandGroup(replacing: .newItem) {

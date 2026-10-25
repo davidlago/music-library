@@ -68,6 +68,7 @@ private struct CollectionItemContent: View {
         .background { AlbumBackdrop(url: library.coverURL(item: item)) }
         .navigationTitle(item.sticker?.text ?? title)
         .navigationBarTitleDisplayMode(.inline)
+        .radioDJ { [model, item] in model.radioDJSubject(item: item) }
     }
 
     // MARK: Hero

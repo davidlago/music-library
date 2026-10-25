@@ -65,6 +65,7 @@ struct CollectionItemDetail: View {
                 }
             }
         }
+        .radioDJ { [model, item] in model.radioDJSubject(item: item) }
         .navigationTitle(item.album.isEmpty ? "Unknown Album" : item.album)
         .toolbar {
             ToolbarItem {

@@ -224,6 +224,7 @@ struct ArtistDetail: View {
             .frame(maxWidth: 1100, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .radioDJ { [model, artistName] in model.radioDJSubject(artist: artistName) }
         .navigationTitle(name)
         .toolbar {
             ToolbarItem { AddToExportListButton([.artist(artistName)]) }

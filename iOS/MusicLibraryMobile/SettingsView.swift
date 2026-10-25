@@ -20,6 +20,9 @@ struct SettingsView: View {
                 } footer: {
                     Text("Before each song, the output switches to the song's sample rate, so a USB DAC plays it at its own rate. Songs at the same rate play without gaps. For bit-perfect output, keep the iPhone's volume at maximum and use the DAC's or amplifier's volume.")
                 }
+                if model.radioDJ.isEnabled {
+                    RadioDJSettingsSection(dj: model.radioDJ)
+                }
                 NavigationLink {
                     LastFMSettings()
                 } label: {

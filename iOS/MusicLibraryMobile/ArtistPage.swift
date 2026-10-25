@@ -72,6 +72,9 @@ private struct ArtistPageContent: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
+        .radioDJ { [model, artistName, tracks, albums, info] in
+            model.radioDJSubject(artist: artistName, tracks: tracks, albums: albums, info: info)
+        }
     }
 
     // MARK: Hero
@@ -584,7 +587,7 @@ struct SongInfoSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
-            .libraryDestinations()
+            .libraryDestinations(djButton: false)
         }
         .environment(\.openRoute, OpenRouteAction { value in path.append(value) })
     }

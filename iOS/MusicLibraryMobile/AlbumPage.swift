@@ -71,6 +71,7 @@ private struct AlbumPageContent: View {
         .background { AlbumBackdrop(url: library.coverURL(album: album)) }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .radioDJ { [model, album, tracks, info] in model.radioDJSubject(album: album, tracks: tracks, info: info) }
         .toolbar {
             Menu { AlbumMenu(album: album) } label: { Image(systemName: "ellipsis.circle") }
                 .accessibilityLabel("More")

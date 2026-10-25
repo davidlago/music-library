@@ -10,6 +10,7 @@ struct SyncContext {
     var database: Database
     var lastFM: SyncLastFM?
     var concerts: SyncConcertSettings?
+    var radioDJ: SyncRadioDJ?
     /// Every track in the library.
     var library: [Track]
     var tracks: (ExportItem) -> [Track]
@@ -30,6 +31,8 @@ final class SyncStore {
         var name: String
         var lastSync: Date?
         var lastSummary: SyncSummary?
+        /// What the Radio DJ has cost on the phone, as of its last sync.
+        var radioDJUsage: RadioDJUsage?
     }
 
     enum Activity: Equatable {
@@ -354,16 +357,17 @@ final class SyncStore {
                 return
             }
             do {
-                let (_, summary) = try await SyncMacSession.sync(
+                let (hello, summary) = try await SyncMacSession.sync(
                     connection, identity: identity,
                     selection: { manifest in await self.applyRequests(manifest, adopting: fromPhone && firstSync, phoneID: phone.id) },
                     libraryRoot: context.libraryRoot, database: context.database, scratch: scratch,
-                    lastFM: context.lastFM, concerts: context.concerts,
+                    lastFM: context.lastFM, concerts: context.concerts, radioDJ: context.radioDJ,
                     approveDeletes: { count in firstSync ? (fromPhone ? false : await self.askToDelete(count)) : true },
                     progress: { progress in await self.report(phone.id, progress) })
                 if let i = phones.firstIndex(where: { $0.id == phone.id }) {
                     phones[i].lastSync = Date()
                     phones[i].lastSummary = summary
+                    if let usage = hello.radioDJUsage { phones[i].radioDJUsage = usage }
                 }
                 if summary.plays > 0 || summary.likes > 0 || (summary.purchases ?? 0) > 0 { onHistoryChanged() }
             } catch is CancellationError {
