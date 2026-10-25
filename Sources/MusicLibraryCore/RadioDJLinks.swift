@@ -63,8 +63,8 @@ public enum RadioDJSegment: Hashable, Sendable {
 /// titles are asked for in one request ("Affection (Lisa Stansfield album)", "Affection (album)", "Affection"), and
 /// the first that is a real article (not missing, not a disambiguation page) about that album (its description names
 /// an album and the artist) or about a musician wins. When none is, the articles the disambiguation pages among them
-/// list are checked the same way, then a search for the name (with the artist); only articles named after it count.
-/// Nothing found means no link.
+/// list are checked the same way, then a search for the name (with the artist); only articles named after it count,
+/// and without the artist only when a single album has that name. Nothing found means no link.
 public struct WikipediaArticleFinder: Sendable {
     public typealias Get = @Sendable (URL) async throws -> Data
     private let get: Get
@@ -150,15 +150,19 @@ public struct WikipediaArticleFinder: Sendable {
 
     /// From a list of pages (a disambiguation page's links, search results): the first, in search order or else the
     /// shortest title, that's named after `name` ("Real Love (Lisa Stansfield album)" for "Real Love") and about it.
+    /// Without the artist, an album is picked only when it's the only one by that name: "Affection" alone could be
+    /// Lisa Stansfield's, Jody Watley's or Koda Kumi's.
     static func pickAmong(_ data: Data, name: String, kind: String, artist: String?) -> String? {
         let pages = (try? JSONDecoder().decode(JSONValue.self, from: data))?["query"]?["pages"]?.array ?? []
         let key = RadioDJLinker.norm(name)
-        return pages
+        let about = pages
             .filter { $0["missing"] == nil && $0["pageprops"]?["disambiguation"] == nil }
             .filter { page in page["title"]?.string.map { RadioDJLinker.forms($0).contains(key) } ?? false }
             .filter { page in
                 isAbout(kind: kind, title: page["title"]?.string ?? "", description: page["description"]?.string ?? "", artist: artist)
             }
+        if kind == "album", artist == nil, Set(about.compactMap { $0["title"]?.string }).count > 1 { return nil }
+        return about
             .sorted { a, b in
                 let ia = a["index"]?.int ?? Int.max, ib = b["index"]?.int ?? Int.max
                 return ia != ib ? ia < ib : (a["title"]?.string?.count ?? 0) < (b["title"]?.string?.count ?? 0)

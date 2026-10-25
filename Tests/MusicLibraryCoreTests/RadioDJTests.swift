@@ -760,6 +760,24 @@ func textReply(_ text: String, stop: String = "end_turn", model: String = "claud
         #expect(await none.article(kind: "artist", name: "Nobody Atall", artist: nil) == nil)
     }
 
+    @Test func doesntGuessWhichAlbumWithoutTheArtist() async {
+        // "Affection (disambiguation)"'s links (trimmed), captured on 2026-10-25: three albums have the name.
+        let links = #"{"query":{"pages":[{"pageid":1,"ns":0,"title":"Affection","description":"Feeling or type of love"},{"pageid":2,"ns":0,"title":"Affection (Jody Watley album)","description":"1995 studio album by Jody Watley"},{"pageid":3,"ns":0,"title":"Affection (Koda Kumi album)","description":"2002 studio album by Koda Kumi"},{"pageid":4,"ns":0,"title":"Affection (Lisa Stansfield album)","description":"1989 studio album by Lisa Stansfield"},{"pageid":5,"ns":0,"title":"Kids in the Street (The All-American Rejects album)","description":"2012 studio album by the All-American Rejects"}]}}"#
+        #expect(WikipediaArticleFinder.pickAmong(Data(links.utf8), name: "Affection", kind: "album", artist: nil) == nil)
+        #expect(WikipediaArticleFinder.pickAmong(Data(links.utf8), name: "Affection", kind: "album", artist: "Lisa Stansfield")
+                == "Affection (Lisa Stansfield album)")
+        // One album by that name is still linked.
+        #expect(WikipediaArticleFinder.pickAmong(Data(Self.realLoveLinks.utf8), name: "Teen Dream", kind: "album", artist: nil) == "Teen Dream")
+
+        let finder = WikipediaArticleFinder(get: { url in
+            let query = url.query ?? ""
+            return Data((query.contains("generator=links") || query.contains("generator=search") ? links : Self.affection).utf8)
+        })
+        #expect(await finder.article(kind: "album", name: "Affection", artist: nil) == nil)
+        #expect(await finder.article(kind: "album", name: "Affection", artist: "Lisa Stansfield")?.absoluteString
+                == "https://en.wikipedia.org/wiki/Affection_(Lisa_Stansfield_album)")
+    }
+
     actor RequestLog {
         var urls: [URL] = []
         func add(_ url: URL) { urls.append(url) }
