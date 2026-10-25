@@ -98,24 +98,29 @@ themeButtons.forEach((button) => {
   });
 });
 
-// Click a screenshot to see it full size.
+// Click a screenshot (or a picture in the docs) to see it full size.
 const lightbox = document.getElementById("lightbox");
 if (lightbox && typeof lightbox.showModal === "function") {
   const big = lightbox.querySelector("img");
+  const zoom = (img) => {
+    big.src = img.currentSrc || img.src;
+    big.alt = img.alt;
+    lightbox.showModal();
+  };
   document.querySelectorAll("[data-zoom]").forEach((shot) => {
-    shot.addEventListener("click", () => {
-      const img = shot.querySelector("img");
-      big.src = img.currentSrc || img.src;
-      big.alt = img.alt;
-      lightbox.showModal();
-    });
+    shot.addEventListener("click", () => zoom(shot.querySelector("img")));
   });
+  document.querySelectorAll(".prose img").forEach((img) => img.addEventListener("click", () => zoom(img)));
   lightbox.addEventListener("click", (event) => {
     if (event.target === lightbox || event.target === big) lightbox.close();
   });
 } else {
-  document.querySelectorAll("[data-zoom]").forEach((shot) => (shot.style.cursor = "default"));
+  document.querySelectorAll("[data-zoom], .prose img").forEach((shot) => (shot.style.cursor = "default"));
 }
+
+// Docs: on a phone, the page list starts folded so the page comes first.
+const docsNav = document.querySelector(".docs-nav details");
+if (docsNav && window.matchMedia("(max-width: 820px)").matches) docsNav.open = false;
 
 // Copy the build commands.
 document.querySelectorAll(".copy").forEach((button) => {

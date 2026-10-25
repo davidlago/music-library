@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{title}}</title>
+  <meta name="theme-color" content="#0c0a14">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/png" href="../favicon.png">
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png">
+  <link rel="stylesheet" href="../style.css">
+  <script>document.documentElement.classList.add("js")</script>
+  <script src="../main.js" defer></script>
+</head>
+<body class="docs-page">
+  <!-- Built from docs/guide/*.md by scripts/render-docs.py: edit the Markdown, not the generated pages. -->
+  <a class="skip" href="#content">Skip to content</a>
+
+  <header class="nav" id="top">
+    <div class="nav-inner">
+      <a class="brand" href="../" aria-label="Music Library home">
+        <img src="../favicon.png" width="28" height="28" alt="">
+        <span>Music Library</span>
+      </a>
+      <nav aria-label="Sections">
+        <ul class="nav-links">
+          <li><a href="../#features">Features</a></li>
+          <li><a href="../#iphone">iPhone</a></li>
+          <li><a href="index.html" aria-current="page">Docs</a></li>
+          <li><a href="../support.html">Support</a></li>
+        </ul>
+      </nav>
+      <div class="nav-actions">
+        <a class="icon-link" href="https://github.com/davidlago/music-library" aria-label="Source code on GitHub">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+        </a>
+        <a class="btn btn-small btn-primary" href="../#install">Download</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap docs-layout">
+    <aside class="docs-nav" aria-label="Documentation">
+      <details open>
+        <summary>Docs</summary>
+        <ul>
+{{nav}}
+        </ul>
+      </details>
+    </aside>
+
+    <main class="docs-main" id="content">
+      <article class="prose">
+{{body}}
+      </article>
+      <nav class="pager" aria-label="Previous and next page">{{pager}}</nav>
+      <p class="edit-link"><a href="{{source}}">Edit this page on GitHub</a></p>
+    </main>
+
+    <aside class="docs-toc" aria-label="On this page">
+      <p>On this page</p>
+      <ul>{{toc}}</ul>
+    </aside>
+  </div>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div class="footer-brand">
+        <img src="../favicon.png" width="32" height="32" alt="">
+        <div>
+          <strong>Music Library</strong>
+          <span>MIT © 2026 Dave Lago</span>
+        </div>
+      </div>
+      <ul class="footer-links">
+        <li><a href="https://github.com/davidlago/music-library">GitHub</a></li>
+        <li><a href="https://github.com/davidlago/music-library/releases">Releases</a></li>
+        <li><a href="https://github.com/davidlago/music-library/blob/main/CHANGELOG.md">Changelog</a></li>
+        <li><a href="https://github.com/davidlago/music-library/issues">Issues</a></li>
+        <li><a href="../support.html">Support</a></li>
+        <li><a href="../privacy.html">Privacy Policy</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <dialog class="lightbox" id="lightbox" aria-label="Screenshot">
+    <form method="dialog"><button class="lightbox-close" aria-label="Close">×</button></form>
+    <img alt="">
+  </dialog>
+</body>
+</html>

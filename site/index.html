@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Music Library for Mac and iPhone</title>
-  <meta name="description" content="A native macOS music library for people who care about their files and their shelves: catalog the CDs, records and downloads you own, import and rip, tag everything from MusicBrainz, play bit-perfect, explore your music with Music DNA and Insights, and take it with you on iPhone and Apple Watch. Free and open source.">
+  <meta name="description" content="Your CDs, your records and your music files in one place. A free, native Mac app with an iPhone and Apple Watch companion: catalog what you own with label numbers, rip and digitize, tag from MusicBrainz, explore with Music DNA and Insights, play bit-perfect, and put a Claude-powered radio DJ on the air. Free and open source.">
   <meta name="theme-color" content="#0c0a14">
   <meta name="color-scheme" content="dark">
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Music Library for Mac and iPhone">
-  <meta property="og:description" content="Catalog the CDs, records and downloads you own, import and rip, tag from MusicBrainz, play bit-perfect, and explore your music in ways streaming apps don't let you. Free and open source.">
+  <meta property="og:description" content="Your CDs, your records and your music files in one place: catalog, rip, digitize, explore and play them, with a radio DJ who knows the story behind every record. Free and open source.">
   <meta property="og:url" content="https://davidlago.github.io/music-library/">
   <meta property="og:image" content="https://davidlago.github.io/music-library/og.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -31,11 +31,10 @@
       <nav aria-label="Sections">
         <ul class="nav-links">
           <li><a href="#features">Features</a></li>
-          <li><a href="#collection">Physical Collection</a></li>
-          <li><a href="#dna">Music DNA</a></li>
-          <li><a href="#library-cds">Local Library</a></li>
+          <li><a href="#collection">Collection</a></li>
+          <li><a href="#radio-dj">Radio DJ</a></li>
           <li><a href="#iphone">iPhone</a></li>
-          <li><a href="#privacy">Privacy</a></li>
+          <li><a href="docs/">Docs</a></li>
         </ul>
       </nav>
       <div class="nav-actions">
@@ -55,9 +54,9 @@
         <img class="hero-icon" src="icon.webp" width="132" height="132" alt="Music Library app icon: a vinyl record and a music note on a sunset gradient">
         <p class="eyebrow">Free and open source · macOS, iPhone and Apple Watch</p>
         <h1>Your music collection,<br><span class="grad">finally treated right.</span></h1>
-        <p class="lede">A native macOS music library for people who care about their files and their shelves. Catalog the
-          CDs, records and downloads you own, import and rip, tag everything from MusicBrainz, play bit-perfect, explore
-          your music in ways streaming apps don't let you, and find your next CD at your local library.</p>
+        <p class="lede">Your CDs, your records and your music files, in one place. Catalog everything you own with a label
+          number on every case, rip and digitize it, tag it from MusicBrainz, explore it in ways streaming apps don't, and
+          play it bit-perfect, on your Mac and in your pocket.</p>
         <div class="cta">
           <a class="btn btn-primary btn-large" href="https://github.com/davidlago/music-library/releases/latest">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.37 12.6c-.02-2.3 1.88-3.4 1.97-3.46-1.07-1.57-2.74-1.79-3.33-1.81-1.42-.14-2.77.84-3.49.84-.72 0-1.83-.82-3.01-.8-1.55.02-2.98.9-3.78 2.29-1.61 2.8-.41 6.94 1.16 9.21.77 1.11 1.68 2.36 2.88 2.31 1.16-.05 1.59-.75 2.99-.75 1.39 0 1.79.75 3.01.72 1.24-.02 2.03-1.13 2.79-2.25.88-1.29 1.24-2.53 1.26-2.6-.03-.01-2.42-.93-2.45-3.7ZM14.08 5.84c.64-.77 1.07-1.85.95-2.92-.92.04-2.03.61-2.69 1.38-.59.68-1.11 1.78-.97 2.83 1.02.08 2.07-.52 2.71-1.29Z"/></svg>
@@ -67,15 +66,13 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.37 12.6c-.02-2.3 1.88-3.4 1.97-3.46-1.07-1.57-2.74-1.79-3.33-1.81-1.42-.14-2.77.84-3.49.84-.72 0-1.83-.82-3.01-.8-1.55.02-2.98.9-3.78 2.29-1.61 2.8-.41 6.94 1.16 9.21.77 1.11 1.68 2.36 2.88 2.31 1.16-.05 1.59-.75 2.99-.75 1.39 0 1.79.75 3.01.72 1.24-.02 2.03-1.13 2.79-2.25.88-1.29 1.24-2.53 1.26-2.6-.03-.01-2.42-.93-2.45-3.7ZM14.08 5.84c.64-.77 1.07-1.85.95-2.92-.92.04-2.03.61-2.69 1.38-.59.68-1.11 1.78-.97 2.83 1.02.08 2.07-.52 2.71-1.29Z"/></svg>
             iPhone app on the App Store
           </a>
-          <a class="btn btn-ghost btn-large" href="https://github.com/davidlago/music-library">
-            View on GitHub
-          </a>
+          <a class="btn btn-ghost btn-large" href="docs/">Read the docs</a>
         </div>
         <p class="meta" id="release-meta">macOS 14 or later · Apple Silicon and Intel · Signed and notarized by Apple</p>
       </div>
       <div class="wrap hero-shot reveal">
-        <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: an album page">
-          <img src="screenshots/album.webp" width="1600" height="1000" alt="The album page for Roy Orbison's Mystery Girl: the cover in its jewel case with the CD #14 sticker, rating, listening stats, the AccurateRip check and Your Copy" fetchpriority="high">
+        <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: the Shelf">
+          <img src="screenshots/collection.webp" width="1600" height="1000" alt="The Shelf: CDs in their jewel cases and records in their sleeves, each with its label number, 44 CDs, 5 vinyl and 3 to digitize" fetchpriority="high">
         </button>
       </div>
     </section>
@@ -83,27 +80,37 @@
     <!-- Pillars -->
     <section class="section pillars-section" id="features">
       <div class="wrap">
-        <div class="pillars">
-          <article class="pillar reveal">
+        <div class="pillars six">
+          <a class="pillar reveal" href="docs/physical-collection.html">
             <span class="pillar-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M12 3v3M21 12h-3"/></svg></span>
-            <h3>Build your collections</h3>
-            <p>Catalog the CDs and records you own in your physical collection, with a label number on every case. Import files and downloads or rip CDs to FLAC into your digital collection, matched on MusicBrainz and filed neatly.</p>
-          </article>
-          <article class="pillar reveal">
+            <h3>Catalog what you own</h3>
+            <p>Every CD and record, ripped or not, with a label number on its case, and Find by Label everywhere.</p>
+          </a>
+          <a class="pillar reveal" href="docs/importing.html">
+            <span class="pillar-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 19h16"/></svg></span>
+            <h3>Build your digital collection</h3>
+            <p>Import and match on MusicBrainz, rip CDs verified with AccurateRip, digitize your records.</p>
+          </a>
+          <a class="pillar reveal" href="docs/music-dna.html">
             <span class="pillar-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8.3 7l7.4.8M7 8.3l2.2 7.4M16.5 10l-4.8 6.2"/></svg></span>
             <h3>Explore it</h3>
-            <p>Rich album and artist pages, artists from both collections, a search language that understands music, Music DNA and Insights.</p>
-          </article>
-          <article class="pillar reveal">
+            <p>Album and artist pages, a search language for music, Music DNA, Insights and a radio DJ.</p>
+          </a>
+          <a class="pillar reveal" href="docs/playback.html">
             <span class="pillar-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h2l2-6 3 12 3-9 2 5 2-2h4"/></svg></span>
-            <h3>Play it</h3>
-            <p>Bit-perfect output at each song's own sample rate, a real play queue, smart playlists and Last.fm.</p>
-          </article>
-          <article class="pillar reveal">
+            <h3>Play it properly</h3>
+            <p>Each song at its own sample rate, a real play queue, smart playlists and Last.fm.</p>
+          </a>
+          <a class="pillar reveal" href="docs/local-library.html">
             <span class="pillar-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M2.5 10 12 4l9.5 6z"/></svg></span>
-            <h3>Borrow more</h3>
-            <p>Browse your local library's CDs with the same search, hear previews, and see what's on the shelf right now.</p>
-          </article>
+            <h3>Find more music</h3>
+            <p>Concerts near you, your public library's CDs, and the best price on the exact CD you want.</p>
+          </a>
+          <a class="pillar reveal" href="docs/iphone.html">
+            <span class="pillar-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg></span>
+            <h3>Take it with you</h3>
+            <p>Both collections on iPhone and Apple Watch, offline through a DAC, plus widgets and USB export.</p>
+          </a>
         </div>
       </div>
     </section>
@@ -114,81 +121,100 @@
         <div class="center-head reveal">
           <p class="kicker">Physical Collection</p>
           <h2>Everything on your shelf, by its label.</h2>
-          <p>CDs you've ripped and ones you haven't, and vinyl you may never digitize: each one is an item in your
-            physical collection, with its edition, when you bought it and what you paid, linked to its digital copy when
-            there is one. Albums you bought as downloads are yours too, kept with your music files in your digital
-            collection.</p>
+          <p>CDs you've ripped and ones you haven't, and records you may never digitize: each is an item with its own page,
+            its edition, when you bought it and what you paid, linked to its digital copy when there is one.</p>
         </div>
         <div class="device-shots reveal">
-          <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: the Shelf">
-            <img src="screenshots/collection.webp" width="1600" height="1000" loading="lazy" alt="The Shelf: the physical collection as jewel cases and record sleeves with their label stickers, 34 CDs, 5 vinyl and 5 to digitize, and the Go to field for a CD or vinyl label">
-          </button>
           <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: an item page">
-            <img src="screenshots/collection-item.webp" width="1600" height="1000" loading="lazy" alt="The item page for The Köln Concert on Vinyl #2: the record sleeve, sides A to D of the track list, Previous and Next on Shelf, the Digital Copy card with no digital copy yet and Import a Transfer… and Link…, and the Your Copy editor">
+            <img src="screenshots/collection-item.webp" width="1600" height="1000" loading="lazy" alt="The item page for The Köln Concert on Vinyl #2: the record sleeve, sides A to D, one of four songs digitized with Digitize the Rest…, and Your Copy">
+          </button>
+          <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: Find by Label">
+            <img src="screenshots/find-by-label.webp" width="1600" height="1000" loading="lazy" alt="Find by Label on CD #14: Mystery Girl by Roy Orbison, ripped, between CD #13 and CD #15">
           </button>
         </div>
         <div class="cards three">
           <article class="card reveal">
             <h3>A label on every case</h3>
-            <p>CDs and records each have their own series, both from 1. The number sits on a white strip across the
-              case's hinge or down the sleeve's edge, so CD #12 and Vinyl #12 never look alike, and a number already
-              taken is refused. Hover a sticker or badge (or press and hold it on the iPhone) for what it means.</p>
+            <p>CDs and records each have their own series, so CD #12 and Vinyl #12 never look alike. The next number is
+              suggested, and a taken one is refused.</p>
           </article>
           <article class="card reveal">
             <h3>Find by Label</h3>
-            <p>Type a number and see what it is and what sits next to it on the shelf, so you can go and grab it. On the
-              Mac (⌘L), the iPhone, the Apple Watch (even offline) and with Siri.</p>
+            <p>Type a number and see what it is and what sits next to it. On the Mac (⌘L), the iPhone, the Apple Watch
+              (even offline) and with Siri.</p>
           </article>
           <article class="card reveal">
             <h3>Add by barcode</h3>
-            <p>Scan or type the barcode on the case, or a few words, and pick the edition from MusicBrainz. Add &amp; Next
-              goes through a stack in one sitting; albums already in your digital collection can be added in bulk.</p>
+            <p>Scan or type the barcode, pick the edition from MusicBrainz, and go through a stack with Add &amp; Next. Ripping
+              a CD links it on its own.</p>
           </article>
-          <article class="card reveal">
-            <h3>Ripping links it</h3>
-            <p>Insert a CD and the app says which one it is; the rip is linked to it. Catalog a CD without ripping it,
-              mark a needle-drop as your record's digital copy, and see what's left in To Digitize.</p>
-          </article>
-          <article class="card reveal">
-            <h3>Browse and search it</h3>
-            <p>Shelves of cases and sleeves, item pages with the track list (a record's with its sides), and search keys
-              like <code>own:vinyl</code>, <code>ripped:no</code> and <code>sticker:cd100-199</code>. A new cover for a
-              CD or record can go to its digital album too.</p>
-          </article>
-          <article class="card reveal">
-            <h3>Count it</h3>
-            <p>The Owned pane of Insights, for your CDs, records and downloads: how much is digitized, free label
-              numbers, spending by medium over time, cost per play, best value and what's still in the wrapper.</p>
-          </article>
+        </div>
+        <p class="center-link reveal"><a class="doc-link" href="docs/physical-collection.html">Read about the Physical Collection →</a></p>
+      </div>
+    </section>
+
+    <!-- Digital Collection -->
+    <section class="section feature" id="digital">
+      <div class="wrap feature-grid">
+        <div class="feature-text reveal">
+          <p class="kicker">Digital Collection</p>
+          <h2>Import, rip, digitize. Keep it tidy.</h2>
+          <p>Every song is matched on MusicBrainz, optionally by its sound with AcoustID, tagged with rich credits and
+            cover art, and filed neatly. Your original files are never modified.</p>
+          <ul class="checks">
+            <li>Insert a CD: it's identified, ripped to FLAC and checked bit for bit with AccurateRip, and a misread track is read again and repaired</li>
+            <li>Digitize your records: record from your turntable at up to 24-bit / 192 kHz, cut the recording into tracks on its waveform, save them as FLAC</li>
+            <li>Credits for every player, producer and engineer, and covers from the Cover Art Archive or your own image</li>
+          </ul>
+          <div class="path" aria-label="Example library folder layout">
+            <span class="path-dim">Music/</span><span>Norah Jones/</span><span>Feels Like Home (2004)/</span><span class="path-file">03 - Those Sweet Words.flac</span>
+          </div>
+          <p><a class="doc-link" href="docs/importing.html">Importing</a> · <a class="doc-link" href="docs/ripping-cds.html">Ripping CDs</a> · <a class="doc-link" href="docs/digitizing-vinyl.html">Digitizing vinyl</a></p>
+        </div>
+        <div class="feature-media reveal">
+          <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: Digitize Vinyl">
+            <img src="screenshots/digitize-vinyl.webp" width="1600" height="1000" loading="lazy" alt="Digitize Vinyl: The Big Reunion recorded at 24-bit / 96 kHz and cut into four tracks on its waveform">
+          </button>
         </div>
       </div>
     </section>
 
-    <!-- Import -->
-    <section class="section feature">
-      <div class="wrap feature-grid">
-        <div class="feature-text reveal">
-          <p class="kicker">Import &amp; rip</p>
-          <h2>Import anything. Keep it tidy.</h2>
-          <p>Drop in files and folders. Each track is matched against MusicBrainz, optionally by audio fingerprint via
-            AcoustID. Confident matches are applied automatically; the rest wait in the Import queue with candidates to
-            pick from.</p>
-          <ul class="checks">
-            <li>Rich metadata and credits: players, producers, engineers, writers</li>
-            <li>Cover art from the Cover Art Archive, or your own image</li>
-            <li>Insert a CD and it's identified by its table of contents, then ripped to FLAC and checked bit for bit with AccurateRip</li>
-            <li>Digitize your records: record a side or the whole album, find the tracks on its waveform, and save them as FLAC, a few at a time if you like</li>
-            <li>Your original files are never modified</li>
-          </ul>
-          <div class="path" aria-label="Example library folder layout">
-            <span class="path-dim">Music/</span><span>Daft Punk/</span><span>Random Access Memories (2013)/</span><span class="path-file">01 - Give Life Back to Music.flac</span>
-          </div>
+    <!-- Radio DJ -->
+    <section class="section feature dna" id="radio-dj">
+      <div class="wrap">
+        <div class="center-head reveal">
+          <p class="kicker">New · Radio DJ</p>
+          <h2>A DJ who knows your records.</h2>
+          <p>Press <strong>On Air</strong> on any page and a host you name tells you the story behind what you're looking
+            at: who made it, who played on it, how it connects to everything else you own. Ask anything; the DJ checks the
+            web, shows its sources and searches your own collection to answer. Powered by Claude, with your own API key.</p>
         </div>
-        <div class="feature-media reveal">
-          <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: the albums grid">
-            <img src="screenshots/albums.webp" width="1600" height="1000" loading="lazy" alt="The Albums grid with cover art, sorted by Recently Played">
+        <div class="device-shots reveal">
+          <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: the Radio DJ on an album page">
+            <img src="screenshots/radio-dj.webp" width="1600" height="1000" loading="lazy" alt="The Radio DJ on the air beside the Mystery Girl album page, telling the story of the album with links to songs and artists">
+          </button>
+          <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: the Radio DJ searching the collection">
+            <img src="screenshots/radio-dj-collection.webp" width="1600" height="1000" loading="lazy" alt="The DJ answering what else you own from the people who made the record, with play buttons and links">
           </button>
         </div>
+        <div class="cards three">
+          <article class="card reveal">
+            <h3>It knows where you are</h3>
+            <p>An album, an artist, a CD on your shelf, Insights, a playlist: the DJ starts from the page and stays on the
+              air while you browse.</p>
+          </article>
+          <article class="card reveal">
+            <h3>It searches your collection</h3>
+            <p>"What else do I have by them, most played first?" The search runs on your device; only the rows it finds
+              are sent.</p>
+          </article>
+          <article class="card reveal">
+            <h3>Everything's a link</h3>
+            <p>What you own opens its page or plays; songs you don't own play a preview; artists you don't know link to a
+              checked Wikipedia article. On iPhone too.</p>
+          </article>
+        </div>
+        <p class="center-link reveal"><a class="doc-link" href="docs/radio-dj.html">Set up the Radio DJ →</a></p>
       </div>
     </section>
 
@@ -198,18 +224,15 @@
         <div class="feature-text reveal">
           <p class="kicker">Albums &amp; artists</p>
           <h2>Pages worth reading.</h2>
-          <p>Album pages show the full release track list, including what you're missing, plus descriptions,
-            community ratings, genres, credits, release details and links to reviews. Artist pages bring photos, bios,
-            stats, links to dozens of sites and upcoming concerts near you. <strong>Artists</strong> lists everyone in
-            both collections, including the artists you only own on CD or vinyl. And with your own Claude API key,
-            press <strong>On Air</strong> for a radio DJ who tells you the story behind the record and takes your
-            questions.</p>
-          <p class="subtle">All of it is fetched once from MusicBrainz, Wikipedia, Wikidata and Last.fm, and kept
-            locally.</p>
+          <p>Album pages show the full release track list, including what you're missing, with descriptions, community
+            ratings, credits, your copies and what each has cost you per play. Artist pages bring photos, bios, stats, links
+            to dozens of sites and upcoming concerts near you. <strong>Artists</strong> lists everyone in both collections.</p>
+          <p class="subtle">Fetched once from MusicBrainz, Wikipedia, Wikidata and Last.fm, and kept locally.</p>
+          <a class="doc-link" href="docs/albums-and-artists.html">Albums and artists →</a>
         </div>
         <div class="feature-media reveal">
-          <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: an artist page">
-            <img src="screenshots/artist.webp" width="1600" height="1000" loading="lazy" alt="The artist page for Roy Orbison: stats including the copy you own, bio, links, Concerts Near You and In Your Physical Collection">
+          <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: an album page">
+            <img src="screenshots/album.webp" width="1600" height="1000" loading="lazy" alt="The album page for Mystery Girl: the cover in its jewel case on CD #14, rating and genres, plays and time listened, the AccurateRip result and the track list">
           </button>
         </div>
       </div>
@@ -221,9 +244,8 @@
         <div class="center-head reveal">
           <p class="kicker">Search</p>
           <h2>Search that understands music.</h2>
-          <p>Plain words search titles, artists, albums, genres, composers, labels and credits. Filters narrow it down,
-            with autocomplete, typo correction, top hits and one-click refinements. Save any search as a smart playlist
-            that keeps itself up to date.</p>
+          <p>Plain words search titles, artists, albums, genres, labels and credits; filters narrow it down, with
+            autocomplete and typo correction. Save any search as a smart playlist that keeps itself up to date.</p>
         </div>
         <div class="searchbar reveal" aria-hidden="true">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
@@ -232,19 +254,14 @@
         <div class="filters reveal">
           <div class="filter"><h4>Text fields</h4><code>artist:radiohead</code><code>credit:"teo macero"</code><code>label:"blue note"</code></div>
           <div class="filter"><h4>Numbers &amp; ranges</h4><code>year:1990-1999</code><code>decade:60s</code><code>time:&gt;10m</code><code>bits:24</code></div>
-          <div class="filter"><h4>When added</h4><code>added:7d</code><code>added:&gt;1y</code><code>added:2025</code></div>
-          <div class="filter"><h4>Flags</h4><code>is:lossless</code><code>is:hires</code><code>is:live</code><code>is:compilation</code></div>
-          <div class="filter"><h4>Gaps</h4><code>missing:cover</code><code>missing:year</code><code>has:credits</code></div>
-          <div class="filter"><h4>Logic</h4><code>-live</code><code>"exact phrase"</code><code>a OR b</code></div>
-          <div class="filter"><h4>Your copy</h4><code>own:vinyl</code><code>own:cd</code><code>own:none</code></div>
-          <div class="filter"><h4>Digitized</h4><code>ripped:no</code><code>ripped:partial</code><code>copies:&gt;1</code></div>
-          <div class="filter"><h4>Labels &amp; purchases</h4><code>sticker:cd100-199</code><code>vinyl#12</code><code>bought:2024</code></div>
+          <div class="filter"><h4>What you own</h4><code>own:vinyl</code><code>ripped:no</code><code>sticker:cd100-199</code><code>bought:2024</code></div>
         </div>
         <div class="feature-media wide reveal">
           <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: search results">
-            <img src="screenshots/search.webp" width="1600" height="1000" loading="lazy" alt="Search results for genre:jazz year:1950-1965: the What You Own strip with a CD (Birth of the Cool) and a record (The Big Reunion), top hits and songs">
+            <img src="screenshots/search.webp" width="1600" height="1000" loading="lazy" alt="Search results for genre:jazz year:1950-1975: What You Own with a CD and two records, artists and albums, and the matching songs">
           </button>
         </div>
+        <p class="center-link reveal"><a class="doc-link" href="docs/search.html">The full search reference →</a></p>
       </div>
     </section>
 
@@ -254,10 +271,9 @@
         <div class="center-head reveal">
           <p class="kicker">Music DNA</p>
           <h2>Follow the people behind the music.</h2>
-          <p>See who played, wrote and produced with whom across both your collections: CDs and records with no
-            digital copy bring their MusicBrainz credits, so a player you only have on vinyl links to the same people as
-            your music files. Click a bubble to put that person at the center, choose how many levels of connections to
-            show, and click your way from one collaborator to the next. Any name in the app opens it.</p>
+          <p>See who played, wrote and produced with whom across both your collections, including the players on records
+            you've never digitized. Click a bubble to put that person at the center and click your way from one
+            collaborator to the next.</p>
         </div>
         <div class="legend reveal" aria-hidden="true">
           <span><i style="--c:#4c8dff"></i>Performance</span>
@@ -266,7 +282,7 @@
         </div>
         <div class="feature-media wide reveal">
           <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: Music DNA">
-            <img src="screenshots/music-dna.webp" width="1600" height="1000" loading="lazy" alt="Music DNA centered on Roy Orbison, with the Traveling Wilburys, Jeff Lynne, Tom Petty and others around him, three levels deep">
+            <img src="screenshots/music-dna.webp" width="1600" height="1000" loading="lazy" alt="Music DNA centered on Roy Orbison, with Jeff Lynne, Tom Petty, T-Bone Burnett, Jim Keltner and dozens of others around him">
           </button>
         </div>
       </div>
@@ -279,19 +295,20 @@
           <p class="kicker">Insights</p>
           <h2>Know your music. And your habits.</h2>
           <div class="tabs" role="tablist" aria-label="Insights panes">
-            <button role="tab" aria-selected="true" aria-controls="insights-shot" data-src="screenshots/insights.webp" data-alt="Insights, Digital Collection pane: totals, a timeline by decade, genres, top artists and audio quality">Digital Collection</button>
-            <button role="tab" aria-selected="false" aria-controls="insights-shot" data-src="screenshots/listening.webp" data-alt="Insights, Listening pane for the past 7 days: 125 plays over a blurred photo of the top artist with each day next to the week before, and Top Charts with Faith Hill, Breathe and All I've Ever Wanted as the top artist, album and song">Listening</button>
+            <button role="tab" aria-selected="true" aria-controls="insights-shot" data-src="screenshots/listening.webp" data-alt="Insights, Listening pane: 130 plays in 7 days over a blurred photo of the top artist, and Top Charts">Listening</button>
+            <button role="tab" aria-selected="false" aria-controls="insights-shot" data-src="screenshots/insights-owned.webp" data-alt="Insights, Owned pane: items, how much is digitized, spending, cost per play and your label series">Owned</button>
+            <button role="tab" aria-selected="false" aria-controls="insights-shot" data-src="screenshots/insights.webp" data-alt="Insights, Digital Collection pane: totals, a timeline through the years, genres, top artists and audio quality">Digital Collection</button>
           </div>
           <dl class="defs">
-            <div><dt>Owned</dt><dd>Your CDs, records and downloads: how much is digitized, your label series with their free numbers, spending by medium over time, cost per play and per hour, best value and what's still in the wrapper.</dd></div>
-            <div><dt>Digital Collection</dt><dd>Your music files by decade, genre, artist, audio quality, growth, track length and most-credited people.</dd></div>
-            <div><dt>Listening</dt><dd>A listening report: plays against the span before, top artists, albums and songs with their pictures, what was new to you, a listening clock, skips, streaks and favorites to rediscover, over 7 days to all time.</dd></div>
+            <div><dt>Listening</dt><dd>A listening report: plays against the span before, top artists, albums and songs with their pictures, what was new to you, a listening clock and forgotten favorites.</dd></div>
+            <div><dt>Owned</dt><dd>Your CDs, records and downloads: how much is digitized, free label numbers, spending over time, cost per play and best value.</dd></div>
+            <div><dt>Digital Collection</dt><dd>Your files by decade, genre, artist, audio quality and growth, and the most-credited people.</dd></div>
           </dl>
-          <p class="subtle">Everything is clickable.</p>
+          <a class="doc-link" href="docs/insights.html">Insights →</a>
         </div>
         <div class="feature-media reveal">
           <button class="shot shot-mac" data-zoom id="insights-shot" role="tabpanel" aria-label="Enlarge screenshot: Insights">
-            <img src="screenshots/insights.webp" width="1600" height="1000" loading="lazy" alt="Insights, Digital Collection pane: totals, a timeline by decade, genres, top artists and audio quality">
+            <img src="screenshots/listening.webp" width="1600" height="1000" loading="lazy" alt="Insights, Listening pane: 130 plays in 7 days over a blurred photo of the top artist, and Top Charts">
           </button>
         </div>
       </div>
@@ -303,8 +320,8 @@
         <div class="center-head reveal">
           <p class="kicker">Playback</p>
           <h2>Hear exactly what's in the file.</h2>
-          <p>The output device follows each track's sample rate and bit depth, and the original format is restored when
-            you quit.</p>
+          <p>The output device follows each song's sample rate and bit depth, and its original format is restored when you
+            quit.</p>
         </div>
         <div class="signal reveal" aria-label="Each track switches the output device to its own format">
           <div class="sig-node"><small>Track</small><strong>FLAC</strong><span>24-bit · 96 kHz</span></div>
@@ -313,67 +330,49 @@
           <div class="sig-line" aria-hidden="true"><i></i></div>
           <div class="sig-node"><small>Your DAC</small><strong>96 kHz</strong><span>24-bit, switched per song</span></div>
         </div>
-        <div class="cards">
+        <div class="cards three">
           <article class="card reveal">
             <h3>A real play queue</h3>
-            <p>Play Next and Add to Queue from any song, album, artist or playlist. Drag to reorder; the queue survives a
-              restart. The player expands into a full Now Playing view.</p>
+            <p>Play Next and Add to Queue from anywhere, drag to reorder, and the queue survives a restart.</p>
           </article>
           <article class="card reveal">
             <h3>Playlists, smart and not</h3>
-            <p>Arrange regular playlists yourself, or define smart ones with a search. Liked Songs is built in.</p>
+            <p>Arrange playlists yourself, or define smart ones with a search. Liked Songs is built in.</p>
           </article>
           <article class="card reveal">
             <h3>History and Last.fm</h3>
-            <p>Plays and time listened per song, album and artist, with optional scrobbling and an offline queue.</p>
-          </article>
-          <article class="card reveal">
-            <h3>Concerts near you</h3>
-            <p>Upcoming shows by the artists in your collections, from Ticketmaster and JamBase, including small clubs and
-              independent venues.</p>
-          </article>
-          <article class="card reveal">
-            <h3>Shop for CDs</h3>
-            <p>Pin down the exact edition on MusicBrainz, then compare new and used copies on Discogs, eBay, CDandLP and
-              Alibris, with shipping, in one list. No accounts needed.</p>
-          </article>
-          <article class="card reveal">
-            <h3>Take it with you</h3>
-            <p>Copy albums, artists and playlists to a USB player or drive in the library's own layout, with
-              <code>.m3u</code> playlists. Nothing is ever overwritten.</p>
-          </article>
-          <article class="card reveal">
-            <h3>Fix missing covers</h3>
-            <p>Pick one from the Cover Art Archive, drop in an image or paste one, and optionally embed it in the
-              album's files. A CD or record's new cover can go to its digital album too.</p>
+            <p>Plays and time listened for every song, album and artist, and scrobbling with an offline queue.</p>
           </article>
         </div>
+        <p class="center-link reveal"><a class="doc-link" href="docs/playback.html">Playback →</a></p>
       </div>
     </section>
 
-    <!-- Local Library CDs -->
-    <section class="section feature" id="library-cds">
-      <div class="wrap feature-grid flip">
-        <div class="feature-text reveal">
-          <p class="kicker">Local Library CDs</p>
-          <h2>Your next favorite album might be free.</h2>
-          <p>Browse the music CDs of a public library catalog run on Aspen Discovery, like the Minuteman Library
-            Network, with the libraries that own each one and what's on the shelf right now.</p>
-          <ul class="checks">
-            <li>The whole catalog downloaded and searched on your Mac: <code>genre:jazz decade:60s -is:owned is:available</code></li>
-            <li>Each CD matched on MusicBrainz by barcode for its cover, track list, rating and description</li>
-            <li>30-second previews from Apple Music, no account needed</li>
-            <li>Your checkouts, and CDs added to your library lists for the next visit</li>
-            <li>Marked when it's already in your digital or physical collection, even when the catalog spells it differently</li>
-          </ul>
+    <!-- Find more music -->
+    <section class="section feature" id="find-more">
+      <div class="wrap">
+        <div class="center-head reveal">
+          <p class="kicker">Find more music</p>
+          <h2>Your next favorite album is out there.</h2>
+          <p>See your artists' upcoming shows nearby, browse your public library's whole CD catalog with the same search
+            as your music, and compare new and used copies of the exact CD you want.</p>
         </div>
-        <div class="feature-media stack reveal">
-          <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: the local library's CD catalog">
-            <img src="screenshots/library-cds.webp" width="1600" height="1000" loading="lazy" alt="The downloaded catalog of a public library's CDs, searched for genre:jazz, with genre and decade chips and shelf status">
-          </button>
-          <button class="shot shot-mac" data-zoom aria-label="Enlarge screenshot: a local library CD's page">
-            <img src="screenshots/library-cd.webp" width="1600" height="1000" loading="lazy" alt="A local library CD's page for Black Radio III: cover and details from MusicBrainz, where to find it across the network, and its track list">
-          </button>
+        <div class="shot-cards">
+          <a class="shot-card reveal" href="docs/concerts.html">
+            <img src="screenshots/concerts.webp" width="1600" height="1000" loading="lazy" alt="Concerts near you by the artists in your collections, month by month">
+            <h3>Concerts</h3>
+            <p>Upcoming shows near your ZIP code from Ticketmaster and JamBase, on artist pages and all together.</p>
+          </a>
+          <a class="shot-card reveal" href="docs/local-library.html">
+            <img src="screenshots/library-cds.webp" width="1600" height="1000" loading="lazy" alt="A public library's CD catalog, downloaded and searched for jazz">
+            <h3>Local Library CDs</h3>
+            <p>Every CD your library network owns, matched on MusicBrainz, with what's on the shelf now and previews.</p>
+          </a>
+          <a class="shot-card reveal" href="docs/shop-for-cds.html">
+            <img src="screenshots/cd-shop.webp" width="1600" height="1000" loading="lazy" alt="Shop for CDs comparing copies of one edition from Discogs and eBay">
+            <h3>Shop for CDs</h3>
+            <p>Pin down the edition, then compare Discogs, eBay, CDandLP and Alibris with shipping. No accounts.</p>
+          </a>
         </div>
       </div>
     </section>
@@ -384,10 +383,9 @@
         <div class="center-head reveal">
           <p class="kicker">iPhone</p>
           <h2>Both collections, in your pocket.</h2>
-          <p>Browse everything on your iPhone: your physical collection with Find by Label and item pages, your
-            digital collection with the Mac's album and artist pages, and Insights, which opens with Artists and Music
-            DNA across both. Download what you want over Wi-Fi from the phone itself and play it offline, through a USB
-            DAC at each song's own sample rate, with gapless playback.</p>
+          <p>Find any CD by its label, browse every album and artist with the Mac's pages, Music DNA and Insights, and play
+            the music you sync to the phone offline, through a USB DAC at each song's own sample rate. Try it first with
+            the sample library built in.</p>
           <div class="cta">
             <a class="btn btn-primary" href="https://apps.apple.com/us/app/daves-music-library/id6822005512">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.37 12.6c-.02-2.3 1.88-3.4 1.97-3.46-1.07-1.57-2.74-1.79-3.33-1.81-1.42-.14-2.77.84-3.49.84-.72 0-1.83-.82-3.01-.8-1.55.02-2.98.9-3.78 2.29-1.61 2.8-.41 6.94 1.16 9.21.77 1.11 1.68 2.36 2.88 2.31 1.16-.05 1.59-.75 2.99-.75 1.39 0 1.79.75 3.01.72 1.24-.02 2.03-1.13 2.79-2.25.88-1.29 1.24-2.53 1.26-2.6-.03-.01-2.42-.93-2.45-3.7ZM14.08 5.84c.64-.77 1.07-1.85.95-2.92-.92.04-2.03.61-2.69 1.38-.59.68-1.11 1.78-.97 2.83 1.02.08 2.07-.52 2.71-1.29Z"/></svg>
@@ -397,54 +395,40 @@
         </div>
         <div class="device-shots reveal">
           <button class="shot shot-device span" data-zoom aria-label="Enlarge screenshot: the physical collection on iPhone">
-            <img src="screenshots/iphone-collection.webp" width="1600" height="1000" loading="lazy" alt="The iPhone app: the Physical tab with Find by Label on CD #34 and its neighbor, and CDs, Vinyl, To Digitize and Ready to Download; the Vinyl list of five records with their stickers; and JT's item page on Vinyl #4, with no digital copy yet">
+            <img src="screenshots/iphone-collection.webp" width="1600" height="1000" loading="lazy" alt="The iPhone app: the Physical tab with Find by Label on CD #14, the records left to digitize, and the item page for Mystery Girl on CD #14">
           </button>
-          <button class="shot shot-device" data-zoom aria-label="Enlarge screenshot: the iPhone app">
-            <img src="screenshots/iphone.webp" width="1600" height="1000" loading="lazy" alt="The iPhone app: the Digital tab's Albums grid with the albums not on the phone dimmed with a cloud mark, Heavier Things (not on this iPhone) with its Download button, and the John Mayer artist page">
+          <button class="shot shot-device" data-zoom aria-label="Enlarge screenshot: albums and artists on iPhone">
+            <img src="screenshots/iphone.webp" width="1600" height="1000" loading="lazy" alt="The iPhone app: the Albums grid, the album page for Till the Sun Turns Black on CD #43, and Ray LaMontagne's artist page">
           </button>
           <button class="shot shot-device" data-zoom aria-label="Enlarge screenshot: Music DNA and Insights on iPhone">
-            <img src="screenshots/iphone-dna-insights.webp" width="1600" height="1000" loading="lazy" alt="The iPhone app: the item page for Mystery Girl on CD #14 (in your digital collection and on this iPhone, with Play and Shuffle), Music DNA centered on Roy Orbison, and Insights with the Explore section and the Digital pane">
+            <img src="screenshots/iphone-dna-insights.webp" width="1600" height="1000" loading="lazy" alt="The iPhone app: Music DNA centered on Joe Cocker, the Listening report for 30 days, and the Owned pane">
           </button>
         </div>
         <div class="cards three">
           <article class="card reveal">
             <h3>Two-way Wi-Fi sync</h3>
-            <p>Pair once with a code. Everything you own comes along read-only, likes and plays come back to the Mac, and
-              syncs are encrypted with a key only your devices know.</p>
+            <p>Pair once with a code. Everything you own comes along, likes and plays go back to the Mac, and syncs are
+              encrypted with a key only your devices know.</p>
           </article>
           <article class="card reveal">
-            <h3>Hi-res on the go</h3>
-            <p>16/44.1, 24/96, 24/192: Now Playing shows the file's format and the rate your DAC is running at.</p>
+            <h3>Widgets and Apple Watch</h3>
+            <p>Now Playing with controls, your listening, your shelf and your next labels on the home and lock screen; a
+              remote and Find by Label on your wrist.</p>
           </article>
           <article class="card reveal">
-            <h3>Same search, same scrobbles</h3>
-            <p>Playlists, Liked Songs and Last.fm scrobbling, including what you play offline.</p>
+            <h3>Same search, same DJ</h3>
+            <p>The same search language, playlists, Liked Songs, Last.fm scrobbling and Radio DJ as on the Mac.</p>
           </article>
         </div>
-      </div>
-    </section>
-
-    <!-- Widgets and Watch -->
-    <section class="section feature device">
-      <div class="wrap">
-        <div class="center-head reveal">
-          <p class="kicker">Widgets &amp; Apple Watch</p>
-          <h2>A glance away.</h2>
-          <p>Home and lock screen widgets show what's playing, with controls that work without opening the app, how much
-            you've listened lately, your streak and top albums, what you added to your physical collection with your next
-            labels, your digital collection at a glance, and a favorite to rediscover. The Apple Watch app is a remote
-            for the iPhone's player, and its Physical page counts your CDs and records, lists what you added lately and
-            finds a label on your shelf with the Digital Crown, even away from the phone. Complications show listening
-            time, the song playing and your physical collection.</p>
-        </div>
-        <div class="device-shots reveal">
+        <div class="device-shots reveal widgets-row">
           <button class="shot shot-device" data-zoom aria-label="Enlarge screenshot: iPhone widgets">
-            <img src="screenshots/iphone-widgets.webp" width="1600" height="1000" loading="lazy" alt="iPhone home screen widgets in several sizes: Now Playing with controls, Listening with top albums, and widgets with collection counts and the latest additions">
+            <img src="screenshots/iphone-widgets.webp" width="1600" height="1000" loading="lazy" alt="iPhone home screens with Music Library widgets: Now Playing, Listening, Digital Collection and Physical Collection">
           </button>
           <button class="shot shot-device" data-zoom aria-label="Enlarge screenshot: the Apple Watch app">
-            <img src="screenshots/watch.webp" width="1600" height="1000" loading="lazy" alt="The Apple Watch app: the Physical page with Find by Label, 34 CDs · 5 records and recently added; Find by Label on CD #34; recently added records (Vinyl #2 The Köln Concert and Vinyl #1 The Big Reunion, on your shelf with no digital copy); and Listening for the past 7 days">
+            <img src="screenshots/watch.webp" width="1600" height="1000" loading="lazy" alt="The Apple Watch app: Now Playing, the Physical page and Find by Label on CD #43">
           </button>
         </div>
+        <p class="center-link reveal"><a class="doc-link" href="docs/iphone.html">The iPhone app</a> · <a class="doc-link" href="docs/widgets-and-watch.html">Widgets and Apple Watch</a></p>
       </div>
     </section>
 
@@ -457,8 +441,8 @@
           <p>Follow the system, or pick a palette you already love from your editor. Every theme is checked for
             contrast.</p>
           <ul class="themes" id="theme-list">
-            <li><button data-theme-shot="screenshots/theme-catppuccin-mocha.webp" data-theme-alt="The Mystery Girl album page in the Catppuccin Mocha theme" aria-pressed="true"><span class="sw" style="--a:#1e1e2e;--b:#313244;--c:#cba6f7;--d:#89b4fa"></span>Catppuccin Mocha</button></li>
-            <li><button data-theme-shot="screenshots/theme-rose-pine-dawn.webp" data-theme-alt="The Mystery Girl album page in the Rosé Pine Dawn theme" aria-pressed="false"><span class="sw" style="--a:#faf4ed;--b:#dfdad9;--c:#907aa9;--d:#286983"></span>Rosé Pine Dawn</button></li>
+            <li><button data-theme-shot="screenshots/theme-catppuccin-mocha.webp" data-theme-alt="An album page in the Catppuccin Mocha theme" aria-pressed="true"><span class="sw" style="--a:#1e1e2e;--b:#313244;--c:#cba6f7;--d:#89b4fa"></span>Catppuccin Mocha</button></li>
+            <li><button data-theme-shot="screenshots/theme-rose-pine-dawn.webp" data-theme-alt="An album page in the Rosé Pine Dawn theme" aria-pressed="false"><span class="sw" style="--a:#faf4ed;--b:#dfdad9;--c:#907aa9;--d:#286983"></span>Rosé Pine Dawn</button></li>
             <li><span class="sw" style="--a:#eff1f5;--b:#ccd0da;--c:#8839ef;--d:#1e66f5"></span>Catppuccin Latte</li>
             <li><span class="sw" style="--a:#24273a;--b:#363a4f;--c:#c6a0f6;--d:#8aadf4"></span>Catppuccin Macchiato</li>
             <li><span class="sw" style="--a:#2e3440;--b:#3b4252;--c:#88c0d0;--d:#81a1c1"></span>Nord</li>
@@ -471,7 +455,7 @@
         </div>
         <div class="feature-media reveal">
           <button class="shot shot-mac" data-zoom id="theme-shot" aria-label="Enlarge screenshot: a theme">
-            <img src="screenshots/theme-catppuccin-mocha.webp" width="1600" height="1000" loading="lazy" alt="The Mystery Girl album page in the Catppuccin Mocha theme">
+            <img src="screenshots/theme-catppuccin-mocha.webp" width="1600" height="1000" loading="lazy" alt="An album page in the Catppuccin Mocha theme">
           </button>
         </div>
       </div>
@@ -489,13 +473,12 @@
             </div>
           </div>
           <div class="privacy-grid">
-            <p>The library, your listening history and your settings stay on your Mac, in one folder you can copy to a
-              new Mac. No sign-up, and no cloud service of its own.</p>
-            <p>The app only talks to services to look things up: MusicBrainz, the Cover Art Archive and Wikipedia, plus
-              AcoustID, Last.fm, Ticketmaster or JamBase only if you add a key. API keys, secrets and your library PIN
-              live in your keychain.</p>
-            <p>The iPhone keeps its music out of iCloud backups and syncs with your Mac over your local network,
-              encrypted with a key the two exchange when pairing.</p>
+            <p>Your library, your listening history and your settings stay on your Mac, in one folder you can copy to a new
+              Mac. No account, no ads, no tracking, and no cloud service of its own.</p>
+            <p>The app talks to MusicBrainz, the Cover Art Archive and Wikipedia only to look things up, and to Last.fm,
+              Ticketmaster, JamBase or Claude only with your own keys, which live in your keychain.</p>
+            <p>The iPhone keeps its music out of iCloud backups and syncs with your Mac over your local network, encrypted
+              with a key the two exchange when pairing. <a href="docs/privacy.html">The details</a>.</p>
           </div>
         </div>
       </div>
@@ -516,16 +499,19 @@
               <li>Unzip it and drag <strong>MusicLibrary.app</strong> to Applications.</li>
               <li>Open it. It's signed and notarized, and includes ffmpeg: nothing else to install.</li>
             </ol>
-            <a class="btn btn-primary" href="https://github.com/davidlago/music-library/releases/latest">Download the latest release</a>
+            <div class="card-actions">
+              <a class="btn btn-primary" href="https://github.com/davidlago/music-library/releases/latest">Download the latest release</a>
+              <a class="btn btn-ghost" href="docs/getting-started.html">Getting started</a>
+            </div>
           </article>
           <article class="card install-card reveal">
             <h3><span class="step-badge">iPhone</span>iOS 26 or later</h3>
             <p>Free on the App Store as <a href="https://apps.apple.com/us/app/daves-music-library/id6822005512">Dave's Music Library</a>, with the Apple Watch app
-              (watchOS 26 or later). Pair it with the Mac app to sync your music over Wi-Fi, or try it first with the
-              sample library built into the app.</p>
+              (watchOS 26 or later). Pair it with the Mac app to sync over Wi-Fi, or try it first with the sample library
+              built in.</p>
             <div class="card-actions">
               <a class="btn btn-primary" href="https://apps.apple.com/us/app/daves-music-library/id6822005512">Download on the App Store</a>
-              <a class="btn btn-ghost" href="https://github.com/davidlago/music-library#iphone-app">iPhone setup guide</a>
+              <a class="btn btn-ghost" href="docs/iphone.html">iPhone guide</a>
             </div>
           </article>
           <article class="card install-card reveal">
@@ -537,8 +523,25 @@ cd music-library
 scripts/build-app.sh
 open build/MusicLibrary.app</code></pre>
             </div>
-            <p class="subtle">Swift 6, no third-party dependencies. MIT licensed.</p>
+            <p class="subtle">Swift 6, no third-party dependencies. MIT licensed. <a href="docs/building-from-source.html">Building from source</a>.</p>
           </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Docs -->
+    <section class="section docs-band" id="docs">
+      <div class="wrap">
+        <div class="center-head reveal">
+          <p class="kicker">Documentation</p>
+          <h2>Every feature, explained.</h2>
+          <p>How everything works and how to set it up, from your first CD to pairing your iPhone.</p>
+          <div class="docs-cta">
+            <a class="btn btn-primary" href="docs/">Read the docs</a>
+            <a class="btn btn-ghost" href="docs/getting-started.html">Getting started</a>
+            <a class="btn btn-ghost" href="docs/search.html">Search reference</a>
+            <a class="btn btn-ghost" href="docs/troubleshooting.html">Troubleshooting</a>
+          </div>
         </div>
       </div>
     </section>
@@ -555,13 +558,16 @@ open build/MusicLibrary.app</code></pre>
       </div>
       <p class="credits">Metadata from <a href="https://musicbrainz.org">MusicBrainz</a> and the
         <a href="https://coverartarchive.org">Cover Art Archive</a>; descriptions and photos from
-        <a href="https://www.wikipedia.org">Wikipedia</a>, <a href="https://www.wikidata.org">Wikidata</a> and
-        <a href="https://commons.wikimedia.org">Wikimedia Commons</a>; fingerprints from
-        <a href="https://acoustid.org">AcoustID</a>; scrobbling via <a href="https://www.last.fm">Last.fm</a>; concerts
-        from <a href="https://www.ticketmaster.com">Ticketmaster</a> and <a href="https://www.jambase.com">JamBase</a>;
-        audio by <a href="https://ffmpeg.org">FFmpeg</a> and <a href="https://acoustid.org/chromaprint">Chromaprint</a>;
-        library catalogs by <a href="https://aspendiscovery.org">Aspen Discovery</a>.</p>
+        <a href="https://www.wikipedia.org">Wikipedia</a>, <a href="https://www.wikidata.org">Wikidata</a>,
+        <a href="https://commons.wikimedia.org">Wikimedia Commons</a> and <a href="https://www.deezer.com">Deezer</a>;
+        fingerprints from <a href="https://acoustid.org">AcoustID</a>; rip checks from
+        <a href="https://www.accuraterip.com">AccurateRip</a>; scrobbling via <a href="https://www.last.fm">Last.fm</a>;
+        concerts from <a href="https://www.ticketmaster.com">Ticketmaster</a> and <a href="https://www.jambase.com">JamBase</a>;
+        the Radio DJ by <a href="https://www.anthropic.com/claude">Claude</a>; audio by <a href="https://ffmpeg.org">FFmpeg</a>
+        and <a href="https://acoustid.org/chromaprint">Chromaprint</a>; library catalogs by
+        <a href="https://aspendiscovery.org">Aspen Discovery</a>.</p>
       <ul class="footer-links">
+        <li><a href="docs/">Docs</a></li>
         <li><a href="https://github.com/davidlago/music-library">GitHub</a></li>
         <li><a href="https://github.com/davidlago/music-library/releases">Releases</a></li>
         <li><a href="https://github.com/davidlago/music-library/blob/main/CHANGELOG.md">Changelog</a></li>

@@ -598,7 +598,7 @@ struct RadioDJSettingsSection: View {
         } header: {
             Text("Radio DJ")
         } footer: {
-            Text("Tap On Air on an album or artist page. The Claude API key, the DJ's name and yours come from your Mac when you sync; change them there. Spending on this iPhone (calendar months, UTC, as Anthropic bills) is estimated at Claude API list prices and shows on your Mac after the next sync.")
+            Text("Tap the radio button at the top of any page to put the DJ on the air. The Claude API key, the DJ's name and yours come from your Mac when you sync; change them there. Spending on this iPhone (calendar months, UTC, as Anthropic bills) is estimated at Claude API list prices and shows on your Mac after the next sync.")
         }
     }
 }

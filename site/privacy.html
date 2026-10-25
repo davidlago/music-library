@@ -27,7 +27,7 @@
   <main class="doc wrap">
     <p class="kicker">Privacy Policy</p>
     <h1>Your library stays yours.</h1>
-    <p class="doc-meta">For Music Library on Mac, iPhone and Apple Watch (on the App Store as Dave's Music Library). Last updated October 19, 2026.</p>
+    <p class="doc-meta">For Music Library on Mac, iPhone and Apple Watch (on the App Store as Dave's Music Library). Last updated October 25, 2026.</p>
 
     <section>
       <h2>The short version</h2>
@@ -54,6 +54,13 @@
           page, the artist's name and the general area you chose on the Mac (a rough map square, not your address or ZIP
           code) are sent to <a href="https://www.ticketmaster.com">Ticketmaster</a> or
           <a href="https://www.jambase.com">JamBase</a>, whose own privacy policies apply.</li>
+        <li><strong>Radio DJ (only if you add a Claude API key on your Mac).</strong> While the DJ is on the air, the
+          details of the page you're on (the album or artist, its credits, track list and description, and your copies
+          and plays of it), your questions, and the rows of any search of your collection the DJ runs are sent to
+          <a href="https://www.anthropic.com">Anthropic</a> with your own key, which your Mac hands to the iPhone when
+          you sync. Your library itself isn't sent. Anthropic's <a href="https://www.anthropic.com/legal/privacy">privacy
+          policy</a> applies to what it keeps. The names of songs the DJ mentions are sent to Apple's iTunes Search API
+          to find their previews.</li>
         <li><strong>Widgets and Apple Watch.</strong> They show a small summary (counts, recent listening, recent
           additions to your physical collection, the song playing and a few small covers) kept on the iPhone and sent only to
           your own paired watch. For Find by Label, the watch also gets an index of your labeled CDs and records (their
@@ -72,8 +79,10 @@
         physical collection looks up the barcode or the words you type on MusicBrainz. Only when you
         turn them on: AcoustID (audio fingerprints, with your key), Last.fm (scrobbling, with your account), your local
         library's catalog website (your card number and PIN go only to that site), Apple's iTunes Search API (song
-        previews), Apple's geocoder (to locate the ZIP code you enter), and Ticketmaster and JamBase (artist names and
-        the area searched). API keys, secrets and your library PIN are kept in your keychain.</p>
+        previews), Apple's geocoder (to locate the ZIP code you enter), Ticketmaster and JamBase (artist names and
+        the area searched), the stores Shop for CDs compares (Discogs, eBay, CDandLP and Alibris, with the CD you're
+        looking for), and Anthropic (the Radio DJ, with your own Claude API key: the page you're on, your questions and
+        the rows of collection searches it runs). API keys, secrets and your library PIN are kept in your keychain.</p>
     </section>
 
     <section>
@@ -103,6 +112,7 @@
       <p></p>
       <ul class="footer-links">
         <li><a href="./">Home</a></li>
+        <li><a href="docs/">Docs</a></li>
         <li><a href="support.html">Support</a></li>
         <li><a href="https://github.com/davidlago/music-library">GitHub</a></li>
       </ul>
