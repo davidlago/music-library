@@ -13,10 +13,16 @@ All taken from a real library (the developer's own, synced from the Mac app), in
 
 - `iphone-6.3/` (1206 × 2622, iPhone 18 Pro simulator): the required "iPhone with Dynamic Island (medium display)" set
   that App Store Connect scales for every iPhone.
-- `iphone/` (1320 × 2868): the optional 6.9-inch "large display" set, the same screens scaled up (the two sizes have the
-  same proportions). Replace the old 6.9-inch set in App Store Connect too, or delete it there, so large iPhones don't
-  keep showing the old screenshots.
+- `iphone/` (1320 × 2868): the same screens scaled up for the optional 6.9-inch "large display" set. App Store
+  Connect currently uses the 6.3-inch set for large displays too ("Using Existing Assets" in Media Manager), so this
+  set isn't uploaded.
 - `watch/` (416 × 496, the Apple Watch paired with the iPhone 18 Pro simulator; its status bar can't be overridden).
+- `header.png` (5244 × 2950, the 16:9 "universal" size) is the **product page header** and `header.search.png`
+  (1920 × 1280, 3:2) the **search results** creative asset (shown on iOS 27 and later; free, under Header and Search
+  Results on the version page). Both are drawn by `swift scripts/make-store-header.swift` from three of the 6.3-inch
+  screenshots. An iPhone shows only the middle of the header (about x 1200…4270, y 0…1920, with the back and share
+  buttons over the top 600), so the headline and phones stay inside x 1300…4200, y 620…1880; check with **Preview**
+  on the version page after uploading. Images can't have an alpha channel.
 
 In order: Physical (Find by Label), an item page (CD #14), records to digitize, Albums, an album page, an artist page,
 Listening, Music DNA; on the watch: Now Playing, Physical, Find by Label.
@@ -50,15 +56,14 @@ The developer collects nothing, but optional features send data to other compani
 - **Location ▸ Coarse Location**: the area searched for concerts (a geohash cell, from the ZIP code entered on the Mac)
   goes to Ticketmaster and JamBase when the Mac has keys for them. Not linked to you, App Functionality, not for
   tracking.
+- **User Content ▸ Other User Content** (added for 1.24.0, the Radio DJ): the user's questions to the DJ, sent to
+  Anthropic with the user's own key. Linked to you, App Functionality, not for tracking.
 
-**To decide before submitting 1.24 (the Radio DJ):** with a Claude API key from the user's Mac, the iPhone sends the
-page being viewed (album or artist details, the user's copies and plays of it), the user's questions and the rows of
-collection searches to Anthropic, with the user's own key. That's likely **User Content ▸ Other User Content** (the
-questions) and **Usage Data ▸ Product Interaction** (plays sent as context), linked to the user's own Anthropic account,
-App Functionality, not for tracking. App Review's guideline 5.1.2(i) also asks apps to disclose where personal data goes
-to a third-party AI and get permission first; the DJ only runs when the user presses its button after adding their own
-key, but a one-time notice on the phone ("The DJ sends this page and your questions to Anthropic with your key") may be
-needed if review asks.
+The Radio DJ (with a Claude API key from the user's Mac) also sends the page being viewed (album or artist details, the
+user's copies and plays of it) and the rows of collection searches; plays are already covered by Product Interaction.
+App Review's guideline 5.1.2(i) asks apps to disclose where personal data goes to a third-party AI and get permission
+first: the DJ only runs when the user presses its button after adding their own key, but a one-time notice on the phone
+("The DJ sends this page and your questions to Anthropic with your key") may be needed if review asks.
 
 Nothing else leaves the phone except to the user's own paired Mac (local network) and watch. No tracking, no ads, no
 analytics. Export compliance: `ITSAppUsesNonExemptEncryption = NO` (only the encryption built into iOS).
@@ -134,11 +139,12 @@ Dave's Music Library is the iPhone companion of Music Library for Mac, a free, o
 
 To review without a Mac: on the first screen, tap "Explore a Sample Library". It opens a library built into the app (fictional artists and albums; the songs were synthesized for it, and the covers and pictures were drawn for it), so nearly every feature can be tried: the Physical tab (CDs and records with label numbers, Find by Label, items with no digital copy, Ready to Download), the Digital tab (browsing, downloads), playback with lock screen controls, likes, Insights, Music DNA, the widgets, the Apple Watch app (Physical page and Find by Label) and the Siri phrase "Find CD 3 in Music Library". Nothing done in the sample is sent anywhere, and the user's own library replaces it after their first sync.
 
-To sync your own music: install the Mac app, open the iPhone's Sync tab and tap "Pair with a Mac", then enter the code it shows in the Mac app (iPhone in the sidebar). Both need to be on the same Wi-Fi network; the app asks for local network access for this. The attached video shows the sample library and the pairing screen.
+To sync your own music: install the Mac app, open the iPhone's Sync tab and tap "Pair with a Mac", then enter the code it shows in the Mac app (iPhone in the sidebar). Both need to be on the same Wi-Fi network; the app asks for local network access for this.
 
 The screenshots show the developer's own library, synced from the Mac app.
 
 Optional features need the user's own accounts or keys, entered by the user: Last.fm scrobbling (Settings, with a Last.fm API key), concerts on artist pages (Ticketmaster or JamBase keys set on the Mac) and the Radio DJ (the user's own Anthropic Claude API key, entered in the Mac app and handed to the phone when they sync; without one, the DJ doesn't appear at all). The DJ runs only when the user taps its button, and sends the page being viewed and the user's questions to Anthropic with the user's own key.
 ```
 
-**Attachment:** the demo video (`build/app-store/review-demo.mp4`).
+**Attachment:** none since 1.24.0 (the first review, for 1.16.0, asked for a demo video from a physical iPhone,
+`build/app-store/review-demo.mp4`, not committed).
