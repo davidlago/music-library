@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.24.0
+
 - Fixed: refreshing a downloaded library catalog (Local Library CDs) while the library's website was struggling could
   forget most of its CDs: a page that came back empty or short ended the scan as if it were complete, and every title
   not yet read was dropped. Such a page is now read again after a pause (or the refresh stops and resumes later), and
