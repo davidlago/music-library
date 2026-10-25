@@ -10,9 +10,9 @@ public struct SyncIdentity: Sendable {
         self.deviceID = deviceID; self.deviceName = deviceName; self.appVersion = appVersion
     }
 
-    func hello(libraryID: String? = nil, lastFMConnected: Bool? = nil) -> SyncHello {
+    func hello(libraryID: String? = nil, lastFMConnected: Bool? = nil, radioDJ: Bool? = nil, radioDJUsage: RadioDJUsage? = nil) -> SyncHello {
         SyncHello(deviceID: deviceID, deviceName: deviceName, appVersion: appVersion,
-                  libraryID: libraryID, lastFMConnected: lastFMConnected)
+                  libraryID: libraryID, lastFMConnected: lastFMConnected, radioDJ: radioDJ, radioDJUsage: radioDJUsage)
     }
 }
 
@@ -51,20 +51,23 @@ public enum SyncPhoneSession {
     /// syncs in a new session, with that key). Otherwise `events` (recorded against `libraryID`) and `requests` go to
     /// the Mac with the file list; once the session returns, the Mac has handled them all. `adoptLastFM` gets the
     /// Mac's Last.fm account when `lastFMConnected` is false and the Mac has one; `storeConcerts` its concert
-    /// settings. `freeSpace` is checked here against what the Mac's plan needs and never sent. Returns the Mac's hello
+    /// settings; `storeRadioDJ` the Radio DJ's key and name (the phone's hello says it takes them, with its
+    /// `radioDJUsage`). `freeSpace` is checked here against what the Mac's plan needs and never sent. Returns the Mac's hello
     /// and what was applied.
     public static func run(_ connection: SyncConnection, identity: SyncIdentity, root: URL, freeSpace: Int64?, pairing: Bool,
                            events: [SyncEvent] = [], requests: [SyncRequest] = [], libraryID: String? = nil, lastFMConnected: Bool = true,
+                           radioDJUsage: RadioDJUsage? = nil,
                            storeGrant: @Sendable (SyncGrant) async throws -> Void,
                            adoptLastFM: @Sendable (SyncLastFM) async -> Void = { _ in },
                            storeConcerts: @Sendable (SyncConcertSettings) async -> Void = { _ in },
+                           storeRadioDJ: @Sendable (SyncRadioDJ) async -> Void = { _ in },
                            progress: @Sendable (SyncProgress) async -> Void = { _ in }) async throws -> (mac: SyncHello, summary: SyncSummary) {
         var receiver: SyncReceiver?
         do {
             try await connection.open()
             guard case .hello(let mac) = try await connection.receiveMessage() else { throw SyncError.unexpected("no hello from the Mac") }
             guard mac.protocolVersion == SyncProtocol.version else { throw SyncError.versionMismatch(mac.protocolVersion) }
-            try await connection.send(.hello(identity.hello(lastFMConnected: lastFMConnected)))
+            try await connection.send(.hello(identity.hello(lastFMConnected: lastFMConnected, radioDJ: true, radioDJUsage: radioDJUsage)))
             if pairing {
                 guard case .pair(let grant) = try await connection.receiveMessage(), grant.keyData != nil else {
                     throw SyncError.unexpected("no key from the Mac")
@@ -92,6 +95,8 @@ public enum SyncPhoneSession {
                     await adoptLastFM(account)
                 case .concerts(let settings):
                     await storeConcerts(settings)
+                case .radioDJ(let settings):
+                    await storeRadioDJ(settings)
                 case .file(let header):
                     let isDatabase = header.path == SyncReceiver.databaseName
                     state.current = header.path
@@ -175,11 +180,13 @@ public enum SyncMacSession {
     }
 
     /// A session on `connection`, made by the Mac or accepted from the phone. `selection` gets the phone's manifest
-    /// once its events are applied, applies its requests and returns what to sync. Returns the phone's hello and
+    /// once its events are applied, applies its requests and returns what to sync. `radioDJ` goes to phones that take
+    /// it, also when its key is nil (removed on the Mac). Returns the phone's hello and
     /// what it applied.
     public static func sync(_ connection: SyncConnection, identity: SyncIdentity,
                             selection: @Sendable (SyncManifest) async -> SyncTracks, libraryRoot: URL,
                             database: Database, scratch: URL, lastFM: SyncLastFM? = nil, concerts: SyncConcertSettings? = nil,
+                            radioDJ: SyncRadioDJ? = nil,
                             approveDeletes: @Sendable (Int) async -> Bool = { _ in true },
                             progress: @Sendable (SyncProgress) async -> Void = { _ in }) async throws -> (phone: SyncHello, summary: SyncSummary) {
         let snapshot = scratch.appendingPathComponent("sync-\(UUID().uuidString).sqlite")
@@ -192,6 +199,7 @@ public enum SyncMacSession {
             let applied = try database.applySyncEvents(manifest.events, libraryID: manifest.libraryID)
             if let lastFM, phone.lastFMConnected == false { try await connection.send(.lastFM(lastFM)) }
             if let concerts { try await connection.send(.concerts(concerts)) }
+            if let radioDJ, phone.radioDJ == true { try await connection.send(.radioDJ(radioDJ)) }
 
             let selected = await selection(manifest)
             var plan = SyncPlan(tracks: selected.tracks, library: selected.library, collectionCovers: try database.collectionCoverPaths(),

@@ -10,7 +10,7 @@ import Foundation
 ///
 /// A session: both send `.hello`; when pairing, the Mac sends `.pair` and the phone answers `.paired` (and that's
 /// all); the phone sends its `.manifest` (with its plays, likes, ownership changes and download/remove requests since
-/// the last sync); the Mac applies those, may send `.lastFM` and `.concerts`, then `.plan`, `.delete`, each file (the
+/// the last sync); the Mac applies those, may send `.lastFM`, `.concerts` and `.radioDJ`, then `.plan`, `.delete`, each file (the
 /// database last) and `.done`; the phone answers `.done` once everything is written.
 public enum SyncProtocol {
     /// 2: plays and likes from the phone, the library ID, Last.fm handoff. 3: the whole library's covers and
@@ -37,6 +37,8 @@ public enum SyncError: Error, LocalizedError, Equatable {
     case remote(String)
     case connection(String)
     case notPaired
+    /// macOS (or iOS) refused the app local network access.
+    case localNetworkDenied
 
     public var errorDescription: String? {
         switch self {
@@ -49,6 +51,7 @@ public enum SyncError: Error, LocalizedError, Equatable {
         case .remote(let m): return m
         case .connection(let m): return "Connection failed: \(m)"
         case .notPaired: return "This iPhone isn't paired with this Mac. Pair them again."
+        case .localNetworkDenied: return "The system is blocking Music Library from the local network. Allow it in System Settings ▸ Privacy & Security ▸ Local Network (on the iPhone: Settings ▸ Privacy & Security ▸ Local Network), then sync again."
         }
     }
 }
@@ -119,6 +122,8 @@ public enum SyncMessage: Codable, Equatable, Sendable {
     case lastFM(SyncLastFM)
     /// Mac → phone: where home is and the concert services' keys, for concerts on artist pages.
     case concerts(SyncConcertSettings)
+    /// Mac → phone, only when the phone's hello says it takes it (`radioDJ`): the Radio DJ's key and name.
+    case radioDJ(SyncRadioDJ)
     /// Phone → Mac: the key is stored.
     case paired
     case manifest(SyncManifest)
@@ -144,13 +149,18 @@ public struct SyncHello: Codable, Equatable, Sendable {
     public var libraryID: String?
     /// The phone is connected to Last.fm (when false, the Mac may send its account).
     public var lastFMConnected: Bool?
+    /// The phone takes `.radioDJ` (older phones can't decode it, so it's only sent when this is true).
+    public var radioDJ: Bool?
+    /// What the Radio DJ has cost on the phone, shown in the Mac's settings.
+    public var radioDJUsage: RadioDJUsage?
 
     public init(deviceID: String, deviceName: String, appVersion: String, freeSpace: Int64? = nil, libraryID: String? = nil,
-                lastFMConnected: Bool? = nil) {
+                lastFMConnected: Bool? = nil, radioDJ: Bool? = nil, radioDJUsage: RadioDJUsage? = nil) {
         protocolVersion = SyncProtocol.version
         schemaVersion = Database.schemaVersion
         self.deviceID = deviceID; self.deviceName = deviceName; self.appVersion = appVersion; self.freeSpace = freeSpace
         self.libraryID = libraryID; self.lastFMConnected = lastFMConnected
+        self.radioDJ = radioDJ; self.radioDJUsage = radioDJUsage
     }
 }
 

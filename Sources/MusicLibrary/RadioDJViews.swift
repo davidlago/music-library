@@ -1,0 +1,705 @@
+import AppKit
+import MusicLibraryCore
+import SwiftUI
+
+/// The Radio DJ's settings and spend on the Mac: the Claude API key (keychain; handed to the phone at each sync),
+/// the DJ's name, and what it has cost here, per month (Application Support `MusicLibrary/radio-dj-usage.json`).
+/// Without a key the feature is off and nothing of it shows outside Settings. Also the conversation on the air, which
+/// stays open in a pane beside the window's pages while you browse, and the album or artist page showing now.
+@MainActor @Observable
+final class RadioDJStore {
+    enum KeyStatus: Equatable {
+        case unchecked, checking, valid
+        case invalid(String)
+    }
+
+    var apiKey: String {
+        didSet {
+            KeychainStore.app.set(trimmedKey, for: RadioDJ.keyAccount)
+            keyStatus = .unchecked
+            if !isEnabled { endSession() }
+        }
+    }
+    var name: String {
+        didSet { UserDefaults.standard.set(name, forKey: RadioDJ.nameKey) }
+    }
+    /// The listener's own name, for the DJ to use (empty: none).
+    var listenerName: String {
+        didSet { UserDefaults.standard.set(listenerName, forKey: RadioDJ.listenerNameKey) }
+    }
+    private(set) var usage: RadioDJUsage
+    private(set) var keyStatus: KeyStatus = .unchecked
+    /// The conversation on the air (nil: off).
+    private(set) var session: RadioDJSession?
+    /// About a preview the DJ's words point to: being looked up, or not found.
+    var previewNote: String?
+    /// The album or artist page showing (nil on other pages): `id` tells pages apart, `subject` is read fresh.
+    private(set) var page: (id: UUID, topic: RadioDJSubject, subject: () -> RadioDJSubject)?
+
+    @ObservationIgnored private let usageURL: URL
+    @ObservationIgnored let previewClient = ApplePreviewClient(country: Locale.current.region?.identifier ?? "US")
+    /// Previews found (nil: Apple has none), by "title|artist".
+    @ObservationIgnored var previewCache: [String: ApplePreviewTrack?] = [:]
+
+    init(usageURL: URL = RadioDJStore.defaultUsageURL) {
+        self.usageURL = usageURL
+        apiKey = KeychainStore.app.string(for: RadioDJ.keyAccount) ?? ""
+        name = UserDefaults.standard.string(forKey: RadioDJ.nameKey) ?? ""
+        listenerName = UserDefaults.standard.string(forKey: RadioDJ.listenerNameKey) ?? ""
+        usage = RadioDJUsage.load(from: usageURL)
+    }
+
+    static var defaultUsageURL: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
+        return base.appendingPathComponent("MusicLibrary/radio-dj-usage.json")
+    }
+
+    private var trimmedKey: String { apiKey.trimmingCharacters(in: .whitespacesAndNewlines) }
+    var isEnabled: Bool { !trimmedKey.isEmpty }
+    var displayName: String { RadioDJ.displayName(name) }
+
+    /// For the phone: the key (nil when removed, which turns the DJ off there too) and the name.
+    var syncSettings: SyncRadioDJ {
+        SyncRadioDJ(apiKey: isEnabled ? trimmedKey : nil, name: displayName, listenerName: trimmedListenerName)
+    }
+
+    private var trimmedListenerName: String? {
+        let name = listenerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
+    }
+
+    /// `library`: the collection the DJ can search while talking; `linker`: links its words to what you own.
+    func makeSession(_ subject: RadioDJSubject, library: RadioDJLibrary?, linker: RadioDJLinker?) -> RadioDJSession {
+        RadioDJSession(name: displayName, subject: subject, client: ClaudeClient(apiKey: trimmedKey), library: library,
+                       linker: linker, listenerName: trimmedListenerName, wikipedia: WikipediaArticleFinder()) { [weak self] tally in
+            self?.record(tally)
+        }
+    }
+
+    func begin(_ session: RadioDJSession) {
+        self.session?.stop()
+        self.session = session
+        session.start()
+    }
+
+    func endSession() {
+        session?.stop()
+        session = nil
+    }
+
+    /// An album or artist page appeared.
+    func showing(page id: UUID, subject: @escaping () -> RadioDJSubject) {
+        page = (id, subject(), subject)
+    }
+
+    /// A page went away (another may already have taken its place).
+    func left(page id: UUID) {
+        if page?.id == id { page = nil }
+    }
+
+    /// Where you are in the app, read now: the album or artist page showing, else the page the sidebar shows
+    /// (`AppModel.radioDJLocation`).
+    @ObservationIgnored var location: () -> RadioDJSubject? = { nil }
+    var here: RadioDJSubject? { location() }
+    /// Which page you're on, cheaply (the album or artist page as it was when it appeared), for showing.
+    var hereTopic: RadioDJSubject? { page?.topic ?? location() }
+
+    private func record(_ tally: RadioDJTally) {
+        usage.add(tally)
+        usage.save(to: usageURL)
+    }
+
+    func checkKey() {
+        guard isEnabled else { return }
+        keyStatus = .checking
+        let client = ClaudeClient(apiKey: trimmedKey)
+        Task {
+            do {
+                try await client.checkKey()
+                keyStatus = .valid
+            } catch {
+                keyStatus = .invalid(error.localizedDescription)
+            }
+        }
+    }
+}
+
+/// The DJ's symbol: a chat bubble with sparkles (an AI to talk with), or sparkles alone on systems without it.
+enum RadioDJIcon {
+    static let name = symbol("text.bubble.badge.sparkles")
+    static func name(filled: Bool) -> String { filled ? symbol("text.bubble.badge.sparkles.fill") : name }
+
+    private static func symbol(_ preferred: String) -> String {
+        NSImage(systemSymbolName: preferred, accessibilityDescription: nil) != nil ? preferred : "sparkles"
+    }
+}
+
+// MARK: Pages
+
+extension View {
+    /// Tells the Radio DJ about an album, artist or item page while it shows: what the DJ opens with when it's put on
+    /// the air here, and what it hears about when you move here with it on. `subject` is read when needed.
+    func radioDJ(_ subject: @escaping () -> RadioDJSubject) -> some View {
+        modifier(RadioDJPageModifier(subject: subject))
+    }
+}
+
+/// Tells the DJ an album, artist or item page is showing (the page's own details beat what the sidebar says).
+private struct RadioDJPageModifier: ViewModifier {
+    @Environment(AppModel.self) private var model
+    let subject: () -> RadioDJSubject
+    @State private var pageID = UUID()
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { model.radioDJ.showing(page: pageID, subject: subject) }
+            .onDisappear { model.radioDJ.left(page: pageID) }
+    }
+}
+
+/// The DJ's button in the window's toolbar, on every page: puts the DJ on the air about where you are, or takes it
+/// off.
+struct RadioDJToolbarButton: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let dj = model.radioDJ
+        Button {
+            if dj.session == nil { model.startRadioDJ(model.radioDJLocation) } else { dj.endSession() }
+        } label: {
+            Label(dj.session == nil ? "On Air" : "Off Air", systemImage: RadioDJIcon.name(filled: dj.session != nil))
+        }
+        .help(dj.session == nil ? "Ask \(dj.displayName) about what you're looking at" : "Send \(dj.displayName) off the air")
+    }
+}
+
+extension AppModel {
+    /// Puts the DJ on the air about `subject`, with the collection to search and link to.
+    func startRadioDJ(_ subject: RadioDJSubject) {
+        let linker = RadioDJLinker(tracks: tracks, collection: collection, subject: subject)
+        radioDJ.begin(radioDJ.makeSession(subject, library: radioDJLibrary, linker: linker))
+    }
+
+    /// A link in the DJ's words: pages open as usual (the DJ stays on the air beside them); songs play in their album.
+    func openRadioDJ(_ reference: RadioDJReference) {
+        func albumOfTrack(_ id: Int64) -> (AlbumSummary, [Track])? {
+            guard let track = trackByID[id] else { return nil }
+            let key = SearchIndex.albumKey(album: track.album, artist: track.effectiveAlbumArtist)
+            return album(forKey: key).map { ($0, tracks(ofAlbumKey: key)) }
+        }
+        func show(_ album: AlbumSummary) {
+            nowPlayingExpanded = false
+            navigationPath.append(album)
+        }
+        switch reference {
+        case .artist(let name): showArtist(named: name)
+        case .album(let key): if let found = album(forKey: key) { show(found) }
+        case .item(let id): showItem(id: id)
+        case .song(let id): if let (found, _) = albumOfTrack(id) { show(found) }
+        case .play(let id):
+            guard let (found, tracks) = albumOfTrack(id), let index = tracks.firstIndex(where: { $0.id == id }) else { return }
+            player.play(queue: tracks, startAt: index, source: found.album)
+        case .preview(let title, let artist):
+            playRadioDJPreview(title: title, artist: artist)
+        }
+    }
+
+    /// A song not in the collection: its Apple Music preview, found by searching Apple's catalog (once per song), or
+    /// paused and resumed when it's the one playing.
+    func playRadioDJPreview(title: String, artist: String?) {
+        let dj = radioDJ
+        let key = "\(title)|\(artist ?? "")"
+        if let current = previews.current, case let cached?? = dj.previewCache[key], cached.id == current.id {
+            previews.togglePlayPause()
+            return
+        }
+        if let cached = dj.previewCache[key] {
+            if let track = cached { previews.play([track]) } else { dj.previewNote = "Apple Music has no preview of “\(title)”." }
+            return
+        }
+        dj.previewNote = "Finding a preview of “\(title)”…"
+        let client = dj.previewClient
+        Task {
+            let found = try? await client.searchSongs(term: [title, artist].compactMap { $0 }.joined(separator: " "))
+            let track = found.flatMap { ApplePreviewMatcher.bestSong($0, title: title, artist: artist) }
+            if found != nil { dj.previewCache[key] = .some(track) }
+            if let track {
+                dj.previewNote = nil
+                previews.play([track])
+            } else {
+                let note = found == nil ? "Couldn't reach Apple Music for a preview." : "Apple Music has no preview of “\(title)”."
+                dj.previewNote = note
+                try? await Task.sleep(for: .seconds(5))
+                if dj.previewNote == note { dj.previewNote = nil }
+            }
+        }
+    }
+}
+
+/// The DJ's booth, a pane beside the window's pages that stays while you browse: who's on, what they're saying (with
+/// the pages they checked), and a line to talk back. On another album or artist page than the one being talked
+/// about, it offers to talk about that one, and messages tell the DJ where you are.
+struct RadioDJPanel: View {
+    static let width: CGFloat = 370
+    private static let bottom = "bottom"
+
+    @Environment(\.theme) private var theme
+    let session: RadioDJSession
+    let dj: RadioDJStore
+    let previews: PreviewPlayer
+    let open: (RadioDJReference) -> Void
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 18) {
+                        ForEach(session.lines) { line in
+                            RadioDJLineView(line: line, segments: line.role == .dj ? session.segments(line) : [],
+                                            speaking: session.activity == .speaking && line.id == session.lines.last?.id)
+                                .id(line.id)
+                        }
+                        if let status = statusText { RadioDJStatusRow(text: status).id("status") }
+                        if let error = session.error { errorRow(error) }
+                        Color.clear.frame(height: 1).id(Self.bottom)
+                    }
+                    .padding(16)
+                }
+                .defaultScrollAnchor(.bottom)
+                .environment(\.openURL, OpenURLAction { url in
+                    if let reference = RadioDJReference(url: url) { open(reference); return .handled }
+                    return url.isWebLink ? .systemAction : .discarded
+                })
+                // Follow the conversation: your question, the status line, the reply as it streams in, an error.
+                .onChange(of: session.scrollKey) { proxy.scrollTo(Self.bottom, anchor: .bottom) }
+            }
+            Divider()
+            composer
+        }
+        .background(theme.background)
+        .overlay(alignment: .leading) { Rectangle().fill(theme.separator).frame(width: 1) }
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            OnAirSign(live: session.isBusy)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(session.name).font(.headline).lineLimit(1)
+                Text(RadioDJ.attributed(session.subject.headline)).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            Button { dj.endSession() } label: {
+                Image(systemName: "xmark.circle.fill").font(.title3).symbolRenderingMode(.hierarchical)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.subtext)
+            .help("Off the air")
+        }
+        .padding(.horizontal, 16).padding(.vertical, 12)
+        .background(theme.card.opacity(0.6))
+    }
+
+    private var statusText: String? {
+        switch session.activity {
+        case .idle, .speaking: return nil
+        case .warmingUp: return "Warming up the turntables…"
+        case .searching(let q): return q.isEmpty ? "Digging through the crates…" : "Digging through the crates: “\(q)”"
+        case .reading(let host): return host.isEmpty ? "Reading up…" : "Reading up on \(host)…"
+        case .browsing(let q): return q.isEmpty ? "Flipping through your shelves…" : "Flipping through your shelves: \(q)"
+        }
+    }
+
+    private func errorRow(_ error: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(error, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.orange)
+            Button("Try Again") { session.retry() }.controlSize(.small)
+        }
+    }
+
+    @ViewBuilder
+    private var previewRow: some View {
+        if let note = dj.previewNote {
+            Label(note, systemImage: "headphones").font(.caption).foregroundStyle(.subtext)
+        } else if let track = previews.current, previews.isPlaying {
+            HStack(spacing: 8) {
+                Image(systemName: "headphones").foregroundStyle(theme.accent)
+                Text("Preview: “\(track.title)” — \(track.artist)").font(.caption).lineLimit(1)
+                Spacer(minLength: 0)
+                Button("Stop") { previews.stop() }.controlSize(.small)
+            }
+        }
+    }
+
+    private var composer: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            previewRow
+            if let page = dj.hereTopic, session.isElsewhere(page), !session.isBusy {
+                Button {
+                    session.send("Tell me about this one.", page: dj.here)
+                } label: {
+                    Label { Text(RadioDJ.attributed("Tell me about \(page.headline)")).lineLimit(1) } icon: { Image(systemName: RadioDJIcon.name) }
+                        .font(.callout)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(Capsule().fill(theme.fill))
+                }
+                .buttonStyle(.plain)
+                .help("Ask \(session.name) about the page you're on")
+            }
+            HStack(alignment: .bottom, spacing: 8) {
+                TextField("Ask \(session.name) anything…", text: $draft, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .lineLimit(1...5)
+                    .focused($focused)
+                    .onSubmit(send)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(theme.fill))
+                Button(action: send) {
+                    Image(systemName: "arrow.up.circle.fill").font(.system(size: 26))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(canSend ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.tertiary))
+                .disabled(!canSend)
+                .help("Send")
+            }
+            Text("This segment: about \(DollarFormat.string(session.cost))")
+                .font(.caption2).foregroundStyle(.subtext)
+                .padding(.leading, 4)
+        }
+        .padding(12)
+        .onAppear { focused = true }
+    }
+
+    private var canSend: Bool { !session.isBusy && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    private func send() {
+        guard canSend else { return }
+        session.send(draft, page: dj.here)
+        draft = ""
+    }
+}
+
+private struct RadioDJLineView: View {
+    @Environment(\.theme) private var theme
+    let line: RadioDJSession.Line
+    let segments: [RadioDJSegment]
+    let speaking: Bool
+
+    var body: some View {
+        switch line.role {
+        case .listener:
+            HStack {
+                Spacer(minLength: 40)
+                Text(line.text)
+                    .textSelection(.enabled)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(theme.accent))
+            }
+        case .dj:
+            HStack(alignment: .top, spacing: 10) {
+                DJAvatar(speaking: speaking)
+                VStack(alignment: .leading, spacing: 10) {
+                    // Not selectable: on the Mac, selectable text opens its links with the system, not `openURL`.
+                    RadioDJText.text(segments, accent: theme.accent)
+                        .font(.body)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .contextMenu {
+                            Button("Copy") {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(RadioDJText.plain(segments), forType: .string)
+                            }
+                        }
+                    if !line.sources.isEmpty {
+                        FlowLayout(spacing: 6) {
+                            ForEach(line.sources) { source in
+                                Link(destination: source.url) {
+                                    Label(source.host, systemImage: "link").font(.caption).lineLimit(1)
+                                        .padding(.horizontal, 8).padding(.vertical, 3)
+                                        .background(Capsule().fill(theme.fill))
+                                }
+                                .buttonStyle(.plain)
+                                .help(source.title)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct RadioDJStatusRow: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            EqualizerBars().frame(width: 28, height: 16)
+            Text(text).font(.callout).italic().foregroundStyle(.subtext).lineLimit(2)
+        }
+        .padding(.leading, 2)
+    }
+}
+
+/// The red sign over the studio door, glowing while the DJ is talking or looking something up.
+struct OnAirSign: View {
+    let live: Bool
+
+    var body: some View {
+        Text("ON AIR")
+            .font(.system(size: 10, weight: .heavy, design: .rounded))
+            .tracking(1.5)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(RoundedRectangle(cornerRadius: 5).fill(Color.red.gradient))
+            .shadow(color: .red.opacity(live ? 0.8 : 0.25), radius: live ? 7 : 2)
+            .animation(live ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true) : .default, value: live)
+    }
+}
+
+private struct DJAvatar: View {
+    let speaking: Bool
+
+    var body: some View {
+        ZStack {
+            Circle().fill(LinearGradient(colors: [.orange, .pink], startPoint: .topLeading, endPoint: .bottomTrailing))
+            if speaking {
+                EqualizerBars(color: .white).frame(width: 14, height: 12)
+            } else {
+                Image(systemName: "music.mic").font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+            }
+        }
+        .frame(width: 30, height: 30)
+    }
+}
+
+/// Four bars bouncing like a VU meter.
+struct EqualizerBars: View {
+    var color: Color = .orange
+
+    var body: some View {
+        TimelineView(.animation) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            GeometryReader { geo in
+                HStack(alignment: .bottom, spacing: geo.size.width * 0.12) {
+                    ForEach(0..<4) { i in
+                        let level = 0.3 + 0.7 * abs(sin(t * (3.1 + Double(i) * 0.9) + Double(i) * 1.7))
+                        RoundedRectangle(cornerRadius: 1.5).fill(color)
+                            .frame(height: geo.size.height * level)
+                    }
+                }
+                .frame(maxHeight: .infinity, alignment: .bottom)
+            }
+        }
+    }
+}
+
+/// The DJ's words in one `Text` (so they select and wrap as one): links to the collection, and songs to play with a
+/// play icon before them. Links to what you own are in the accent color, the rest (previews, web pages) in `outside`.
+enum RadioDJText {
+    static let outside = Color.purple
+
+    /// What the line says, without links (for Copy).
+    static func plain(_ segments: [RadioDJSegment]) -> String {
+        segments.map { segment in
+            switch segment {
+            case .text(let words), .play(let words), .preview(let words), .external(let words): String(words.characters)
+            }
+        }.joined()
+    }
+
+    static func text(_ segments: [RadioDJSegment], accent: Color) -> Text {
+        segments.reduce(Text(verbatim: "")) { text, segment in
+            switch segment {
+            case .text(let words):
+                return Text("\(text)\(words)")
+            case .play(let title):
+                let icon = Text(Image(systemName: "play.circle.fill")).foregroundStyle(accent)
+                return Text("\(text)\(icon)\u{202F}\(title)")
+            case .preview(var title):
+                // Not yours: a 30-second sample, in headphones rather than the play button, in the not-yours color.
+                title.foregroundColor = outside
+                let icon = Text(Image(systemName: "headphones.circle")).foregroundStyle(outside)
+                return Text("\(text)\(icon)\u{202F}\(title)")
+            case .external(var title):
+                // Not yours: opens a page on the web.
+                title.foregroundColor = outside
+                let icon = Text(Image(systemName: "arrow.up.right.square")).font(.caption).foregroundStyle(outside)
+                return Text("\(text)\(title)\u{202F}\(icon)")
+            }
+        }
+    }
+}
+
+// MARK: Settings
+
+struct RadioDJSettings: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var dj = model.radioDJ
+        Form {
+            Section {
+                HStack(alignment: .top, spacing: 14) {
+                    Image(systemName: RadioDJIcon.name).font(.system(size: 28)).foregroundStyle(.orange)
+                    Text("Switch on a radio DJ on album and artist pages: they tell you the story behind the music, the people who made it and how it connects to everything else, and answer your questions, including about what's in your own collection. Powered by Claude, looking things up on the web as they talk (only the rows a collection search finds are sent). Off until you add an API key; summon them on each page with On Air in the toolbar.")
+                        .font(.callout).foregroundStyle(.subtext)
+                }
+            }
+            Section {
+                HStack {
+                    SecureField("API key", text: $dj.apiKey)
+                        .font(.system(.body, design: .monospaced))
+                    Button("Check") { dj.checkKey() }
+                        .disabled(!dj.isEnabled || dj.keyStatus == .checking)
+                }
+                keyStatus(dj)
+                Link("Get an API key at platform.claude.com", destination: URL(string: "https://platform.claude.com/settings/keys")!)
+                    .font(.caption)
+            } header: {
+                Text("Claude API")
+            } footer: {
+                Text("Stored in your keychain and handed to your iPhone when you sync. Remove it to turn the DJ off on both.")
+                    .font(.caption).foregroundStyle(.subtext)
+            }
+            Section {
+                TextField("DJ's name", text: $dj.name, prompt: Text(RadioDJ.defaultName))
+                TextField("Your name", text: $dj.listenerName, prompt: Text("Optional"))
+            } header: {
+                Text("On the air")
+            } footer: {
+                Text("What the DJ calls themself, and what they call you (now and then, like a regular caller). The DJ runs on the best Claude model for the job, chosen automatically.")
+                    .font(.caption).foregroundStyle(.subtext)
+            }
+            spending(dj)
+        }
+        .formStyle(.grouped)
+        .themedScrollBackground()
+        .frame(height: 720)
+    }
+
+    @ViewBuilder
+    private func keyStatus(_ dj: RadioDJStore) -> some View {
+        switch dj.keyStatus {
+        case .unchecked:
+            LabeledContent("Status") {
+                Text(dj.isEnabled ? "Ready (not checked yet)" : "Off: no API key").foregroundStyle(.subtext)
+            }
+        case .checking:
+            LabeledContent("Status") { HStack { ProgressView().controlSize(.small); Text("Checking…").foregroundStyle(.subtext) } }
+        case .valid:
+            LabeledContent("Status") { Label("The key works", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
+        case .invalid(let message):
+            LabeledContent("Status") { Label(message, systemImage: "exclamationmark.circle.fill").foregroundStyle(.orange) }
+        }
+    }
+
+    private func spending(_ dj: RadioDJStore) -> some View {
+        let phones = model.iPhone.phones.compactMap { phone in phone.radioDJUsage.map { (phone, $0) } }
+        let month = phones.reduce(dj.usage.month()) { $0 + $1.1.month() }
+        let all = phones.reduce(dj.usage.allTime) { $0 + $1.1.allTime }
+        return Section {
+            LabeledContent("This month") { Text(DollarFormat.string(month.dollars)).monospacedDigit().fontWeight(.semibold) }
+            LabeledContent("All time") { Text(DollarFormat.string(all.dollars)).monospacedDigit() }
+            if !phones.isEmpty {
+                LabeledContent("This Mac") { amounts(dj.usage) }
+                ForEach(phones, id: \.0.id) { phone, usage in
+                    LabeledContent(phone.name) { amounts(usage) }
+                }
+            }
+            LabeledContent("Segments") {
+                Text("\(all.segments) on the air, \(all.webSearches) web search\(all.webSearches == 1 ? "" : "es")").foregroundStyle(.subtext)
+            }
+        } header: {
+            Text("Spending")
+        } footer: {
+            Text("Calendar months (UTC), as Anthropic bills. Estimated at Claude API list prices (Claude Opus 5.5: $4 per million input tokens, $20 per million output tokens; web searches $10 per 1,000). iPhone amounts are as of each phone's last sync. Your actual bill is at platform.claude.com.")
+                .font(.caption).foregroundStyle(.subtext)
+        }
+    }
+
+    private func amounts(_ usage: RadioDJUsage) -> some View {
+        Text("\(DollarFormat.string(usage.month().dollars)) this month · \(DollarFormat.string(usage.allTime.dollars)) in all")
+            .monospacedDigit().foregroundStyle(.subtext)
+    }
+}
+
+// MARK: What's on the page
+
+extension AppModel {
+    /// What the DJ's collection search reads, as it is now.
+    var radioDJLibrary: RadioDJLibrary {
+        RadioDJLibrary(index: index, collectionIndex: collectionIndex, collection: collection, playTotals: playTotals, likedDates: likedDates,
+                       plays: (try? database?.plays()) ?? [], albumInfos: albumInfo.infos, currencyCode: currencyCode)
+    }
+
+    /// Where you are, for the DJ: the album, artist or item page showing, else what the sidebar shows (or the search).
+    var radioDJLocation: RadioDJSubject {
+        if let page = radioDJ.page { return page.subject() }
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        if !query.isEmpty {
+            return .page("search results for “\(query)”", details: ["The listener searched their collection for \(query); search_collection with the same query shows the results."])
+        }
+        switch sidebar {
+        case .collection(let scope)?:
+            let page = scope == .downloads ? "the Downloads list of their digital collection" : "the \(scope.title) page of their physical collection"
+            return .page(page, details: ["\(collection.count(scope)) items here; \(collection.count(.cds)) CDs, \(collection.count(.vinyl)) records, \(collection.count(.downloads)) downloads in all"])
+        case .songs?: return .page("the Songs list of their digital collection", details: ["\(tracks.count) songs"])
+        case .albums?: return .page("the Albums grid of their digital collection", details: ["\(albums.count) albums"])
+        case .artists?: return .page("the Artists list (both collections)", details: ["\(allArtists.count) artists"])
+        case .insights?:
+            let pane = UserDefaults.standard.string(forKey: "insightsPane") ?? "Owned"
+            let period = UserDefaults.standard.string(forKey: "listeningPeriod") ?? ListeningStats.Period.month.rawValue
+            let shown = pane == "Listening" ? "Listening, \(period)" : pane == "Library" ? "Digital Collection" : pane
+            return .page("Insights (\(shown))", details: ["Their collection statistics; collection_stats has the numbers on screen."])
+        case .musicDNA?:
+            return .page("Music DNA" + (dnaCenter.map { ", centered on \($0)" } ?? ""),
+                         details: ["A map of who played, wrote and produced with whom across their collection."])
+        case .concerts?: return .page("the Concerts page", details: ["Upcoming concerts near them by artists in their collections."])
+        case .likedSongs?: return .page("their Liked Songs", details: ["\(likedDates.count) liked songs"])
+        case .playlist(let id)?:
+            let playlist = playlists.first { $0.id == id }
+            return .page("their playlist “\(playlist?.name ?? "Untitled")”", details: ["\(playlist?.trackCount ?? 0) songs"])
+        case .smartPlaylist(let id)?:
+            let playlist = smartPlaylists.first { $0.id == id }
+            return .page("their smart playlist “\(playlist?.name ?? "Untitled")”", details: ["Songs matching \(playlist?.query ?? ""); search_collection with that query lists them."])
+        case .importQueue?: return .page("the Import page")
+        case .digitizeVinyl?: return .page("Digitize Vinyl, where they record their records")
+        case .exportList?: return .page("the Export List")
+        case .iPhone?: return .page("the iPhone sync page")
+        case .catalog?: return .page("their public library's CD catalog")
+        case .catalogCheckouts?: return .page("their public library checkouts")
+        case .catalogList?: return .page("their public library list")
+        case .cdShop?: return .page("Shop for CDs")
+        case .cd?: return .page("the page of the CD in the drive")
+        case nil: return .page("Music Library")
+        }
+    }
+
+    private func plays(_ tracks: [Track]) -> Int { tracks.reduce(0) { $0 + (playTotals[$1.id]?.plays ?? 0) } }
+    private func liked(_ tracks: [Track]) -> Int { tracks.filter { likedDates[$0.id] != nil }.count }
+
+    func radioDJSubject(album: AlbumSummary) -> RadioDJSubject {
+        let tracks = tracks(of: album)
+        return .album(album, tracks: tracks, info: albumInfo.info(for: album),
+                      items: collection.copies(albumKey: AlbumInfoStore.key(album)), plays: plays(tracks), liked: liked(tracks))
+    }
+
+    func radioDJSubject(item: CollectionItem) -> RadioDJSubject {
+        let tracks = tracks(ofAlbumKey: item.albumKey)
+        return .item(item, tracks: tracks, info: albumInfo.infos[item.albumKey], plays: plays(tracks), liked: liked(tracks))
+    }
+
+    func radioDJSubject(artist name: String) -> RadioDJSubject {
+        let tracks = tracks(ofArtist: name)
+        let top = tracks.map { ($0, playTotals[$0.id]?.plays ?? 0) }.filter { $0.1 > 0 }.sorted { $0.1 > $1.1 }
+            .prefix(5).map { "“\($0.0.title)” (\($0.1) plays)" }
+        return .artist(name, info: artistInfo.info(for: name), albums: albums(forArtist: name), tracks: tracks,
+                       items: collection.items(artist: name), plays: plays(tracks), topSongs: Array(top))
+    }
+}

@@ -103,6 +103,8 @@ struct CollectionHome: View {
         }
         .background(Color(.systemGroupedBackground))
         .refreshable { model.reload() }
+        .radioDJPage(.page("the Physical Collection home", details: [
+            "\(collection.count(.cds)) CDs, \(collection.count(.vinyl)) records, \(collection.count(.downloads)) downloads; \(collection.count(.toDigitize)) to digitize; \(ready.count) ready to download to this iPhone"]))
     }
 
     private var sampleNote: some View {
@@ -452,6 +454,8 @@ struct CollectionListPage: View {
             }
         }
         .navigationTitle(title ?? scope.title)
+        .radioDJPage(.page("the \(title ?? scope.title) list of their \(scope == .downloads ? "digital" : "physical") collection",
+                           details: ["\(model.collection.count(scope)) items" + (query.map { ", matching \($0)" } ?? "")]))
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $text, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Filter, or a label like 12")
         .autocorrectionDisabled()

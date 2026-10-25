@@ -214,6 +214,13 @@ public actor ApplePreviewClient {
         return try await fetch("search", ["term": term, "media": "music", "entity": "album", "limit": "15"])
     }
 
+    /// Songs matching free text (title and artist), each with its preview when Apple has one.
+    public func searchSongs(term: String) async throws -> [ApplePreviewTrack] {
+        let term = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty else { return [] }
+        return try await fetch("search", ["term": term, "media": "music", "entity": "song", "limit": "15"]).flatMap(\.tracks)
+    }
+
     func fetch(_ endpoint: String, _ params: [String: String]) async throws -> [AppleAlbum] {
         try await throttle()
         return try ApplePreviewParser.parseAlbums(try await get(Self.url(endpoint, params, country: country)))
@@ -288,6 +295,17 @@ public enum ApplePreviewMatcher {
         }
         if let r = s.range(of: " - "), r.lowerBound > s.startIndex { s = String(s[..<r.lowerBound]) }
         return CatalogText.key(s)
+    }
+
+    /// The search result that is this song with a preview: the same title (without "(Remastered)" and the like) by a
+    /// compatible artist (any, when no artist is given), the shortest title first.
+    public static func bestSong(_ candidates: [ApplePreviewTrack], title: String, artist: String?) -> ApplePreviewTrack? {
+        let key = songKey(title)
+        let artistTokens = artist.map(CatalogOwnership.tokens) ?? []
+        return candidates
+            .filter { $0.previewURL != nil && songKey($0.title) == key }
+            .filter { artistTokens.isEmpty || CatalogOwnership.compatible(artistTokens, CatalogOwnership.tokens($0.artist)) }
+            .min { $0.title.count < $1.title.count }
     }
 
     /// A song of a track list (disc, number, title).

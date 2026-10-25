@@ -7,6 +7,15 @@ struct SyncTab: View {
     var body: some View {
         let sync = model.sync
         NavigationStack {
+            syncList(sync)
+                .radioDJPage(.page("the Sync page, for syncing with Music Library on their Mac"))
+                .radioDJButton()
+        }
+    }
+
+    @ViewBuilder
+    private func syncList(_ sync: PhoneSync) -> some View {
+        Group {
             List {
                 if model.isSample {
                     Section {

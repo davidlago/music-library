@@ -283,6 +283,8 @@ final class AppModel {
     @ObservationIgnored let catalog = LibraryCatalogStore()
     /// Upcoming concerts near home.
     @ObservationIgnored let concerts = ConcertStore()
+    /// The Radio DJ (off without a Claude API key).
+    @ObservationIgnored let radioDJ = RadioDJStore()
     /// Shopping for new and used CDs.
     @ObservationIgnored let cdShop = CDShopStore()
     /// Wi-Fi sync to the iPhone app.
@@ -342,6 +344,7 @@ final class AppModel {
             self.historyVersion += 1
         }
         iPhone.context = { [unowned self] in self.syncContext }
+        radioDJ.location = { [unowned self] in self.radioDJLocation }
         iPhone.startListening()
         artistInfo.onAutoSyncEnabled = { [unowned self] in self.syncArtistInfo() }
         catalog.makeEnricher = { [unowned self] client in
@@ -1646,7 +1649,8 @@ final class AppModel {
 
     func syncIPhone(_ phone: SyncStore.PairedPhone) { iPhone.sync(phone) }
 
-    /// What a sync with the iPhone needs: the library, and the Last.fm account and concert settings to hand over.
+    /// What a sync with the iPhone needs: the library, and the Last.fm account, concert settings and Radio DJ to hand
+    /// over.
     private var syncContext: SyncContext? {
         guard let database else { return nil }
         var lastFM: SyncLastFM?
@@ -1659,6 +1663,7 @@ final class AppModel {
                                                   ticketmasterKey: concerts.ticketmasterKey, jambaseKey: concerts.jambaseKey)
         }
         return SyncContext(libraryRoot: libraryRoot, database: database, lastFM: lastFM, concerts: concertSettings,
+                           radioDJ: radioDJ.syncSettings,
                            library: tracks, tracks: { [unowned self] in self.tracks(for: $0) }, collection: collection,
                            collectionReady: collectionLoaded)
     }

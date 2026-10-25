@@ -41,6 +41,8 @@ final class PhoneModel {
     let scrobbler = Scrobbler(openURL: { UIApplication.shared.open($0) })
     let sync = PhoneSync()
     let concerts = PhoneConcerts()
+    /// The Radio DJ, on once the Mac has handed over a Claude API key.
+    let radioDJ = PhoneRadioDJ()
     /// Plays and likes since the last sync (and ownership changes from versions that could edit it here).
     @ObservationIgnored let outbox = SyncOutbox(url: URL.applicationSupportDirectory.appendingPathComponent("sync-outbox.json"))
     /// The same, for the sample library; never sent anywhere.
@@ -139,6 +141,9 @@ final class PhoneModel {
             self?.refreshOverlays()
         }
         sync.storeConcerts = { [weak self] settings in self?.concerts.adopt(settings) }
+        sync.storeRadioDJ = { [weak self] settings in self?.radioDJ.adopt(settings) }
+        sync.radioDJUsage = { [weak self] in self?.radioDJ.usage }
+        radioDJ.location = { [weak self] in self?.radioDJLocation }
         sync.isLastFMConnected = { [weak self] in
             if case .connected = self?.scrobbler.status { return true }
             return false
@@ -149,6 +154,8 @@ final class PhoneModel {
                             session: LastFMSession(key: account.sessionKey, username: account.username))
         }
         player.onTrackStart = { [weak self] track in
+            // A DJ preview stops when your own music starts.
+            self?.radioDJ.previews.stop()
             if self?.isSample == false { self?.scrobbler.trackStarted(track) }
             self?.startPlay(track)
             self?.savePlayerState()

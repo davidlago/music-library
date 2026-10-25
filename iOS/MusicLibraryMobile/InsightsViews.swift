@@ -64,6 +64,8 @@ struct InsightsTab: View {
         LibraryStack {
             content
                 .navigationTitle("Insights")
+                .radioDJPage(.page("Insights (\(pane == .listening ? "Listening, \(period.rawValue)" : pane == .library ? "Digital Collection" : pane.rawValue))",
+                                   details: ["Their collection statistics; collection_stats has the numbers on screen."]))
                 .onAppear(perform: load)
                 .onChange(of: model.libraryVersion) { load() }
                 .onChange(of: model.historyVersion) { load() }

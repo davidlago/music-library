@@ -28,6 +28,8 @@ struct LibraryTab: View {
                 }
             }
             .navigationTitle("Digital Collection")
+            .radioDJPage(.page("the Digital Collection home", details: [
+                "\(model.library?.tracks.count ?? 0) songs, \(model.library?.albums.count ?? 0) albums; \(model.library?.presentIDs.count ?? 0) songs on this iPhone"]))
             .toolbar {
                 Button("Settings", systemImage: "gearshape") { showSettings = true }
             }
@@ -187,15 +189,17 @@ private struct LibraryHome: View {
 
 extension View {
     /// Where library links go; every tab's stack uses the same pages.
-    func libraryDestinations() -> some View {
-        navigationDestination(for: LibraryRoute.self) { LibraryRoutePage(route: $0) }
-            .navigationDestination(for: AlbumSummary.self) { AlbumPage(album: $0) }
-            .navigationDestination(for: ArtistSummary.self) { ArtistPage(artist: $0) }
-            .navigationDestination(for: ArtistNameRoute.self) { ArtistPage(name: $0.name) }
-            .navigationDestination(for: DNARoute.self) { MusicDNAPage(name: $0.name) }
-            .navigationDestination(for: QueryRoute.self) { QueryPage(route: $0) }
-            .navigationDestination(for: CollectionRoute.self) { CollectionRoutePage(route: $0) }
-            .navigationDestination(for: CollectionItemRoute.self) { CollectionItemPage(id: $0.id) }
+    /// `djButton`: every page has the Radio DJ's button at the top (not in sheets, which can't show the DJ's).
+    func libraryDestinations(djButton: Bool = true) -> some View {
+        radioDJButton(djButton)
+            .navigationDestination(for: LibraryRoute.self) { LibraryRoutePage(route: $0).radioDJButton(djButton) }
+            .navigationDestination(for: AlbumSummary.self) { AlbumPage(album: $0).radioDJButton(djButton) }
+            .navigationDestination(for: ArtistSummary.self) { ArtistPage(artist: $0).radioDJButton(djButton) }
+            .navigationDestination(for: ArtistNameRoute.self) { ArtistPage(name: $0.name).radioDJButton(djButton) }
+            .navigationDestination(for: DNARoute.self) { MusicDNAPage(name: $0.name).radioDJButton(djButton) }
+            .navigationDestination(for: QueryRoute.self) { QueryPage(route: $0).radioDJButton(djButton) }
+            .navigationDestination(for: CollectionRoute.self) { CollectionRoutePage(route: $0).radioDJButton(djButton) }
+            .navigationDestination(for: CollectionItemRoute.self) { CollectionItemPage(id: $0.id).radioDJButton(djButton) }
     }
 }
 
@@ -215,17 +219,22 @@ private struct LibraryRoutePage: View {
             case .albums:
                 AlbumGrid(albums: scoped(library.albums) { library.tracks(album: $0) }, library: library)
                     .navigationTitle("Albums")
+                    .radioDJPage(.page("the Albums list of their digital collection", details: ["\(library.albums.count) albums"]))
             case .songs:
                 TrackListPage(title: "Songs", tracks: scope == .onPhone ? library.presentTracks : library.tracks, sortable: true)
+                    .radioDJPage(.page("the Songs list of their digital collection", details: ["\(library.tracks.count) songs"]))
             case .liked:
                 TrackListPage(title: "Liked Songs", tracks: scopedTracks(model.likedTracks), item: .likedSongs)
+                    .radioDJPage(.page("their Liked Songs", details: ["\(model.likedTracks.count) liked songs"]))
             case .playlist(let id):
                 if let item = library.playlists.first(where: { $0.id == id }) {
                     TrackListPage(title: item.playlist.name, tracks: item.tracks, item: .playlist(id))
+                        .radioDJPage(.page("their playlist “\(item.playlist.name)”", details: ["\(item.tracks.count) songs: " + item.tracks.prefix(30).map { "“\($0.title)” by \($0.artist)" }.joined(separator: ", ")]))
                 }
             case .smartPlaylist(let id):
                 if let p = library.smartPlaylists.first(where: { $0.id == id }) {
                     TrackListPage(title: p.name, tracks: scopedTracks(library.tracks(smartPlaylist: p)), item: .smartPlaylist(id))
+                        .radioDJPage(.page("their smart playlist “\(p.name)”", details: ["Songs matching \(p.query); search_collection with that query lists them."]))
                 }
             }
         } else {

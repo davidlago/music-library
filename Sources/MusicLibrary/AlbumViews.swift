@@ -52,6 +52,7 @@ struct AlbumDetail: View {
                 }
             }
         }
+        .radioDJ { [model, album] in model.radioDJSubject(album: album) }
         .navigationTitle(title)
         .toolbar {
             ToolbarItem { AddToExportListButton(album: album) }

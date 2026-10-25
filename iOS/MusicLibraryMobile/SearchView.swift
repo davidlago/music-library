@@ -24,6 +24,8 @@ struct SearchTab: View {
                 }
             }
             .navigationTitle("Search")
+            .radioDJPage(text.trimmingCharacters(in: .whitespaces).isEmpty ? .page("Search")
+                : .page("search results for “\(text)”", details: ["\(results.library.tracks.count) songs, \(results.library.albums.count) albums, \(results.items.count) copies; search_collection with the same query shows them."]))
         }
         .searchable(text: $text, prompt: "Songs, albums, artists, or artist:…")
         .autocorrectionDisabled()
@@ -66,6 +68,7 @@ struct QueryPage: View {
         }
         .navigationTitle(route.title ?? route.query)
         .navigationBarTitleDisplayMode(.inline)
+        .radioDJPage(.page("the list “\(route.title ?? route.query)”", details: ["Everything matching \(route.query); search_collection with that query shows it."]))
         .task(id: "\(route.query)|\(model.libraryVersion)|\(model.collectionVersion)") {
             guard let index = model.library?.index else { return }
             let query = route.query

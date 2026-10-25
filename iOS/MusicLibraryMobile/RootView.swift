@@ -68,6 +68,7 @@ struct RootView: View {
         .sheet(item: Binding(get: { model.infoTrack }, set: { model.infoTrack = $0 })) { track in
             SongInfoSheet(track: track)
         }
+        .radioDJSheet(model, player: player)
         .onOpenURL { url in GlanceLink(url: url).map(open) }
         // Siri and Shortcuts (`OpenCollectionItemIntent`), possibly before this view existed.
         .onChange(of: model.pendingLink, initial: true) { _, link in

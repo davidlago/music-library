@@ -26,6 +26,13 @@ struct MainWindow: View {
             // launch, crashed the app).
             HStack(spacing: 0) {
                 splitView
+                // The Radio DJ stays on the air beside the pages while you browse.
+                if let session = model.radioDJ.session {
+                    RadioDJPanel(session: session, dj: model.radioDJ, previews: model.previews) { model.openRadioDJ($0) }
+                        .frame(width: RadioDJPanel.width)
+                        .layoutPriority(1)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
                 if model.showsQueue {
                     Divider()
                     QueueView().frame(width: 300)
@@ -46,6 +53,7 @@ struct MainWindow: View {
             }
         }
         .animation(.spring(duration: 0.35), value: expanded)
+        .animation(.easeInOut(duration: 0.25), value: model.radioDJ.session == nil)
         .onChange(of: model.player.currentTrack == nil) { _, noTrack in
             if noTrack { model.nowPlayingExpanded = false }
         }
@@ -76,6 +84,11 @@ struct MainWindow: View {
         .toolbarBackground(theme.toolbar, for: .windowToolbar)
         .toolbarBackground(theme.isThemed ? .visible : .automatic, for: .windowToolbar)
         .searchable(text: $model.searchText, placement: .toolbar, prompt: "Search or filter (genre:jazz)")
+        .toolbar {
+            if model.radioDJ.isEnabled {
+                ToolbarItem(placement: .primaryAction) { RadioDJToolbarButton() }
+            }
+        }
         .searchSuggestions { SearchSuggestions() }
         .onSubmit(of: .search) { model.recordRecentSearch() }
         .dropDestination(for: URL.self) { urls, _ in

@@ -49,6 +49,10 @@ final class PhoneSync {
     @ObservationIgnored var onEventsDelivered: (Set<String>, Set<String>) -> Void = { _, _ in }
     /// Keeps the Mac's concert settings.
     @ObservationIgnored var storeConcerts: (SyncConcertSettings) -> Void = { _ in }
+    /// Keeps the Mac's Radio DJ key and name.
+    @ObservationIgnored var storeRadioDJ: (SyncRadioDJ) -> Void = { _ in }
+    /// What the Radio DJ has cost on this phone, for the Mac's settings.
+    @ObservationIgnored var radioDJUsage: () -> RadioDJUsage? = { nil }
     @ObservationIgnored var isLastFMConnected: () -> Bool = { true }
     /// Gets the Mac's Last.fm account when this phone isn't connected.
     @ObservationIgnored var adoptLastFM: (SyncLastFM) -> Void = { _ in }
@@ -218,6 +222,7 @@ final class PhoneSync {
             .volumeAvailableCapacityForImportantUsage
         let (events, requests, libraryID) = pairing ? ([], [], nil) : pendingEvents()
         let lastFMConnected = isLastFMConnected()
+        let djUsage = radioDJUsage()
         Task {
             defer {
                 busy = false
@@ -228,9 +233,11 @@ final class PhoneSync {
                 let result = try await SyncPhoneSession.run(
                     connection, identity: identity, root: root, freeSpace: free, pairing: pairing,
                     events: events, requests: requests, libraryID: libraryID, lastFMConnected: lastFMConnected,
+                    radioDJUsage: djUsage,
                     storeGrant: { grant in try await self.store(grant) },
                     adoptLastFM: { account in await self.adopt(account) },
                     storeConcerts: { settings in await self.keepConcerts(settings) },
+                    storeRadioDJ: { settings in await self.keepRadioDJ(settings) },
                     progress: { progress in await self.report(progress) })
                 if pairing {
                     // Later syncs use the key the Mac just handed over.
@@ -273,6 +280,10 @@ final class PhoneSync {
 
     private func keepConcerts(_ settings: SyncConcertSettings) {
         storeConcerts(settings)
+    }
+
+    private func keepRadioDJ(_ settings: SyncRadioDJ) {
+        storeRadioDJ(settings)
     }
 
     private func report(_ progress: SyncProgress) {

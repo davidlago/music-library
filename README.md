@@ -80,6 +80,12 @@
 - **Music DNA.** See who played, wrote and produced with whom across both your collections (CDs and records with no
   digital copy bring their MusicBrainz credits), and click your way from one collaborator to the next. Any name in the
   app opens it.
+- **A radio DJ who knows everything.** With your own Claude API key, press **On Air** on an album, artist or collection
+  item page and a DJ you name tells you the story behind the music, who played on it and how it connects to everything
+  else, then takes your questions, checking facts on the web and showing its sources. It can search your own
+  collection too ("what else do I have by them, most played first?"), sending only the rows it finds. Anything it
+  mentions that you own is a link to its page, and songs it suggests come with a play button. Also on iPhone (the key comes over
+  with sync); Settings shows what it has cost. Without a key, none of it appears.
 - **Insights.** Three panes: **Owned** (your CDs, records and downloads: how much is digitized, your label series with
   their free numbers and duplicates, how you own it by medium, money spent over time, cost per play and per hour, best
   value, what's still in the wrapper, artists, genres, decades and record labels), your **Digital Collection** (by
@@ -208,6 +214,13 @@ taken (**Label Check** finds it after updating).
 
 **Artists** (in the sidebar's **Explore** section) lists the artists of both collections: someone you only own on CD
 or vinyl is there too, and their page shows what's in your physical collection.
+
+**On Air** (in the toolbar of album, artist and collection item pages, once a Claude API key is set in Settings ▸
+Radio DJ) opens a panel beside the page where your DJ opens a segment about what's on screen, using what the app knows
+(credits, track list, description, your copies and plays) and the web, and then talks with you. When a question is
+about your own music, it searches your collection on your Mac or iPhone with the same search language as the search
+box, sorted by plays, last played, date added, year or title. It goes off when you
+leave the page.
 
 ![The Albums grid with cover art, sorted by Recently Played](docs/screenshots/albums.png)
 

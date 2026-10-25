@@ -50,6 +50,7 @@ struct MusicDNAPage: View {
                     Group {
                         if let center = graph.person(named: name) {
                             DNAPersonPage(graph: graph, center: center)
+                                .radioDJPage(.page("Music DNA, centered on \(name)", details: ["Who \(name) played, wrote and produced with across their collection."]))
                         } else {
                             ContentUnavailableView("\(name) Isn't in Your Credits", systemImage: "person.crop.circle.badge.questionmark",
                                                    description: Text("Nobody by that name appears in the credits of your music, digital or physical."))
@@ -71,6 +72,7 @@ struct MusicDNAPage: View {
                     }
                 } else {
                     DNALanding(graph: graph)
+                        .radioDJPage(.page("Music DNA", details: ["The best-connected people in their music."]))
                 }
             } else {
                 LibraryStatusView().navigationTitle("Music DNA")
