@@ -35,10 +35,36 @@ web. Or ask anything in **Ask … anything…**. Nothing is sent to Claude, and 
 - **It knows your numbers**: "how many minutes of Roy Orbison do I own?", "what did I play most this month?", from the
   same figures as [Insights](insights.md).
 - **It checks the web** (searching and reading pages) and lists its sources under each answer.
+- **It looks at photos**: show it a record or CD (see [Show it a photo](#show-it-a-photo)).
 - **It helps you buy a copy** (on the Mac): ask it to find an album on CD or vinyl and it opens the [Shop](shop.md)
   searching for it, then tells you what came up. You pick the edition and the copy; it never buys anything.
 - **It knows the time of day** where you are, so a 3 PM segment opens with a good afternoon, not a late-night hello.
 - **Off Air** (or the panel's close button) ends the segment.
+
+## Show it a photo
+
+Holding a record in a shop and wondering whether you already have it, or what it's worth? Show the DJ a photo: the
+cover, the spine, the back with its barcode, the label, or a whole crate.
+
+- **On iPhone**, tap the camera button beside **Ask … anything…** to take a picture (touch and hold it to choose from
+  your photo library instead).
+- **On the Mac**, click the photo button beside the text field to choose files or paste an image, or drop images (from
+  Finder, Photos or a web page) anywhere on the panel; ⌘V pastes one when the text field isn't being typed in.
+
+Up to four photos go with a message. They show above the text field, where you can take one back, with a few questions
+to ask about them: **What's this? Do I have it?**, **What else do I have by them?**, **What do the reviews say?**,
+**What's a fair price for it?** and, on the Mac, **Find me a copy to buy**. Or type your own question, or send the photo
+alone.
+
+The DJ reads what's printed (artist, title, record label, catalog number, barcode, the matrix in the run-out groove) to
+tell you what it is and which edition or pressing, and says how sure it is or which side to photograph next. It checks
+your collection for the album and others by the artist, looks up reviews on the web, and, asked about price, checks what
+that edition sells for (Discogs listings and sales, eBay sold listings, record stores) and gives a fair range for the
+condition it can see or you describe. On the Mac it can open the [Shop](shop.md) on it to compare copies for sale.
+
+Photos are scaled down (at most 2048 pixels on the long side) and saved again as JPEG before they're sent, so their
+location and camera details stay on your device. They're part of the conversation, so later questions can refer back to
+them; a photo costs about two cents the first time it's sent and much less after that.
 
 ![The DJ answering "What else do I own from the people who made this record?" from a search of the collection, with play buttons and links](../screenshots/radio-dj-collection.png)
 
@@ -74,5 +100,6 @@ Going on the air is free; a typical opening segment with a couple of follow-up q
 ## Privacy
 
 What the DJ sends to Anthropic: the page's details (the album or artist, its credits, track list and description, your
-copies and plays of it), your questions, the rows of any collection search it runs, and what the Shop found when it opens it for you. Your library itself never
+copies and plays of it), your questions and any photos you show it (without their location or camera details), the rows
+of any collection search it runs, and what the Shop found when it opens it for you. Your library itself never
 leaves your device. See [Privacy](privacy.md).

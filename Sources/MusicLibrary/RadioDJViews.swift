@@ -1,6 +1,7 @@
 import AppKit
 import MusicLibraryCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The Radio DJ's settings and spend on the Mac: the Claude API key (keychain; handed to the phone at each sync),
 /// the DJ's name, and what it has cost here, per month (Application Support `MusicLibrary/radio-dj-usage.json`).
@@ -251,8 +252,9 @@ extension AppModel {
 }
 
 /// The DJ's booth, a pane beside the window's pages that stays while you browse: who's on, what they're saying (with
-/// the pages they checked), and a line to talk back. On another album or artist page than the one being talked
-/// about, it offers to talk about that one, and messages tell the DJ where you are.
+/// the pages they checked), and a line to talk back, with photos to show (chosen, pasted or dropped on the pane: a
+/// record in a shop, a shelf). On another album or artist page than the one being talked about, it offers to talk
+/// about that one, and messages tell the DJ where you are.
 struct RadioDJPanel: View {
     static let width: CGFloat = 370
     private static let bottom = "bottom"
@@ -264,6 +266,10 @@ struct RadioDJPanel: View {
     let open: (RadioDJReference) -> Void
     @State private var draft = ""
     @FocusState private var focused: Bool
+    /// Photos to send with the next message.
+    @State private var photos: [RadioDJPhoto] = []
+    @State private var photoNote: String?
+    @State private var dropTargeted = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -297,6 +303,16 @@ struct RadioDJPanel: View {
         }
         .background(theme.background)
         .overlay(alignment: .leading) { Rectangle().fill(theme.separator).frame(width: 1) }
+        .overlay {
+            if dropTargeted {
+                RoundedRectangle(cornerRadius: 8).strokeBorder(theme.accent, lineWidth: 3).padding(4).allowsHitTesting(false)
+            }
+        }
+        .onDrop(of: [.image, .fileURL, .url], isTargeted: $dropTargeted) { providers in
+            addDropped(providers)
+            return true
+        }
+        .onPasteCommand(of: [.image, .fileURL]) { _ in pastePhoto() }
     }
 
     private var header: some View {
@@ -322,7 +338,7 @@ struct RadioDJPanel: View {
     /// where "Tell me about…" takes over).
     @ViewBuilder
     private var suggestionChips: some View {
-        if !session.suggestions.isEmpty, !session.isBusy, !session.isElsewhere(dj.hereTopic) {
+        if !session.suggestions.isEmpty, !session.isBusy, photos.isEmpty, !session.isElsewhere(dj.hereTopic) {
             FlowLayout(spacing: 6) {
                 ForEach(session.suggestions, id: \.self) { question in
                     Button { session.send(question, page: dj.here) } label: {
@@ -386,15 +402,31 @@ struct RadioDJPanel: View {
                 .buttonStyle(.plain)
                 .help("Ask \(session.name) about the page you're on")
             }
+            attachedPhotos
             HStack(alignment: .bottom, spacing: 8) {
-                TextField("Ask \(session.name) anything…", text: $draft, axis: .vertical)
+                Menu {
+                    Button("Choose Photos…", action: choosePhotos)
+                    Button("Paste Image", action: pastePhoto)
+                } label: {
+                    Image(systemName: "photo.badge.plus").font(.system(size: 19))
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .foregroundStyle(photos.count < RadioDJPhoto.maxPerMessage ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.tertiary))
+                .disabled(photos.count >= RadioDJPhoto.maxPerMessage)
+                .padding(.bottom, 6)
+                .help("Show \(session.name) a photo: a record or CD, its back or label, a shelf (or drop one on the panel)")
+                TextField(photos.isEmpty ? "Ask \(session.name) anything…" : "Ask about \(photos.count == 1 ? "this photo" : "these photos")…",
+                          text: $draft, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(1...5)
                     .focused($focused)
-                    .onSubmit(send)
+                    .onSubmit { send() }
                     .padding(.horizontal, 12).padding(.vertical, 8)
                     .background(RoundedRectangle(cornerRadius: 16).fill(theme.fill))
-                Button(action: send) {
+                Button { send() } label: {
                     Image(systemName: "arrow.up.circle.fill").font(.system(size: 26))
                 }
                 .buttonStyle(.plain)
@@ -410,12 +442,130 @@ struct RadioDJPanel: View {
         .onAppear { focused = true }
     }
 
-    private var canSend: Bool { !session.isBusy && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var canSend: Bool {
+        !session.isBusy && (!photos.isEmpty || !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
 
-    private func send() {
-        guard canSend else { return }
-        session.send(draft, page: dj.here)
+    /// What's typed, or `question` (a chip about the photos).
+    private func send(_ question: String? = nil) {
+        guard !session.isBusy, question != nil || canSend else { return }
+        session.send(question ?? draft, photos: photos, page: dj.here)
         draft = ""
+        photos = []
+        photoNote = nil
+    }
+
+    /// The photos going with the next message (each can be taken back), and questions to ask about them.
+    @ViewBuilder
+    private var attachedPhotos: some View {
+        if let photoNote {
+            Label(photoNote, systemImage: "photo").font(.caption).foregroundStyle(.subtext)
+        }
+        if !photos.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(photos) { photo in
+                        RadioDJPhotoThumb(photo: photo, size: 64)
+                            .overlay(alignment: .topTrailing) {
+                                Button { photos.removeAll { $0.id == photo.id } } label: {
+                                    Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette)
+                                        .foregroundStyle(.white, .black.opacity(0.6))
+                                }
+                                .buttonStyle(.plain)
+                                .padding(3)
+                                .help("Don't send this photo")
+                            }
+                    }
+                }
+            }
+            if !session.isBusy {
+                FlowLayout(spacing: 6) {
+                    ForEach(session.photoQuestions(count: photos.count), id: \.self) { question in
+                        Button { send(question) } label: {
+                            Text(question).font(.callout)
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .background(Capsule().fill(theme.fill))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Ask \(session.name) this about the photo")
+                    }
+                }
+            }
+        }
+    }
+
+    private func choosePhotos() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose photos to show \(session.name)"
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls { Task { await addPhoto(from: url) } }
+    }
+
+    private func pastePhoto() {
+        switch ImageInput.pasted() {
+        case .file(let url): Task { await addPhoto(from: url) }
+        case .image(let data): Task { await addPhoto(data) }
+        case nil: photoNote = "There's no image on the clipboard."
+        }
+    }
+
+    /// Image data first (a picture dragged from Photos or a web page), else a file or a web image's address.
+    private func addDropped(_ providers: [NSItemProvider]) {
+        for provider in providers {
+            if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+                    guard let data else { return }
+                    Task { @MainActor in await addPhoto(data) }
+                }
+            } else if provider.canLoadObject(ofClass: URL.self) {
+                _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                    guard let url else { return }
+                    Task { @MainActor in await addPhoto(from: url) }
+                }
+            }
+        }
+    }
+
+    private func addPhoto(from url: URL) async {
+        switch await ImageInput.load(url) {
+        case .success(let image): await addPhoto(image.data)
+        case .failure(let failure): photoNote = failure.message
+        }
+    }
+
+    /// Scaled and re-encoded off the main thread.
+    private func addPhoto(_ data: Data) async {
+        guard photos.count < RadioDJPhoto.maxPerMessage else {
+            photoNote = "\(RadioDJPhoto.maxPerMessage) photos at a time."
+            return
+        }
+        let photo = await Task.detached(priority: .userInitiated) { RadioDJPhoto(imageData: data) }.value
+        guard let photo else { photoNote = "That isn't a photo \(session.name) can look at."; return }
+        guard photos.count < RadioDJPhoto.maxPerMessage else { return }
+        photoNote = nil
+        photos.append(photo)
+        focused = true
+    }
+}
+
+/// A photo the listener showed (or is about to show) the DJ, cropped to a square.
+struct RadioDJPhotoThumb: View {
+    let photo: RadioDJPhoto
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if let image = NSImage(data: photo.thumbnail) {
+                Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+            } else {
+                Image(systemName: "photo").foregroundStyle(.subtext)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.white.opacity(0.15), lineWidth: 1))
     }
 }
 
@@ -428,13 +578,21 @@ private struct RadioDJLineView: View {
     var body: some View {
         switch line.role {
         case .listener:
-            HStack {
-                Spacer(minLength: 40)
-                Text(line.text)
-                    .textSelection(.enabled)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12).padding(.vertical, 8)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(theme.accent))
+            VStack(alignment: .trailing, spacing: 6) {
+                if !line.photos.isEmpty {
+                    HStack(spacing: 6) {
+                        Spacer(minLength: 40)
+                        ForEach(line.photos) { RadioDJPhotoThumb(photo: $0, size: line.photos.count == 1 ? 160 : 72) }
+                    }
+                }
+                HStack {
+                    Spacer(minLength: 40)
+                    Text(line.text)
+                        .textSelection(.enabled)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(theme.accent))
+                }
             }
         case .dj:
             HStack(alignment: .top, spacing: 10) {
@@ -650,7 +808,7 @@ struct RadioDJSettings: View {
             Section {
                 HStack(alignment: .top, spacing: 14) {
                     Image(systemName: RadioDJIcon.name).font(.system(size: 28)).foregroundStyle(.orange)
-                    Text("Switch on a radio DJ on album and artist pages: they tell you the story behind the music, the people who made it and how it connects to everything else, and answer your questions, including about what's in your own collection. Powered by Claude, looking things up on the web as they talk (only the rows a collection search finds are sent). Off until you add an API key; summon them on each page with On Air in the toolbar.")
+                    Text("Switch on a radio DJ on album and artist pages: they tell you the story behind the music, the people who made it and how it connects to everything else, and answer your questions, including about what's in your own collection and photos of records you show them. Powered by Claude, looking things up on the web as they talk (only the rows a collection search finds are sent). Off until you add an API key; summon them on each page with On Air in the toolbar.")
                         .font(.callout).foregroundStyle(.subtext)
                 }
             }

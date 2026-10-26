@@ -286,6 +286,7 @@ p { margin: 0; }
 
 .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .cards.three { margin-top: 48px; }
+.cards.four { grid-template-columns: repeat(2, 1fr); }
 .card { padding: 26px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
 .card h3 { font-size: 19px; margin-bottom: 10px; }
 .card p { color: var(--muted); font-size: 15.5px; }
@@ -416,7 +417,7 @@ p { margin: 0; }
   .hero { padding-top: 48px; }
   .hero-icon { width: 104px; height: 104px; }
   .hero-shot { margin-top: 44px; }
-  .pillars, .cards, .install, .privacy-grid, .filters, .device-shots { grid-template-columns: 1fr; }
+  .pillars, .cards, .cards.four, .install, .privacy-grid, .filters, .device-shots { grid-template-columns: 1fr; }
   .signal { flex-direction: column; }
   .sig-node { width: 100%; }
   .sig-line { flex: 0 0 28px; width: 2px; height: 28px; }

@@ -1,5 +1,6 @@
 import AVFoundation
 import MusicLibraryCore
+import PhotosUI
 import SwiftUI
 
 /// The Radio DJ on the phone: the Claude API key and DJ name the Mac hands over at each sync (the key in the
@@ -262,13 +263,20 @@ extension PhoneModel {
     }
 }
 
-/// The DJ's booth: who's on, what they're saying (with the pages they checked) and a line to talk back.
+/// The DJ's booth: who's on, what they're saying (with the pages they checked) and a line to talk back, with photos
+/// to show it (taken with the camera, a record in a shop, or chosen from the library).
 struct RadioDJSheet: View {
     let session: RadioDJSession
     let dj: PhoneRadioDJ
     let open: (RadioDJReference) -> Void
     @State private var draft = ""
     @FocusState private var focused: Bool
+    /// Photos to send with the next message.
+    @State private var photos: [RadioDJPhoto] = []
+    @State private var photoNote: String?
+    @State private var showingCamera = false
+    @State private var showingLibrary = false
+    @State private var picked: [PhotosPickerItem] = []
 
     var body: some View {
         NavigationStack {
@@ -281,7 +289,7 @@ struct RadioDJSheet: View {
                                 .id(line.id)
                         }
                         // The questions to start with (gone once one is asked, or when "Tell me about…" takes over).
-                        if !session.suggestions.isEmpty, !session.isBusy, !session.isElsewhere(dj.hereTopic) {
+                        if !session.suggestions.isEmpty, !session.isBusy, photos.isEmpty, !session.isElsewhere(dj.hereTopic) {
                             FlowLayout(spacing: 8) {
                                 ForEach(session.suggestions, id: \.self) { question in
                                     Button(question) { session.send(question, page: dj.here) }
@@ -317,6 +325,22 @@ struct RadioDJSheet: View {
                 .onChange(of: session.scrollKey) { proxy.scrollTo("bottom", anchor: .bottom) }
             }
             .safeAreaInset(edge: .bottom) { composer }
+            .fullScreenCover(isPresented: $showingCamera) {
+                CameraPicker(onPhoto: { data in Task { await addPhoto(data) } }, onDone: { showingCamera = false })
+                    .ignoresSafeArea()
+            }
+            .photosPicker(isPresented: $showingLibrary, selection: $picked,
+                          maxSelectionCount: max(1, RadioDJPhoto.maxPerMessage - photos.count), matching: .images)
+            .onChange(of: picked) {
+                let items = picked
+                picked = []
+                Task {
+                    for item in items {
+                        if let data = try? await item.loadTransferable(type: Data.self) { await addPhoto(data) }
+                        else { photoNote = "Couldn't open that photo." }
+                    }
+                }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -378,15 +402,18 @@ struct RadioDJSheet: View {
                 }
                 .buttonStyle(.glass)
             }
+            attachedPhotos
             HStack(alignment: .bottom, spacing: 8) {
-                TextField("Ask \(session.name) anything…", text: $draft, axis: .vertical)
+                photoButton
+                TextField(photos.isEmpty ? "Ask \(session.name) anything…" : "Ask about \(photos.count == 1 ? "this photo" : "these photos")…",
+                          text: $draft, axis: .vertical)
                     .lineLimit(1...5)
                     .focused($focused)
                     .submitLabel(.send)
-                    .onSubmit(send)
+                    .onSubmit { send() }
                     .padding(.horizontal, 16).padding(.vertical, 11)
                     .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 22))
-                Button(action: send) {
+                Button { send() } label: {
                     Image(systemName: "arrow.up").font(.body.weight(.semibold)).frame(width: 30, height: 30)
                 }
                 .buttonStyle(.glassProminent)
@@ -400,12 +427,150 @@ struct RadioDJSheet: View {
         .padding(.horizontal, 16).padding(.bottom, 8).padding(.top, 6)
     }
 
-    private var canSend: Bool { !session.isBusy && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var canSend: Bool {
+        !session.isBusy && (!photos.isEmpty || !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
 
-    private func send() {
-        guard canSend else { return }
-        session.send(draft, page: dj.here)
+    /// What's typed, or `question` (a chip about the photos).
+    private func send(_ question: String? = nil) {
+        guard !session.isBusy, question != nil || canSend else { return }
+        session.send(question ?? draft, photos: photos, page: dj.here)
         draft = ""
+        photos = []
+        photoNote = nil
+    }
+
+    private var hasCamera: Bool { UIImagePickerController.isSourceTypeAvailable(.camera) }
+
+    /// Tap for the camera (the library on a device without one); touch and hold for both.
+    private var photoButton: some View {
+        Menu {
+            if hasCamera {
+                Button("Take Photo", systemImage: "camera") { showingCamera = true }
+            }
+            Button("Choose from Library", systemImage: "photo.on.rectangle") { showingLibrary = true }
+        } label: {
+            Image(systemName: hasCamera ? "camera" : "photo").font(.body.weight(.semibold)).frame(width: 30, height: 30)
+        } primaryAction: {
+            if hasCamera { showingCamera = true } else { showingLibrary = true }
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .disabled(photos.count >= RadioDJPhoto.maxPerMessage || session.isBusy)
+        .accessibilityLabel(hasCamera ? "Show \(session.name) a photo" : "Choose a photo for \(session.name)")
+        .accessibilityHint(hasCamera ? "Opens the camera. Touch and hold to choose from your library." : "")
+    }
+
+    /// The photos going with the next message (each can be taken back), and questions to ask about them.
+    @ViewBuilder
+    private var attachedPhotos: some View {
+        if let photoNote {
+            Label(photoNote, systemImage: "photo").font(.caption).foregroundStyle(.secondary)
+        }
+        if !photos.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(photos) { photo in
+                        RadioDJPhotoThumb(photo: photo, size: 64)
+                            .overlay(alignment: .topTrailing) {
+                                Button { photos.removeAll { $0.id == photo.id } } label: {
+                                    Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette)
+                                        .foregroundStyle(.white, .black.opacity(0.6))
+                                }
+                                .padding(2)
+                                .accessibilityLabel("Don't send this photo")
+                            }
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+            if !session.isBusy {
+                FlowLayout(spacing: 8) {
+                    ForEach(session.photoQuestions(count: photos.count), id: \.self) { question in
+                        Button(question) { send(question) }
+                        .font(.subheadline)
+                        .buttonStyle(.glass)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    /// Scaled and re-encoded off the main thread.
+    private func addPhoto(_ data: Data) async {
+        guard photos.count < RadioDJPhoto.maxPerMessage else {
+            photoNote = "\(RadioDJPhoto.maxPerMessage) photos at a time."
+            return
+        }
+        let photo = await Task.detached(priority: .userInitiated) { RadioDJPhoto(imageData: data) }.value
+        guard let photo else { photoNote = "That isn't a photo \(session.name) can look at."; return }
+        guard photos.count < RadioDJPhoto.maxPerMessage else { return }
+        photoNote = nil
+        photos.append(photo)
+    }
+}
+
+/// A photo the listener showed (or is about to show) the DJ, cropped to a square.
+struct RadioDJPhotoThumb: View {
+    let photo: RadioDJPhoto
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if let image = UIImage(data: photo.thumbnail) {
+                Image(uiImage: image).resizable().aspectRatio(contentMode: .fill)
+            } else {
+                Image(systemName: "photo").foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.15), lineWidth: 1))
+        .accessibilityLabel("Photo")
+    }
+}
+
+/// The camera, for a photo to show the DJ: hands back the picture taken as JPEG data, the right way up.
+struct CameraPicker: UIViewControllerRepresentable {
+    let onPhoto: (Data) -> Void
+    let onDone: () -> Void
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.cameraCaptureMode = .photo
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ picker: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: CameraPicker
+        init(_ parent: CameraPicker) { self.parent = parent }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let image = info[.originalImage] as? UIImage, let data = Self.upright(image) { parent.onPhoto(data) }
+            parent.onDone()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { parent.onDone() }
+
+        /// Drawn upright at no more than the DJ's size (the camera's image carries its orientation separately).
+        static func upright(_ image: UIImage) -> Data? {
+            let longest = max(image.size.width, image.size.height)
+            guard longest > 0 else { return nil }
+            let scale = min(1, CGFloat(RadioDJPhoto.maxPixels) / longest)
+            let size = CGSize(width: (image.size.width * scale).rounded(), height: (image.size.height * scale).rounded())
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            return UIGraphicsImageRenderer(size: size, format: format).jpegData(withCompressionQuality: 0.9) { _ in
+                image.draw(in: CGRect(origin: .zero, size: size))
+            }
+        }
     }
 }
 
@@ -417,13 +582,21 @@ private struct RadioDJLineView: View {
     var body: some View {
         switch line.role {
         case .listener:
-            HStack {
-                Spacer(minLength: 48)
-                Text(line.text)
-                    .textSelection(.enabled)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14).padding(.vertical, 9)
-                    .background(RoundedRectangle(cornerRadius: 18).fill(Color.accentColor))
+            VStack(alignment: .trailing, spacing: 6) {
+                if !line.photos.isEmpty {
+                    HStack(spacing: 6) {
+                        Spacer(minLength: 48)
+                        ForEach(line.photos) { RadioDJPhotoThumb(photo: $0, size: line.photos.count == 1 ? 160 : 68) }
+                    }
+                }
+                HStack {
+                    Spacer(minLength: 48)
+                    Text(line.text)
+                        .textSelection(.enabled)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14).padding(.vertical, 9)
+                        .background(RoundedRectangle(cornerRadius: 18).fill(Color.accentColor))
+                }
             }
         case .dj:
             HStack(alignment: .top, spacing: 10) {
@@ -663,7 +836,7 @@ struct RadioDJSettingsSection: View {
         } header: {
             Text("Radio DJ")
         } footer: {
-            Text("Tap the radio button at the top of any page to put the DJ on the air. The Claude API key, the DJ's name and yours come from your Mac when you sync; change them there. Spending on this iPhone (calendar months, UTC, as Anthropic bills) is estimated at Claude API list prices and shows on your Mac after the next sync.")
+            Text("Tap the radio button at the top of any page to put the DJ on the air; tap the camera beside its text field to show it a record or CD. The Claude API key, the DJ's name and yours come from your Mac when you sync; change them there. Spending on this iPhone (calendar months, UTC, as Anthropic bills) is estimated at Claude API list prices and shows on your Mac after the next sync.")
         }
     }
 }

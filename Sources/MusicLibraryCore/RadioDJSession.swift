@@ -21,9 +21,13 @@ public final class RadioDJSession {
         public let id: UUID
         public var role: Role
         public var text: String
+        /// What the listener showed with their message.
+        public var photos: [RadioDJPhoto] = []
         public var sources: [Source] = []
 
-        init(role: Role, text: String) { id = UUID(); self.role = role; self.text = text }
+        init(role: Role, text: String, photos: [RadioDJPhoto] = []) {
+            id = UUID(); self.role = role; self.text = text; self.photos = photos
+        }
     }
 
     public enum Activity: Equatable, Sendable {
@@ -66,7 +70,7 @@ public final class RadioDJSession {
     /// The page the DJ came on from, told (with the time then) before the first question.
     @ObservationIgnored private var openedFrom: RadioDJSubject?
     /// The last request that failed, to try again.
-    @ObservationIgnored private var failed: (text: String, display: String?)?
+    @ObservationIgnored private var failed: (text: String, display: String?, photos: [RadioDJPhoto])?
     @ObservationIgnored private var countedSegment = false
     /// A tool ran since the last words: the next words start a new paragraph.
     @ObservationIgnored private var breakBeforeText = false
@@ -123,10 +127,18 @@ public final class RadioDJSession {
         return page.topic != subject.topic
     }
 
-    /// Sends what the listener wrote. `page`: the page they're on now; when it's another album or artist than the
+    /// Questions to ask about photos about to be sent.
+    public func photoQuestions(count: Int) -> [String] {
+        RadioDJ.photoQuestions(count: count, canSearchCollection: library != nil, canShop: shop != nil)
+    }
+
+    /// Sends what the listener wrote, with any photos they're showing (at most `RadioDJPhoto.maxPerMessage`; photos
+    /// alone ask what they are). `page`: the page they're on now; when it's another album or artist than the
     /// conversation is about, the message tells the DJ (with what the app knows about it) and it becomes the topic.
-    public func send(_ text: String, page: RadioDJSubject? = nil) {
-        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    public func send(_ text: String, photos: [RadioDJPhoto] = [], page: RadioDJSubject? = nil) {
+        let photos = Array(photos.prefix(RadioDJPhoto.maxPerMessage))
+        var text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty, !photos.isEmpty { text = RadioDJ.photoQuestion(count: photos.count, canSearchCollection: library != nil) }
         guard !text.isEmpty, !isBusy else { return }
         var message = text
         if let page, isElsewhere(page) {
@@ -134,12 +146,12 @@ public final class RadioDJSession {
             subject = page
             linker?.setPage(page)
         }
-        run(message, display: text)
+        run(message, display: text, photos: photos)
     }
 
     public func retry() {
         guard let failed, !isBusy else { return }
-        run(failed.text, display: failed.display, repeating: true)
+        run(failed.text, display: failed.display, photos: failed.photos, repeating: true)
     }
 
     /// Ends the segment: cancels a reply in progress.
@@ -148,16 +160,16 @@ public final class RadioDJSession {
         task = nil
     }
 
-    /// Sends `text`; `display` is what shows as the listener's line (nil: nothing). The first question carries the
-    /// opener, and counts the segment.
-    private func run(_ text: String, display: String?, repeating: Bool = false) {
+    /// Sends `text` with `photos`; `display` is what shows as the listener's line (nil: nothing). The first question
+    /// carries the opener, and counts the segment.
+    private func run(_ text: String, display: String?, photos: [RadioDJPhoto] = [], repeating: Bool = false) {
         error = nil
         failed = nil
         suggestions = []
-        if let display, !repeating { lines.append(Line(role: .listener, text: display)) }
+        if let display, !repeating { lines.append(Line(role: .listener, text: display, photos: photos)) }
         let turnStart = history.count
         if history.isEmpty, let openedFrom {
-            history.append(.user(RadioDJ.opener(openedFrom, at: now()) + "\n\n" + text))
+            history.append(.user(RadioDJ.opener(openedFrom, at: now()) + "\n\n" + text, photos: photos))
             if !countedSegment {
                 countedSegment = true
                 var segment = RadioDJTally()
@@ -165,7 +177,7 @@ public final class RadioDJSession {
                 onUsage(segment)
             }
         } else {
-            history.append(.user(text))
+            history.append(.user(text, photos: photos))
         }
         let line = Line(role: .dj, text: "")
         lines.append(line)
@@ -181,7 +193,7 @@ public final class RadioDJSession {
                 if let i = lines.firstIndex(where: { $0.id == line.id }), lines[i].text.isEmpty || !cancelled { lines.remove(at: i) }
                 if !cancelled {
                     self.error = error.localizedDescription
-                    failed = (text, display)
+                    failed = (text, display, photos)
                 }
             }
             activity = .idle

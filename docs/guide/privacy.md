@@ -23,7 +23,7 @@ key are kept in your keychain.
 | Your library's catalog website | Only once you open Local Library CDs | Searches, and your card number and PIN if you sign in (sent only to that site) |
 | Apple's iTunes Search | When you open a library CD you don't own, or ask for a song preview | The album, artist or song |
 | Discogs, eBay, CDandLP, Alibris, Frankfurter | Only when you shop for a CD or record | Its barcode, catalog number or names |
-| Anthropic (Claude API) | Only with your key, while the Radio DJ is on the air | The page's details, your questions and the rows of collection searches it runs |
+| Anthropic (Claude API) | Only with your key, while the Radio DJ is on the air | The page's details, your questions, photos you show it (without location or camera details) and the rows of collection searches it runs |
 
 Downloading artist and album info can be turned off in **Settings ▸ General**, and looking up library CDs in **Settings ▸
 Local Library**.
@@ -36,7 +36,8 @@ The iPhone keeps its music and its copy of the library on the phone, out of iClo
   runs it listens on the local network for its paired phones (macOS may ask to allow incoming connections).
 - **Last.fm**, if you connect it.
 - **Ticketmaster and JamBase**, for concerts on artist pages, only if the Mac has keys for them.
-- **Anthropic**, while the Radio DJ is on the air, only if the Mac handed over a key.
+- **Anthropic**, while the Radio DJ is on the air, only if the Mac handed over a key. Photos you take or pick for the DJ
+  go only there, without their location; the app asks for the camera the first time you take one.
 - **Apple's iTunes Search**, for previews of songs the DJ mentions.
 
 The widgets and the watch get a small summary (stats, recent additions to your physical collection, the song playing and

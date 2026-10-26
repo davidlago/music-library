@@ -17,6 +17,8 @@
 	<false/>
 	<key>MusicLibraryAppGroup</key>
 	<string>$(APP_GROUP_IDENTIFIER)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo of a record or CD to show the Radio DJ, who tells you what it is, whether you have it and what it's worth.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_musiclib-sync._tcp</string>

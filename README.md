@@ -45,7 +45,8 @@ playback, and a Claude-powered radio DJ who tells you the story behind every rec
   are made of and how you listen. [Albums and artists →](docs/guide/albums-and-artists.md) ·
   [Search →](docs/guide/search.md) · [Music DNA →](docs/guide/music-dna.md) · [Insights →](docs/guide/insights.md)
 - **Put a DJ on the air.** With your own Claude API key, press **On Air** and your DJ tells you about what you're looking
-  at, answers questions, checks the web and searches your own collection.
+  at, answers questions, checks the web and searches your own collection. Show it a photo of a record or CD (on iPhone,
+  straight from the camera) to find out what it is, whether you have it and what to pay.
   [Radio DJ →](docs/guide/radio-dj.md)
 - **Play it properly.** Each song at its own sample rate and bit depth, a real play queue, playlists and smart playlists,
   and Last.fm scrobbling. [Playback →](docs/guide/playback.md)
