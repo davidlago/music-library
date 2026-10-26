@@ -7,6 +7,14 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.26.0
+
+- New: show the **Radio DJ** a photo. On iPhone, tap the camera button in the DJ's sheet to take a picture of a record
+  or CD (touch and hold for your photo library); on the Mac, choose, paste or drop images on the DJ's panel. The DJ
+  reads the cover, spine, back or label to tell you what it is and which edition, whether you already have it and what
+  else by the artist you own, what the reviews say, and what a fair price is. Photos are sent without their location.
+  See [Show it a photo](https://github.com/davidlago/music-library/blob/main/docs/guide/radio-dj.md#show-it-a-photo).
+
 ## 1.25.1
 
 - Fixed: the Radio DJ could link an album you don't own to the Wikipedia article of a different album with the same

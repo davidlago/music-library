@@ -60,6 +60,11 @@ to a third-party AI and get permission first; the DJ only runs when the user pre
 key, but a one-time notice on the phone ("The DJ sends this page and your questions to Anthropic with your key") may be
 needed if review asks.
 
+**Since photos for the DJ (after 1.25.1):** photos the user takes or picks in the DJ's sheet go to Anthropic too
+(re-encoded without location or camera metadata), which adds **User Content ▸ Photos or Videos**, linked to the user's
+own Anthropic account, App Functionality, not for tracking. The camera needs `NSCameraUsageDescription` (in
+`iOS/MusicLibraryMobile-Info.plist`); the photo library goes through the system picker, which needs no permission.
+
 Nothing else leaves the phone except to the user's own paired Mac (local network) and watch. No tracking, no ads, no
 analytics. Export compliance: `ITSAppUsesNonExemptEncryption = NO` (only the encryption built into iOS).
 
