@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.26.0
+
 - New: show the **Radio DJ** a photo. On iPhone, tap the camera button in the DJ's sheet to take a picture of a record
   or CD (touch and hold for your photo library); on the Mac, choose, paste or drop images on the DJ's panel. The DJ
   reads the cover, spine, back or label to tell you what it is and which edition, whether you already have it and what
