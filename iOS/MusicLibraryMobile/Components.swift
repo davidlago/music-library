@@ -497,7 +497,7 @@ struct AvailabilityBar: View {
     }
 
     private func detail(_ a: PhoneModel.Availability, _ pending: Bool, sync: PhoneSync) -> String? {
-        if !sync.isPaired { return a == .onPhone ? nil : "Pair with your Mac in the Sync tab to download music." }
+        if !sync.isPaired { return a == .onPhone ? nil : "Pair with your Mac (Sync, on Listen Now) to download music." }
         if pending {
             if case .syncing = sync.status { return "Syncing with \(sync.macName ?? "the Mac")…" }
             return sync.macPeer == nil ? "Starts when \(sync.macName ?? "your Mac") is on the same Wi-Fi with Music Library open." : "Starting…"

@@ -32,8 +32,7 @@ struct TrackTable: View {
             let list = sorted
             if let idx = list.firstIndex(where: { ids.contains($0.id) }) { model.player.play(queue: list, startAt: idx, source: source) }
         }
-        .themedScrollBackground()
-        .sheet(item: $infoTrack) { TrackInfoSheet(track: $0).themedSheet() }
+        .sheet(item: $infoTrack) { TrackInfoSheet(track: $0) }
         .background {
             Button("Get Info") { showInfo(for: selection) }
                 .keyboardShortcut("i", modifiers: .command)
@@ -145,9 +144,9 @@ struct AlbumsView: View {
                                     .overlay(alignment: .topTrailing) { copiesChip(mark) }
                                     .padding(.bottom, 4)
                                 Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.headline).lineLimit(1)
-                                Text(a.artist.isEmpty ? "Unknown Artist" : a.artist).font(.subheadline).foregroundStyle(.subtext).lineLimit(1)
+                                Text(a.artist.isEmpty ? "Unknown Artist" : a.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                                 if let detail = detail(a) {
-                                    Text(detail).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                                    Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                                 }
                             }
                             .frame(width: 150, alignment: .leading)
@@ -274,14 +273,14 @@ struct PlaylistView: View {
         List(selection: $selection) {
             ForEach(Array(tracks.enumerated()), id: \.offset) { position, t in
                 HStack {
-                    Text("\(position + 1)").monospacedDigit().foregroundStyle(.subtext).frame(width: 32, alignment: .trailing)
+                    Text("\(position + 1)").monospacedDigit().foregroundStyle(.secondary).frame(width: 32, alignment: .trailing)
                     VStack(alignment: .leading) {
                         Text(t.title).lineLimit(1)
-                        Text("\(t.artist) — \(t.album)").font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                        Text("\(t.artist) — \(t.album)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     Spacer()
                     LikeButton(model: model, track: t)
-                    Text(formatTime(t.duration)).monospacedDigit().foregroundStyle(.subtext)
+                    Text(formatTime(t.duration)).monospacedDigit().foregroundStyle(.secondary)
                 }
                 .tag(position)
             }
@@ -290,7 +289,6 @@ struct PlaylistView: View {
                 reload()
             }
         }
-        .themedScrollBackground()
         .onDeleteCommand { removeSelected() }
         .contextMenu(forSelectionType: Int.self) { positions in
             if !positions.isEmpty {
@@ -451,7 +449,6 @@ struct LikedSongsView: View {
 /// The heart that adds a song to Liked Songs. Takes the model instead of reading it from the environment, so it
 /// works inside `Table` cells.
 struct LikeButton: View {
-    @Environment(\.theme) private var theme
     let model: AppModel
     let track: Track
     var font: Font = .body
@@ -463,7 +460,7 @@ struct LikeButton: View {
         Button { model.toggleLike(track) } label: {
             Image(systemName: liked ? "heart.fill" : "heart")
                 .font(font)
-                .foregroundStyle(liked ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.subtext))
+                .foregroundStyle(liked ? AnyShapeStyle(AppColor.accent) : AnyShapeStyle(.secondary))
                 .symbolEffect(.bounce, value: liked)
                 .contentShape(Rectangle())
         }

@@ -7,34 +7,71 @@ enum LibraryRoute: Hashable {
     case smartPlaylist(Int64)
 }
 
-/// The Digital tab lists the whole digital collection or only what's on this iPhone.
+/// The digital collection lists everything or only what's on this iPhone.
 enum LibraryScope: String, CaseIterable, Identifiable {
     case all = "All Music", onPhone = "On This iPhone"
     var id: Self { self }
 }
 
-struct LibraryTab: View {
+/// The digital collection on the Collection tab, under the physical one: albums, songs, liked songs, downloads and
+/// playlists, all of them or only what's on this iPhone.
+struct DigitalCollectionCard: View {
     @Environment(PhoneModel.self) private var model
-    @State private var showSettings = false
+    @AppStorage("libraryScope") private var scope = LibraryScope.all
+    let library: LibrarySnapshot
 
     var body: some View {
-        LibraryStack(opener: PendingAlbumOpener()) {
-            Group {
-                // A physical collection without songs yet is a library too (its albums show up as they're ripped).
-                if let library = model.library, !library.isEmpty {
-                    LibraryHome(library: library)
-                } else {
-                    LibraryStatusView()
+        let playlists = library.playlists.filter { scope == .all || model.availability($0.tracks) != .notOnPhone }
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: "Digital Collection")
+            Picker("Show", selection: $scope) { ForEach(LibraryScope.allCases) { Text($0.rawValue).tag($0) } }
+                .pickerStyle(.segmented)
+            VStack(spacing: 0) {
+                link(LibraryRoute.albums, "Albums", systemImage: "square.stack",
+                     count: scope == .all ? library.albums.count : library.albums.count { library.tracks(album: $0).contains(where: library.isPresent) })
+                divider
+                link(LibraryRoute.songs, "Songs", systemImage: "music.note",
+                     count: scope == .all ? library.tracks.count : library.presentIDs.count)
+                if !model.likedDates.isEmpty {
+                    divider
+                    link(LibraryRoute.liked, "Liked Songs", systemImage: "heart", count: model.likedDates.count)
+                }
+                let downloads = model.collection.count(.downloads)
+                if downloads > 0 {
+                    divider
+                    link(CollectionRoute.scope(.downloads), "Downloads", systemImage: "arrow.down.circle", count: downloads)
+                }
+                ForEach(playlists) { item in
+                    divider
+                    link(LibraryRoute.playlist(item.id), item.playlist.name, systemImage: "music.note.list", count: item.tracks.count)
+                }
+                ForEach(library.smartPlaylists) { p in
+                    divider
+                    link(LibraryRoute.smartPlaylist(p.id), p.name, systemImage: "gearshape", count: nil)
                 }
             }
-            .navigationTitle("Digital Collection")
-            .radioDJPage(.page("the Digital Collection home", details: [
-                "\(model.library?.tracks.count ?? 0) songs, \(model.library?.albums.count ?? 0) albums; \(model.library?.presentIDs.count ?? 0) songs on this iPhone"]))
-            .toolbar {
-                Button("Settings", systemImage: "gearshape") { showSettings = true }
-            }
+            .padding(.vertical, 2)
+            .card()
+            Text("\(library.presentIDs.count.formatted()) of \(songCount(library.tracks.count)) on this iPhone")
+                .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 4)
         }
-        .sheet(isPresented: $showSettings) { SettingsView() }
+    }
+
+    private var divider: some View { Divider().padding(.leading, 50) }
+
+    private func link<Route: Hashable>(_ route: Route, _ title: String, systemImage: String, count: Int?) -> some View {
+        NavigationLink(value: route) {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage).foregroundStyle(Color.accentColor).frame(width: 26)
+                Text(title).lineLimit(1)
+                Spacer(minLength: 8)
+                if let count { CountPill(count: count) }
+                InsightChevron()
+            }
+            .padding(.horizontal, 14).padding(.vertical, 11)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -47,7 +84,7 @@ private struct SampleLibraryNote: View {
             Label {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Sample Library").font(.headline)
-                    Text("Fictional artists and albums, made up so you can try the app. Pair with Music Library on your Mac in the Sync tab to bring your own music: it replaces the sample after the first sync. What you do here isn't sent to your Mac or Last.fm.")
+                    Text("Fictional artists and albums, made up so you can try the app. Pair with Music Library on your Mac (Sync, at the top of Listen Now) to bring your own music: it replaces the sample after the first sync. What you do here isn't sent to your Mac or Last.fm.")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
             } icon: {
@@ -60,7 +97,7 @@ private struct SampleLibraryNote: View {
 
 /// Shows the album a widget opened (`PhoneModel.pendingAlbumKey`) once the library is loaded, or the collection item
 /// for it when the album has no songs in the library, over whatever page the tab had pushed.
-private struct PendingAlbumOpener: ViewModifier {
+struct PendingAlbumOpener: ViewModifier {
     @Environment(PhoneModel.self) private var model
     @Environment(\.showRoute) private var showRoute
 
@@ -83,7 +120,8 @@ private struct PendingAlbumOpener: ViewModifier {
     }
 }
 
-private struct LibraryHome: View {
+/// The digital collection as a list: the Collection tab's page while nothing is on the shelf.
+struct LibraryHome: View {
     @Environment(PhoneModel.self) private var model
     @AppStorage("libraryScope") private var scope = LibraryScope.all
     let library: LibrarySnapshot
@@ -559,7 +597,7 @@ struct TrackRows: View {
                 }
             }
         } message: { _ in
-            Text(model.sync.isPaired ? "Download it from your Mac to play it here." : "Pair with your Mac in the Sync tab to download music.")
+            Text(model.sync.isPaired ? "Download it from your Mac to play it here." : "Pair with your Mac (Sync, on Listen Now) to download music.")
         }
     }
 }

@@ -4,7 +4,7 @@ import Network
 import Observation
 import UIKit
 
-/// The phone's end of Wi-Fi sync. While the Sync tab is on screen (iOS suspends the app in the background), the
+/// The phone's end of Wi-Fi sync. While the Sync screen is open (iOS suspends the app in the background), the
 /// phone advertises itself on the local network: with a pairing code until it's paired, then with the key the Mac
 /// handed over, so the Mac can start a sync. Once paired, while the app is open it also looks for the Mac (which
 /// listens for this phone while it runs) and starts a sync itself when music was asked for or removed, or when
@@ -89,7 +89,7 @@ final class PhoneSync {
 
     // MARK: Listening
 
-    /// The Sync tab appeared or went away, or the app became active or went to the background.
+    /// The Sync screen opened or closed, or the app became active or went to the background.
     func setVisible(_ visible: Bool) {
         self.visible = visible
         if visible {
@@ -149,7 +149,7 @@ final class PhoneSync {
         switch state {
         case .failed(let error), .waiting(let error):
             if case .dns(let code) = error, code == -65570 /* kDNSServiceErr_PolicyDenied */ {
-                lastError = "Allow Music Library to use the local network in Settings ▸ Privacy & Security ▸ Local Network, then open this tab again."
+                lastError = "Allow Music Library to use the local network in Settings ▸ Privacy & Security ▸ Local Network, then open Sync again."
             } else {
                 lastError = "Can't listen for the Mac: \(error.localizedDescription)"
             }

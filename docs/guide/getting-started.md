@@ -46,7 +46,7 @@ Mac with your iPhone, see [iPhone app](iphone.md#pair-once).
 - **Bring in music.** **File ▸ Import…** (⌘O), drop files or folders on the window, or insert a CD. See
   [Importing music](importing.md) and [Ripping CDs](ripping-cds.md).
 - **Get the iPhone app.** [Dave's Music Library](https://apps.apple.com/us/app/daves-music-library/id6822005512) on the
-  App Store, then pair it from its Sync tab. See [iPhone app](iphone.md).
+  App Store, then pair it from **Sync**, at the top of its Listen Now tab. See [iPhone app](iphone.md).
 
 ## Settings worth filling in on day one
 
@@ -65,18 +65,20 @@ The rest of the settings are described in [Settings](settings.md).
 
 ## Finding your way around
 
-The sidebar has two collections and the tools around them:
+The sidebar starts with **Listen Now**, then your collection and the tools around it:
 
 | Section | Items |
 |---|---|
-| **Physical Collection** | Shelf, CDs, Vinyl, To Digitize (shown while something's left to digitize) |
-| **Digital Collection** | Songs, Albums, Downloads |
+| **Collection** | Shelf, CDs, Vinyl, To Digitize (shown while something's left to digitize), Albums, Songs, Downloads |
 | **Explore** | Artists, Insights, Music DNA, Concerts |
-| **Import** | Import, Digitize Vinyl, and any inserted CD |
-| **Local Library** | Local Library CDs, My Checkouts, your library list |
-| **Shopping** | Shop |
-| **Export** | Export List, iPhone |
+| **Acquire** | Import, any inserted CD, Digitize Vinyl, Local Library CDs, My Checkouts, your library list, Shop |
+| **Devices** | iPhone, Export List |
 | **Playlists** and **Smart Playlists** | Liked Songs and your own |
 
-Once you own a CD or record, the app opens on the Shelf. The search field at the top right searches everything (see
-[Search](search.md)), and the player bar along the bottom is always there (see [Playback](playback.md)).
+Once there's anything in your library or collection, the app opens on **Listen Now**: the album playing (or the one you
+played last) at the top, with Play, Shuffle and Open Album, then the albums you've been playing, your week in four
+numbers, what's up next in the queue, and the album's neighbors on the shelf when you own it with a label. The page
+takes its color from the album's cover, as album and artist pages do from their cover and photo.
+
+The search field at the top right searches everything (see [Search](search.md)), and the player floats at the bottom of
+the window (see [Playback](playback.md)).

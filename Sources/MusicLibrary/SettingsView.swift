@@ -9,14 +9,13 @@ struct SettingsView: View {
         TabView {
             GeneralSettings().tabItem { Label("General", systemImage: "gearshape") }
             PlaybackSettings().tabItem { Label("Playback", systemImage: "play.circle") }
-            AppearanceSettings().tabItem { Label("Appearance", systemImage: "paintpalette") }
+            AppearanceSettings().tabItem { Label("Appearance", systemImage: "circle.lefthalf.filled") }
             LastFMSettings().tabItem { Label("Last.fm", systemImage: "dot.radiowaves.left.and.right") }
             ConcertSettings().tabItem { Label("Concerts", systemImage: "ticket") }
             RadioDJSettings().tabItem { Label("Radio DJ", systemImage: RadioDJIcon.name) }
             LibraryCatalogSettings().tabItem { Label("Local Library", systemImage: "building.columns") }
         }
         .frame(width: 600)
-        .themedRoot(model.theme)
     }
 }
 
@@ -34,7 +33,7 @@ struct GeneralSettings: View {
                     }
                 }
                 Text("Changing the folder opens (or creates) a library there. Existing files and the database are not moved or migrated.")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Export") {
                 LabeledContent("Destination") {
@@ -47,12 +46,12 @@ struct GeneralSettings: View {
                     }
                 }
                 Text("Where the Export List is copied to, such as a USB music player or a backup drive.")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("MusicBrainz") {
                 TextField("Contact email", text: $model.mbContact, prompt: Text("you@example.com"))
                 Text("Sent in the User-Agent of MusicBrainz requests, as their API etiquette asks.")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Auto-match confident results (score ≥ 95, duration within 5 s)", isOn: $model.autoMatch)
             }
             Section("AcoustID fingerprinting (optional)") {
@@ -64,7 +63,7 @@ struct GeneralSettings: View {
                 Toggle("Download artist photos, bios, album descriptions and links automatically", isOn: Binding(
                     get: { model.artistInfo.autoSync }, set: { model.artistInfo.autoSync = $0 }))
                 Text("From MusicBrainz, Wikipedia and Wikimedia Commons (and Last.fm when it's connected). Photos are saved in the Artist Images folder of your library folder.")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Button("Update All Now") { model.refreshArtistInfo(model.artists.map(\.name)) }
                         .disabled(model.artistInfo.isSyncing)
@@ -87,7 +86,6 @@ struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
-        .themedScrollBackground()
         .onAppear { model.refreshTools() }
     }
 
@@ -113,11 +111,10 @@ struct PlaybackSettings: View {
                 Toggle("Match output device sample rate to the song", isOn: $model.matchOutputRate)
                 Toggle("Match output bit depth", isOn: $model.matchOutputBitDepth).disabled(!model.matchOutputRate)
                 Text("Changes your output device's format for all apps while playing. The original format is restored when you quit or turn this off. Has no effect on devices with a fixed rate (e.g. Bluetooth/AirPlay).")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .themedScrollBackground()
     }
 }
 
@@ -125,31 +122,22 @@ struct AppearanceSettings: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        let families = Dictionary(grouping: Theme.all, by: \.family)
-        let order = Theme.all.map(\.family).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("Themes color the whole window, the player and the Insights charts. Themes marked \(Image(systemName: "circle.lefthalf.filled")) follow your Mac's light or dark setting.")
-                    .font(.callout).foregroundStyle(.subtext)
-                ForEach(order, id: \.self) { family in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(family).font(.headline)
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 120, maximum: 150), spacing: 14)], alignment: .leading, spacing: 14) {
-                            ForEach(families[family] ?? []) { theme in
-                                Button { model.themeID = theme.id } label: {
-                                    ThemeSwatch(theme: theme, selected: model.themeID == theme.id)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel(theme.name)
-                                .accessibilityAddTraits(model.themeID == theme.id ? .isSelected : [])
-                            }
-                        }
+        VStack(spacing: 18) {
+            HStack(spacing: 22) {
+                ForEach(AppearanceMode.allCases) { mode in
+                    Button { model.appearance = mode } label: {
+                        AppearanceSwatch(mode: mode, selected: model.appearance == mode)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(mode.name)
+                    .accessibilityAddTraits(model.appearance == mode ? .isSelected : [])
                 }
             }
-            .padding(20)
+            Text(model.appearance == .system ? "Follows your Mac's light or dark setting." : "Always \(model.appearance.name.lowercased()), whatever your Mac uses.")
+                .font(.callout).foregroundStyle(.secondary)
         }
-        .frame(height: 520)
+        .padding(24)
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -161,7 +149,7 @@ struct LastFMSettings: View {
         Form {
             Section {
                 Text("Scrobbling sends the songs you play to your Last.fm profile. A song counts once you've listened to half of it or 4 minutes, whichever comes first (songs under 30 seconds don't count).")
-                    .font(.callout).foregroundStyle(.subtext)
+                    .font(.callout).foregroundStyle(.secondary)
             }
             Section {
                 TextField(text: $scrobbler.apiKey) { Text("API key").font(.body) }
@@ -174,7 +162,7 @@ struct LastFMSettings: View {
                 Text("API account")
             } footer: {
                 Text("Last.fm needs an API key and shared secret for each app. Both are stored in your keychain on this Mac.")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Account") {
                 accountRow(scrobbler)
@@ -189,7 +177,7 @@ struct LastFMSettings: View {
                 LabeledContent("Waiting to send") {
                     HStack {
                         Text(scrobbler.pendingCount == 0 ? "Nothing" : "\(scrobbler.pendingCount) scrobble\(scrobbler.pendingCount == 1 ? "" : "s")")
-                            .foregroundStyle(.subtext)
+                            .foregroundStyle(.secondary)
                         if scrobbler.isSending { ProgressView().controlSize(.small) }
                         if scrobbler.pendingCount > 0 { Button("Send Now") { scrobbler.flush() }.disabled(scrobbler.isSending) }
                     }
@@ -200,17 +188,16 @@ struct LastFMSettings: View {
                     ForEach(scrobbler.recent) { s in
                         HStack {
                             Text(s.track).lineLimit(1)
-                            Text(s.artist).foregroundStyle(.subtext).lineLimit(1)
+                            Text(s.artist).foregroundStyle(.secondary).lineLimit(1)
                             Spacer()
                             Text(Date(timeIntervalSince1970: TimeInterval(s.timestamp)), style: .relative)
-                                .font(.caption).foregroundStyle(.subtext).monospacedDigit()
+                                .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                         }
                     }
                 }
             }
         }
         .formStyle(.grouped)
-        .themedScrollBackground()
         .frame(height: 560)
     }
 
@@ -218,11 +205,11 @@ struct LastFMSettings: View {
     private func accountRow(_ scrobbler: Scrobbler) -> some View {
         switch scrobbler.status {
         case .notConfigured:
-            LabeledContent("Status") { Text("Enter your API key and secret first").foregroundStyle(.subtext) }
+            LabeledContent("Status") { Text("Enter your API key and secret first").foregroundStyle(.secondary) }
         case .disconnected:
             LabeledContent("Status") {
                 HStack {
-                    Text("Not connected").foregroundStyle(.subtext)
+                    Text("Not connected").foregroundStyle(.secondary)
                     Button("Connect…") { scrobbler.connect() }
                 }
             }
@@ -230,7 +217,7 @@ struct LastFMSettings: View {
             LabeledContent("Status") {
                 HStack {
                     ProgressView().controlSize(.small)
-                    Text("Allow access in your browser…").foregroundStyle(.subtext)
+                    Text("Allow access in your browser…").foregroundStyle(.secondary)
                     Button("Open Page Again") { scrobbler.reopenAuthorizationPage() }
                     Button("Cancel") { scrobbler.cancelAuthorization() }
                 }
@@ -263,7 +250,7 @@ struct LibraryCatalogSettings: View {
         Form {
             Section {
                 Text("Browse your local library's music CDs, see which libraries have them on the shelf and which are already in your digital or physical collection. Works with library catalogs run on Aspen Discovery, like the Minuteman Library Network.")
-                    .font(.callout).foregroundStyle(.subtext)
+                    .font(.callout).foregroundStyle(.secondary)
             }
             Section("Catalog") {
                 CatalogSiteField()
@@ -272,7 +259,7 @@ struct LibraryCatalogSettings: View {
                     ForEach(catalog.libraryChoices) { Text($0.name).tag($0.name) }
                 }
                 Text("Selected when browsing, listed first in availability, and offered for “Available now at”.")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section {
                 TextField("Library card number or username", text: $catalog.username)
@@ -292,17 +279,16 @@ struct LibraryCatalogSettings: View {
                 Text("Account")
             } footer: {
                 Text("Used to show what you have checked out, and to add CDs to one of your lists on the local library's website so you know what to look for. The password is stored in your keychain on this Mac.")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             CatalogDownloadSettings()
             Section("Album details") {
                 Toggle("Look up track lists, covers and info on MusicBrainz as CDs load", isOn: $catalog.autoLookup)
                 Text("Each CD is matched by its barcode (or its title and artist) once, then remembered in your library database. This also recognizes CDs you already have when the catalog spells them differently.")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .themedScrollBackground()
         .frame(height: 640)
         .onAppear { if catalog.libraries.isEmpty { catalog.loadLibraries() } }
     }
@@ -313,10 +299,10 @@ struct LibraryCatalogSettings: View {
         HStack {
             switch catalog.account {
             case .signedOut:
-                Text("Not signed in").foregroundStyle(.subtext)
+                Text("Not signed in").foregroundStyle(.secondary)
             case .signingIn:
                 ProgressView().controlSize(.small)
-                Text("Signing in…").foregroundStyle(.subtext)
+                Text("Signing in…").foregroundStyle(.secondary)
             case .signedIn(let name):
                 Label("Signed in as \(name)", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
             case .failed(let message):

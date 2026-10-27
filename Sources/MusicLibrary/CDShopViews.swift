@@ -6,7 +6,6 @@ import SwiftUI
 /// compare copies for sale on Discogs, eBay, CDandLP and Alibris.
 struct CDShopView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
 
     var body: some View {
         let store = model.cdShop
@@ -38,7 +37,6 @@ struct CDShopView: View {
 // MARK: Search
 
 private struct CDShopSearchBar: View {
-    @Environment(\.theme) private var theme
     @Bindable var store: CDShopStore
 
     var body: some View {
@@ -71,7 +69,7 @@ private struct CDShopSearchBar: View {
         TextField(prompt, text: text)
             .textFieldStyle(.plain)
             .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 8).fill(theme.fill))
+            .background(RoundedRectangle(cornerRadius: 8).fill(AppColor.fill))
             .frame(maxWidth: width)
             .onSubmit { store.unlock(); store.search() }
     }
@@ -79,7 +77,6 @@ private struct CDShopSearchBar: View {
 
 /// Step one: the albums MusicBrainz found and their editions in the format.
 private struct CDShopEditionsSection: View {
-    @Environment(\.theme) private var theme
     let store: CDShopStore
 
     var body: some View {
@@ -95,7 +92,7 @@ private struct CDShopEditionsSection: View {
         case .searching where store.albums.isEmpty:
             ProgressView("Searching MusicBrainz…").frame(maxWidth: .infinity).padding(.top, 40)
         case .failed(let message):
-            Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.subtext)
+            Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
         default:
             if store.albums.isEmpty {
                 ContentUnavailableView {
@@ -113,12 +110,12 @@ private struct CDShopEditionsSection: View {
                     if store.artists.count > 1 { artistChips }
                     Text((store.albums.count == 1 ? "1 album" : "\(store.albums.count) albums")
                          + (store.artist.map { " by \($0.name): open one to see its \(format.name) editions" } ?? ""))
-                        .font(.caption).foregroundStyle(.subtext)
+                        .font(.caption).foregroundStyle(.secondary)
                     ForEach(store.albums) { album in
                         CDShopAlbumCard(store: store, album: album)
                     }
                     HStack(spacing: 6) {
-                        Text("Not here?").foregroundStyle(.subtext)
+                        Text("Not here?").foregroundStyle(.secondary)
                         Button("Search the stores by name") { store.shopByName() }.buttonStyle(.link)
                     }
                     .font(.callout).padding(.top, 4)
@@ -138,7 +135,7 @@ extension CDShopEditionsSection {
                     Text(artist.name + (artist.disambiguation.isEmpty ? "" : " (\(artist.disambiguation))"))
                         .font(.caption)
                         .padding(.horizontal, 9).padding(.vertical, 4)
-                        .background(Capsule().fill(selected ? theme.accent.opacity(0.25) : theme.fill))
+                        .background(Capsule().fill(selected ? AppColor.accent.opacity(0.25) : AppColor.fill))
                 }
                 .buttonStyle(.plain)
                 .help(selected ? "Showing \(artist.name)" : "Show \(artist.name)'s albums instead")
@@ -148,7 +145,6 @@ extension CDShopEditionsSection {
 }
 
 private struct CDShopAlbumCard: View {
-    @Environment(\.theme) private var theme
     let store: CDShopStore
     let album: CDAlbum
 
@@ -163,16 +159,16 @@ private struct CDShopAlbumCard: View {
                     CDShopCover(releaseId: nil, releaseGroupId: album.releaseGroupId, side: 56, format: format)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(album.title).font(.headline)
-                        Text(album.artist).foregroundStyle(.subtext)
+                        Text(album.artist).foregroundStyle(.secondary)
                         Text([album.kind, album.year.map(String.init),
                               !album.editionsLoaded ? nil : album.editions.count == 1 ? "1 \(format.name) edition" : "\(album.editions.count) \(format.name) editions"]
                             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
-                            .font(.caption).foregroundStyle(.subtext)
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Button("Any \(format.name) Edition") { store.lock(edition: nil, album: album) }
                         .help("Shop for this album on \(format == .cd ? "CD" : "vinyl"), whichever edition")
-                    Image(systemName: "chevron.right").rotationEffect(.degrees(expanded ? 90 : 0)).foregroundStyle(.subtext)
+                    Image(systemName: "chevron.right").rotationEffect(.degrees(expanded ? 90 : 0)).foregroundStyle(.secondary)
                 }
                 .padding(12)
                 .contentShape(Rectangle())
@@ -183,10 +179,10 @@ private struct CDShopAlbumCard: View {
                 if store.loadingEditions.contains(album.id) {
                     ProgressView("Finding \(format.name) editions…").controlSize(.small).frame(maxWidth: .infinity).padding(12)
                 } else if let error = store.editionErrors[album.id] {
-                    Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.subtext).padding(12)
+                    Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.secondary).padding(12)
                 } else if album.editionsLoaded, album.editions.isEmpty {
                     Text("MusicBrainz lists no \(format.name) editions of this album. “Any \(format.name) Edition” still searches the stores for it.")
-                        .font(.caption).foregroundStyle(.subtext).padding(12)
+                        .font(.caption).foregroundStyle(.secondary).padding(12)
                 }
                 ForEach(Array(album.editions.enumerated()), id: \.element.id) { i, edition in
                     CDShopEditionRow(edition: edition, format: format) { store.lock(edition: edition, album: album) }
@@ -194,13 +190,12 @@ private struct CDShopAlbumCard: View {
                 }
             }
         }
-        .background(RoundedRectangle(cornerRadius: 12).fill(theme.card))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
     }
 }
 
 private struct CDShopEditionRow: View {
-    @Environment(\.theme) private var theme
     @Environment(AppModel.self) private var model
     let edition: CDEdition
     let format: ShopFormat
@@ -216,12 +211,12 @@ private struct CDShopEditionRow: View {
                         .font(.callout.weight(.semibold))
                     if !edition.status.isEmpty, edition.status != "Official" {
                         Text(edition.status).font(.caption2).padding(.horizontal, 5).padding(.vertical, 1)
-                            .background(Capsule().fill(theme.fill))
+                            .background(Capsule().fill(AppColor.fill))
                     }
                 }
                 Text([edition.label, edition.catalogNumber].filter { !$0.isEmpty }.joined(separator: " · "))
-                    .font(.caption).foregroundStyle(.subtext).lineLimit(1)
-                Text(details).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(details).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 CDShopOwnedNote(edition: edition, releaseGroupId: edition.releaseGroupId, album: edition.title, artist: edition.artist,
                                 format: format)
             }
@@ -231,7 +226,7 @@ private struct CDShopEditionRow: View {
             Button("Shop This Edition", action: choose).buttonStyle(.bordered)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(hovering ? theme.fill.opacity(0.5) : Color.clear)
+        .background(hovering ? AppColor.fill.opacity(0.5) : Color.clear)
         .onHover { hovering = $0 }
         .textSelection(.enabled)
     }
@@ -247,7 +242,6 @@ private struct CDShopEditionRow: View {
 
 /// Step two: copies for sale.
 private struct CDShopOffersSection: View {
-    @Environment(\.theme) private var theme
     @Environment(AppModel.self) private var model
     @Bindable var store: CDShopStore
     let target: CDShoppingTarget
@@ -258,7 +252,7 @@ private struct CDShopOffersSection: View {
             shopChips
             filters
             if let error = store.resolveError {
-                Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.subtext)
+                Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.secondary)
             }
             let shown = store.shownOffers
             if shown.isEmpty {
@@ -266,14 +260,14 @@ private struct CDShopOffersSection: View {
                     ProgressView("Looking for copies…").frame(maxWidth: .infinity).padding(.vertical, 30)
                 } else {
                     Text(store.offers.isEmpty ? "No copies found on these stores." : "No copies match these filters.")
-                        .foregroundStyle(.subtext).frame(maxWidth: .infinity).padding(.vertical, 30)
+                        .foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 30)
                 }
             }
             ForEach(sections(shown), id: \.title) { section in
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline) {
                         Text(section.title).font(.title3.bold())
-                        Text(section.subtitle).font(.caption).foregroundStyle(.subtext)
+                        Text(section.subtitle).font(.caption).foregroundStyle(.secondary)
                     }
                     VStack(spacing: 0) {
                         ForEach(Array(section.offers.enumerated()), id: \.element.id) { i, offer in
@@ -281,13 +275,13 @@ private struct CDShopOffersSection: View {
                             if i < section.offers.count - 1 { Divider().opacity(0.5) }
                         }
                     }
-                    .background(RoundedRectangle(cornerRadius: 12).fill(theme.card))
-                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+                    .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
+                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
                 }
             }
             alsoSearch
             Text("Prices in other currencies are converted to dollars at the European Central Bank's rates and are approximate; shipping is shown when the store lists it. Listings open on the store's site, where you buy as usual.")
-                .font(.caption).foregroundStyle(.subtext)
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -301,21 +295,21 @@ private struct CDShopOffersSection: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(target.isByName ? "\(target.format.name.uppercased()) BY NAME"
                      : target.edition == nil ? "ANY \(target.format.name.uppercased()) EDITION" : "THIS \(target.format.name.uppercased()) EDITION")
-                    .font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.subtext)
+                    .font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.secondary)
                 Text(target.album).font(.title2.bold())
-                Text(target.artist).foregroundStyle(.subtext)
+                Text(target.artist).foregroundStyle(.secondary)
                 if target.isByName {
                     Text("Not on MusicBrainz, so these are the stores' own search results: check each listing is the \(target.format.noun) you want.")
-                        .font(.caption).foregroundStyle(.subtext)
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 if let e = target.edition {
                     Text([e.date, e.country, e.label, e.catalogNumber, e.format].filter { !$0.isEmpty }.joined(separator: " · "))
-                        .font(.caption).foregroundStyle(.subtext).textSelection(.enabled)
-                    if !e.barcode.isEmpty { Text("Barcode \(e.barcode)").font(.caption).foregroundStyle(.subtext).textSelection(.enabled) }
+                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                    if !e.barcode.isEmpty { Text("Barcode \(e.barcode)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
                 }
                 if let stats = store.discogsStats, stats.forSale > 0, let lowest = stats.lowest {
                     Text("Discogs: \(stats.forSale) for sale from \(lowest.formatted()) before shipping")
-                        .font(.caption).foregroundStyle(.subtext)
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 CDShopOwnedNote(edition: target.edition, releaseGroupId: target.releaseGroupId, album: target.album, artist: target.artist,
                                 format: target.format)
@@ -342,12 +336,12 @@ private struct CDShopOffersSection: View {
                     HStack(spacing: 5) {
                         status(store.shopStates[shop] ?? .waiting)
                         Text(shop.name)
-                        if case .done(let n) = store.shopStates[shop] { Text("\(n)").foregroundStyle(.subtext).monospacedDigit() }
+                        if case .done(let n) = store.shopStates[shop] { Text("\(n)").foregroundStyle(.secondary).monospacedDigit() }
                     }
                     .font(.caption)
                     .padding(.horizontal, 9).padding(.vertical, 4)
-                    .background(Capsule().fill(hidden ? Color.clear : theme.fill))
-                    .overlay(Capsule().strokeBorder(theme.separator.opacity(hidden ? 0.8 : 0), lineWidth: 0.5))
+                    .background(Capsule().fill(hidden ? Color.clear : AppColor.fill))
+                    .overlay(Capsule().strokeBorder(AppColor.separator.opacity(hidden ? 0.8 : 0), lineWidth: 0.5))
                     .opacity(hidden ? 0.55 : 1)
                 }
                 .buttonStyle(.plain)
@@ -362,7 +356,7 @@ private struct CDShopOffersSection: View {
         case .waiting, .loading: ProgressView().controlSize(.mini)
         case .done: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
         case .failed: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-        case .notLinked: Image(systemName: "minus.circle").foregroundStyle(.subtext)
+        case .notLinked: Image(systemName: "minus.circle").foregroundStyle(.secondary)
         }
     }
 
@@ -407,7 +401,7 @@ private struct CDShopOffersSection: View {
 
     private var alsoSearch: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Search on").font(.caption.weight(.semibold)).foregroundStyle(.subtext)
+            Text("Search on").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             FlowLayout(spacing: 6) {
                 ForEach(CDShop.searched + CDShop.linked) { shop in
                     if let url = CDShopURLs.browse(shop, for: target)?.webLink {
@@ -421,7 +415,6 @@ private struct CDShopOffersSection: View {
 }
 
 private struct CDOfferRow: View {
-    @Environment(\.theme) private var theme
     let offer: CDOffer
     let dollars: Decimal?
     let format: ShopFormat
@@ -432,20 +425,20 @@ private struct CDOfferRow: View {
             AsyncImage(url: offer.imageURL) { image in
                 image.resizable().scaledToFill()
             } placeholder: {
-                ZStack { Rectangle().fill(theme.fill); Image(systemName: format.symbol).foregroundStyle(.subtext) }
+                ZStack { Rectangle().fill(AppColor.fill); Image(systemName: format.symbol).foregroundStyle(.secondary) }
             }
             .frame(width: 48, height: 48)
             .clipShape(RoundedRectangle(cornerRadius: 4))
             VStack(alignment: .leading, spacing: 2) {
                 Text(offer.title).font(.callout.weight(.medium)).lineLimit(2)
-                if !offer.edition.isEmpty { Text(offer.edition).font(.caption).foregroundStyle(.subtext).lineLimit(1) }
-                Text(details).font(.caption).foregroundStyle(.subtext).lineLimit(1)
-                if !offer.notes.isEmpty { Text(offer.notes).font(.caption2).foregroundStyle(.subtext).lineLimit(1).italic() }
+                if !offer.edition.isEmpty { Text(offer.edition).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                Text(details).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                if !offer.notes.isEmpty { Text(offer.notes).font(.caption2).foregroundStyle(.secondary).lineLimit(1).italic() }
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
                 Text(totalText).font(.headline).monospacedDigit()
-                Text(breakdown).font(.caption2).foregroundStyle(.subtext).monospacedDigit()
+                Text(breakdown).font(.caption2).foregroundStyle(.secondary).monospacedDigit()
             }
             .frame(minWidth: 110, alignment: .trailing)
             if let url = offer.url.webLink {
@@ -455,7 +448,7 @@ private struct CDOfferRow: View {
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(hovering ? theme.fill.opacity(0.6) : Color.clear)
+        .background(hovering ? AppColor.fill.opacity(0.6) : Color.clear)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .contextMenu {
@@ -503,7 +496,6 @@ private struct CDOfferRow: View {
 /// A release's (or, failing that, its album's) front cover from the Cover Art Archive.
 struct CDShopCover: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let releaseId: String?
     let releaseGroupId: String?
     let side: CGFloat
@@ -517,8 +509,8 @@ struct CDShopCover: View {
             if let image {
                 Image(nsImage: image).resizable().scaledToFill()
             } else {
-                Rectangle().fill(theme.fill)
-                Image(systemName: format.symbol).foregroundStyle(.subtext)
+                Rectangle().fill(AppColor.fill)
+                Image(systemName: format.symbol).foregroundStyle(.secondary)
             }
         }
         .frame(width: side, height: side)

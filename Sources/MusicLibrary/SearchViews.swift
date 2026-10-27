@@ -15,7 +15,7 @@ struct SearchSuggestions: View {
                 HStack {
                     Text(c.label).lineLimit(1)
                     Spacer()
-                    Text(c.detail).foregroundStyle(.subtext).lineLimit(1)
+                    Text(c.detail).foregroundStyle(.secondary).lineLimit(1)
                 }
                 .searchCompletion(c.replacement)
             }
@@ -76,7 +76,7 @@ struct SearchLabelHits: View {
         var stickers = Array(Set(hits.compactMap(\.sticker))).sorted()
         if let wanted, !stickers.contains(wanted) { stickers.insert(wanted, at: 0) }
         return VStack(alignment: .leading, spacing: 8) {
-            Text("Label").font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.subtext)
+            Text("Label").font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.secondary)
             ForEach(stickers, id: \.self) { sticker in
                 LabelLookupCard(sticker: sticker, coverWidth: 96, open: { model.showItem(id: $0.id) }, step: nil)
             }
@@ -95,7 +95,7 @@ struct CollectionHitsStrip: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("What You Own").font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.subtext)
+                Text("What You Own").font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.secondary)
                 Spacer()
                 Button(total > 12 ? "Show All \(total)" : "Show on Shelf") { model.showShelf(query: model.searchText) }
                     .buttonStyle(.link).font(.caption)
@@ -123,10 +123,10 @@ struct SearchHeader: View {
         VStack(alignment: .leading, spacing: 8) {
             if let corrected = results.correctedText {
                 HStack(spacing: 4) {
-                    Image(systemName: "wand.and.stars").foregroundStyle(.subtext)
+                    Image(systemName: "wand.and.stars").foregroundStyle(.secondary)
                     Text("Showing results for")
                     Text(corrected).bold()
-                    Text("·").foregroundStyle(.subtext)
+                    Text("·").foregroundStyle(.secondary)
                     Button("Search for “\(model.searchText)” instead") { model.searchExactly() }
                         .buttonStyle(.link)
                 }
@@ -136,7 +136,7 @@ struct SearchHeader: View {
                 Label(issue, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange)
             }
             HStack(spacing: 10) {
-                Text("Refine").font(.caption).foregroundStyle(.subtext)
+                Text("Refine").font(.caption).foregroundStyle(.secondary)
                 RefineMenus()
                 Spacer(minLength: 12)
                 Button { play(shuffled: false) } label: { Label("Play", systemImage: "play.fill") }
@@ -235,7 +235,7 @@ struct TopHitsStrip: View {
                         VStack(spacing: 4) {
                             ArtistPhoto(name: a.name, size: size)
                             Text(a.name.isEmpty ? "Unknown Artist" : a.name).font(.caption.weight(.medium)).lineLimit(1)
-                            Text("Artist · \(a.albumCount) album\(a.albumCount == 1 ? "" : "s")").font(.caption2).foregroundStyle(.subtext).lineLimit(1)
+                            Text("Artist · \(a.albumCount) album\(a.albumCount == 1 ? "" : "s")").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                         }
                         .frame(width: size + 16)
                     }
@@ -253,7 +253,7 @@ struct TopHitsStrip: View {
                                        mark: model.copyMark(for: a))
                             Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.caption.weight(.medium)).lineLimit(1)
                             Text([a.artist, a.year.map(String.init)].compactMap { $0 }.joined(separator: " · "))
-                                .font(.caption2).foregroundStyle(.subtext).lineLimit(1)
+                                .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                         }
                         .frame(width: size + 16, alignment: .leading)
                     }
@@ -285,9 +285,9 @@ struct InitialsBadge: View {
         ZStack {
             Circle().fill(.quaternary)
             if initials.isEmpty {
-                Image(systemName: "music.mic").font(.system(size: size / 3)).foregroundStyle(.subtext)
+                Image(systemName: "music.mic").font(.system(size: size / 3)).foregroundStyle(.secondary)
             } else {
-                Text(initials.uppercased()).font(.system(size: size / 3, weight: .semibold, design: .rounded)).foregroundStyle(.subtext)
+                Text(initials.uppercased()).font(.system(size: size / 3, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
             }
         }
         .frame(width: size, height: size)
@@ -313,7 +313,7 @@ struct SearchHelpView: View {
                     ForEach(SearchFilterKey.all, id: \.name) { k in
                         GridRow {
                             Text(k.name + ":").font(.system(.callout, design: .monospaced)).bold()
-                            Text(k.help).font(.callout).foregroundStyle(.subtext)
+                            Text(k.help).font(.callout).foregroundStyle(.secondary)
                                 .frame(maxWidth: 260, alignment: .leading)
                             Button(k.example) { onExample(k.example) }
                                 .buttonStyle(.link)
@@ -322,14 +322,14 @@ struct SearchHelpView: View {
                     }
                 }
                 Text("Numbers accept comparisons and ranges: year:>2000, year:1990-1999, time:3:00..5:00")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
                 Divider()
                 Text("What You Own").font(.headline)
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
                     ForEach(CollectionSearchQuery.keys, id: \.key) { k in
                         GridRow {
                             Text(k.key == "#" ? "#" : k.key + ":").font(.system(.callout, design: .monospaced)).bold()
-                            Text(k.help).font(.callout).foregroundStyle(.subtext)
+                            Text(k.help).font(.callout).foregroundStyle(.secondary)
                                 .frame(maxWidth: 260, alignment: .leading)
                             Button(k.example) { onExample(k.example) }
                                 .buttonStyle(.link)
@@ -338,7 +338,7 @@ struct SearchHelpView: View {
                     }
                 }
                 Text("These filters apply to the whole search: own:vinyl genre:jazz finds the songs of your jazz records. A label (#12, cd 12, vinyl 12) also shows what's at it on your shelf. iPhones with a version before 1.21 show smart playlists with these filters empty (or unfiltered when one is negated, like -own:vinyl).")
-                    .font(.caption).foregroundStyle(.subtext).fixedSize(horizontal: false, vertical: true)
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             .padding(16)
         }
@@ -348,7 +348,7 @@ struct SearchHelpView: View {
     private func basic(_ syntax: String, _ meaning: String) -> some View {
         GridRow {
             Text(syntax).font(.system(.callout, design: .monospaced))
-            Text(meaning).font(.callout).foregroundStyle(.subtext)
+            Text(meaning).font(.callout).foregroundStyle(.secondary)
         }
     }
 }
@@ -393,7 +393,7 @@ struct SmartPlaylistEditor: View {
                 }
                 ForEach(preview.issues, id: \.self) { Label($0, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
             }
-            .font(.callout).foregroundStyle(.subtext)
+            .font(.callout).foregroundStyle(.secondary)
             DisclosureGroup("Syntax", isExpanded: $showHelp) {
                 SearchHelpView { example in
                     draft.query = draft.query.trimmingCharacters(in: .whitespaces).isEmpty ? example : draft.query + " " + example
@@ -428,11 +428,11 @@ struct SmartPlaylistView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: "gearshape").foregroundStyle(.subtext)
+                Image(systemName: "gearshape").foregroundStyle(.secondary)
                 Text(playlist.query).font(.system(.callout, design: .monospaced)).textSelection(.enabled).lineLimit(2)
                 Spacer()
                 Text("\(songCount(tracks.count)) · \(formatLongDuration(tracks.reduce(0) { $0 + $1.duration }))")
-                    .font(.callout).foregroundStyle(.subtext)
+                    .font(.callout).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
             Divider()

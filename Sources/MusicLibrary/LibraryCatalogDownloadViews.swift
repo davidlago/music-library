@@ -5,7 +5,6 @@ import SwiftUI
 /// narrow the results.
 struct DownloadedCatalogView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
 
     var body: some View {
         let catalog = model.catalog
@@ -57,7 +56,7 @@ struct DownloadedCatalogView: View {
             VStack(alignment: .leading, spacing: 6) {
                 if !genres.isEmpty {
                     FlowLayout(spacing: 6) {
-                        Text("Genres").font(.caption.weight(.semibold)).foregroundStyle(.subtext).padding(.trailing, 4)
+                        Text("Genres").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.trailing, 4)
                         ForEach(Array(genres), id: \.name) { g in
                             chip("\(g.name.capitalized) \(g.count)") { catalog.addToLocalSearch(SearchFilterKey.token("genre", g.name)) }
                         }
@@ -65,7 +64,7 @@ struct DownloadedCatalogView: View {
                 }
                 if result.decades.count > 1 {
                     FlowLayout(spacing: 6) {
-                        Text("Decades").font(.caption.weight(.semibold)).foregroundStyle(.subtext).padding(.trailing, 4)
+                        Text("Decades").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.trailing, 4)
                         ForEach(result.decades, id: \.decade) { d in
                             chip("\(String(d.decade))s \(d.count)") { catalog.addToLocalSearch("decade:\(d.decade)s") }
                         }
@@ -79,7 +78,7 @@ struct DownloadedCatalogView: View {
         Button(action: action) {
             Text(title).font(.caption)
                 .padding(.horizontal, 9).padding(.vertical, 4)
-                .background(Capsule().fill(theme.fill))
+                .background(Capsule().fill(AppColor.fill))
         }
         .buttonStyle(.plain)
     }
@@ -112,12 +111,12 @@ struct DownloadedSearchBar: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.subtext)
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                     TextField("Search: miles davis   genre:jazz decade:60s -is:owned", text: $catalog.localText)
                         .textFieldStyle(.plain)
                     if !catalog.localText.isEmpty {
                         Button { catalog.localText = "" } label: { Image(systemName: "xmark.circle.fill") }
-                            .buttonStyle(.plain).foregroundStyle(.subtext)
+                            .buttonStyle(.plain).foregroundStyle(.secondary)
                             .help("Clear the search")
                     }
                 }
@@ -233,18 +232,18 @@ struct DownloadStatus: View {
                     .frame(width: 120)
                 if let until = progress.pausedUntil {
                     Text("Paused: the local library's website asked for a break. Resuming at \(until.formatted(date: .omitted, time: .shortened)) (page \(progress.page) of \(progress.pages ?? 0)).")
-                        .font(.caption).foregroundStyle(.subtext)
+                        .font(.caption).foregroundStyle(.secondary)
                 } else {
                     Text(progress.pages.map { "Downloading \(progress.library)'s CDs… page \(progress.page) of \($0)" }
                          ?? "Downloading \(progress.library)'s CDs…")
-                        .font(.caption).foregroundStyle(.subtext)
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             } else if let error = catalog.downloadError {
                 Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange).lineLimit(2)
                 Button("Try Again") { catalog.downloadCatalogs(force: true) }.controlSize(.small)
             } else if let date = catalog.lastDownload {
                 Text("Updated \(date.formatted(.relative(presentation: .named))) · \(catalog.detailedCount.formatted()) of \(catalog.records.count.formatted()) with album details")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             LookupStatus()
@@ -264,7 +263,7 @@ struct CatalogDownloadSettings: View {
                     HStack {
                         let count = catalog.records.values.filter { $0.libraries.contains(name) }.count
                         Text(catalog.downloadDates[name] == nil ? "Not downloaded yet" : "\(count.formatted()) CDs")
-                            .foregroundStyle(.subtext)
+                            .foregroundStyle(.secondary)
                         Button { catalog.removeDownload(name) } label: { Image(systemName: "minus.circle") }
                             .buttonStyle(.borderless)
                             .help("Stop downloading \(name)'s catalog")
@@ -291,13 +290,13 @@ struct CatalogDownloadSettings: View {
             let missing = catalog.records.keys.filter { catalog.needsLookup($0) }.count
             if missing > 0 {
                 Text("\(missing.formatted()) CDs still to look up on MusicBrainz, about \(duration(missing)) at its pace of one request a second.")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
         } header: {
             Text("Downloaded catalogs")
         } footer: {
             Text("Every CD these libraries own is downloaded and searched on your Mac. New titles and availability are checked when the download is more than 12 hours old; album details are looked up once.")
-                .font(.caption).foregroundStyle(.subtext)
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 

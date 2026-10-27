@@ -8,7 +8,7 @@ yourself without a signing certificate ask after every rebuild.)
 
 ## The iPhone can't find the Mac, or a sync times out
 
-- Both need to be on the same Wi-Fi network, with Music Library open on the Mac and the Sync tab open on the phone.
+- Both need to be on the same Wi-Fi network, with Music Library open on the Mac and Sync open on the phone (the button at the top of Listen Now).
 - Both apps need **Local Network** access: on the iPhone in Settings ▸ Apps ▸ Dave's Music Library, on the Mac in System
   Settings ▸ Privacy & Security ▸ Local Network.
 - Right after launch, macOS sometimes refuses the Mac app's first local network connection. The app tries again with a

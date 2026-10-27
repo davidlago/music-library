@@ -29,23 +29,19 @@ struct CollectionRoutePage: View {
 
 // MARK: Tab
 
-/// The Physical tab: the CDs and records you own, with or without songs in the library (downloads are on the Digital
+/// The Collection tab: the CDs and records you own, then the digital collection, with or without songs in the library (downloads are on the Digital
 /// tab). Read-only; the collection is edited in Music Library on the Mac.
 struct CollectionTab: View {
     @Environment(PhoneModel.self) private var model
+    @State private var showSettings = false
 
     var body: some View {
-        LibraryStack(opener: PendingItemOpener()) {
+        LibraryStack(opener: PendingLinksOpener()) {
             Group {
-                if let library = model.library {
+                if let library = model.library, !library.isEmpty {
+                    // With nothing on the shelf, the digital collection alone (downloads are digital).
                     if model.collection.count(.all) == 0 {
-                        ContentUnavailableView {
-                            Label("Your Shelf Is Empty", systemImage: "books.vertical")
-                        } description: {
-                            Text("Add the CDs and records you own in Music Library on your Mac, then sync. They show up here, ripped or not.")
-                        } actions: {
-                            Button("Check Again") { model.reload() }
-                        }
+                        LibraryHome(library: library)
                     } else {
                         CollectionHome(library: library)
                     }
@@ -53,8 +49,20 @@ struct CollectionTab: View {
                     LibraryStatusView()
                 }
             }
-            .navigationTitle("Physical Collection")
+            .navigationTitle("Collection")
+            .toolbar {
+                Button("Settings", systemImage: "gearshape") { showSettings = true }
+            }
         }
+        .sheet(isPresented: $showSettings) { SettingsView() }
+    }
+}
+
+/// The albums (`PhoneModel.pendingAlbumKey`) and items (`pendingItemID`) widgets, the watch and Siri open, both shown
+/// on the Collection tab.
+private struct PendingLinksOpener: ViewModifier {
+    func body(content: Content) -> some View {
+        content.modifier(PendingItemOpener()).modifier(PendingAlbumOpener())
     }
 }
 
@@ -94,6 +102,7 @@ struct CollectionHome: View {
                 FindByLabelCard()
                 tiles(collection, ready: ready)
                 rows(collection, ready: ready)
+                DigitalCollectionCard(library: library)
                 recentlyAdded(collection)
                 footnotes(collection)
             }
@@ -644,7 +653,7 @@ struct ReadyToDownloadPage: View {
                 } footer: {
                     Text(model.sync.isPaired
                          ? "\(items.count) album\(items.count == 1 ? "" : "s") · \(songCount(songs)) not on this iPhone. They download at the next sync with \(model.sync.macName ?? "your Mac")."
-                         : "\(items.count) album\(items.count == 1 ? "" : "s") · \(songCount(songs)) not on this iPhone. They download at the first sync after you pair with your Mac in the Sync tab.")
+                         : "\(items.count) album\(items.count == 1 ? "" : "s") · \(songCount(songs)) not on this iPhone. They download at the first sync after you pair with your Mac (Sync, on Listen Now).")
                 }
             }
             Section {

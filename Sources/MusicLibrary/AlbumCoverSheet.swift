@@ -72,7 +72,6 @@ struct CoverSheetRequest: Identifiable {
 struct AlbumCoverSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.theme) private var theme
     let album: AlbumSummary
     let tracks: [Track]
     let request: CoverSheetRequest
@@ -131,7 +130,7 @@ struct AlbumCoverSheet: View {
             DataImage(data: image ?? current, size: 240)
                 .overlay {
                     if downloading { ProgressView().controlSize(.large) }
-                    if dropTargeted { RoundedRectangle(cornerRadius: 6).strokeBorder(theme.accent, lineWidth: 3) }
+                    if dropTargeted { RoundedRectangle(cornerRadius: 6).strokeBorder(AppColor.accent, lineWidth: 3) }
                 }
                 .dropDestination(for: URL.self) { urls, _ in
                     guard let url = urls.first else { return false }
@@ -141,14 +140,14 @@ struct AlbumCoverSheet: View {
             Text(image != nil ? (source ?? "New cover") : (current != nil ? "Current cover" : "No cover yet"))
                 .font(.callout.weight(.medium)).lineLimit(2).multilineTextAlignment(.center)
             if let size = pixelSize(image ?? current) {
-                Text(size).font(.caption).foregroundStyle(.subtext)
+                Text(size).font(.caption).foregroundStyle(.secondary)
             }
             HStack {
                 Button("Choose Image…", action: choose)
                 Button("Paste", action: paste).help("Use an image you copied")
             }
             if image != nil { Button("Keep Current Cover") { image = nil; source = nil; chosen = nil }.buttonStyle(.link) }
-            Text("Or drop an image file here.").font(.caption).foregroundStyle(.subtext)
+            Text("Or drop an image file here.").font(.caption).foregroundStyle(.secondary)
             if let message { Text(message).font(.caption).foregroundStyle(.red).multilineTextAlignment(.center) }
             Spacer(minLength: 0)
         }
@@ -173,7 +172,7 @@ struct AlbumCoverSheet: View {
             }
             .textFieldStyle(.roundedBorder)
             .onSubmit { Task { await runSearch() } }
-            Text("Covers from the Cover Art Archive, for releases on MusicBrainz").font(.caption).foregroundStyle(.subtext)
+            Text("Covers from the Cover Art Archive, for releases on MusicBrainz").font(.caption).foregroundStyle(.secondary)
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 12, alignment: .top)], spacing: 12) {
                     ForEach(shown) { c in candidateCell(c) }
@@ -184,10 +183,10 @@ struct AlbumCoverSheet: View {
                 if searching {
                     ProgressView("Searching MusicBrainz…")
                 } else if shown.isEmpty, let searchMessage {
-                    Text(searchMessage).foregroundStyle(.subtext).multilineTextAlignment(.center).padding()
+                    Text(searchMessage).foregroundStyle(.secondary).multilineTextAlignment(.center).padding()
                 } else if shown.isEmpty, !candidates.isEmpty, candidates.allSatisfy({ noArt.contains($0.id) || thumbnails[$0.id] != nil }) {
                     Text("None of these releases has a cover on the Cover Art Archive. Try another search, or choose an image.")
-                        .foregroundStyle(.subtext).multilineTextAlignment(.center).padding()
+                        .foregroundStyle(.secondary).multilineTextAlignment(.center).padding()
                 }
             }
         }
@@ -200,10 +199,10 @@ struct AlbumCoverSheet: View {
                 DataImage(data: thumbnails[c.id], size: 128)
                     .overlay {
                         if thumbnails[c.id] == nil { ProgressView().controlSize(.small) }
-                        if chosen == c.id { RoundedRectangle(cornerRadius: 6).strokeBorder(theme.accent, lineWidth: 3) }
+                        if chosen == c.id { RoundedRectangle(cornerRadius: 6).strokeBorder(AppColor.accent, lineWidth: 3) }
                     }
                 Text(c.title).font(.caption.weight(.medium)).lineLimit(1)
-                Text(c.detail).font(.caption2).foregroundStyle(.subtext).lineLimit(2)
+                Text(c.detail).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
             }
             .frame(width: 128, alignment: .leading)
             .contentShape(Rectangle())
@@ -220,7 +219,7 @@ struct AlbumCoverSheet: View {
         HStack(spacing: 12) {
             if let progress {
                 ProgressView(value: Double(progress.done), total: Double(max(progress.total, 1))).frame(width: 160)
-                Text("Updating files… \(progress.done) of \(progress.total)").font(.callout).foregroundStyle(.subtext)
+                Text("Updating files… \(progress.done) of \(progress.total)").font(.callout).foregroundStyle(.secondary)
             } else if embeddableCount > 0 {
                 Toggle("Also embed it in the album’s \(embeddableCount == 1 ? "file" : "\(embeddableCount) files")", isOn: $embed)
                     .help("Writes the cover into the album's mp3, flac and m4a files in your digital collection, so other players and exported copies show it too")

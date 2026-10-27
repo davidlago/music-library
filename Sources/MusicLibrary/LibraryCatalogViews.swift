@@ -29,7 +29,7 @@ struct LiveCatalogView: View {
             VStack(alignment: .leading, spacing: 16) {
                 if catalog.hasDownloads {
                     HStack {
-                        Image(systemName: "globe").foregroundStyle(.subtext)
+                        Image(systemName: "globe").foregroundStyle(.secondary)
                         Text("Searching every library in the network live on the local library's website.").font(.callout)
                         Spacer()
                         Button("Back to Downloaded CDs") { catalog.liveMode = false }
@@ -84,7 +84,7 @@ struct LiveCatalogView: View {
             Spacer()
             if catalog.isLoading {
                 ProgressView().controlSize(.small)
-                Text(catalog.items.isEmpty ? "Searching the catalog…" : "Loading more…").foregroundStyle(.subtext)
+                Text(catalog.items.isEmpty ? "Searching the catalog…" : "Loading more…").foregroundStyle(.secondary)
             } else if catalog.hasMore {
                 Button("Load More") { catalog.loadMore() }
             }
@@ -94,7 +94,7 @@ struct LiveCatalogView: View {
         .padding(.top, 4)
         if catalog.hasClientFilters, !catalog.items.isEmpty {
             Text("\(shown) of the \(catalog.items.count) titles loaded so far match. The catalog can't filter by this itself, so titles are checked as pages load.")
-                .font(.caption).foregroundStyle(.subtext).frame(maxWidth: .infinity)
+                .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity)
         }
     }
 
@@ -121,13 +121,13 @@ struct CatalogFilterBar: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.subtext)
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                     TextField("Search the catalog's music CDs", text: $draft)
                         .textFieldStyle(.plain)
                         .onSubmit { catalog.query.text = draft }
                     if !draft.isEmpty {
                         Button { draft = ""; catalog.query.text = "" } label: { Image(systemName: "xmark.circle.fill") }
-                            .buttonStyle(.plain).foregroundStyle(.subtext)
+                            .buttonStyle(.plain).foregroundStyle(.secondary)
                             .help("Clear the search")
                     }
                 }
@@ -230,12 +230,12 @@ struct LookupStatus: View {
                 ProgressView().controlSize(.small)
                 if let until = catalog.client.cooldownUntil, until > Date() {
                     Text("Album details paused until \(until.formatted(date: .omitted, time: .shortened)) (the local library's website asked for a break) · \(catalog.lookupRemaining) left")
-                        .font(.caption).foregroundStyle(.subtext)
+                        .font(.caption).foregroundStyle(.secondary)
                 } else {
-                    Text("Looking up album details… \(catalog.lookupRemaining) left").font(.caption).foregroundStyle(.subtext)
+                    Text("Looking up album details… \(catalog.lookupRemaining) left").font(.caption).foregroundStyle(.secondary)
                 }
                 Button { catalog.cancelLookups() } label: { Image(systemName: "xmark.circle.fill") }
-                    .buttonStyle(.plain).foregroundStyle(.subtext).help("Stop looking up albums")
+                    .buttonStyle(.plain).foregroundStyle(.secondary).help("Stop looking up albums")
             }
             .help("Track lists, years, genres and covers come from MusicBrainz, matched by each CD's barcode")
         } else if let error = catalog.lookupError {
@@ -263,7 +263,6 @@ struct CatalogErrorBanner: View {
 
 struct CatalogCard: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let item: CatalogItem
     @State private var cover: NSImage?
 
@@ -277,15 +276,15 @@ struct CatalogCard: View {
                     if let cover {
                         Image(nsImage: cover).resizable().scaledToFill()
                     } else {
-                        Rectangle().fill(theme.fill)
-                        Image(systemName: "opticaldisc").font(.system(size: 40)).foregroundStyle(.subtext)
+                        Rectangle().fill(AppColor.fill)
+                        Image(systemName: "opticaldisc").font(.system(size: 40)).foregroundStyle(.secondary)
                     }
                 }
                 .frame(width: 150, height: 150)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 if owned {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.title2).symbolRenderingMode(.palette).foregroundStyle(.white, theme.accent)
+                        .font(.title2).symbolRenderingMode(.palette).foregroundStyle(.white, AppColor.accent)
                         .shadow(radius: 2).padding(6)
                         .help("In your digital collection")
                 }
@@ -299,10 +298,10 @@ struct CatalogCard: View {
             }
             Text(item.displayTitle).font(.headline).lineLimit(2)
             Text(item.artist.isEmpty ? (details?.mbArtist ?? "Various Artists") : item.artist)
-                .font(.subheadline).foregroundStyle(.subtext).lineLimit(1)
+                .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
             HStack(spacing: 6) {
                 CatalogStatusBadge(availability: item.availability, text: item.statusText, library: catalog.siteLibrary)
-                if let year = details?.year ?? item.year { Text(String(year)).font(.caption).foregroundStyle(.subtext) }
+                if let year = details?.year ?? item.year { Text(String(year)).font(.caption).foregroundStyle(.secondary) }
             }
             let copies = catalog.collectionCopies(item)
             if !copies.isEmpty { CollectionCopyNote(copies: copies, compact: true) }
@@ -377,7 +376,6 @@ struct CatalogItemMenu: View {
 /// copies are and whether they're on the shelf, its editions, and whether it's already in your library.
 struct CatalogDetail: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let item: CatalogItem
     @State private var cover: NSImage?
     @State private var descriptionExpanded = false
@@ -466,8 +464,8 @@ struct CatalogDetail: View {
                     Image(nsImage: cover).resizable().scaledToFill()
                 } else {
                     ZStack {
-                        Rectangle().fill(theme.fill)
-                        Image(systemName: "opticaldisc").font(.system(size: coverSize / 4)).foregroundStyle(.subtext)
+                        Rectangle().fill(AppColor.fill)
+                        Image(systemName: "opticaldisc").font(.system(size: coverSize / 4)).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -476,21 +474,21 @@ struct CatalogDetail: View {
             .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
             .padding(.bottom, 10)
 
-            Text(typeLine(details)).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.subtext)
+            Text(typeLine(details)).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.secondary)
             Text(item.displayTitle).font(.system(size: 30, weight: .bold)).lineLimit(3).minimumScaleFactor(0.7)
                 .textSelection(.enabled)
             if let mbTitle = details?.mbTitle, CatalogText.key(mbTitle) != CatalogText.key(item.displayTitle) {
-                Text("Released as “\(mbTitle)”").font(.callout).foregroundStyle(.subtext)
+                Text("Released as “\(mbTitle)”").font(.callout).foregroundStyle(.secondary)
             }
             artistLine(details)
-            if let meta = metaLine(details) { Text(meta).font(.callout).foregroundStyle(.subtext) }
+            if let meta = metaLine(details) { Text(meta).font(.callout).foregroundStyle(.secondary) }
             if let info = details?.album, let rating = info.rating { RatingView(rating: rating, votes: info.ratingVotes) }
             if let genres = details?.album?.genres, !genres.isEmpty {
                 FlowLayout(spacing: 6) {
                     ForEach(genres, id: \.self) { g in
                         Text(g.capitalized).font(.caption)
                             .padding(.horizontal, 9).padding(.vertical, 4)
-                            .background(Capsule().fill(theme.fill))
+                            .background(Capsule().fill(AppColor.fill))
                     }
                 }
             }
@@ -502,7 +500,7 @@ struct CatalogDetail: View {
                 } else {
                     // Short, so the buttons beside it keep their full titles.
                     Label("No digital copy", systemImage: "circle.dashed")
-                        .foregroundStyle(.subtext)
+                        .foregroundStyle(.secondary)
                         .fixedSize()
                         .padding(.trailing, 6)
                         .help("This CD isn't in your digital collection")
@@ -534,7 +532,7 @@ struct CatalogDetail: View {
                 HStack(spacing: 8) {
                     ArtistPhoto(name: artist.name, size: 26)
                     Text(name).font(.title3.weight(.medium))
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.subtext)
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 }
             }
             .buttonStyle(.plain)
@@ -591,14 +589,14 @@ struct CatalogDetail: View {
                     }
                     if let source = info.descriptionSource {
                         if let url = info.descriptionURL?.webLink { Link("From \(source)", destination: url).font(.caption) }
-                        else { Text("From \(source)").font(.caption).foregroundStyle(.subtext) }
+                        else { Text("From \(source)").font(.caption).foregroundStyle(.secondary) }
                     }
                 }
             }
         } else if catalog.isLookingUp(item) {
-            Label("Looking up this CD on MusicBrainz…", systemImage: "arrow.down.circle").font(.callout).foregroundStyle(.subtext)
+            Label("Looking up this CD on MusicBrainz…", systemImage: "arrow.down.circle").font(.callout).foregroundStyle(.secondary)
         } else if let details, !details.isMatched {
-            Label("This CD wasn't found on MusicBrainz.", systemImage: "questionmark.circle").font(.callout).foregroundStyle(.subtext)
+            Label("This CD wasn't found on MusicBrainz.", systemImage: "questionmark.circle").font(.callout).foregroundStyle(.secondary)
         }
         releaseDetails(details)
         if let work = catalog.works[item.id], !work.contributors.isEmpty {
@@ -607,7 +605,7 @@ struct CatalogDetail: View {
                 ForEach(Array(work.contributors.prefix(16).enumerated()), id: \.offset) { _, c in
                     HStack(alignment: .firstTextBaseline) {
                         PersonLink(name: CatalogText.displayName(c.name)) { model.showMusicDNA($0) }.fontWeight(.medium)
-                        if let role = c.role { Text(role).foregroundStyle(.subtext) }
+                        if let role = c.role { Text(role).foregroundStyle(.secondary) }
                     }
                     .font(.callout)
                 }
@@ -622,7 +620,7 @@ struct CatalogDetail: View {
                             Label(link.title, systemImage: ArtistDetail.icon(link.kind))
                                 .font(.callout)
                                 .padding(.horizontal, 11).padding(.vertical, 6)
-                                .background(Capsule().fill(theme.fill))
+                                .background(Capsule().fill(AppColor.fill))
                         }
                         .buttonStyle(.plain)
                         .help(link.url.absoluteString)
@@ -648,7 +646,7 @@ struct CatalogDetail: View {
                 Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
                     ForEach(rows, id: \.0) { k, v in
                         GridRow {
-                            Text(k).foregroundStyle(.subtext)
+                            Text(k).foregroundStyle(.secondary)
                             Text(v).textSelection(.enabled)
                         }
                         .font(.callout)
@@ -699,7 +697,7 @@ struct CatalogDetail: View {
                         trackRow(number: i + 1, title: title, artist: nil, duration: nil, preview: lined[i], queue: queue)
                     }
                 }
-                Text("From the local library's catalog record.").font(.caption).foregroundStyle(.subtext)
+                Text("From the local library's catalog record.").font(.caption).foregroundStyle(.secondary)
                 previewsFooter(queue)
             }
         } else if let apple, !apple.tracks.isEmpty {
@@ -722,7 +720,7 @@ struct CatalogDetail: View {
         } else if model.catalog.isLookingUp(item) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeader(title: "Tracks")
-                HStack { ProgressView().controlSize(.small); Text("Looking up the track list…").foregroundStyle(.subtext) }
+                HStack { ProgressView().controlSize(.small); Text("Looking up the track list…").foregroundStyle(.secondary) }
             }
         } else {
             previewsFooter([])
@@ -731,7 +729,7 @@ struct CatalogDetail: View {
 
     private func discHeader(_ disc: Int, first: Bool) -> some View {
         HStack {
-            Image(systemName: "opticaldisc").foregroundStyle(.subtext)
+            Image(systemName: "opticaldisc").foregroundStyle(.secondary)
             Text("Disc \(disc)").font(.callout.weight(.semibold))
             Spacer()
         }
@@ -785,15 +783,15 @@ struct CatalogDetail: View {
                 }
             }
             .font(.caption)
-            .foregroundStyle(.subtext)
+            .foregroundStyle(.secondary)
         }
     }
 
     private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         VStack(spacing: 0, content: content)
             .padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 14).fill(theme.card.opacity(0.72)))
-            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(theme.separator.opacity(0.5), lineWidth: 0.5))
+            .background(RoundedRectangle(cornerRadius: 14).fill(AppColor.card.opacity(0.72)))
+            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(AppColor.separator.opacity(0.5), lineWidth: 0.5))
     }
 
     private func trackRow(number: Int, title: String, artist: String?, duration: Double?,
@@ -805,30 +803,30 @@ struct CatalogDetail: View {
             ZStack {
                 if let preview, isCurrent || hoveredPreview == preview.id {
                     Button { previews.toggle(preview, in: queue) } label: {
-                        Image(systemName: playing ? "pause.fill" : "play.fill").foregroundStyle(theme.accent)
+                        Image(systemName: playing ? "pause.fill" : "play.fill").foregroundStyle(AppColor.accent)
                             .frame(width: 24, height: 20).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help(playing ? "Pause the preview" : "Play a 30-second preview from Apple Music")
                 } else {
-                    Text(String(number)).monospacedDigit().foregroundStyle(.subtext)
+                    Text(String(number)).monospacedDigit().foregroundStyle(.secondary)
                 }
             }
             .frame(width: 24)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).lineLimit(1).foregroundStyle(isCurrent ? theme.accent : .primary)
+                Text(title).lineLimit(1).foregroundStyle(isCurrent ? AppColor.accent : .primary)
                 if let artist, !artist.isEmpty {
                     PersonLinks(artist) { model.showMusicDNA($0) }.font(.caption)
                 }
             }
             Spacer()
-            Text(duration.map(formatTime) ?? "").monospacedDigit().foregroundStyle(.subtext).frame(width: 46, alignment: .trailing)
+            Text(duration.map(formatTime) ?? "").monospacedDigit().foregroundStyle(.secondary).frame(width: 46, alignment: .trailing)
         }
         .padding(.horizontal, 14).padding(.vertical, 7)
         .background(alignment: .bottomLeading) {
             if isCurrent {
                 GeometryReader { g in
-                    Capsule().fill(theme.accent.opacity(0.7))
+                    Capsule().fill(AppColor.accent.opacity(0.7))
                         .frame(width: max(0, g.size.width - 28) * previews.progress, height: 2)
                         .offset(x: 14, y: g.size.height - 2)
                 }
@@ -853,7 +851,7 @@ struct CatalogDetail: View {
                 Spacer()
                 if !copies.isEmpty {
                     let libraries = Set(copies.filter(\.isAvailable).map(\.library)).count
-                    Text("On the shelf at \(libraries) librar\(libraries == 1 ? "y" : "ies")").font(.callout).foregroundStyle(.subtext)
+                    Text("On the shelf at \(libraries) librar\(libraries == 1 ? "y" : "ies")").font(.callout).foregroundStyle(.secondary)
                 }
                 Button {
                     Task { loadingCopies = true; await catalog.loadCopies(item, force: true); loadingCopies = false }
@@ -862,9 +860,9 @@ struct CatalogDetail: View {
             }
             if copies.isEmpty {
                 if loadingCopies {
-                    HStack { ProgressView().controlSize(.small); Text("Checking the libraries…").foregroundStyle(.subtext) }
+                    HStack { ProgressView().controlSize(.small); Text("Checking the libraries…").foregroundStyle(.secondary) }
                 } else {
-                    Text(catalog.copiesError[item.id] ?? "No copy details from the catalog.").foregroundStyle(.subtext)
+                    Text(catalog.copiesError[item.id] ?? "No copy details from the catalog.").foregroundStyle(.secondary)
                 }
             } else {
                 card {
@@ -896,13 +894,13 @@ struct CatalogDetail: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(copy.library).fontWeight(home ? .semibold : .regular)
-                    if home { Text("My Local Library").font(.caption2).padding(.horizontal, 5).padding(.vertical, 1).background(Capsule().fill(theme.fill)) }
+                    if home { Text("My Local Library").font(.caption2).padding(.horizontal, 5).padding(.vertical, 1).background(Capsule().fill(AppColor.fill)) }
                 }
                 Text(copy.location.components(separatedBy: " - ").dropFirst().joined(separator: " - "))
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Text(copy.callNumber).font(.caption.monospaced()).foregroundStyle(.subtext).lineLimit(1).textSelection(.enabled)
+            Text(copy.callNumber).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).textSelection(.enabled)
             Text(copy.isAvailable ? "\(copy.available) of \(copy.total) in" : (copy.total == 1 ? "Out" : "0 of \(copy.total) in"))
                 .font(.caption).monospacedDigit()
                 .foregroundStyle(copy.isAvailable ? Color.green : Color.red)
@@ -926,7 +924,7 @@ struct CatalogDetail: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text([e.published, e.edition].compactMap { $0 }.joined(separator: " · ")).lineLimit(2)
                                 Text([e.physical, e.upc.map { "UPC \($0)" }].compactMap { $0 }.joined(separator: " · "))
-                                    .font(.caption).foregroundStyle(.subtext).lineLimit(2)
+                                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                             }
                             Spacer()
                             CatalogStatusBadge(availability: e.availability, text: e.statusText, library: model.catalog.siteLibrary)
@@ -945,7 +943,6 @@ struct CatalogDetail: View {
 /// The CDs (or everything) you have checked out, and whether each is in your music library yet.
 struct CatalogCheckoutsView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     @AppStorage("checkoutsAllFormats") private var allFormats = false
 
     var body: some View {
@@ -964,14 +961,14 @@ struct CatalogCheckoutsView: View {
                     if missing > 0 {
                         Label("\(missing) of these CDs \(missing == 1 ? "isn't" : "aren't") in your digital collection yet. Insert one to rip it from the Import section.",
                               systemImage: "opticaldisc")
-                            .font(.callout).foregroundStyle(.subtext)
+                            .font(.callout).foregroundStyle(.secondary)
                     }
                     VStack(spacing: 0) {
                         ForEach(list) { row($0) }
                     }
                     .padding(.vertical, 6)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(theme.card.opacity(0.72)))
-                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(theme.separator.opacity(0.5), lineWidth: 0.5))
+                    .background(RoundedRectangle(cornerRadius: 14).fill(AppColor.card.opacity(0.72)))
+                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(AppColor.separator.opacity(0.5), lineWidth: 0.5))
                 }
             }
             .padding(20)
@@ -1028,7 +1025,7 @@ struct CatalogCheckoutsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(checkout.displayTitle).fontWeight(.medium).lineLimit(1)
                 Text([checkout.artist, checkout.format ?? ""].filter { !$0.isEmpty }.joined(separator: " · "))
-                    .font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
             if let owned {
@@ -1038,12 +1035,12 @@ struct CatalogCheckoutsView: View {
                 .buttonStyle(.borderless)
                 .help("Open \(owned.album) in your digital collection")
             } else if isMusic(checkout) {
-                Text("Not in your digital collection").font(.caption).foregroundStyle(.subtext)
+                Text("Not in your digital collection").font(.caption).foregroundStyle(.secondary)
             }
             VStack(alignment: .trailing, spacing: 1) {
                 Text(checkout.due.map { "Due \($0)" } ?? "").font(.caption.weight(soon ? .semibold : .regular))
                     .foregroundStyle(soon ? Color.red : Color.primary)
-                if let renewed = checkout.renewed { Text("Renewed \(renewed)").font(.caption2).foregroundStyle(.subtext) }
+                if let renewed = checkout.renewed { Text("Renewed \(renewed)").font(.caption2).foregroundStyle(.secondary) }
             }
             .frame(width: 130, alignment: .trailing)
         }
@@ -1053,7 +1050,6 @@ struct CatalogCheckoutsView: View {
 
 struct CheckoutCover: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let path: String?
     @State private var image: NSImage?
 
@@ -1062,8 +1058,8 @@ struct CheckoutCover: View {
             if let image {
                 Image(nsImage: image).resizable().scaledToFill()
             } else {
-                Rectangle().fill(theme.fill)
-                Image(systemName: "opticaldisc").foregroundStyle(.subtext)
+                Rectangle().fill(AppColor.fill)
+                Image(systemName: "opticaldisc").foregroundStyle(.secondary)
             }
         }
         .frame(width: 40, height: 40)
@@ -1102,7 +1098,6 @@ struct CatalogListButton: View {
 /// The list chosen in Settings: what's on it, where it's on the shelf, and removing titles.
 struct CatalogListView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
 
     var body: some View {
         let catalog = model.catalog
@@ -1121,13 +1116,13 @@ struct CatalogListView: View {
                 if !entries.isEmpty {
                     let here = entries.filter { $0.item.availability == .here }.count
                     let site = catalog.siteLibrary ?? "your local library"
-                    Text("\(here) of \(entries.count) on the shelf at \(site) right now.").font(.callout).foregroundStyle(.subtext)
+                    Text("\(here) of \(entries.count) on the shelf at \(site) right now.").font(.callout).foregroundStyle(.secondary)
                     VStack(spacing: 0) {
                         ForEach(entries) { row($0) }
                     }
                     .padding(.vertical, 6)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(theme.card.opacity(0.72)))
-                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(theme.separator.opacity(0.5), lineWidth: 0.5))
+                    .background(RoundedRectangle(cornerRadius: 14).fill(AppColor.card.opacity(0.72)))
+                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(AppColor.separator.opacity(0.5), lineWidth: 0.5))
                 }
             }
             .padding(20)
@@ -1190,15 +1185,15 @@ struct CatalogListView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.displayTitle).fontWeight(.medium).lineLimit(1)
                         Text(item.artist.isEmpty ? (catalog.details[item.id]?.mbArtist ?? "Various Artists") : item.artist)
-                            .font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     Spacer()
                     if let call = item.callNumber, item.availability == .here {
-                        Text(call).font(.caption.monospaced()).foregroundStyle(.subtext).lineLimit(1)
+                        Text(call).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
                     }
                     CatalogStatusBadge(availability: item.availability, text: item.statusText, library: catalog.siteLibrary)
                     if owned != nil {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(theme.accent).help("In your digital collection")
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(AppColor.accent).help("In your digital collection")
                     }
                 }
                 .contentShape(Rectangle())
@@ -1216,7 +1211,6 @@ struct CatalogListView: View {
 
 private struct ListCover: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let item: CatalogItem
     @State private var image: NSImage?
 
@@ -1226,8 +1220,8 @@ private struct ListCover: View {
             if let image {
                 Image(nsImage: image).resizable().scaledToFill()
             } else {
-                Rectangle().fill(theme.fill)
-                Image(systemName: "opticaldisc").foregroundStyle(.subtext)
+                Rectangle().fill(AppColor.fill)
+                Image(systemName: "opticaldisc").foregroundStyle(.secondary)
             }
         }
         .frame(width: 40, height: 40)
@@ -1254,7 +1248,7 @@ struct CollectionCopyNote: View {
             Button { model.showItem(id: copy.id) } label: {
                 Label(compact ? short(copy) : text(copy), systemImage: "books.vertical.fill")
                     .font(compact ? .caption : .callout)
-                    .foregroundStyle(.subtext)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             .buttonStyle(.plain)

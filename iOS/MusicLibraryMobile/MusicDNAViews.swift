@@ -668,7 +668,7 @@ private struct DNATrackList: View {
                 }
             }
         } message: { _ in
-            Text(model.sync.isPaired ? "Download it from your Mac to play it here." : "Pair with your Mac in the Sync tab to download music.")
+            Text(model.sync.isPaired ? "Download it from your Mac to play it here." : "Pair with your Mac (Sync, on Listen Now) to download music.")
         }
     }
 }

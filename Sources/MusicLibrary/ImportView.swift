@@ -16,7 +16,6 @@ struct ImportView: View {
                 }
             }
             .frame(minWidth: 260, idealWidth: 300, maxWidth: 420)
-            .themedScrollBackground()
             .safeAreaInset(edge: .bottom) {
                 if !importer.batch.isEmpty {
                     VStack(spacing: 0) {
@@ -76,7 +75,7 @@ struct ImportRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.displayTitle).lineLimit(1)
                 Text(entry.metadata.artist.isEmpty ? entry.url.lastPathComponent : entry.metadata.artist)
-                    .font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 Text(entry.status.label).font(.caption2).foregroundStyle(color).lineLimit(2)
             }
         }
@@ -118,7 +117,7 @@ struct ImportDetail: View {
         if entry.status == .done ? entry.pricedOnItem : importer.songsPricedElsewhere && entry.status != .duplicate {
             Text(importer.boughtAsAlbum && importer.effectiveLinkItem == nil
                  ? "Bought as a whole album: what you paid is below the list." : "What you paid is on your copy's page.")
-                .font(.caption).foregroundStyle(.subtext)
+                .font(.caption).foregroundStyle(.secondary)
         } else {
             songPurchase
         }
@@ -144,10 +143,10 @@ struct ImportDetail: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(entry.url.lastPathComponent).font(.title3.bold()).lineLimit(1)
-            Text(entry.url.deletingLastPathComponent().path).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+            Text(entry.url.deletingLastPathComponent().path).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             HStack {
-                Text(entry.status.label).foregroundStyle(.subtext)
-                if let note = entry.note { Text("· \(note)").foregroundStyle(.subtext) }
+                Text(entry.status.label).foregroundStyle(.secondary)
+                if let note = entry.note { Text("· \(note)").foregroundStyle(.secondary) }
             }
             .font(.callout)
         }
@@ -189,7 +188,7 @@ struct ImportDetail: View {
                     return true
                 }
             Text(entry.cover != nil ? "New cover" : (entry.item?.embeddedCover != nil ? "Embedded cover" : "No cover"))
-                .font(.caption).foregroundStyle(.subtext)
+                .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Button("Choose Image…") {
                     let panel = NSOpenPanel()
@@ -230,7 +229,6 @@ struct ImportDetail: View {
                 TableColumn("Score") { Text("\($0.score)").monospacedDigit() }.width(45)
             }
             .frame(height: 260)
-            .themedScrollBackground()
             .onChange(of: pick) {
                 if let id = pick, let c = entry.candidates.first(where: { $0.id == id }), id != entry.selectedCandidateID {
                     Task { await importer.choose(entry, candidate: c) }
@@ -238,7 +236,7 @@ struct ImportDetail: View {
             }
             .overlay {
                 if entry.candidates.isEmpty && entry.status != .matching {
-                    Text("No matches. Edit the search fields and press Search.").foregroundStyle(.subtext).allowsHitTesting(false)
+                    Text("No matches. Edit the search fields and press Search.").foregroundStyle(.secondary).allowsHitTesting(false)
                 }
             }
         }
@@ -272,7 +270,7 @@ struct ImportBatchPurchaseBar: View {
         VStack(alignment: .leading, spacing: 8) {
             if importer.songsPricedElsewhere, let item = importer.effectiveLinkItem {
                 Text("What you paid is on \(item.sticker?.text ?? "your \(item.medium.name.lowercased())")'s page.")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             } else {
                 if importer.canBuyAsAlbum {
                     HStack {
@@ -294,14 +292,14 @@ struct ImportBatchPurchaseBar: View {
                     }
                     .help("What the album cost and when you bought it")
                 } else {
-                    Text(count == 1 ? "Paid for this song" : "Paid for all \(count) songs").font(.caption).foregroundStyle(.subtext)
+                    Text(count == 1 ? "Paid for this song" : "Paid for all \(count) songs").font(.caption).foregroundStyle(.secondary)
                     HStack(spacing: 8) {
                         PurchasePriceField(price: Binding(get: { importer.batchTotal }, set: { importer.setBatchTotal($0, day: importer.batchDay ?? PurchaseDay(Date())) }))
                         PurchaseDateField(day: Binding(get: { importer.batchDay }, set: { importer.setBatchDay($0) }))
                     }
                     .help("Split evenly across the songs; each song's own price can still be changed")
                     if let note = note(), count > 1 {
-                        Text(note).font(.caption).foregroundStyle(.subtext)
+                        Text(note).font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -362,7 +360,7 @@ struct ImportCollectionBar: View {
                         } else {
                             Text("None")
                         }
-                        Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.subtext)
+                        Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
                     }
                 }
                 .help(linked.map { "\($0.album) — \($0.artist)" } ?? "Pick the CD or record these files were digitized from")
@@ -426,7 +424,7 @@ struct ImportLinkPicker: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(item.album.isEmpty ? "Unknown Album" : item.album).lineLimit(1)
                     Text([item.artist, item.formatDetail ?? item.medium.name].filter { !$0.isEmpty }.joined(separator: " · "))
-                        .font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer()
                 if let s = item.sticker { StickerPill(sticker: s, size: 9) }

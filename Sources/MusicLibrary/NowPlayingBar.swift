@@ -9,7 +9,7 @@ struct FormatCaption: View {
     var body: some View {
         if let format = player.currentTrack?.audioFormat {
             HStack(spacing: 0) {
-                Text(format.summary).foregroundStyle(.subtext)
+                Text(format.summary).foregroundStyle(.secondary)
                 if let out = player.outputState {
                     Text(" → \(out.summary)")
                         .foregroundStyle(out.matched ? Color.secondary : Color.orange)
@@ -75,7 +75,7 @@ struct VolumeControl: View {
     var body: some View {
         let player = model.player
         HStack(spacing: 6) {
-            Image(systemName: "speaker.fill").foregroundStyle(.subtext)
+            Image(systemName: "speaker.fill").foregroundStyle(.secondary)
             Slider(value: Binding(get: { Double(player.volume) }, set: { player.volume = Float($0) }), in: 0...1)
                 .frame(width: width)
         }
@@ -85,7 +85,6 @@ struct VolumeControl: View {
 /// Shows or hides the queue inspector; from the expanded Now Playing view it also collapses that.
 struct QueueButton: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
 
     var body: some View {
         let shown = model.showsQueue && !model.nowPlayingExpanded
@@ -100,7 +99,7 @@ struct QueueButton: View {
             }
         } label: {
             Image(systemName: "list.bullet").font(.title3)
-                .foregroundStyle(shown ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.subtext))
+                .foregroundStyle(shown ? AnyShapeStyle(AppColor.accent) : AnyShapeStyle(.secondary))
         }
         .buttonStyle(.borderless)
         .help(shown ? "Hide Queue" : "Show Queue")
@@ -108,10 +107,13 @@ struct QueueButton: View {
     }
 }
 
+/// The player, a glass capsule floating over the bottom of the pages (`MainWindow` places it).
 struct NowPlayingBar: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     @State private var hovering = false
+
+    /// How much room pages leave under their last row so it can scroll clear of the player.
+    static let clearance: CGFloat = 96
 
     var body: some View {
         let player = model.player
@@ -124,10 +126,10 @@ struct NowPlayingBar: View {
                         if let cover = player.cover {
                             Image(nsImage: cover).resizable().scaledToFill()
                         } else {
-                            ZStack { Rectangle().fill(.quaternary); Image(systemName: "music.note").foregroundStyle(.subtext) }
+                            ZStack { Rectangle().fill(.quaternary); Image(systemName: "music.note").foregroundStyle(.secondary) }
                         }
                     }
-                    .frame(width: 48, height: 48)
+                    .frame(width: 46, height: 46)
                     .overlay {
                         if hovering && player.currentTrack != nil {
                             ZStack {
@@ -136,15 +138,15 @@ struct NowPlayingBar: View {
                             }
                         }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                     VStack(alignment: .leading, spacing: 2) {
                         Text(player.currentTrack?.title ?? "Not Playing").font(.headline).lineLimit(1)
-                        Text(player.currentTrack?.artist ?? "").font(.subheadline).foregroundStyle(.subtext).lineLimit(1)
+                        Text(player.currentTrack?.artist ?? "").font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                         FormatCaption(player: player)
                     }
                     Spacer(minLength: 0)
                 }
-                .frame(width: 300, alignment: .leading)
+                .frame(width: 240, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -161,10 +163,23 @@ struct NowPlayingBar: View {
             VolumeControl()
             QueueButton()
         }
-        .padding(.horizontal, 14).padding(.vertical, 8)
-        .background(theme.bar)
+        .padding(.leading, 9).padding(.trailing, 20).padding(.vertical, 9)
+        .frame(maxWidth: 980)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(.white.opacity(0.12), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.22), radius: 22, y: 10)
         .overlay(alignment: .top) {
-            if let err = player.lastError { Text(err).font(.caption).foregroundStyle(.red).offset(y: -16) }
+            if let err = player.lastError {
+                Text(err).font(.caption).foregroundStyle(.red)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(.regularMaterial, in: Capsule())
+                    .offset(y: -26)
+            }
         }
     }
+}
+
+extension View {
+    /// Room under a page's last row so it scrolls clear of the floating player.
+    func playerClearance() -> some View { safeAreaPadding(.bottom, NowPlayingBar.clearance) }
 }

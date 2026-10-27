@@ -6,26 +6,36 @@ struct ContentView: View {
 
     var body: some View {
         MainWindow()
-            .themedRoot(model.theme)
             .onAppear { model.applyAppearance() }
     }
 }
 
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     @State private var dropTargeted = false
+    @State private var columns = NavigationSplitViewVisibility.all
+    /// The sidebar's width, so the floating player centers over the pages beside it.
+    @State private var sidebarWidth: CGFloat = 220
 
     var body: some View {
         let expanded = model.nowPlayingExpanded && model.player.currentTrack != nil
-        // The player bar spans the window below the split view. Pages pushed onto a NavigationStack draw over
-        // anything else in their column on macOS, so the bar must live outside the column to stay visible.
+        // The player floats over the bottom of the pages as an overlay on the split view. Pages pushed onto a
+        // NavigationStack draw over anything else in their column on macOS, so it must live outside the column.
         VStack(spacing: 0) {
             // The queue is a pane beside the split view, not an `.inspector`: on macOS 27 a NavigationSplitView with an
             // inspector can loop through constraint passes until AppKit throws (showing it, or restoring the window at
             // launch, crashed the app).
             HStack(spacing: 0) {
                 splitView
+                    .overlay(alignment: .bottom) {
+                        if !expanded {
+                            NowPlayingBar()
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 14)
+                                .padding(.leading, columns == .detailOnly ? 0 : sidebarWidth)
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+                    }
                 // The Radio DJ stays on the air beside the pages while you browse.
                 if let session = model.radioDJ.session {
                     RadioDJPanel(session: session, dj: model.radioDJ, previews: model.previews) { model.openRadioDJ($0) }
@@ -46,11 +56,6 @@ struct MainWindow: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            if !expanded {
-                Divider()
-                NowPlayingBar()
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
         }
         .animation(.spring(duration: 0.35), value: expanded)
         .animation(.easeInOut(duration: 0.25), value: model.radioDJ.session == nil)
@@ -61,28 +66,27 @@ struct MainWindow: View {
 
     private var splitView: some View {
         @Bindable var model = model
-        return NavigationSplitView {
+        return NavigationSplitView(columnVisibility: $columns) {
             SidebarView()
-                .scrollContentBackground(theme.isThemed ? .hidden : .automatic)
-                .background(theme.sidebar)
                 .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { sidebarWidth = $0 }
         } detail: {
             VStack(spacing: 0) {
                 if !model.ffmpegAvailable { MissingToolsBanner() }
                 // One navigation stack for the whole content area; pages push albums and artists onto it.
+                // Every page leaves room under its last row for the floating player. Each page root gets it: on macOS a
+                // NavigationStack doesn't pass its own safe area on to the pages pushed onto it.
                 NavigationStack(path: $model.navigationPath) {
-                    DetailRouter()
-                        .navigationDestination(for: AlbumSummary.self) { AlbumDetail(album: $0) }
-                        .navigationDestination(for: ArtistSummary.self) { ArtistDetail(artist: $0) }
-                        .navigationDestination(for: ArtistRoute.self) { ArtistDetail(name: $0.name) }
-                        .navigationDestination(for: CatalogItem.self) { CatalogDetail(item: $0) }
-                        .navigationDestination(for: CollectionItemRoute.self) { CollectionItemDetail(id: $0.id) }
+                    DetailRouter().playerClearance()
+                        .navigationDestination(for: AlbumSummary.self) { AlbumDetail(album: $0).playerClearance() }
+                        .navigationDestination(for: ArtistSummary.self) { ArtistDetail(artist: $0).playerClearance() }
+                        .navigationDestination(for: ArtistRoute.self) { ArtistDetail(name: $0.name).playerClearance() }
+                        .navigationDestination(for: CatalogItem.self) { CatalogDetail(item: $0).playerClearance() }
+                        .navigationDestination(for: CollectionItemRoute.self) { CollectionItemDetail(id: $0.id).playerClearance() }
                 }
             }
-            .background(theme.isThemed ? theme.background : Color.clear)
         }
-        .toolbarBackground(theme.toolbar, for: .windowToolbar)
-        .toolbarBackground(theme.isThemed ? .visible : .automatic, for: .windowToolbar)
+        .toolbarBackground(.windowBackground, for: .windowToolbar)
         .searchable(text: $model.searchText, placement: .toolbar, prompt: "Search or filter (genre:jazz)")
         .toolbar {
             if model.radioDJ.isEnabled {
@@ -105,18 +109,18 @@ struct MainWindow: View {
             Button("OK") { model.errorMessage = nil }
         } message: { Text(model.errorMessage ?? "") }
         .sheet(isPresented: Binding(get: { model.exportState != nil }, set: { if !$0 { model.exportState = nil } })) {
-            ExportSheet().themedSheet()
+            ExportSheet()
         }
-        .sheet(item: $model.smartPlaylistDraft) { SmartPlaylistEditor(draft: $0).themedSheet() }
+        .sheet(item: $model.smartPlaylistDraft) { SmartPlaylistEditor(draft: $0) }
         .sheet(item: $model.collectionSheet) { sheet in
             switch sheet {
-            case .add(let medium, let prefill): AddToCollectionSheet(medium: medium, prefill: prefill).themedSheet()
-            case .findByLabel(let sticker): FindByLabelPanel(initial: sticker).themedSheet()
-            case .addLibraryAlbums: BulkAddSheet().themedSheet()
-            case .labelCheck: LabelCheckSheet().themedSheet()
-            case .link(let id): LinkAlbumPicker(itemID: id).themedSheet()
-            case .cover(let id, let request): CollectionCoverSheet(itemID: id, request: request).themedSheet()
-            case .changeEdition(let id): ChangeEditionSheet(itemID: id).themedSheet()
+            case .add(let medium, let prefill): AddToCollectionSheet(medium: medium, prefill: prefill)
+            case .findByLabel(let sticker): FindByLabelPanel(initial: sticker)
+            case .addLibraryAlbums: BulkAddSheet()
+            case .labelCheck: LabelCheckSheet()
+            case .link(let id): LinkAlbumPicker(itemID: id)
+            case .cover(let id, let request): CollectionCoverSheet(itemID: id, request: request)
+            case .changeEdition(let id): ChangeEditionSheet(itemID: id)
             }
         }
         .removeFromLibraryConfirmation(model)
@@ -143,65 +147,61 @@ struct SidebarView: View {
     var body: some View {
         @Bindable var model = model
         List(selection: $model.sidebar) {
-            Section("Physical Collection") {
-                // Downloads are listed with the digital collection below.
+            Label("Listen Now", systemImage: "play.circle").tag(SidebarItem.listenNow)
+            // Both collections together: what's on the shelf first, then what's digital (downloads are digital).
+            Section("Collection") {
                 ForEach(CollectionScope.allCases.filter { $0 != .downloads }, id: \.self) { scope in
                     let count = model.collection.count(scope)
                     // To Digitize only while something is waiting (or it's the page showing).
                     if scope != .toDigitize || count > 0 || model.sidebar == .collection(.toDigitize) {
-                        Label(scope.title, systemImage: scope.symbol).sidebarBadge(count).tag(SidebarItem.collection(scope))
+                        Label(scope.title, systemImage: scope.symbol).badge(count).tag(SidebarItem.collection(scope))
                     }
                 }
-            }
-            Section("Digital Collection") {
-                Label("Songs", systemImage: "music.note").sidebarBadge(model.tracks.count).tag(SidebarItem.songs)
-                Label("Albums", systemImage: "square.stack").sidebarBadge(model.albums.count).tag(SidebarItem.albums)
+                Label("Albums", systemImage: "square.stack").badge(model.albums.count).tag(SidebarItem.albums)
+                Label("Songs", systemImage: "music.note").badge(model.tracks.count).tag(SidebarItem.songs)
                 Label(CollectionScope.downloads.title, systemImage: CollectionScope.downloads.symbol)
-                    .sidebarBadge(model.collection.count(.downloads))
+                    .badge(model.collection.count(.downloads))
                     .tag(SidebarItem.collection(.downloads))
             }
             Section("Explore") {
                 // Artists from both collections, so they're with Insights, Music DNA and Concerts.
-                Label("Artists", systemImage: "music.mic").sidebarBadge(model.allArtists.count).tag(SidebarItem.artists)
+                Label("Artists", systemImage: "music.mic").badge(model.allArtists.count).tag(SidebarItem.artists)
                 Label("Insights", systemImage: "chart.bar.xaxis").tag(SidebarItem.insights)
                 Label("Music DNA", systemImage: "point.3.connected.trianglepath.dotted").tag(SidebarItem.musicDNA)
                 Label("Concerts", systemImage: "ticket").tag(SidebarItem.concerts)
             }
-            Section("Import") {
+            // Ways music comes in: importing and ripping, recording records, the public library and the Shop.
+            Section("Acquire") {
                 Label("Import", systemImage: "square.and.arrow.down")
-                    .sidebarBadge(model.importer.pendingCount)
+                    .badge(model.importer.pendingCount)
                     .tag(SidebarItem.importQueue)
-                Label("Digitize Vinyl", systemImage: "waveform.badge.mic")
-                    .tag(SidebarItem.digitizeVinyl)
                 ForEach(model.cd.discs) { disc in
                     Label(disc.title, systemImage: "opticaldisc")
-                        .sidebarBadge(disc.isRipping ? disc.remainingCount : 0)
+                        .badge(disc.isRipping ? disc.remainingCount : 0)
                         .tag(SidebarItem.cd(disc.id))
                 }
-            }
-            Section("Local Library") {
+                Label("Digitize Vinyl", systemImage: "waveform.badge.mic")
+                    .tag(SidebarItem.digitizeVinyl)
                 Label("Local Library CDs", systemImage: "building.columns").tag(SidebarItem.catalog)
                 Label("My Checkouts", systemImage: "books.vertical")
-                    .sidebarBadge(model.catalog.cdCheckouts.count)
+                    .badge(model.catalog.cdCheckouts.count)
                     .tag(SidebarItem.catalogCheckouts)
                 Label(model.catalog.listTitle, systemImage: "bookmark")
-                    .sidebarBadge(model.catalog.listEntries.count)
+                    .badge(model.catalog.listEntries.count)
                     .tag(SidebarItem.catalogList)
-            }
-            Section("Shopping") {
                 Label("Shop", systemImage: "cart").tag(SidebarItem.cdShop)
             }
-            Section("Export") {
-                Label("Export List", systemImage: "externaldrive")
-                    .sidebarBadge(model.exportList.count)
-                    .tag(SidebarItem.exportList)
+            Section("Devices") {
                 Label("iPhone", systemImage: "iphone")
-                    .sidebarBadge(model.iPhone.selection.included.count)
+                    .badge(model.iPhone.selection.included.count)
                     .tag(SidebarItem.iPhone)
+                Label("Export List", systemImage: "externaldrive")
+                    .badge(model.exportList.count)
+                    .tag(SidebarItem.exportList)
             }
             Section {
                 Label(AppModel.likedSongsName, systemImage: "heart.fill")
-                    .sidebarBadge(model.likedDates.count)
+                    .badge(model.likedDates.count)
                     .tag(SidebarItem.likedSongs)
                     .contextMenu {
                         Button("Play") { model.player.play(queue: model.likedTracks, startAt: 0, source: AppModel.likedSongsName) }
@@ -224,7 +224,7 @@ struct SidebarView: View {
             Section {
                 ForEach(model.smartPlaylists) { p in
                     Label(p.name, systemImage: "gearshape")
-                        .sidebarBadge(model.smartPlaylistCounts[p.id] ?? 0)
+                        .badge(model.smartPlaylistCounts[p.id] ?? 0)
                         .tag(SidebarItem.smartPlaylist(p.id))
                         .contextMenu {
                             Button("Play") { model.player.play(queue: model.smartPlaylistTracks(p), startAt: 0, source: p.name) }
@@ -263,7 +263,7 @@ struct PlaylistRow: View {
                     .onExitCommand { model.renamingPlaylistID = nil }
                     .onAppear { draft = playlist.name; focused = true }
             } else {
-                Label(playlist.name, systemImage: "music.note.list").sidebarBadge(playlist.trackCount)
+                Label(playlist.name, systemImage: "music.note.list").badge(playlist.trackCount)
             }
         }
         .contextMenu {
@@ -291,6 +291,7 @@ struct DetailRouter: View {
     @ViewBuilder
     private var destination: some View {
         switch model.sidebar ?? .songs {
+        case .listenNow: ListenNowView()
         case .collection(let scope): CollectionView(scope: scope).id(scope)
         case .songs: SongsView()
         case .insights: InsightsView()

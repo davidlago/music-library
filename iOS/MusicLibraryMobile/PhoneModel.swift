@@ -72,9 +72,11 @@ final class PhoneModel {
 
     /// The song whose details are shown (Song Info).
     var infoTrack: Track?
-    /// An album a widget opened (`SearchIndex.albumKey`), pushed on the Digital tab once the library has loaded.
+    /// The Sync screen is showing (a sheet over the tabs); the phone listens for the Mac only while it is.
+    var showsSync = false
+    /// An album a widget opened (`SearchIndex.albumKey`), pushed on the Collection tab once the library has loaded.
     var pendingAlbumKey: String?
-    /// A collection item a widget opened (`GlanceLink.item(id:)`), pushed on the Physical tab once the library has loaded.
+    /// A collection item a widget opened (`GlanceLink.item(id:)`), pushed on the Collection tab once the library has loaded.
     var pendingItemID: String?
     /// A link to open as if a widget had been tapped (Siri and Shortcuts), handled by `RootView`.
     var pendingLink: GlanceLink?
@@ -92,6 +94,9 @@ final class PhoneModel {
     private(set) var collectionStats: CollectionStats?
     @ObservationIgnored private var statsVersion = -1
     @ObservationIgnored private var listeningKey: (period: ListeningStats.Period, library: Int, history: Int, at: Date)?
+    /// The last 7 days, for Listen Now, kept apart from `listeningStats` so Insights keeps its own period.
+    private(set) var weekListening: ListeningStats?
+    @ObservationIgnored private var weekListeningKey: (library: Int, history: Int, at: Date)?
     @ObservationIgnored private var collectionKey: (library: Int, collection: Int, history: Int)?
 
     @ObservationIgnored private var currentPlay: (track: Track, startedAt: Date, tracker: ListenTracker)?
@@ -404,7 +409,7 @@ final class PhoneModel {
         album(for: item).map { .album(album: $0.album, artist: $0.artist) }
     }
 
-    /// CDs and records (the Physical tab's; downloads are digital already) with a digital copy whose songs aren't all
+    /// CDs and records (the shelf's; downloads are digital already) with a digital copy whose songs aren't all
     /// on this iPhone, one per album, in shelf order.
     var readyToDownload: [CollectionItem] {
         guard library != nil, !isSample else { return [] }
@@ -517,6 +522,49 @@ final class PhoneModel {
                 self.listeningStats = stats
             }
         }
+    }
+
+    /// The last 7 days for Listen Now, computed off the main thread unless it's up to date (refreshed after a few
+    /// minutes like `loadListening`).
+    func loadWeekListening() {
+        if let k = weekListeningKey, k.library == libraryVersion, k.history == historyVersion,
+           Date().timeIntervalSince(k.at) < 300 { return }
+        guard let library else { return }
+        let key = (library: libraryVersion, history: historyVersion, at: Date())
+        weekListeningKey = key
+        let plays = plays
+        Task.detached(priority: .utility) {
+            let stats = ListeningStats(plays: plays, tracks: library.tracks, period: .week, now: key.at)
+            await MainActor.run {
+                guard self.weekListeningKey?.at == key.at else { return }
+                self.weekListening = stats
+            }
+        }
+    }
+
+    /// The album Listen Now leads with: the one playing, else the one played last, else the one added last.
+    var listenNowAlbum: AlbumSummary? {
+        guard let library else { return nil }
+        if let t = player.currentTrack,
+           let a = library.album(forKey: SearchIndex.albumKey(album: t.album, artist: t.effectiveAlbumArtist)) {
+            return a
+        }
+        if let key = albumPlayTotals.compactMap({ k, v in v.lastPlayed.map { (k, $0) } }).max(by: { $0.1 < $1.1 })?.0,
+           let a = library.album(forKey: key) {
+            return a
+        }
+        let added = library.tracks.max { $0.addedAt < $1.addedAt }
+        return added.flatMap { library.album(forKey: SearchIndex.albumKey(album: $0.album, artist: $0.effectiveAlbumArtist)) }
+    }
+
+    /// Albums by when they were last played, most recent first.
+    func recentlyPlayedAlbums(limit: Int, excluding key: String? = nil) -> [AlbumSummary] {
+        guard let library else { return [] }
+        return albumPlayTotals.compactMap { k, total in total.lastPlayed.map { (k, $0) } }
+            .filter { $0.0 != key }
+            .sorted { $0.1 > $1.1 }
+            .prefix(limit)
+            .compactMap { library.album(forKey: $0.0) }
     }
 
     /// The Owned pane: computed off the main thread when the library, the collection or the history changed.

@@ -63,7 +63,7 @@ struct InsightsTab: View {
     var body: some View {
         LibraryStack {
             content
-                .navigationTitle("Insights")
+                .navigationTitle("Explore")
                 .radioDJPage(.page("Insights (\(pane == .listening ? "Listening, \(period.rawValue)" : pane == .library ? "Digital Collection" : pane.rawValue))",
                                    details: ["Their collection statistics; collection_stats has the numbers on screen."]))
                 .onAppear(perform: load)
@@ -146,7 +146,7 @@ struct InsightsTab: View {
 private struct InsightsExplore: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader(title: "Explore")
+            SectionHeader(title: "Artists and People")
             VStack(spacing: 0) {
                 row(LibraryRoute.artists, "Artists", "Everyone in both your collections", symbol: "music.mic")
                 Divider().padding(.leading, 52)

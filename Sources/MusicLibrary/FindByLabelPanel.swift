@@ -22,7 +22,7 @@ struct FindByLabelPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .center, spacing: 14) {
-                Image(systemName: "number.square").font(.title).foregroundStyle(.subtext)
+                Image(systemName: "number.square").font(.title).foregroundStyle(.secondary)
                 Text("Find by Label").font(.title2.bold())
                 Spacer()
                 Picker("Series", selection: $series) {
@@ -33,7 +33,7 @@ struct FindByLabelPanel: View {
             }
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(series == .cd ? "CD #" : "Vinyl #")
-                    .font(.system(size: 30, weight: .semibold, design: .rounded)).foregroundStyle(.subtext)
+                    .font(.system(size: 30, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
                 TextField("Label number", text: $text, prompt: Text("12"))
                     .font(.system(size: 34, weight: .semibold, design: .monospaced))
                     .textFieldStyle(.plain)
@@ -50,7 +50,7 @@ struct FindByLabelPanel: View {
                                 step: { set($0) })
             } else {
                 Text("Type the number on the label. ↑ ↓ step along the shelf, ⇥ switches between CD and Vinyl, ↩ opens it.")
-                    .font(.callout).foregroundStyle(.subtext)
+                    .font(.callout).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
                     .multilineTextAlignment(.center)
             }
@@ -104,7 +104,6 @@ struct FindByLabelPanel: View {
 /// Shelf's Go to.
 struct LabelLookupCard: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let sticker: Sticker
     var coverWidth: CGFloat = 160
     /// Opens an item's page.
@@ -133,7 +132,7 @@ struct LabelLookupCard: View {
             }
             if let other, let first = c.items(at: other).first {
                 HStack(spacing: 6) {
-                    Text("Not to be confused with").foregroundStyle(.subtext)
+                    Text("Not to be confused with").foregroundStyle(.secondary)
                     StickerPill(sticker: other, size: 10)
                     Text(first.album).lineLimit(1)
                     if let step {
@@ -145,8 +144,8 @@ struct LabelLookupCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(theme.card))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
     }
 
     /// "CD #157 is free", or past the end "CD #313 is the next free number".
@@ -160,7 +159,7 @@ struct LabelLookupCard: View {
             text = "\(sticker.text) is free"
         }
         return HStack(spacing: 10) {
-            Image(systemName: "circle.dashed").font(.title2).foregroundStyle(.subtext)
+            Image(systemName: "circle.dashed").font(.title2).foregroundStyle(.secondary)
             Text(text).font(.title3.weight(.medium))
         }
         .frame(minHeight: 44)
@@ -178,11 +177,11 @@ struct LabelLookupCard: View {
             VStack(alignment: .leading, spacing: 5) {
                 if let s = item.sticker { StickerPill(sticker: s, size: 14) }
                 Text(item.album.isEmpty ? "Unknown Album" : item.album).font(.title3.bold()).lineLimit(2)
-                Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).foregroundStyle(.subtext).lineLimit(1)
+                Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).foregroundStyle(.secondary).lineLimit(1)
                 let meta = [item.year.map(String.init), item.formatDetail, item.recordLabel].compactMap { $0 }
-                if !meta.isEmpty { Text(meta.joined(separator: " · ")).font(.callout).foregroundStyle(.subtext).lineLimit(1) }
+                if !meta.isEmpty { Text(meta.joined(separator: " · ")).font(.callout).foregroundStyle(.secondary).lineLimit(1) }
                 DigitalStatusLabel(state: state, medium: item.medium, from: Self.from(state, in: model)).font(.callout)
-                if let bought = Self.purchaseLine(item) { Text(bought).font(.callout).foregroundStyle(.subtext) }
+                if let bought = Self.purchaseLine(item) { Text(bought).font(.callout).foregroundStyle(.secondary) }
                 Button("Open") { open(item) }.controlSize(.small).padding(.top, 2)
             }
             Spacer(minLength: 0)
@@ -191,9 +190,9 @@ struct LabelLookupCard: View {
 
     private func neighborsLine(_ n: (previous: CollectionItem?, next: CollectionItem?)) -> some View {
         HStack(spacing: 5) {
-            Text("Between").foregroundStyle(.subtext)
+            Text("Between").foregroundStyle(.secondary)
             neighbor(n.previous, edge: "the start of the shelf")
-            Text("and").foregroundStyle(.subtext)
+            Text("and").foregroundStyle(.secondary)
             neighbor(n.next, edge: "the end")
         }
         .font(.callout)
@@ -214,7 +213,7 @@ struct LabelLookupCard: View {
             .buttonStyle(.plain)
             .help(step == nil ? "Open \(s.text)" : "Go to \(s.text)")
         } else {
-            Text(edge).foregroundStyle(.subtext)
+            Text(edge).foregroundStyle(.secondary)
         }
     }
 

@@ -99,7 +99,6 @@ final class EditionSearch {
 /// label · cat. no. · media · barcode".
 struct EditionResults: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     @Bindable var search: EditionSearch
     let medium: CollectionMedium
     @Binding var selection: String?
@@ -137,11 +136,11 @@ struct EditionResults: View {
                 if search.searching {
                     ProgressView("Searching MusicBrainz…")
                 } else if let message = search.message {
-                    Text(message).foregroundStyle(.subtext).multilineTextAlignment(.center).padding()
+                    Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center).padding()
                 } else if search.results.isEmpty {
                     Text(medium == .download ? "Search for the album, or type its barcode."
                          : "Search for the \(medium == .cd ? "CD" : "record"), or scan its barcode.")
-                        .foregroundStyle(.subtext).multilineTextAlignment(.center).padding()
+                        .foregroundStyle(.secondary).multilineTextAlignment(.center).padding()
                 }
             }
         }
@@ -161,14 +160,14 @@ struct EditionResults: View {
                     Text(e.title).lineLimit(1)
                     if !e.status.isEmpty, e.status != "Official" {
                         Text(e.status).font(.caption2).padding(.horizontal, 5).padding(.vertical, 1)
-                            .background(Capsule().strokeBorder(theme.separator, lineWidth: 0.5))
+                            .background(Capsule().strokeBorder(AppColor.separator, lineWidth: 0.5))
                     }
                 }
-                Text(Self.detail(e)).font(.caption).foregroundStyle(.subtext).lineLimit(2)
+                Text(Self.detail(e)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
             Spacer(minLength: 0)
             if let owned = model.collection.matches(releaseID: e.id, releaseGroupID: nil, albumKey: nil, barcode: nil, medium: nil).first {
-                Text(owned.sticker?.text ?? "Yours").font(.caption.weight(.medium)).foregroundStyle(.subtext)
+                Text(owned.sticker?.text ?? "Yours").font(.caption.weight(.medium)).foregroundStyle(.secondary)
                     .help("You already own a copy")
             }
         }
@@ -191,7 +190,6 @@ struct EditionResults: View {
 struct AddToCollectionSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.theme) private var theme
     /// Nil: the medium last used.
     let medium: CollectionMedium?
     let prefill: CollectionPrefill?
@@ -321,28 +319,28 @@ struct AddToCollectionSheet: View {
                         coverWell(draft)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(draft.album.isEmpty ? "Unknown Album" : draft.album).font(.headline).lineLimit(3)
-                            Text(draft.artist).foregroundStyle(.subtext).lineLimit(2)
-                            if let e = edition { Text(EditionResults.detail(e)).font(.caption).foregroundStyle(.subtext).lineLimit(3) }
+                            Text(draft.artist).foregroundStyle(.secondary).lineLimit(2)
+                            if let e = edition { Text(EditionResults.detail(e)).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
                         }
                     }
                     alreadyOwned(draft)
                     Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
                         if let series = chosenMedium.series {
                             GridRow(alignment: .firstTextBaseline) {
-                                Text("Label").foregroundStyle(.subtext)
+                                Text("Label").foregroundStyle(.secondary)
                                 StickerField(series: series, number: $number, live: true)
                             }
                         }
                         GridRow {
-                            Text("Bought").foregroundStyle(.subtext)
+                            Text("Bought").foregroundStyle(.secondary)
                             PurchaseDateField(day: $purchasedOn)
                         }
                         GridRow {
-                            Text("Paid").foregroundStyle(.subtext)
+                            Text("Paid").foregroundStyle(.secondary)
                             PurchasePriceField(price: $price)
                         }
                         GridRow(alignment: .firstTextBaseline) {
-                            Text("Notes").foregroundStyle(.subtext)
+                            Text("Notes").foregroundStyle(.secondary)
                             TextField("Notes", text: $notes, prompt: Text("Where you got it, its condition…"), axis: .vertical)
                                 .textFieldStyle(.roundedBorder).labelsHidden().lineLimit(1...4)
                         }
@@ -353,7 +351,7 @@ struct AddToCollectionSheet: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Label("Linked to “\(match.album.album)” in your digital collection (\(songCount(match.album.trackCount)))", systemImage: "link")
                             Text("The songs in your digital collection under this title and artist are its digital copy.")
-                                .font(.caption).foregroundStyle(.subtext)
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                         .help(Self.linkHelp(chosenMedium))
                     } else if let match = libraryMatch {
@@ -362,7 +360,7 @@ struct AddToCollectionSheet: View {
                                 Text("Link to “\(match.album.album)” in your digital collection (\(songCount(match.album.trackCount)))")
                                 if !match.sure {
                                     Text("Matched by title and artist\(match.album.artist.isEmpty ? "" : " (\(match.album.artist))"): check it's the same album")
-                                        .font(.caption).foregroundStyle(.subtext)
+                                        .font(.caption).foregroundStyle(.secondary)
                                 }
                             }
                         }
@@ -372,7 +370,7 @@ struct AddToCollectionSheet: View {
             }
         } else {
             Text(manualEntry ? "Type at least the album or the artist." : "Pick the edition you own.")
-                .foregroundStyle(.subtext)
+                .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -392,8 +390,8 @@ struct AddToCollectionSheet: View {
                                              barcode: draft.barcode, medium: nil)
         if !owned.isEmpty {
             HStack(spacing: 6) {
-                Image(systemName: "info.circle").foregroundStyle(.subtext)
-                Text("You already own:").foregroundStyle(.subtext)
+                Image(systemName: "info.circle").foregroundStyle(.secondary)
+                Text("You already own:").foregroundStyle(.secondary)
                 ForEach(owned.prefix(3)) { item in
                     if let s = item.sticker { StickerPill(sticker: s, size: 10) } else { Text(item.medium.name) }
                 }
@@ -414,7 +412,7 @@ struct AddToCollectionSheet: View {
             }
             .overlay {
                 if loadingCover { ProgressView().controlSize(.small) }
-                if coverDropTargeted { RoundedRectangle(cornerRadius: 6).strokeBorder(theme.accent, lineWidth: 3) }
+                if coverDropTargeted { RoundedRectangle(cornerRadius: 6).strokeBorder(AppColor.accent, lineWidth: 3) }
             }
             .dropDestination(for: URL.self) { urls, _ in
                 guard let url = urls.first else { return false }
@@ -427,7 +425,7 @@ struct AddToCollectionSheet: View {
             }
             .controlSize(.mini)
             Text(coverSource ?? (linkedCover != nil && cover == nil ? "The album's cover" : "Drop an image"))
-                .font(.caption2).foregroundStyle(.subtext).lineLimit(1)
+                .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
         }
         .frame(width: 124)
     }
@@ -440,7 +438,7 @@ struct AddToCollectionSheet: View {
                 Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.callout).lineLimit(2)
             } else if added > 0 {
                 Text("Added \(added)\(chosenMedium.series.map { " · next \($0.name) #\(model.nextNumber(in: $0))" } ?? "")")
-                    .font(.callout).foregroundStyle(.subtext)
+                    .font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
             Button(added > 0 ? "Done" : "Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
@@ -647,7 +645,7 @@ struct ChangeEditionSheet: View {
             Text("Change Edition").font(.title2.bold())
             if let item {
                 HStack(spacing: 6) {
-                    Text("Which edition is").foregroundStyle(.subtext)
+                    Text("Which edition is").foregroundStyle(.secondary)
                     if let s = item.sticker { StickerPill(sticker: s, size: 10) }
                     Text("“\(item.album)”?").lineLimit(1)
                 }

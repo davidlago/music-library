@@ -60,7 +60,7 @@ private struct VinylRecordPicker: View {
                     Button("Add a Record…") { model.collectionSheet = .add(medium: .vinyl, prefill: nil) }
                 }
                 Text("Record it from your turntable's preamp or audio interface, then cut it into tracks. You can save a few tracks now and the rest another time.")
-                    .font(.callout).foregroundStyle(.subtext)
+                    .font(.callout).foregroundStyle(.secondary)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 18)], alignment: .leading, spacing: 20) {
                     ForEach(sorted) { item in
                         Button { vinyl.choose(item.id) } label: {
@@ -68,8 +68,8 @@ private struct VinylRecordPicker: View {
                                 CopyArt(mark: model.collection.mark(item: item), url: model.coverURL(for: item), width: 150,
                                         revision: model.coverRevision, title: item.album)
                                 Text(item.album.isEmpty ? "Unknown Album" : item.album).font(.callout.weight(.medium)).lineLimit(1)
-                                Text(item.artist).font(.caption).foregroundStyle(.subtext).lineLimit(1)
-                                Text(VinylText.state(model.collection.digitalState(item))).font(.caption2).foregroundStyle(.subtext)
+                                Text(item.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                Text(VinylText.state(model.collection.digitalState(item))).font(.caption2).foregroundStyle(.secondary)
                             }
                             .frame(width: 150, alignment: .leading)
                             .contentShape(Rectangle())
@@ -107,7 +107,6 @@ enum VinylText {
 
 private struct VinylSessionPage: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let vinyl: VinylController
     let item: CollectionItem
     @State private var confirmDiscard = false
@@ -136,7 +135,7 @@ private struct VinylSessionPage: View {
                             Text(vinyl.state == .recording
                                  ? "While recording, the playhead follows the recording: Split at Playhead starts a new track now. Drag elsewhere to scroll; ⌘-scroll or pinch to zoom."
                                  : "Click the waveform to move the playhead and press Space to listen. Drag a cut's edge to move it, or drag elsewhere to scroll; ⌘-scroll or pinch to zoom.")
-                                .font(.caption).foregroundStyle(.subtext)
+                                .font(.caption).foregroundStyle(.secondary)
                             VinylWaveformEditor(vinyl: vinyl)
                             VinylCutList(vinyl: vinyl, item: item)
                         }
@@ -161,10 +160,10 @@ private struct VinylSessionPage: View {
                     revision: model.coverRevision, title: item.album)
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.album.isEmpty ? "Unknown Album" : item.album).font(.title2.bold()).lineLimit(2)
-                Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).font(.title3).foregroundStyle(.subtext)
+                Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).font(.title3).foregroundStyle(.secondary)
                 HStack(spacing: 8) {
                     if let sticker = item.sticker { StickerPill(sticker: sticker) }
-                    Text(VinylText.state(model.collection.digitalState(item))).font(.callout).foregroundStyle(.subtext)
+                    Text(VinylText.state(model.collection.digitalState(item))).font(.callout).foregroundStyle(.secondary)
                 }
             }
             Spacer()
@@ -198,7 +197,7 @@ private struct VinylSessionPage: View {
                 .controlSize(.large)
                 .disabled(count == 0 || vinyl.state == .recording || vinyl.state == .paused)
                 .help("Saves each named cut as a FLAC file in your library, like a ripped CD")
-                if !vinyl.statusLine.isEmpty { Text(vinyl.statusLine).font(.callout).foregroundStyle(.subtext) }
+                if !vinyl.statusLine.isEmpty { Text(vinyl.statusLine).font(.callout).foregroundStyle(.secondary) }
             }
             Spacer()
             Button("Discard Recording…", role: .destructive) { confirmDiscard = true }
@@ -213,8 +212,8 @@ private struct VinylSessionPage: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(theme.card.opacity(0.85)))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card.opacity(0.85)))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
     }
 }
 
@@ -235,7 +234,7 @@ private struct VinylInputPanel: View {
             } else {
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
                     GridRow {
-                        Text("Input").foregroundStyle(.subtext)
+                        Text("Input").foregroundStyle(.secondary)
                         HStack {
                             Picker("Input", selection: $vinyl.deviceUID) {
                                 ForEach(vinyl.devices) { d in
@@ -250,7 +249,7 @@ private struct VinylInputPanel: View {
                         }
                     }
                     GridRow {
-                        Text("Sample rate").foregroundStyle(.subtext)
+                        Text("Sample rate").foregroundStyle(.secondary)
                         Picker("Sample rate", selection: $vinyl.sampleRate) {
                             ForEach(rates, id: \.self) { Text("\(AudioFormat.kHzString(Double($0))) kHz").tag($0) }
                         }
@@ -259,7 +258,7 @@ private struct VinylInputPanel: View {
                         .disabled(running || locked)
                     }
                     GridRow {
-                        Text("Bit depth").foregroundStyle(.subtext)
+                        Text("Bit depth").foregroundStyle(.secondary)
                         Picker("Bit depth", selection: $vinyl.bitDepth) {
                             ForEach(VinylFormat.bitDepths, id: \.self) { Text("\($0)-bit").tag($0) }
                         }
@@ -271,10 +270,10 @@ private struct VinylInputPanel: View {
                 }
                 if let session = vinyl.session {
                     Text("This recording is \(session.format.summary)\(session.format.channels == 1 ? ", mono" : ""), saved as FLAC. Discard it to record at another rate or depth.")
-                        .font(.caption).foregroundStyle(.subtext)
+                        .font(.caption).foregroundStyle(.secondary)
                 } else {
                     Text("Saved as lossless FLAC. 24-bit / 96 kHz takes about \(VinylText.size(VinylFormat(sampleRate: 96_000, bitDepth: 24, channels: 2).bytesPerMinute)) a minute while recording.")
-                        .font(.caption).foregroundStyle(.subtext)
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
             VinylMeter(levels: vinyl.levels, clipped: vinyl.clipped, active: vinyl.state != .idle) { vinyl.resetClip() }
@@ -286,12 +285,12 @@ private struct VinylInputPanel: View {
                     .toggleStyle(.switch).controlSize(.small)
                     .help("Plays the input through \(vinyl.outputName) while checking levels or recording, a moment behind. It doesn't change what's recorded. With a microphone, use headphones.")
                 if vinyl.listen {
-                    Image(systemName: "speaker.fill").font(.caption).foregroundStyle(.subtext)
+                    Image(systemName: "speaker.fill").font(.caption).foregroundStyle(.secondary)
                     Slider(value: $vinyl.listenVolume, in: 0...1).frame(width: 110)
                         .help("Listening volume (the recording's level isn't changed)")
                 }
             }
-            if let note = vinyl.inputNote { Text(note).font(.caption).foregroundStyle(.subtext) }
+            if let note = vinyl.inputNote { Text(note).font(.caption).foregroundStyle(.secondary) }
             if vinyl.microphoneDenied {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Music Library isn't allowed to record. Allow it in System Settings ▸ Privacy & Security ▸ Microphone.").font(.callout)
@@ -313,7 +312,6 @@ private struct VinylInputPanel: View {
 
 /// Left and right peak levels in dB, green to red at the top, with a clip light that stays on until clicked.
 private struct VinylMeter: View {
-    @Environment(\.theme) private var theme
     let levels: [Float]
     let clipped: Bool
     let active: Bool
@@ -328,7 +326,7 @@ private struct VinylMeter: View {
             Button(action: resetClip) {
                 Text("CLIP").font(.caption2.weight(.bold))
                     .padding(.horizontal, 6).padding(.vertical, 3)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(clipped ? Color.red : theme.fill))
+                    .background(RoundedRectangle(cornerRadius: 4).fill(clipped ? Color.red : AppColor.fill))
                     .foregroundStyle(clipped ? Color.white : Color.secondary)
             }
             .buttonStyle(.plain)
@@ -341,17 +339,17 @@ private struct VinylMeter: View {
         let db = 20 * log10(Double(max(level, 1e-5)))
         let fraction = max(0, min(1, (db + 60) / 60))
         return HStack(spacing: 6) {
-            Text(label).font(.caption2.monospaced()).foregroundStyle(.subtext)
+            Text(label).font(.caption2.monospaced()).foregroundStyle(.secondary)
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3).fill(theme.fill)
+                    RoundedRectangle(cornerRadius: 3).fill(AppColor.fill)
                     RoundedRectangle(cornerRadius: 3)
                         .fill(LinearGradient(colors: [.green, .green, .yellow, .red], startPoint: .leading, endPoint: .trailing))
                         .mask(alignment: .leading) { Rectangle().frame(width: geo.size.width * fraction) }
                 }
             }
             .frame(height: 8)
-            Text(level > 0.00001 ? String(format: "%.0f dB", db) : "–∞ dB").font(.caption2.monospacedDigit()).foregroundStyle(.subtext)
+            Text(level > 0.00001 ? String(format: "%.0f dB", db) : "–∞ dB").font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
                 .frame(width: 44, alignment: .trailing)
         }
     }
@@ -389,10 +387,10 @@ private struct VinylRecordPanel: View {
                 }
                 Text(VinylText.time(vinyl.duration)).font(.system(.title2, design: .monospaced).weight(.medium))
                 if let format = vinyl.session?.format {
-                    Text("· \(VinylText.size(vinyl.frameCount * format.bytesPerFrame))").font(.callout).foregroundStyle(.subtext)
+                    Text("· \(VinylText.size(vinyl.frameCount * format.bytesPerFrame))").font(.callout).foregroundStyle(.secondary)
                 }
             }
-            Text(hint).font(.caption).foregroundStyle(.subtext).fixedSize(horizontal: false, vertical: true)
+            Text(hint).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -414,7 +412,6 @@ private struct VinylRecordPanel: View {
 /// pauses and the playhead. Clicking moves the playhead (not while recording, when it follows the recording); dragging
 /// a cut's edge moves it, elsewhere scrolls.
 private struct VinylWaveformEditor: View {
-    @Environment(\.theme) private var theme
     let vinyl: VinylController
     /// The part shown, in seconds.
     @State private var visibleStart = 0.0
@@ -518,7 +515,7 @@ private struct VinylWaveformEditor: View {
         let selectedID = vinyl.selectedSegmentID
         let playhead = vinyl.playhead
         let options = vinyl.targetOptions
-        let accent = theme.accent, fill = theme.fill
+        let accent = AppColor.accent, fill = AppColor.fill
         return Canvas { ctx, size in
             ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(fill))
             for (k, seg) in segments.enumerated() {
@@ -634,7 +631,7 @@ private struct VinylWaveformEditor: View {
         let segments = vinyl.segments
         let playhead = vinyl.playhead
         let window = (visibleStart, visibleLength)
-        let accent = theme.accent, fill = theme.fill
+        let accent = AppColor.accent, fill = AppColor.fill
         return Canvas { ctx, size in
             let perPoint = duration / size.width
             ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(fill))
@@ -694,7 +691,6 @@ private struct ScrollWheelCatcher: NSViewRepresentable {
 
 private struct VinylCutList: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let vinyl: VinylController
     let item: CollectionItem
 
@@ -713,13 +709,13 @@ private struct VinylCutList: View {
         VStack(alignment: .leading, spacing: 8) {
             if item.releaseID == nil {
                 HStack(alignment: .firstTextBaseline) {
-                    Image(systemName: "info.circle").foregroundStyle(.subtext)
+                    Image(systemName: "info.circle").foregroundStyle(.secondary)
                     Text("This record isn't matched to an edition on MusicBrainz, so name each track yourself, or choose the edition to name them from its track list.")
                         .font(.callout)
                     Button("Change Edition…") { model.collectionSheet = .changeEdition(itemID: item.id) }
                 }
             } else if vinyl.isLoadingRelease {
-                Label("Downloading the track list…", systemImage: "arrow.down.circle").font(.callout).foregroundStyle(.subtext)
+                Label("Downloading the track list…", systemImage: "arrow.down.circle").font(.callout).foregroundStyle(.secondary)
             } else if let error = vinyl.releaseError {
                 HStack {
                     Text(error).font(.callout)
@@ -730,7 +726,7 @@ private struct VinylCutList: View {
                 Text(vinyl.state == .recording || vinyl.state == .paused
                      ? "No tracks yet. Click the waveform where a song starts and Split at Playhead: the last track grows with the recording."
                      : "No tracks yet. Move the playhead to a song's start and Split at Playhead.")
-                    .font(.callout).foregroundStyle(.subtext)
+                    .font(.callout).foregroundStyle(.secondary)
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(vinyl.segments.enumerated()), id: \.element.id) { k, seg in
@@ -738,7 +734,7 @@ private struct VinylCutList: View {
                         if k < vinyl.segments.count - 1 { Divider() }
                     }
                 }
-                .background(RoundedRectangle(cornerRadius: 10).fill(theme.fill))
+                .background(RoundedRectangle(cornerRadius: 10).fill(AppColor.fill))
             }
         }
     }
@@ -749,11 +745,11 @@ private struct VinylCutList: View {
         let twice = seg.target != nil && vinyl.segments.prefix(k).contains { $0.target == seg.target }
         let length = Double(seg.end - seg.start) / rate
         return HStack(spacing: 10) {
-            Text("\(k + 1)").font(.callout.monospacedDigit()).foregroundStyle(.subtext).frame(width: 22, alignment: .trailing)
+            Text("\(k + 1)").font(.callout.monospacedDigit()).foregroundStyle(.secondary).frame(width: 22, alignment: .trailing)
             VStack(alignment: .leading, spacing: 1) {
                 Text("\(VinylText.time(Double(seg.start) / rate)) – \(VinylText.time(Double(seg.end) / rate))").font(.callout.monospacedDigit())
                 HStack(spacing: 4) {
-                    Text(formatTime(length)).font(.caption.monospacedDigit()).foregroundStyle(.subtext)
+                    Text(formatTime(length)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                     if let d = option?.duration, abs(d - length) > 8 {
                         Text("(album: \(formatTime(d)))").font(.caption.monospacedDigit()).foregroundStyle(.orange)
                             .help("This track is \(formatTime(d)) on the album: the cut may be off")
@@ -779,7 +775,7 @@ private struct VinylCutList: View {
                 } else if item.releaseID == nil {
                     manualFields(seg)
                 } else {
-                    Text("–").foregroundStyle(.subtext)
+                    Text("–").foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -802,7 +798,7 @@ private struct VinylCutList: View {
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 10).padding(.vertical, 7)
-        .background(selected ? theme.accent.opacity(0.14) : Color.clear)
+        .background(selected ? AppColor.accent.opacity(0.14) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture {
             vinyl.selectedSegmentID = seg.id

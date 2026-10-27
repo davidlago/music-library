@@ -9,7 +9,7 @@ collection. Albums you bought as downloads are things you own too; they're liste
 
 ## The Shelf
 
-The sidebar's **Physical Collection** section has:
+The sidebar's **Collection** section starts with:
 
 - **Shelf**: every CD and record.
 - **CDs** and **Vinyl**: one medium each.
@@ -109,7 +109,7 @@ grab it.
 Choose CD or Vinyl and type the number. **↑** and **↓** step along the shelf, **⇥** switches series, **↩** opens the
 item. Typing a label in the search field (`#142`, `cd 142`, `vinyl 12`) shows the item above the results too.
 
-Find by Label is also on the iPhone's Physical tab, on the Apple Watch (even away from the phone) and in Siri: "Find
+Find by Label is also on the iPhone's Collection tab, on the Apple Watch (even away from the phone) and in Siri: "Find
 CD 12 in Music Library". See [iPhone app](iphone.md#physical) and [Widgets and Apple Watch](widgets-and-watch.md).
 
 ## Label Check

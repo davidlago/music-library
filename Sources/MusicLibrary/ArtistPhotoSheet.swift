@@ -8,7 +8,6 @@ import SwiftUI
 struct ArtistPhotoSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.theme) private var theme
     let name: String
     let request: CoverSheetRequest
 
@@ -64,7 +63,7 @@ struct ArtistPhotoSheet: View {
             PhotoCircle(data: image ?? current, size: 220)
                 .overlay {
                     if downloading { ProgressView().controlSize(.large) }
-                    if dropTargeted { Circle().strokeBorder(theme.accent, lineWidth: 3) }
+                    if dropTargeted { Circle().strokeBorder(AppColor.accent, lineWidth: 3) }
                 }
                 .dropDestination(for: URL.self) { urls, _ in
                     guard let url = urls.first else { return false }
@@ -74,14 +73,14 @@ struct ArtistPhotoSheet: View {
             Text(image != nil ? (source ?? "New photo") : (current != nil ? "Current photo" : "No photo yet"))
                 .font(.callout.weight(.medium)).lineLimit(2).multilineTextAlignment(.center)
             if let size = pixelSize(image ?? current) {
-                Text(size).font(.caption).foregroundStyle(.subtext)
+                Text(size).font(.caption).foregroundStyle(.secondary)
             }
             HStack {
                 Button("Choose Image…", action: choose)
                 Button("Paste", action: paste).help("Use an image you copied")
             }
             if image != nil { Button("Keep Current Photo") { image = nil; source = nil; credit = nil; chosen = nil }.buttonStyle(.link) }
-            Text("Or drop an image file here.").font(.caption).foregroundStyle(.subtext)
+            Text("Or drop an image file here.").font(.caption).foregroundStyle(.secondary)
             if let message { Text(message).font(.caption).foregroundStyle(.red).multilineTextAlignment(.center) }
             Spacer(minLength: 0)
         }
@@ -105,7 +104,7 @@ struct ArtistPhotoSheet: View {
             }
             .textFieldStyle(.roundedBorder)
             .onSubmit { Task { await runSearch() } }
-            Text("Artist pictures from Deezer, and photos from Wikipedia and Wikimedia Commons").font(.caption).foregroundStyle(.subtext)
+            Text("Artist pictures from Deezer, and photos from Wikipedia and Wikimedia Commons").font(.caption).foregroundStyle(.secondary)
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 12, alignment: .top)], spacing: 12) {
                     ForEach(shown) { c in candidateCell(c) }
@@ -117,7 +116,7 @@ struct ArtistPhotoSheet: View {
                     if searching || loadingLinked {
                         ProgressView("Searching Deezer and Wikimedia…")
                     } else if let searchMessage {
-                        Text(searchMessage).foregroundStyle(.subtext).multilineTextAlignment(.center).padding()
+                        Text(searchMessage).foregroundStyle(.secondary).multilineTextAlignment(.center).padding()
                     }
                 }
             }
@@ -131,10 +130,10 @@ struct ArtistPhotoSheet: View {
                 PhotoCircle(data: thumbnails[c.id], size: 128)
                     .overlay {
                         if thumbnails[c.id] == nil { ProgressView().controlSize(.small) }
-                        if chosen == c.id { Circle().strokeBorder(theme.accent, lineWidth: 3) }
+                        if chosen == c.id { Circle().strokeBorder(AppColor.accent, lineWidth: 3) }
                     }
                 Text(c.title).font(.caption.weight(.medium)).lineLimit(1)
-                Text(c.detail).font(.caption2).foregroundStyle(.subtext).lineLimit(2)
+                Text(c.detail).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
             }
             .frame(width: 128, alignment: .leading)
             .contentShape(Rectangle())
@@ -280,7 +279,6 @@ struct ArtistPhotoSheet: View {
 
 /// Image data in a circle, the way artist photos are shown.
 private struct PhotoCircle: View {
-    @Environment(\.theme) private var theme
     let data: Data?
     let size: CGFloat
 
@@ -290,11 +288,11 @@ private struct PhotoCircle: View {
                 Image(nsImage: img).resizable().scaledToFill()
             } else {
                 Rectangle().fill(.quaternary)
-                Image(systemName: "person.fill").font(.system(size: size / 4)).foregroundStyle(.subtext)
+                Image(systemName: "person.fill").font(.system(size: size / 4)).foregroundStyle(.secondary)
             }
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
-        .overlay(Circle().strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+        .overlay(Circle().strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
     }
 }

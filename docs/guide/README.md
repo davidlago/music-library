@@ -47,7 +47,7 @@ pages explain every feature, how it works and how to set it up. For a quick look
 
 ## Reference
 
-- [Settings](settings.md): every setting on the Mac, themes and keyboard shortcuts.
+- [Settings](settings.md): every setting on the Mac, light and dark mode, and keyboard shortcuts.
 - [Privacy](privacy.md): what stays on your devices and what the app talks to.
 - [Troubleshooting](troubleshooting.md): keychain prompts, local network access, sync, and other things that come up.
 - [Building from source](building-from-source.md): build the Mac and iPhone apps yourself.

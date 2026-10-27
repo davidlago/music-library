@@ -91,7 +91,6 @@ struct ExportListView: View {
                 }
             }
         }
-        .themedScrollBackground()
         .onDeleteCommand { remove(selection) }
         .overlay {
             if model.exportList.isEmpty {
@@ -144,11 +143,11 @@ struct ExportDestinationBar: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "externaldrive.fill").font(.title2).foregroundStyle(.subtext)
+            Image(systemName: "externaldrive.fill").font(.title2).foregroundStyle(.secondary)
             if let dest = model.exportDestination {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(dest.lastPathComponent).font(.headline)
-                    Text(dest.path).font(.caption).foregroundStyle(.subtext).lineLimit(1).truncationMode(.middle)
+                    Text(dest.path).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 }
                 if !model.exportDestinationAvailable && !scanning {
                     Text("Not connected").font(.caption.weight(.medium)).foregroundStyle(.orange)
@@ -158,7 +157,7 @@ struct ExportDestinationBar: View {
             } else {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("No destination").font(.headline)
-                    Text("Choose your music player, USB drive or backup folder.").font(.caption).foregroundStyle(.subtext)
+                    Text("Choose your music player, USB drive or backup folder.").font(.caption).foregroundStyle(.secondary)
                 }
             }
             Spacer()
@@ -184,7 +183,7 @@ struct ExportPaneHeader: View {
     var body: some View {
         HStack(spacing: 8) {
             Label(title, systemImage: systemImage).font(.subheadline.weight(.semibold))
-            Text(detail).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+            Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 14).frame(height: 34)
@@ -201,7 +200,7 @@ struct ExportItemStatus: View {
         if tracks.isEmpty {
             EmptyView()
         } else if sizes.isEmpty {
-            Label("Already there", systemImage: "checkmark.circle").font(.caption).foregroundStyle(.subtext).labelStyle(.titleAndIcon)
+            Label("Already there", systemImage: "checkmark.circle").font(.caption).foregroundStyle(.secondary).labelStyle(.titleAndIcon)
         } else {
             let bytes = ByteCountFormatter.string(fromByteCount: sizes.reduce(0, +), countStyle: .file)
             ExportBadge(text: sizes.count == tracks.count ? "All new · \(bytes)" : "+\(sizes.count) new · \(bytes)")
@@ -220,18 +219,18 @@ struct ExportTrackRow: View {
         HStack(spacing: 8) {
             if known {
                 Image(systemName: incomingSize == nil ? "checkmark.circle" : "arrow.up.circle.fill")
-                    .foregroundStyle(incomingSize == nil ? AnyShapeStyle(.subtext) : AnyShapeStyle(.tint))
+                    .foregroundStyle(incomingSize == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
                     .help(incomingSize == nil ? "Already at the destination" : "Will be copied")
             }
             VStack(alignment: .leading, spacing: 0) {
                 Text(track.title.isEmpty ? (track.path as NSString).lastPathComponent : track.title).lineLimit(1)
                 Text([track.artist, track.album].filter { !$0.isEmpty }.joined(separator: " — "))
-                    .font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
             if let incomingSize {
                 Text(ByteCountFormatter.string(fromByteCount: incomingSize, countStyle: .file))
-                    .font(.caption).foregroundStyle(.subtext).monospacedDigit()
+                    .font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
         }
         .opacity(known && incomingSize == nil ? 0.55 : 1)
@@ -240,19 +239,17 @@ struct ExportTrackRow: View {
 
 struct ExportBadge: View {
     let text: String
-    @Environment(\.theme) private var theme
 
     var body: some View {
-        Text(text).font(.caption.weight(.semibold)).foregroundStyle(theme.accent).lineLimit(1)
+        Text(text).font(.caption.weight(.semibold)).foregroundStyle(AppColor.accent).lineLimit(1)
             .padding(.horizontal, 7).padding(.vertical, 2)
-            .background(Capsule().fill(theme.accent.opacity(0.15)))
+            .background(Capsule().fill(AppColor.accent.opacity(0.15)))
     }
 }
 
 /// The destination's album folders, library data and playlists, including what the export will add.
 struct DestinationContentsView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let preview: ExportPreview?
     let error: String?
     let scanning: Bool
@@ -307,12 +304,11 @@ struct DestinationContentsView: View {
                 Section(artist.isEmpty ? "Music" : artist) {
                     ForEach(byArtist[artist] ?? []) { f in
                         DestinationFolderRow(folder: f)
-                            .listRowBackground(f.incomingFiles > 0 || f.incomingCover ? theme.accent.opacity(0.10) : Color.clear)
+                            .listRowBackground(f.incomingFiles > 0 || f.incomingCover ? AppColor.accent.opacity(0.10) : Color.clear)
                     }
                 }
             }
         }
-        .themedScrollBackground()
         .overlay {
             if folders.isEmpty {
                 ContentUnavailableView(onlyChanges ? "No Changes" : "No Music Yet", systemImage: "music.note",
@@ -361,11 +357,11 @@ struct DestinationFolderRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: folder.isNew ? "folder.badge.plus" : "folder")
-                .foregroundStyle(folder.isNew ? AnyShapeStyle(.tint) : AnyShapeStyle(.subtext))
+                .foregroundStyle(folder.isNew ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 0) {
                 Text(folder.album.isEmpty ? "Loose files" : folder.album).lineLimit(1)
-                Text(detail).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
             if let badge { ExportBadge(text: badge) }
@@ -395,10 +391,10 @@ struct DestinationDataRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: systemImage).foregroundStyle(.subtext).frame(width: 20)
+            Image(systemName: systemImage).foregroundStyle(.secondary).frame(width: 20)
             VStack(alignment: .leading, spacing: 0) {
                 Text(title).lineLimit(1)
-                Text(detail).font(.caption).foregroundStyle(.subtext).lineLimit(1).truncationMode(.tail)
+                Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
             }
             Spacer(minLength: 8)
             if let badge { ExportBadge(text: badge) }
@@ -457,18 +453,18 @@ struct ExportListFooter: View {
                     Text("Not enough space: \(bytes) needed, \(ByteCountFormatter.string(fromByteCount: free, countStyle: .file)) free.")
                         .foregroundStyle(.red)
                 } else if plan.files.isEmpty && plan.covers.isEmpty && plan.artistImages.isEmpty && plan.collectionCovers.isEmpty {
-                    Image(systemName: "checkmark.circle").foregroundStyle(.subtext)
-                    Text(hasTracks ? "Every picked song is already at the destination." : "Pick something to export.").foregroundStyle(.subtext)
+                    Image(systemName: "checkmark.circle").foregroundStyle(.secondary)
+                    Text(hasTracks ? "Every picked song is already at the destination." : "Pick something to export.").foregroundStyle(.secondary)
                 } else {
                     Image(systemName: "arrow.up.circle.fill").foregroundStyle(.tint)
                     Text(copyLine(plan) + " (\(bytes))").fontWeight(.medium)
-                    if plan.skipped > 0 { Text("· \(songCount(plan.skipped)) already there").foregroundStyle(.subtext) }
+                    if plan.skipped > 0 { Text("· \(songCount(plan.skipped)) already there").foregroundStyle(.secondary) }
                 }
             }
             .font(.callout)
         } else {
             Text("Songs are copied into Music/Artist/Album, as in your library folder. Files already at the destination are never overwritten, and nothing is deleted.")
-                .font(.caption).foregroundStyle(.subtext)
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -491,10 +487,10 @@ struct ExportItemRow: View {
     var body: some View {
         let count = model.tracks(for: item).count
         HStack(spacing: 10) {
-            Image(systemName: icon).foregroundStyle(.subtext).frame(width: 20)
+            Image(systemName: icon).foregroundStyle(.secondary).frame(width: 20)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title).lineLimit(1)
-                Text(detail(count: count)).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                Text(detail(count: count)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
         .padding(.vertical, 2)
@@ -574,7 +570,7 @@ struct ExportSheet: View {
                 ProgressView(value: Double(state?.done ?? 0), total: Double(max(state?.total ?? 1, 1)))
                 HStack {
                     Text("\(state?.done ?? 0) of \(state?.total ?? 0) \(state?.destination != nil ? "files" : "tracks")")
-                        .font(.caption).foregroundStyle(.subtext)
+                        .font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     if state?.destination != nil {
                         Button("Cancel") { model.cancelExport() }.keyboardShortcut(.cancelAction)

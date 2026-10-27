@@ -23,7 +23,7 @@ struct PurchaseDateField: View {
                            in: ...Date(), displayedComponents: .date)
                     .labelsHidden().fixedSize()
                 Button { self.day = nil } label: { Image(systemName: "xmark.circle.fill") }
-                    .buttonStyle(.plain).foregroundStyle(.subtext)
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
                     .help("Clear the purchase date")
             } else {
                 Button("Add Date") { self.day = PurchaseDay(Date()) }
@@ -40,7 +40,7 @@ struct PurchasePriceField: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Text(Locale.current.currencySymbol ?? "$").foregroundStyle(.subtext)
+            Text(Locale.current.currencySymbol ?? "$").foregroundStyle(.secondary)
             TextField("Price", text: $text, prompt: Text(Decimal(0).formatted(.number.precision(.fractionLength(2)))))
                 .textFieldStyle(.roundedBorder)
                 .labelsHidden()
@@ -91,7 +91,7 @@ struct YourCopiesSection: View {
             }
             if copies.isEmpty {
                 Label("You don't own a copy", systemImage: "arrow.left.arrow.right")
-                    .font(.callout).foregroundStyle(.subtext)
+                    .font(.callout).foregroundStyle(.secondary)
                     .help("Borrowed, or not added yet: add the copy you own")
             } else {
                 VStack(spacing: 0) {
@@ -103,12 +103,12 @@ struct YourCopiesSection: View {
                     }
                 }
                 if let summary = summary(copies) {
-                    Text(summary).font(.caption).foregroundStyle(.subtext)
+                    Text(summary).font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
         .onChange(of: album.id) { added = nil }
-        .sheet(isPresented: $linkingExisting) { AddExistingItemSheet(album: album).themedSheet() }
+        .sheet(isPresented: $linkingExisting) { AddExistingItemSheet(album: album) }
     }
 
     /// The album's copies as saved now, including one added a moment ago.
@@ -142,11 +142,11 @@ struct YourCopiesSection: View {
     private func addedFields(_ item: CollectionItem) -> some View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
             GridRow {
-                Text("Bought").foregroundStyle(.subtext)
+                Text("Bought").foregroundStyle(.secondary)
                 PurchaseDateField(day: field(item, \.purchasedOn))
             }
             GridRow {
-                Text("Paid").foregroundStyle(.subtext)
+                Text("Paid").foregroundStyle(.secondary)
                 PurchasePriceField(price: field(item, \.price))
             }
         }
@@ -188,7 +188,7 @@ struct AddExistingItemSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Add Existing Item").font(.title2.bold())
             Text("Which item you own is a copy of “\(album.album)”? Items with music of their own aren't listed.")
-                .font(.callout).foregroundStyle(.subtext)
+                .font(.callout).foregroundStyle(.secondary)
             TextField("Search what you own", text: $query, prompt: Text("Search what you own"))
                 .textFieldStyle(.roundedBorder)
             List(selection: $selection) {
@@ -198,7 +198,7 @@ struct AddExistingItemSheet: View {
             .frame(minHeight: 260)
             .overlay {
                 if suggested.isEmpty && others.isEmpty {
-                    Text("Everything you own has music in your digital collection.").foregroundStyle(.subtext)
+                    Text("Everything you own has music in your digital collection.").foregroundStyle(.secondary)
                 }
             }
             if let item = selectedItem {
@@ -254,7 +254,7 @@ struct AddExistingItemSheet: View {
                 Text(item.album.isEmpty ? "Unknown Album" : item.album).lineLimit(1)
                 Text([item.artist, item.year.map(String.init), item.formatDetail ?? item.medium.name].compactMap { $0 }
                     .filter { !$0.isEmpty }.joined(separator: " · "))
-                    .font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
             if let s = item.sticker { StickerPill(sticker: s, size: 10) }

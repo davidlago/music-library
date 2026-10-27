@@ -7,6 +7,26 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- New: **Listen Now**, the first row of the Mac sidebar and the page the app opens on. It leads with the album playing
+  (or the one you played last), with Play, Shuffle and Open Album, then the albums you've been playing, your week in four
+  numbers, what's up next, and the album's neighbors on the shelf.
+- Changed: the Mac sidebar has four sections instead of seven: **Collection** (Shelf, CDs, Vinyl, To Digitize, Albums,
+  Songs, Downloads), **Explore**, **Acquire** (Import, ripping, Digitize Vinyl, your public library and the Shop) and
+  **Devices** (iPhone, Export List), with your playlists below.
+- Changed: the Mac player floats at the bottom of the window as a glass capsule over the pages, which leave room under
+  their last row for it.
+- Changed: the iPhone app has four tabs: **Listen Now** (where it opens: the album playing or played last, tinted by its
+  cover, with what you've been playing, its neighbors on the shelf, your week and what's up next), **Collection** (your
+  CDs and records, then your digital collection), **Explore** (Artists, Music DNA and Insights) and **Search**. **Sync**
+  and **Settings** are buttons at the top of Listen Now.
+- Changed: artist pages on the Mac take their color from the artist's photo, like album pages from their cover, and the
+  tint is stronger on both devices.
+
+- Changed: **themes are gone**. Music Library now has one look in **Light** and **Dark**, following your Mac or iPhone,
+  with **System**, **Light** or **Dark** in **Settings ▸ Appearance** on the Mac (also **View ▸ Appearance**) and under
+  **Appearance** in the iPhone app's Settings. A theme you had picked becomes its mode: themes that came in light and
+  dark follow the system, the others stay light or dark.
+
 ## 1.27.0
 
 - New: choose the **Radio DJ**'s model. Add a Claude API key, an [OpenRouter](https://openrouter.ai) key, or both, in

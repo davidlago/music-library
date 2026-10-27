@@ -3,7 +3,6 @@ import SwiftUI
 
 struct NowPlayingView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
 
     var body: some View {
         let player = model.player
@@ -50,7 +49,7 @@ struct NowPlayingView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
-            theme.background
+            AppColor.background
                 .overlay {
                     if let cover = player.cover {
                         Image(nsImage: cover).resizable().scaledToFill().blur(radius: 60).opacity(0.4)
@@ -74,8 +73,8 @@ struct NowPlayingView: View {
                         Text(m.title).font(.largeTitle.bold()).lineLimit(2)
                         LikeButton(model: model, track: track, font: .title)
                     }
-                    Text(m.artist).font(.title2).foregroundStyle(.subtext).lineLimit(1)
-                    Text(albumLine(m)).font(.title3).foregroundStyle(.subtext).lineLimit(1)
+                    Text(m.artist).font(.title2).foregroundStyle(.secondary).lineLimit(1)
+                    Text(albumLine(m)).font(.title3).foregroundStyle(.secondary).lineLimit(1)
                     FormatCaption(player: player, font: .callout, lineLimit: 2)
                     ScrobbleCaption()
                     ScrollView {
@@ -95,8 +94,8 @@ struct NowPlayingView: View {
                     Text(m.title).font(.title.bold()).lineLimit(2).multilineTextAlignment(.center)
                     LikeButton(model: model, track: track, font: .title2)
                 }
-                Text(m.artist).font(.title3).foregroundStyle(.subtext).lineLimit(1)
-                Text(albumLine(m)).font(.headline).foregroundStyle(.subtext).lineLimit(1)
+                Text(m.artist).font(.title3).foregroundStyle(.secondary).lineLimit(1)
+                Text(albumLine(m)).font(.headline).foregroundStyle(.secondary).lineLimit(1)
                 FormatCaption(player: player, font: .callout, lineLimit: 2)
                 ScrobbleCaption()
             }
@@ -114,7 +113,7 @@ struct NowPlayingView: View {
                 Image(nsImage: image).resizable().scaledToFill()
             } else {
                 Rectangle().fill(.quaternary)
-                Image(systemName: "music.note").font(.system(size: side / 4)).foregroundStyle(.subtext)
+                Image(systemName: "music.note").font(.system(size: side / 4)).foregroundStyle(.secondary)
             }
         }
         .frame(width: side, height: side)
@@ -148,7 +147,7 @@ struct ScrobbleCaption: View {
         if scrobbler.isActive, let track = model.player.currentTrack, track.duration > ListenTracker.minimumDuration {
             Label(scrobbler.currentPlayScrobbled ? "Scrobbled to Last.fm" : "Will scrobble to Last.fm",
                   systemImage: scrobbler.currentPlayScrobbled ? "checkmark.circle.fill" : "dot.radiowaves.left.and.right")
-                .font(.caption).foregroundStyle(.subtext)
+                .font(.caption).foregroundStyle(.secondary)
                 .help(scrobbler.currentPlayScrobbled ? "" : "After half the song or 4 minutes of listening")
         }
     }

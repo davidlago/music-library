@@ -43,7 +43,6 @@ enum CollectionShow: String, CaseIterable, Identifiable {
 /// (in sections of a hundred labels when sorted by label) or as a table.
 struct CollectionView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let scope: CollectionScope
     @AppStorage("collectionLayout") private var layout = CollectionLayout.grid
     @AppStorage private var sort: CollectionSort
@@ -77,7 +76,7 @@ struct CollectionView: View {
                                     step: { self.found = $0; jump(to: $0) })
                         .overlay(alignment: .topTrailing) {
                             Button { self.found = nil } label: { Image(systemName: "xmark.circle.fill") }
-                                .buttonStyle(.plain).foregroundStyle(.subtext).padding(10)
+                                .buttonStyle(.plain).foregroundStyle(.secondary).padding(10)
                                 .help("Close")
                         }
                         .padding(.horizontal, 20).padding(.bottom, 10)
@@ -97,13 +96,12 @@ struct CollectionView: View {
                     .frame(maxHeight: .infinity)
                 } else if layout == .list {
                     CollectionTable(model: model, items: items, selection: $selection, highlighted: highlighted,
-                                    highlight: theme.accent, scrollTarget: $scrollTarget)
+                                    highlight: AppColor.accent, scrollTarget: $scrollTarget)
                 } else {
                     grid(items)
                 }
             }
         }
-        .background(theme.isThemed ? theme.background : Color.clear)
         .navigationTitle(scope.title)
         .navigationSubtitle(subtitle(items.count))
         .toolbar { toolbar }
@@ -160,11 +158,11 @@ struct CollectionView: View {
         ]
         return HStack(spacing: 6) {
             ForEach(Array(parts.enumerated()), id: \.offset) { i, part in
-                if i > 0 { Text("·").foregroundStyle(.subtext) }
+                if i > 0 { Text("·").foregroundStyle(.secondary) }
                 Button(part.1) { model.sidebar = .collection(part.0) }
                     .buttonStyle(.plain)
                     .fontWeight(part.0 == scope ? .semibold : .regular)
-                    .foregroundStyle(part.0 == scope ? AnyShapeStyle(.primary) : AnyShapeStyle(.subtext))
+                    .foregroundStyle(part.0 == scope ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                     .help("Show \(part.0.title)")
             }
         }
@@ -195,7 +193,7 @@ struct CollectionView: View {
     private var filterField: some View {
         @Bindable var model = model
         return HStack(spacing: 6) {
-            Image(systemName: "line.3.horizontal.decrease").foregroundStyle(.subtext)
+            Image(systemName: "line.3.horizontal.decrease").foregroundStyle(.secondary)
             TextField("Filter", text: $model.shelfQuery,
                       prompt: Text(isDownloads ? "Filter: jazz, bought:2024, paid:>10…" : "Filter: jazz, own:vinyl, ripped:no, bought:2024, #12…"))
                 .textFieldStyle(.plain)
@@ -209,11 +207,11 @@ struct CollectionView: View {
                 }
             if !model.shelfQuery.isEmpty {
                 Button { model.shelfQuery = "" } label: { Image(systemName: "xmark.circle.fill") }
-                    .buttonStyle(.plain).foregroundStyle(.subtext)
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 8).fill(theme.fill))
+        .background(RoundedRectangle(cornerRadius: 8).fill(AppColor.fill))
         .frame(maxWidth: 460)
         .help(isDownloads ? "Search your downloads: words match titles, artists, record labels, notes and track titles; keys like bought: and paid: filter"
               : "Search your physical collection: words match titles, artists, record labels, notes and track titles; keys like own:, ripped:, sticker:, bought:, paid: filter")
@@ -222,7 +220,7 @@ struct CollectionView: View {
     /// Go to: a series and a number ("cd 12" and "v12" work too), scrolling to the item and showing its card.
     private var goTo: some View {
         HStack(spacing: 6) {
-            Text("Go to").foregroundStyle(.subtext)
+            Text("Go to").foregroundStyle(.secondary)
             Picker("Series", selection: $goToSeries) {
                 ForEach(StickerSeries.allCases, id: \.self) { Text($0.name).tag($0) }
             }
@@ -280,18 +278,17 @@ struct CollectionView: View {
                             if let title = section.title {
                                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                                     Text(title).font(.headline)
-                                    if let detail = section.detail { Text(detail).font(.callout).foregroundStyle(.subtext) }
+                                    if let detail = section.detail { Text(detail).font(.callout).foregroundStyle(.secondary) }
                                     Spacer()
                                 }
                                 .padding(.vertical, 6)
-                                .background(theme.isThemed ? theme.background : Color(nsColor: .windowBackgroundColor))
+                                .background(Color(nsColor: .windowBackgroundColor))
                             }
                         }
                     }
                 }
                 .padding(20)
             }
-            .themedScrollBackground()
             .onChange(of: scrollTarget) {
                 guard let id = scrollTarget else { return }
                 withAnimation { proxy.scrollTo(id, anchor: .center) }
@@ -306,7 +303,7 @@ struct CollectionView: View {
                 .padding(6)
                 .background {
                     if highlighted == item.id {
-                        RoundedRectangle(cornerRadius: 10).strokeBorder(theme.accent, lineWidth: 3)
+                        RoundedRectangle(cornerRadius: 10).strokeBorder(AppColor.accent, lineWidth: 3)
                     }
                 }
         }
@@ -455,7 +452,7 @@ struct CollectionCell: View {
             CopyArt(mark: mark, url: model.coverURL(for: item), width: width, revision: model.coverRevision, title: item.album)
                 .padding(.bottom, 4)
             Text(item.album.isEmpty ? "Unknown Album" : item.album).font(.callout.weight(.medium)).lineLimit(1)
-            Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+            Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }
         .frame(width: width, alignment: .leading)
         .contentShape(Rectangle())
@@ -583,7 +580,6 @@ struct CollectionTable: View {
         } primaryAction: { ids in
             if let id = sorted.first(where: { ids.contains($0.id) })?.id { model.showItem(id: id) }
         }
-        .themedScrollBackground()
     }
 
     /// "12/12", "8/12", "12 ↻" (from another copy), "—", "Missing".
@@ -633,13 +629,12 @@ extension View {
 struct LabelCheckSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Label Check").font(.title2.bold())
             Text("Numbers missing from each series, and numbers on more than one item. Saving a number already used is refused, so duplicates come from older versions of the app or other copies of your library folder.")
-                .font(.callout).foregroundStyle(.subtext).fixedSize(horizontal: false, vertical: true)
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     ForEach(StickerSeries.allCases, id: \.self) { series($0) }
@@ -669,7 +664,7 @@ struct LabelCheckSheet: View {
                 Text(series == .cd ? "CDs" : "Vinyl").font(.headline)
                 Text(highest.map { "#1–\($0) · \(labeled.count.formatted()) labeled · next \(series.name) #\(c.nextNumber(in: series))" }
                      ?? "No labels yet")
-                    .font(.callout).foregroundStyle(.subtext)
+                    .font(.callout).foregroundStyle(.secondary)
             }
             if free > 0 {
                 Text("\(free.formatted()) free number\(free == 1 ? "" : "s")").font(.callout.weight(.medium))
@@ -678,12 +673,12 @@ struct LabelCheckSheet: View {
                         Text(gap.count == 1 ? "#\(gap.lowerBound)" : "#\(gap.lowerBound)–\(gap.upperBound)")
                             .font(.caption.monospacedDigit())
                             .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Capsule().fill(theme.fill))
+                            .background(Capsule().fill(AppColor.fill))
                     }
-                    if gaps.count > 60 { Text("and \(gaps.count - 60) more").font(.caption).foregroundStyle(.subtext) }
+                    if gaps.count > 60 { Text("and \(gaps.count - 60) more").font(.caption).foregroundStyle(.secondary) }
                 }
             } else if highest != nil {
-                Label("No free numbers", systemImage: "checkmark.circle").font(.callout).foregroundStyle(.subtext)
+                Label("No free numbers", systemImage: "checkmark.circle").font(.callout).foregroundStyle(.secondary)
             }
             if !duplicates.isEmpty {
                 Text("\(duplicates.count) number\(duplicates.count == 1 ? "" : "s") used twice").font(.callout.weight(.medium))
@@ -694,7 +689,7 @@ struct LabelCheckSheet: View {
                             ForEach(items) { item in
                                 HStack {
                                     Text(item.album.isEmpty ? "Unknown Album" : item.album).lineLimit(1)
-                                    Text(item.artist).foregroundStyle(.subtext).lineLimit(1)
+                                    Text(item.artist).foregroundStyle(.secondary).lineLimit(1)
                                     Spacer()
                                     Button("Open") { dismiss(); model.showItem(id: item.id) }.controlSize(.small)
                                 }
@@ -708,7 +703,7 @@ struct LabelCheckSheet: View {
             if unlabeled > 0 {
                 HStack {
                     Text("\(unlabeled.formatted()) \(series == .cd ? (unlabeled == 1 ? "CD" : "CDs") : (unlabeled == 1 ? "record" : "records")) without a label")
-                        .font(.callout).foregroundStyle(.subtext)
+                        .font(.callout).foregroundStyle(.secondary)
                     Button("Show") {
                         dismiss()
                         model.showShelf(query: "sticker:none", scope: series == .cd ? .cds : .vinyl)
@@ -719,7 +714,7 @@ struct LabelCheckSheet: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(theme.card))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
     }
 }
