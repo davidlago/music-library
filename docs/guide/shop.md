@@ -1,6 +1,6 @@
 # Shop
 
-**Shop** (sidebar **Shopping**; **Shop for This CD** or **Shop for It on Vinyl** in an album's **…** menu; **Shop for
+**Shop** (sidebar **Acquire**; **Shop for This CD** or **Shop for It on Vinyl** in an album's **…** menu; **Shop for
 This CD** or **Shop for This Record** in a CD's or record's **…** menu) finds the exact CD or record you want on
 MusicBrainz and compares new and used copies that ship to the US, from several stores at once, with shipping and a
 total in dollars. No accounts or sign-ins. The [Radio DJ](radio-dj.md) can open it for you, too.

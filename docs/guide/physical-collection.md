@@ -9,7 +9,7 @@ collection. Albums you bought as downloads are things you own too; they're liste
 
 ## The Shelf
 
-The sidebar's **Physical Collection** section has:
+The sidebar's **Collection** section starts with:
 
 - **Shelf**: every CD and record.
 - **CDs** and **Vinyl**: one medium each.

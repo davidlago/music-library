@@ -591,9 +591,10 @@ struct AlbumBackdrop: View {
                     Image(nsImage: image).resizable().scaledToFill()
                         .frame(width: geo.size.width, height: geo.size.height)
                         .blur(radius: 70)
-                        .opacity(0.55)
+                        .saturation(1.3)
+                        .opacity(0.75)
                         .clipped()
-                    LinearGradient(colors: [AppColor.background.opacity(0.35), AppColor.background.opacity(0.8)],
+                    LinearGradient(colors: [AppColor.background.opacity(0.15), AppColor.background.opacity(0.75)],
                                    startPoint: .top, endPoint: .bottom)
                 }
             }

@@ -1144,6 +1144,13 @@ extension AppModel {
             return .page("search results for “\(query)”", details: ["The listener searched their collection for \(query); search_collection with the same query shows the results."])
         }
         switch sidebar {
+        case .listenNow?:
+            let album = listenNowAlbum
+            let playing = player.currentTrack.map { "\($0.title) by \($0.artist)" }
+            return .page("Listen Now, their home page", details: [
+                playing.map { "Now playing: \($0)" } ?? "Nothing is playing.",
+                album.map { "Leading the page: the album \($0.album) by \($0.artist)" } ?? "",
+            ].filter { !$0.isEmpty })
         case .collection(let scope)?:
             let page = scope == .downloads ? "the Downloads list of their digital collection" : "the \(scope.title) page of their physical collection"
             return .page(page, details: ["\(collection.count(scope)) items here; \(collection.count(.cds)) CDs, \(collection.count(.vinyl)) records, \(collection.count(.downloads)) downloads in all"])

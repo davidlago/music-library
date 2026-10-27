@@ -4,6 +4,8 @@ import MusicLibraryCore
 import SwiftUI
 
 enum SidebarItem: Hashable {
+    /// Listen Now: what's playing (or was last), what you've been playing, your week and what's beside it on the shelf.
+    case listenNow
     /// The Shelf (`.all`), one medium, or To Digitize.
     case collection(CollectionScope)
     case songs, albums, artists, insights, musicDNA, concerts, importQueue, exportList, iPhone, catalog, catalogCheckouts, catalogList, cdShop
@@ -96,8 +98,8 @@ final class AppModel {
         }
     }
 
-    /// Songs until the collection is first loaded, then the Shelf when there's anything on it (unless something else
-    /// was picked meanwhile).
+    /// Songs until the collection is first loaded, then Listen Now when the library or the collection has anything in
+    /// it (unless something else was picked meanwhile).
     var sidebar: SidebarItem? = .songs {
         didSet {
             guard sidebar != oldValue else { return }
@@ -187,6 +189,10 @@ final class AppModel {
     private(set) var historyVersion = 0
     @ObservationIgnored private var listeningRequest: (period: ListeningStats.Period, library: Int, history: Int, at: Date)?
     @ObservationIgnored private var listeningTask: Task<Void, Never>?
+    /// The last 7 days, for Listen Now, kept apart from `listening` so Insights keeps its own period.
+    private(set) var weekListening: ListeningStats?
+    @ObservationIgnored private var weekListeningRequest: (library: Int, history: Int, at: Date)?
+    @ObservationIgnored private var weekListeningTask: Task<Void, Never>?
     /// Everything you own (CDs, records, downloads), with or without tracks in the library. Rebuilt off the main
     /// thread after each library reload and each change (`saveItem`, `deleteItem`).
     private(set) var collection = MusicCollection.empty
@@ -451,7 +457,7 @@ final class AppModel {
         tracks = []; albums = []; artists = []; playlists = []; smartPlaylists = []; likedDates = [:]; totalTracks = 0
         playTotals = [:]; artistPlayTotals = [:]; albumPlayTotals = [:]; albumAddedDates = [:]
         index = .empty; searchResults = SearchResults(); stats = nil; statsVersion = -1
-        listening = nil; listeningRequest = nil
+        listening = nil; listeningRequest = nil; weekListening = nil; weekListeningRequest = nil
         trackPurchases = [:]
         collection = .empty; collectionIndex = .empty; collectionStats = nil; collectionStatsRequest = nil; collectionLoaded = false
         unsettledItems = [:]; searchItems = []; searchLabelHits = []; collectionVersion += 1
@@ -1100,11 +1106,14 @@ final class AppModel {
         for (id, change) in unsettled where unsettledItems[id] == change { unsettledItems.removeValue(forKey: id) }
         catalog.collection = collection
         refreshCollectionPlaylistCounts()
-        // The app opens on the Shelf once there's anything on it (D19; downloads aren't on the Shelf), unless
-        // something else was picked already (a page opened or a search typed while it loaded counts too).
+        // The app opens on Listen Now once there's anything to show, unless something else was picked already
+        // (a page opened or a search typed while it loaded counts too). An empty library stays on Songs, which
+        // explains how to import.
         if !appliedDefaultSidebar {
             appliedDefaultSidebar = true
-            if !sidebarChosen, searchText.isEmpty, navigationPath.isEmpty, collection.count(.all) > 0 { sidebar = .collection(.all) }
+            if !sidebarChosen, searchText.isEmpty, navigationPath.isEmpty, !tracks.isEmpty || !collection.items.isEmpty {
+                sidebar = .listenNow
+            }
         }
         if !collectionLoaded {
             collectionLoaded = true
@@ -1351,6 +1360,48 @@ final class AppModel {
                 self.listening = stats
             }
         }
+    }
+
+    /// The last 7 days' listening for Listen Now, computed in the background unless it's up to date (refreshed after
+    /// a few minutes like `loadListeningIfNeeded`).
+    func loadWeekListeningIfNeeded() {
+        if let r = weekListeningRequest, r.library == libraryVersion, r.history == historyVersion,
+           Date().timeIntervalSince(r.at) < 300 { return }
+        guard let db = database else { return }
+        let request = (library: libraryVersion, history: historyVersion, at: Date())
+        weekListeningRequest = request
+        let plays = (try? db.plays()) ?? []
+        let all = tracks
+        weekListeningTask?.cancel()
+        weekListeningTask = Task.detached(priority: .utility) {
+            let stats = ListeningStats(plays: plays, tracks: all, period: .week, now: request.at)
+            guard !Task.isCancelled else { return }
+            await MainActor.run { [weak self] in
+                guard let self, self.weekListeningRequest?.at == request.at else { return }
+                self.weekListening = stats
+            }
+        }
+    }
+
+    /// The album Listen Now leads with: the one playing, else the one played last, else the one added last.
+    var listenNowAlbum: AlbumSummary? {
+        if let t = player.currentTrack, let a = album(forKey: SearchIndex.albumKey(album: t.album, artist: t.effectiveAlbumArtist)) {
+            return a
+        }
+        if let key = albumPlayTotals.filter({ $0.value.lastPlayed != nil }).max(by: { $0.value.lastPlayed! < $1.value.lastPlayed! })?.key,
+           let a = album(forKey: key) {
+            return a
+        }
+        return albumAddedDates.max(by: { $0.value < $1.value }).flatMap { album(forKey: $0.key) }
+    }
+
+    /// Albums by when they were last played, most recent first.
+    func recentlyPlayedAlbums(limit: Int, excluding key: String? = nil) -> [AlbumSummary] {
+        albumPlayTotals.compactMap { k, total in total.lastPlayed.map { (k, $0) } }
+            .filter { $0.0 != key }
+            .sorted { $0.1 > $1.1 }
+            .prefix(limit)
+            .compactMap { album(forKey: $0.0) }
     }
 
     // MARK: Smart playlists

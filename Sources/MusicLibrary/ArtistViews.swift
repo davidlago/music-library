@@ -198,6 +198,8 @@ struct ArtistDetail: View {
     @State private var photoSheet: CoverSheetRequest?
     @State private var hoveringPhoto = false
     @State private var photoDropTargeted = false
+    /// The artist's photo, blurred behind the page like an album page's cover.
+    @State private var backdrop: NSImage?
 
     init(artist: ArtistSummary) { artistName = artist.name }
     init(name: String) { artistName = name }
@@ -206,20 +208,26 @@ struct ArtistDetail: View {
 
     var body: some View {
         let info = model.artistInfo.info(for: artistName)
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                hero(info)
-                statTiles(info)
-                if let bio = info?.bio { about(bio, info!) }
-                if let links = info?.links.filter(\.url.isWebLink), !links.isEmpty { linksSection(links) }
-                ArtistConcertsSection(artist: artistName, mbid: info?.mbid)
-                if items.contains(where: \.medium.isPhysical) { collectionSection }
-                if !albums.isEmpty { albumsSection }
-                if !tracks.isEmpty { songsSection }
+        ZStack {
+            AlbumBackdrop(image: backdrop)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    hero(info)
+                    statTiles(info)
+                    if let bio = info?.bio { about(bio, info!) }
+                    if let links = info?.links.filter(\.url.isWebLink), !links.isEmpty { linksSection(links) }
+                    ArtistConcertsSection(artist: artistName, mbid: info?.mbid)
+                    if items.contains(where: \.medium.isPhysical) { collectionSection }
+                    if !albums.isEmpty { albumsSection }
+                    if !tracks.isEmpty { songsSection }
+                }
+                .padding(24)
+                .frame(maxWidth: 1100, alignment: .leading)
+                .frame(maxWidth: .infinity)
             }
-            .padding(24)
-            .frame(maxWidth: 1100, alignment: .leading)
-            .frame(maxWidth: .infinity)
+        }
+        .task(id: model.artistInfo.imageFile(for: artistName)) {
+            backdrop = await model.artistInfo.image(for: artistName)
         }
         .radioDJ { [model, artistName] in model.radioDJSubject(artist: artistName) }
         .navigationTitle(name)

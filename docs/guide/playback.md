@@ -20,8 +20,9 @@ Playback uses the output chosen in System Settings ▸ Sound.
 
 ## The player and Now Playing
 
-The player bar along the bottom of the window has the song, a heart for Liked Songs, previous / play-pause / next, the
-scrubber, volume, and the queue button. **Space** plays and pauses (except while typing).
+The player floats at the bottom of the window, over the pages: the song, a heart for Liked Songs, previous / play-pause /
+next, the scrubber, volume, and the queue button. Pages leave room under their last row, so nothing stays hidden behind
+it. **Space** plays and pauses (except while typing).
 
 Click the cover to expand **Now Playing**: a large cover, the song's details and credits (click a name for
 [Music DNA](music-dna.md)), and whether it was scrobbled to Last.fm. **Esc** closes it.

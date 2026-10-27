@@ -1,6 +1,6 @@
 # Digitizing vinyl
 
-**Digitize Vinyl** (in the sidebar's **Import** section) records a record you own from your turntable and turns it into
+**Digitize Vinyl** (in the sidebar's **Acquire** section) records a record you own from your turntable and turns it into
 tracks in your Digital Collection, lossless FLAC tagged and filed like a ripped CD, linked to the record in your
 [Physical Collection](physical-collection.md).
 

@@ -7,6 +7,17 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- New: **Listen Now**, the first row of the Mac sidebar and the page the app opens on. It leads with the album playing
+  (or the one you played last), with Play, Shuffle and Open Album, then the albums you've been playing, your week in four
+  numbers, what's up next, and the album's neighbors on the shelf.
+- Changed: the Mac sidebar has four sections instead of seven: **Collection** (Shelf, CDs, Vinyl, To Digitize, Albums,
+  Songs, Downloads), **Explore**, **Acquire** (Import, ripping, Digitize Vinyl, your public library and the Shop) and
+  **Devices** (iPhone, Export List), with your playlists below.
+- Changed: the Mac player floats at the bottom of the window as a glass capsule over the pages, which leave room under
+  their last row for it.
+- Changed: artist pages take their color from the artist's photo, like album pages from their cover, and the tint is
+  stronger.
+
 - Changed: **themes are gone**. Music Library now has one look in **Light** and **Dark**, following your Mac or iPhone,
   with **System**, **Light** or **Dark** in **Settings ▸ Appearance** on the Mac (also **View ▸ Appearance**) and under
   **Appearance** in the iPhone app's Settings. A theme you had picked becomes its mode: themes that came in light and
