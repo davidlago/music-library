@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.28.0
+
 - New: **Add to Physical Collection** and **Change Edition…** can search [Discogs](https://www.discogs.com) as well as
   MusicBrainz (**Search: MusicBrainz | Discogs**), by barcode, words, catalog number or a pasted Discogs release link,
   for the records and CDs MusicBrainz doesn't list. The copy keeps its Discogs release: its cover, barcode and details
@@ -26,7 +28,6 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   and **Settings** are buttons at the top of Listen Now.
 - Changed: artist pages on the Mac take their color from the artist's photo, like album pages from their cover, and the
   tint is stronger on both devices.
-
 - Changed: **themes are gone**. Music Library now has one look in **Light** and **Dark**, following your Mac or iPhone,
   with **System**, **Light** or **Dark** in **Settings ▸ Appearance** on the Mac (also **View ▸ Appearance**) and under
   **Appearance** in the iPhone app's Settings. A theme you had picked becomes its mode: themes that came in light and
