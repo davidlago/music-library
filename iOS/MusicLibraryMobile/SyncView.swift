@@ -1,15 +1,20 @@
 import MusicLibraryCore
 import SwiftUI
 
+/// Sync with the Mac, a sheet opened from Listen Now (or from a page asking to pair). The phone listens for the Mac only
+/// while it's open (`PhoneModel.showsSync`).
 struct SyncTab: View {
     @Environment(PhoneModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         let sync = model.sync
         NavigationStack {
             syncList(sync)
                 .radioDJPage(.page("the Sync page, for syncing with Music Library on their Mac"))
-                .radioDJButton()
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                }
         }
     }
 
@@ -127,13 +132,13 @@ struct SyncTab: View {
             case .waiting:
                 HStack(spacing: 10) {
                     ProgressView()
-                    Text("The Mac can also start the sync while this tab is open.").foregroundStyle(.secondary)
+                    Text("The Mac can also start the sync while this screen is open.").foregroundStyle(.secondary)
                 }
             default:
                 EmptyView()
             }
         } footer: {
-            Text("Keep the app open while syncing: iOS pauses it in the background. Download or remove music from album, artist and playlist pages and on the Physical tab (its Ready to Download gets every CD and record you've digitized); the iPhone syncs with the Mac as soon as it's around.")
+            Text("Keep the app open while syncing: iOS pauses it in the background. Download or remove music from album, artist and playlist pages and on the Collection tab (its Ready to Download gets every CD and record you've digitized); the iPhone syncs with the Mac as soon as it's around.")
         }
     }
 }

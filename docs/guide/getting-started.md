@@ -46,7 +46,7 @@ Mac with your iPhone, see [iPhone app](iphone.md#pair-once).
 - **Bring in music.** **File ▸ Import…** (⌘O), drop files or folders on the window, or insert a CD. See
   [Importing music](importing.md) and [Ripping CDs](ripping-cds.md).
 - **Get the iPhone app.** [Dave's Music Library](https://apps.apple.com/us/app/daves-music-library/id6822005512) on the
-  App Store, then pair it from its Sync tab. See [iPhone app](iphone.md).
+  App Store, then pair it from **Sync**, at the top of its Listen Now tab. See [iPhone app](iphone.md).
 
 ## Settings worth filling in on day one
 

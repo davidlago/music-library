@@ -885,11 +885,10 @@ extension PhoneModel {
     var radioDJLocation: RadioDJSubject {
         if let page = radioDJ.page { return page.subject() }
         return switch UserDefaults.standard.string(forKey: "selectedTab") {
-        case "library": .page("the Digital Collection tab")
-        case "insights": .page("Insights", details: ["Their collection statistics; collection_stats has the numbers."])
-        case "sync": .page("the Sync tab")
+        case "collection": .page("the Collection tab: their physical and digital collections")
+        case "insights": .page("Explore: Insights, artists and Music DNA", details: ["Their collection statistics; collection_stats has the numbers."])
         case "search": .page("Search")
-        default: .page("the Physical Collection tab")
+        default: .page("Listen Now, their home page")
         }
     }
 

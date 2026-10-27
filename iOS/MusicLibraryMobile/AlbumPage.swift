@@ -359,7 +359,7 @@ struct AlbumTrackList: View {
                 }
             }
         } message: { _ in
-            Text(model.sync.isPaired ? "Download it from your Mac to play it here." : "Pair with your Mac in the Sync tab to download music.")
+            Text(model.sync.isPaired ? "Download it from your Mac to play it here." : "Pair with your Mac (Sync, on Listen Now) to download music.")
         }
     }
 
@@ -532,9 +532,10 @@ struct AlbumBackdrop: View {
                     .scaleEffect(max(geo.size.width, geo.size.height) / 120 * 1.2)
                     .frame(width: geo.size.width, height: geo.size.height)
                     .blur(radius: 50)
-                    .opacity(0.45)
+                    .saturation(1.3)
+                    .opacity(0.65)
                     .clipped()
-                LinearGradient(colors: [Color(.systemGroupedBackground).opacity(0.2), Color(.systemGroupedBackground).opacity(0.85),
+                LinearGradient(colors: [Color(.systemGroupedBackground).opacity(0.1), Color(.systemGroupedBackground).opacity(0.75),
                                         Color(.systemGroupedBackground)],
                                startPoint: .top, endPoint: .bottom)
             }

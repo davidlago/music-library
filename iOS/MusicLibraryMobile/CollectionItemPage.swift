@@ -204,7 +204,7 @@ private struct CollectionItemContent: View {
     private func withMusic(_ state: DigitalState) -> some View {
         let playable = model.playable(tracks)
         let album = model.album(for: item)
-        // Digitized, but only on the Mac: dimmed, like the Digital tab's albums.
+        // Digitized, but only on the Mac: dimmed, like the digital collection's albums.
         DigitalStatusLine(item: item, state: state, collection: collection, tracks: tracks)
             .opacity(model.availability(tracks) == .notOnPhone && !model.isSample ? 0.55 : 1)
         if let exportItem = model.exportItem(for: item) {

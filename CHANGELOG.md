@@ -15,8 +15,12 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   **Devices** (iPhone, Export List), with your playlists below.
 - Changed: the Mac player floats at the bottom of the window as a glass capsule over the pages, which leave room under
   their last row for it.
-- Changed: artist pages take their color from the artist's photo, like album pages from their cover, and the tint is
-  stronger.
+- Changed: the iPhone app has four tabs: **Listen Now** (where it opens: the album playing or played last, tinted by its
+  cover, with what you've been playing, its neighbors on the shelf, your week and what's up next), **Collection** (your
+  CDs and records, then your digital collection), **Explore** (Artists, Music DNA and Insights) and **Search**. **Sync**
+  and **Settings** are buttons at the top of Listen Now.
+- Changed: artist pages on the Mac take their color from the artist's photo, like album pages from their cover, and the
+  tint is stronger on both devices.
 
 - Changed: **themes are gone**. Music Library now has one look in **Light** and **Dark**, following your Mac or iPhone,
   with **System**, **Light** or **Dark** in **Settings ▸ Appearance** on the Mac (also **View ▸ Appearance**) and under

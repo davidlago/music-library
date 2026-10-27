@@ -37,7 +37,7 @@ account, and the Mac's concert settings and Radio DJ key come along too.
 
 - **On the phone**: open any album, artist or playlist and tap **Download**, or **… ▸ Remove from iPhone** (also in
   long-press menus, and per song). Tapping a song that isn't on the phone offers **Download Song** or **Download Album**.
-  The Physical tab's **Ready to Download** lists the CDs and records you've digitized that aren't on the phone, with
+  The Collection tab's **Ready to Download** lists the CDs and records you've digitized that aren't on the phone, with
   **Download All**.
 - **On the Mac**: **Add to iPhone** in any album, artist, playlist or song menu. The Mac's **iPhone** page shows the
   list, including what was taken off the phone ("Kept off the iPhone").
@@ -46,8 +46,8 @@ account, and the Mac's concert settings and Radio DJ key come along too.
   the next sync, and Remove from iPhone still wins.
 
 With Music Library open on the Mac and both on the same Wi-Fi, the phone syncs right away; otherwise what you asked for
-waits in the Sync tab ("Waiting for the Mac") until the Mac is around. **Sync Now** works from either side while the
-phone's Sync tab is open. Removing deletes the songs from the phone at once. The first sync from a Mac asks before
+waits in Sync ("Waiting for the Mac") until the Mac is around. **Sync Now** works from either side while the
+phone's Sync screen is open. Removing deletes the songs from the phone at once. The first sync from a Mac asks before
 deleting anything.
 
 Keep the app open while it syncs: iOS pauses it in the background.
@@ -60,9 +60,15 @@ folder onto **Music Library**. Later syncs send only what changed.
 
 ## The tabs
 
-### Physical
+### Listen Now
 
-Your Physical Collection, where the app opens once you own a CD or record.
+Where the app opens. It leads with the album that's playing (or the one you played last), tinted by its cover, with
+**Play** and **Shuffle**, then **Keep Listening** (the albums you've been playing), the album's neighbors **Beside It on
+the Shelf**, **Your Week** in four numbers, and **Up Next**. The buttons at the top open **Sync** and **Settings**.
+
+### Collection
+
+Both collections on one tab: the CDs and records you own first, then your digital collection.
 
 - **Find by Label**: pick CD or Vinyl, type the number (or step with ‹ ›) and see what it is, whether it's ripped and
   what's on either side of it on the shelf.
@@ -70,32 +76,34 @@ Your Physical Collection, where the app opens once you own a CD or record.
   a list, sorted and filtered ("Filter, or a label like 12").
 - Item pages like the Mac's: the case or sleeve, previous and next on the shelf, the digital copy, tracks, your copy's
   details and other copies.
+- **Digital Collection**: **Albums**, **Songs**, **Liked Songs**, **Downloads** and your playlists. Switch between
+  **All Music** and **On This iPhone**. Music that isn't on the phone is dimmed; tap it to download it. With nothing on
+  the shelf, the tab is just this list.
 
 Items with no digital copy are shown at full brightness with a disc or record badge, never dimmed and never with a
 Download button: there's nothing to download until you rip or digitize them. Press and hold a sticker or badge to see
 what it means.
 
-### Digital
-
-Your Digital Collection: **Albums**, **Songs**, **Liked Songs**, **Downloads** and your playlists. Switch between
-**All Music** and **On This iPhone**. Music that isn't on the phone is dimmed; tap it to download it.
-
 ![The iPhone app: the Albums grid in cases and sleeves, the album page for Till the Sun Turns Black on CD #43, and Ray LaMontagne's artist page](../screenshots/iphone.png)
 
 Album and artist pages have what the Mac's have: description, rating, the full track list, release details, credits,
-your copies, plays, links, and concerts near you.
+your copies, plays, links, and concerts near you. They take their color from the cover or the artist's photo.
 
-### Insights
+### Explore
 
-**Explore** at the top: **Artists** (everyone in both collections) and **Music DNA**. Below, the **Owned**, **Digital**
-and **Listening** panes, as on the Mac.
+**Artists** (everyone in both collections) and **Music DNA** at the top. Below, the **Owned**, **Digital** and
+**Listening** panes of Insights, as on the Mac.
 
 ![The iPhone app: Music DNA centered on Joe Cocker, the Listening report for 30 days, and the Owned pane](../screenshots/iphone-dna-insights.png)
 
-### Sync and Search
+### Search
 
-**Sync** pairs and syncs, lists what's waiting for the Mac and the last sync. **Search** takes the same search language
-as the Mac, including `own:` and labels like `cd 12`.
+The same search language as the Mac, including `own:` and labels like `cd 12`.
+
+### Sync
+
+The **Sync** button at the top of Listen Now pairs and syncs, and lists what's waiting for the Mac and the last sync. The
+phone looks for the Mac's syncs only while Sync is open.
 
 ## Playing
 
@@ -110,7 +118,7 @@ as the Mac, including `own:` and labels like `cd 12`.
 
 ## Settings
 
-The gear on the Digital tab:
+The gear at the top of Listen Now (and of the Collection tab):
 
 - **Appearance**: **System** (follows your iPhone's light or dark setting), **Light** or **Dark**.
 - **Match the DAC's sample rate** (on by default) and the current output.

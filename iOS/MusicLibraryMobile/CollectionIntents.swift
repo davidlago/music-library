@@ -2,7 +2,7 @@ import AppIntents
 import MusicLibraryCore
 import MusicLibraryGlance
 
-// Siri and Shortcuts: Find by Label, the Physical tab's card as a question ("Find CD 12 in Music Library").
+// Siri and Shortcuts: Find by Label, the Collection tab's card as a question ("Find CD 12 in Music Library").
 // In the app only; the widgets don't offer it. Like the widget buttons, it uses `PhoneModel.shared`, which loads the
 // library first: Siri can start the app in the background.
 //
@@ -75,7 +75,7 @@ nonisolated struct LabelEntityQuery: EntityStringQuery {
     }
 }
 
-/// Says what has a label ("CD #12 is Kind of Blue by Miles Davis") and opens it on the Physical tab.
+/// Says what has a label ("CD #12 is Kind of Blue by Miles Davis") and opens it on the Collection tab.
 struct FindByLabelIntent: AppIntent {
     static let title: LocalizedStringResource = "Find by Label"
     static let description = IntentDescription("Says which CD or record in your physical collection has a label number, and opens it.")
@@ -134,7 +134,7 @@ struct FindByLabelIntent: AppIntent {
     }
 }
 
-/// Opens an item's page on the Physical tab (what Find by Label ends with).
+/// Opens an item's page on the Collection tab (what Find by Label ends with).
 struct OpenCollectionItemIntent: AppIntent {
     static let title: LocalizedStringResource = "Open in Physical Collection"
     static let isDiscoverable = false

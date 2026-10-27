@@ -84,7 +84,7 @@ Applications. It's signed and notarized, and includes everything it needs. Then 
 
 **iPhone and Apple Watch** (iOS 26 / watchOS 26 or later): get
 [Dave's Music Library](https://apps.apple.com/us/app/daves-music-library/id6822005512) free on the App Store, then pair
-it with the Mac from its Sync tab. No Mac app yet? Tap **Explore a Sample Library** to try it.
+it with the Mac from **Sync** on its Listen Now tab. No Mac app yet? Tap **Explore a Sample Library** to try it.
 
 ## Documentation
 
