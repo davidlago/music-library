@@ -7,6 +7,12 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- New: choose the **Radio DJ**'s model. Add a Claude API key, an [OpenRouter](https://openrouter.ai) key, or both, in
+  Settings ▸ Radio DJ on the Mac, then **Choose Model…** to pick one of the Claude models (Claude Opus 5.5 stays the
+  default) or any OpenRouter model that can use tools, each with its price per million tokens, its context window and
+  whether it sees photos. The choice and keys go to your iPhone at the next sync. With OpenRouter, spending shows what
+  OpenRouter says each reply cost. [Radio DJ](https://github.com/davidlago/music-library/blob/main/docs/guide/radio-dj.md#choose-the-model)
+
 ## 1.26.0
 
 - New: show the **Radio DJ** a photo. On iPhone, tap the camera button in the DJ's sheet to take a picture of a record

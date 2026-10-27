@@ -5,7 +5,7 @@ import Testing
 
 /// Plays back scripted SSE responses (or errors) and records the requests.
 final class ScriptedClaudeTransport: ClaudeTransport, @unchecked Sendable {
-    enum Reply { case lines([String]), failure(ClaudeError) }
+    enum Reply { case lines([String]), failure(ClaudeError), status(Int, String) }
 
     private let lock = NSLock()
     private var replies: [Reply]
@@ -24,6 +24,7 @@ final class ScriptedClaudeTransport: ClaudeTransport, @unchecked Sendable {
         }
         switch reply {
         case .failure(let error): throw error
+        case .status(let status, let body): throw HTTPStatusError(status: status, body: Data(body.utf8))
         case .lines(let lines):
             return AsyncThrowingStream { c in
                 for line in lines { c.yield(line) }
@@ -348,7 +349,8 @@ func textReply(_ text: String, stop: String = "end_turn", model: String = "claud
             throw SyncError.connection("no session")
         }
         let mac = SyncIdentity(deviceID: "mac-id", deviceName: "Mac", appVersion: "test")
-        let settings = SyncRadioDJ(apiKey: "sk-ant-test", name: "Wolfman", listenerName: "Dave")
+        let model = RadioDJModel(provider: .openRouter, id: "openai/gpt-5.2", name: "OpenAI: GPT-5.2", inputPrice: 1.75, outputPrice: 14)
+        let settings = SyncRadioDJ(apiKey: "sk-ant-test", name: "Wolfman", listenerName: "Dave", openRouterKey: "sk-or-test", model: model)
         let (phone, _) = try await SyncMacSession.sync(
             SyncConnection(endpoint: .hostPort(host: "127.0.0.1", port: advertiser.port!), key: key), identity: mac,
             selection: { _ in SyncTracks(tracks: f.tracks) }, libraryRoot: f.root, database: f.db, scratch: scratch, radioDJ: settings)

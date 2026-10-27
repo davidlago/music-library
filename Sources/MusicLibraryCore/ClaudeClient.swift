@@ -51,7 +51,7 @@ public enum ClaudeError: Error, LocalizedError, Equatable {
         case .unauthorized: return "The Claude API key was refused. Check it in Settings."
         case .rateLimited: return "Too many requests to the Claude API right now. Try again in a minute."
         case .overloaded: return "Claude is busy right now. Try again in a moment."
-        case .refused: return "That one's off the air: Claude declined to answer it."
+        case .refused: return "That one's off the air: the model declined to answer it."
         case .api(let m): return m
         case .connection(let m): return "Couldn't reach the Claude API: \(m)"
         }
@@ -125,9 +125,13 @@ public struct ClaudeRequest: Sendable {
     public var system: [String]
     public var messages: [ClaudeMessage]
     public var tools: [JSONValue]
+    /// `fallbacks: "default"` (not every model takes it).
+    public var serverFallback: Bool
 
-    public init(model: String, maxTokens: Int, system: [String], messages: [ClaudeMessage], tools: [JSONValue] = []) {
+    public init(model: String, maxTokens: Int, system: [String], messages: [ClaudeMessage], tools: [JSONValue] = [],
+                serverFallback: Bool = true) {
         self.model = model; self.maxTokens = maxTokens; self.system = system; self.messages = messages; self.tools = tools
+        self.serverFallback = serverFallback
     }
 
     public func body() throws -> Data {
@@ -139,8 +143,8 @@ public struct ClaudeRequest: Sendable {
             "messages": .array(messages.map { .object(["role": .string($0.role), "content": .array($0.content)]) }),
             // Each turn resends the conversation; caching keeps the repeated part cheap.
             "cache_control": .object(["type": .string("ephemeral")]),
-            "fallbacks": .string("default"),
         ]
+        if serverFallback { body["fallbacks"] = .string("default") }
         if !tools.isEmpty { body["tools"] = .array(tools) }
         return try JSONEncoder().encode(JSONValue.object(body))
     }
@@ -236,7 +240,13 @@ public struct ClaudeStreamAccumulator: Sendable {
     }
 }
 
-/// Sends a request and hands back the response's lines; injectable for tests.
+/// A response other than 200 from `URLSessionClaudeTransport`, for the client to put in its own words.
+public struct HTTPStatusError: Error, Sendable {
+    public var status: Int
+    public var body: Data
+}
+
+/// Sends a request and hands back the response's lines; injectable for tests. Used for the Claude API and OpenRouter.
 public protocol ClaudeTransport: Sendable {
     func lines(for request: URLRequest) async throws -> AsyncThrowingStream<String, Error>
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse)
@@ -254,7 +264,7 @@ public struct URLSessionClaudeTransport: ClaudeTransport {
         guard status == 200 else {
             var body = Data()
             for try await byte in bytes { body.append(byte); if body.count > 64_000 { break } }
-            throw ClaudeAPI.describe(status: status, body: body)
+            throw HTTPStatusError(status: status, body: body)
         }
         return AsyncThrowingStream { continuation in
             let task = Task {
@@ -279,7 +289,32 @@ public struct URLSessionClaudeTransport: ClaudeTransport {
     }
 }
 
-public struct ClaudeClient: Sendable {
+/// One finished response, whichever API it came from, as Claude API content blocks (which the session keeps as the
+/// conversation), with what it cost.
+public struct RadioDJReply: Sendable {
+    public var model: String?
+    /// The Claude API's stop reasons ("end_turn", "tool_use", "pause_turn", "refusal", "max_tokens").
+    public var stopReason: String?
+    public var content: [JSONValue]
+    public var tally: RadioDJTally
+
+    public init(model: String?, stopReason: String?, content: [JSONValue], tally: RadioDJTally) {
+        self.model = model; self.stopReason = stopReason; self.content = content; self.tally = tally
+    }
+
+    /// The tool calls the app has to run.
+    public var toolCalls: [JSONValue] { content.filter { $0["type"]?.string == "tool_use" } }
+}
+
+/// What the Radio DJ talks through: the Claude API (`ClaudeClient`) or OpenRouter (`OpenRouterClient`).
+public protocol RadioDJClient: Sendable {
+    /// Streams one turn, calling `onEvent` as text and tool calls arrive, and returns the whole reply.
+    func reply(to request: ClaudeRequest, onEvent: @Sendable (ClaudeStreamEvent) async -> Void) async throws -> RadioDJReply
+    /// Checks the key without spending anything.
+    func checkKey() async throws
+}
+
+public struct ClaudeClient: RadioDJClient {
     public let apiKey: String
     let transport: any ClaudeTransport
 
@@ -289,15 +324,26 @@ public struct ClaudeClient: Sendable {
 
     /// Streams one turn, calling `onEvent` as text and tool calls arrive, and returns the whole reply.
     public func stream(_ request: ClaudeRequest, onEvent: @Sendable (ClaudeStreamEvent) async -> Void) async throws -> ClaudeStreamAccumulator {
-        let urlRequest = ClaudeAPI.request(ClaudeAPI.messagesURL, apiKey: apiKey, body: try request.body(), beta: [ClaudeAPI.fallbackBeta])
+        let urlRequest = ClaudeAPI.request(ClaudeAPI.messagesURL, apiKey: apiKey, body: try request.body(),
+                                           beta: request.serverFallback ? [ClaudeAPI.fallbackBeta] : [])
         var reply = ClaudeStreamAccumulator()
-        for try await line in try await transport.lines(for: urlRequest) {
+        let lines: AsyncThrowingStream<String, Error>
+        do { lines = try await transport.lines(for: urlRequest) } catch let error as HTTPStatusError {
+            throw ClaudeAPI.describe(status: error.status, body: error.body)
+        }
+        for try await line in lines {
             guard line.hasPrefix("data:") else { continue }
             let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
             for event in reply.handle(data: payload) { await onEvent(event) }
             if let error = reply.error { throw error }
         }
         return reply
+    }
+
+    public func reply(to request: ClaudeRequest, onEvent: @Sendable (ClaudeStreamEvent) async -> Void) async throws -> RadioDJReply {
+        let result = try await stream(request, onEvent: onEvent)
+        return RadioDJReply(model: result.model, stopReason: result.stopReason, content: result.content,
+                            tally: RadioDJTally.billing(usage: result.usage, requestedModel: request.model, servedModel: result.model))
     }
 
     /// Checks the key with a free request (the models list).

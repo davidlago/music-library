@@ -65,6 +65,10 @@ needed if review asks.
 own Anthropic account, App Functionality, not for tracking. The camera needs `NSCameraUsageDescription` (in
 `iOS/MusicLibraryMobile-Info.plist`); the photo library goes through the system picker, which needs no permission.
 
+**Since OpenRouter models for the DJ (after 1.26.0):** with an OpenRouter key and model chosen on the Mac, the same data
+goes to OpenRouter (and the model's provider) instead of Anthropic, with the user's own key. Same privacy label
+categories; the review notes and privacy policy name OpenRouter as a possible recipient.
+
 Nothing else leaves the phone except to the user's own paired Mac (local network) and watch. No tracking, no ads, no
 analytics. Export compliance: `ITSAppUsesNonExemptEncryption = NO` (only the encryption built into iOS).
 
@@ -143,7 +147,7 @@ To sync your own music: install the Mac app, open the iPhone's Sync tab and tap 
 
 The screenshots show the developer's own library, synced from the Mac app.
 
-Optional features need the user's own accounts or keys, entered by the user: Last.fm scrobbling (Settings, with a Last.fm API key), concerts on artist pages (Ticketmaster or JamBase keys set on the Mac) and the Radio DJ (the user's own Anthropic Claude API key, entered in the Mac app and handed to the phone when they sync; without one, the DJ doesn't appear at all). The DJ runs only when the user taps its button, and sends the page being viewed and the user's questions to Anthropic with the user's own key.
+Optional features need the user's own accounts or keys, entered by the user: Last.fm scrobbling (Settings, with a Last.fm API key), concerts on artist pages (Ticketmaster or JamBase keys set on the Mac) and the Radio DJ (the user's own Anthropic Claude API key or OpenRouter key, entered in the Mac app and handed to the phone when they sync; without one, the DJ doesn't appear at all). The DJ runs only when the user taps its button, and sends the page being viewed and the user's questions to Anthropic with the user's own key.
 ```
 
 **Attachment:** the demo video (`build/app-store/review-demo.mp4`).

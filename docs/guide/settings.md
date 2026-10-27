@@ -51,7 +51,7 @@ artist pages** (on). See [Concerts](concerts.md).
 
 ## Radio DJ
 
-Your Claude API key (**Check** tests it), the **DJ's name** and **Your name**, and what the DJ has cost: this month, all
+Your Claude API and OpenRouter keys (**Check** tests each), the model (**Choose Model…**, with prices), the **DJ's name** and **Your name**, and what the DJ has cost: this month, all
 time, segments and web searches, per device. See [Radio DJ](radio-dj.md).
 
 ## Local Library
