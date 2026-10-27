@@ -18,8 +18,9 @@ Add the record to your Physical Collection first (the page points you to **Add a
 choose it on the page, or start from the record itself: **Digitize…** (or **Digitize the Rest…**) on its page, **… ▸
 Digitize This Record…**, or the Shelf's context menu.
 
-The record's track list comes from its release on MusicBrainz. For a record MusicBrainz doesn't list, type each track's
-number and title, or pick the right edition with **Change Edition…**.
+The record's track list comes from its release on MusicBrainz, or on Discogs for a record added from there (see
+[Adding to your collection](physical-collection.md#adding-to-your-collection)). For a record matched to neither, type
+each track's number and title, or pick the right edition with **Change Edition…** (which can search Discogs too).
 
 ## Set up the input
 

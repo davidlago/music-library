@@ -182,7 +182,8 @@ extension ArtistLink {
 extension AlbumInfo {
     public static func assemble(title: String, releaseGroup rg: MBReleaseGroup?, release: ReleaseInfo?,
                                 wikidata: ArtistInfoParser.WikidataEntity?, wikipedia: ArtistInfoParser.WikipediaSummary?,
-                                lastfm: ArtistInfoParser.LastFMAlbum?, now: Date = Date()) -> AlbumInfo {
+                                lastfm: ArtistInfoParser.LastFMAlbum?, discogs: DiscogsRelease? = nil,
+                                now: Date = Date()) -> AlbumInfo {
         var info = AlbumInfo(title: rg?.title ?? title)
         info.fetchedAt = now
         if let rg {
@@ -238,6 +239,12 @@ extension AlbumInfo {
                 info.links.append(ArtistLink(kind: .lastfm, url: url))
             }
         }
+        if let discogs {
+            if info.genres.isEmpty { info.genres = Array(discogs.genres.prefix(6)) }
+            if let url = discogs.webURL, !info.links.contains(where: { $0.kind == .discogs }) {
+                info.links.append(ArtistLink(kind: .discogs, url: url))
+            }
+        }
         let order = ArtistLink.Kind.allCases
         info.links = info.links.enumerated().sorted { a, b in
             let ia = order.firstIndex(of: a.element.kind)!, ib = order.firstIndex(of: b.element.kind)!
@@ -290,10 +297,18 @@ public enum AlbumTracklist {
 }
 
 extension InfoFetcher {
-    /// Release group (by ID, via the release, or by search), release track list, Wikipedia and Last.fm.
-    public func fetchAlbum(title: String, artist: String, releaseGroupId: String?, releaseId: String?) async throws -> AlbumInfo {
+    /// Release group (by ID, via the release, or by search), release track list, Wikipedia and Last.fm. Without a
+    /// MusicBrainz release, the track list is the Discogs release's.
+    public func fetchAlbum(title: String, artist: String, releaseGroupId: String?, releaseId: String?,
+                           discogsReleaseId: Int? = nil) async throws -> AlbumInfo {
         var release: ReleaseInfo?
-        if let releaseId, !releaseId.isEmpty { release = try await musicBrainz.fetchRelease(id: releaseId) }
+        var discogsRelease: DiscogsRelease?
+        if let releaseId, !releaseId.isEmpty {
+            release = try await musicBrainz.fetchRelease(id: releaseId)
+        } else if let discogsReleaseId, let discogs {
+            discogsRelease = try await discogs.release(id: discogsReleaseId)
+            release = discogsRelease?.releaseInfo
+        }
         var rgId = releaseGroupId.flatMap { $0.isEmpty ? nil : $0 } ?? release?.releaseGroupId
         if rgId == nil {
             let wanted = ArtistResolver.normalized(title)
@@ -309,7 +324,7 @@ extension InfoFetcher {
             lastfmAlbum = try? await lastfm.albumInfo(album: title, artist: artist, username: lastfmUser)
         }
         return AlbumInfo.assemble(title: title, releaseGroup: rg, release: release, wikidata: wikidata,
-                                  wikipedia: wikipedia, lastfm: lastfmAlbum)
+                                  wikipedia: wikipedia, lastfm: lastfmAlbum, discogs: discogsRelease)
     }
 }
 

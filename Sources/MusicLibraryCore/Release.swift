@@ -116,8 +116,9 @@ public struct ReleaseInfo: Hashable, Sendable {
         metadata.trackTotal = track.trackTotal
         metadata.discNo = track.discNo
         metadata.discTotal = discTotal
-        metadata.mbRecordingId = track.recordingId
-        metadata.mbReleaseId = id
+        // A Discogs release (`DiscogsRelease.releaseInfo`) has no MusicBrainz IDs.
+        metadata.mbRecordingId = track.recordingId.isEmpty ? nil : track.recordingId
+        metadata.mbReleaseId = id.isEmpty ? nil : id
         let ext = extended(for: track)
         let composer = CreditDerivation.derive(track.credits + credits).composer
         if !composer.isEmpty { metadata.composer = composer }

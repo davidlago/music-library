@@ -24,41 +24,67 @@ struct CollectionPrefill: Hashable {
 
 // MARK: Edition search
 
-/// A MusicBrainz search for the edition you own (`MusicBrainzClient.searchEditions`: a barcode, else words of the
-/// artist and album, then a catalog number), run only when asked (Return or Search).
+/// A search for the edition you own, run only when asked (Return or Search): on MusicBrainz
+/// (`MusicBrainzClient.searchEditions`: a barcode, else words of the artist and album, then a catalog number) or on
+/// Discogs (`DiscogsClient.searchEditions`, the same ways), which often lists records MusicBrainz doesn't. A pasted
+/// Discogs release link is looked up there whichever is picked.
 @MainActor @Observable
 final class EditionSearch {
+    enum Source: String, CaseIterable, Identifiable {
+        case musicBrainz, discogs
+        var id: Self { self }
+        var name: String { self == .musicBrainz ? "MusicBrainz" : "Discogs" }
+    }
+
     var text = ""
+    /// Where to search (user defaults `editionSearchSource`).
+    var source = Source(rawValue: UserDefaults.standard.string(forKey: "editionSearchSource") ?? "") ?? .musicBrainz {
+        didSet { UserDefaults.standard.set(source.rawValue, forKey: "editionSearchSource") }
+    }
     private(set) var results: [CollectionEdition] = []
     private(set) var searching = false
     private(set) var message: String?
-    /// The text and medium the results are for.
-    private(set) var searched: (text: String, medium: CollectionMedium)?
+    /// The last search found nothing (rather than failing).
+    private(set) var foundNothing = false
+    /// The text, medium and source the results are for.
+    private(set) var searched: (text: String, medium: CollectionMedium, source: Source)?
     @ObservationIgnored private var task: Task<Void, Never>?
-    /// Small Cover Art Archive fronts, by release; nil once known to have none.
+    /// Discogs releases looked up, by release ID: a search result has only some of the release's details.
+    @ObservationIgnored private var releases: [Int: Task<DiscogsRelease, Error>] = [:]
+    /// Small cover pictures, by edition; nil once known to have none.
     private(set) var thumbnails: [String: Data?] = [:]
 
-    var isCurrent: Bool { searched?.text == text.trimmingCharacters(in: .whitespaces) }
+    var isCurrent: Bool { searched?.text == text.trimmingCharacters(in: .whitespaces) && searched?.source == source }
 
-    func run(_ client: MusicBrainzClient, medium: CollectionMedium, done: @escaping @MainActor ([CollectionEdition]) -> Void = { _ in }) {
+    func run(_ model: AppModel, medium: CollectionMedium, done: @escaping @MainActor ([CollectionEdition]) -> Void = { _ in }) {
         let query = CollectionReleaseQuery(text: text.trimmingCharacters(in: .whitespaces), medium: medium)
         guard !query.isEmpty else { return }
+        let chosen = source
+        let from: Source = DiscogsLink.releaseID(in: query.text) != nil ? .discogs : chosen
+        let musicBrainz = model.musicBrainz, discogs = model.discogs
         task?.cancel()
         searching = true
         message = nil
+        foundNothing = false
         task = Task {
             do {
-                let found = try await client.searchEditions(query)
+                let found = switch from {
+                case .musicBrainz: try await musicBrainz.searchEditions(query)
+                case .discogs: try await discogs.searchEditions(query)
+                }
                 guard !Task.isCancelled else { return }
                 results = found
-                searched = (query.text, medium)
-                message = found.isEmpty ? "Nothing found on MusicBrainz. Try other words, or enter it yourself." : nil
+                searched = (query.text, medium, chosen)
+                foundNothing = found.isEmpty
+                message = found.isEmpty
+                    ? "Nothing found on \(from.name). Try other words\(from == .musicBrainz ? ", search Discogs," : "") or enter it yourself."
+                    : nil
                 searching = false
                 done(found)
             } catch {
                 guard !Task.isCancelled else { return }
                 results = []
-                searched = (query.text, medium)
+                searched = (query.text, medium, chosen)
                 message = "Search failed: \(error.localizedDescription)"
                 searching = false
             }
@@ -71,16 +97,47 @@ final class EditionSearch {
         results = []
         searched = nil
         message = nil
+        foundNothing = false
         searching = false
     }
 
-    func loadThumbnail(_ edition: CollectionEdition, client: CoverArtClient) async {
+    func loadThumbnail(_ edition: CollectionEdition, model: AppModel) async {
         guard thumbnails[edition.id] == nil else { return }
-        let data = try? await client.fetchFront(releaseId: edition.id, releaseGroupId: nil, size: 250)
+        let data: Data?
+        if edition.isDiscogs {
+            // Discogs' search gives no pictures without an account: the release's comes once it's looked up.
+            guard let url = edition.thumbnail else { return }
+            data = try? await model.discogs.image(url)
+        } else {
+            data = try? await model.coverArt.fetchFront(releaseId: edition.id, releaseGroupId: nil, size: 250)
+        }
         thumbnails[edition.id] = .some(data.flatMap { NSImage(data: $0) != nil ? $0 : nil })
     }
 
-    /// The results by release group, in the order MusicBrainz ranked them.
+    /// The whole Discogs release of a result (looked up once), which replaces the result's details: its barcode,
+    /// labels, track count and picture. Nil for a MusicBrainz edition.
+    @discardableResult
+    func details(_ edition: CollectionEdition, client: DiscogsClient) async throws -> DiscogsRelease? {
+        guard let id = edition.discogsReleaseID else { return nil }
+        let lookup = releases[id] ?? Task { try await client.release(id: id) }
+        releases[id] = lookup
+        do {
+            let release = try await lookup.value
+            if let i = results.firstIndex(where: { $0.id == edition.id }) {
+                var refined = release.edition
+                refined.releaseGroupTitle = results[i].releaseGroupTitle
+                refined.discogsMasterID = results[i].discogsMasterID ?? refined.discogsMasterID
+                if results[i] != refined { results[i] = refined }
+            }
+            return release
+        } catch {
+            releases[id] = nil
+            throw error
+        }
+    }
+
+    /// The results by release group (or Discogs master), in the order they were ranked, each named by the title most
+    /// of its editions have (a Discogs master's versions can be titled differently).
     var groups: [(id: String, title: String, artist: String, editions: [CollectionEdition])] {
         var order: [String] = []
         var byGroup: [String: [CollectionEdition]] = [:]
@@ -90,7 +147,10 @@ final class EditionSearch {
         }
         return order.compactMap { key in
             guard let editions = byGroup[key], let first = editions.first else { return nil }
-            return (key, first.releaseGroupTitle.isEmpty ? first.title : first.releaseGroupTitle, first.artist, editions)
+            let titles = editions.map { $0.releaseGroupTitle.isEmpty ? $0.title : $0.releaseGroupTitle }
+            let counts = titles.reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+            let title = titles.first { counts[$0] == counts.values.max() } ?? first.title
+            return (key, title, first.artist, editions)
         }
     }
 }
@@ -110,7 +170,18 @@ struct EditionResults: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                TextField("Search", text: $search.text, prompt: Text("Artist and album, or barcode"))
+                Text("Search").foregroundStyle(.secondary)
+                Picker("Search", selection: $search.source) {
+                    ForEach(EditionSearch.Source.allCases) { Text($0.name).tag($0) }
+                }
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
+                .help("Discogs often lists records and CDs MusicBrainz doesn't")
+                Spacer()
+            }
+            .font(.callout)
+            HStack {
+                TextField("Search", text: $search.text,
+                          prompt: Text(search.source == .discogs ? "Artist and album, barcode, or Discogs link" : "Artist and album, or barcode"))
                     .textFieldStyle(.roundedBorder)
                     .focused(focused)
                     .onSubmit {
@@ -134,9 +205,15 @@ struct EditionResults: View {
             }
             .overlay {
                 if search.searching {
-                    ProgressView("Searching MusicBrainz…")
+                    ProgressView("Searching \(DiscogsLink.releaseID(in: search.text) != nil ? "Discogs" : search.source.name)…")
                 } else if let message = search.message {
-                    Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center).padding()
+                    VStack(spacing: 8) {
+                        Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        if search.foundNothing, search.source == .musicBrainz {
+                            Button("Search Discogs") { search.source = .discogs }
+                        }
+                    }
+                    .padding()
                 } else if search.results.isEmpty {
                     Text(medium == .download ? "Search for the album, or type its barcode."
                          : "Search for the \(medium == .cd ? "CD" : "record"), or scan its barcode.")
@@ -144,17 +221,25 @@ struct EditionResults: View {
                 }
             }
         }
+        // The same words on the other site.
+        .onChange(of: search.source) {
+            if search.searched != nil, !search.text.trimmingCharacters(in: .whitespaces).isEmpty { run() }
+        }
+        .onChange(of: selection) {
+            guard let e = search.results.first(where: { $0.id == selection }), e.isDiscogs else { return }
+            Task { try? await search.details(e, client: model.discogs) }
+        }
     }
 
     private func run() {
         selection = nil
-        search.run(model.musicBrainz, medium: medium, done: onResults)
+        search.run(model, medium: medium, done: onResults)
     }
 
     private func row(_ e: CollectionEdition) -> some View {
         HStack(spacing: 10) {
             DataImage(data: search.thumbnails[e.id] ?? nil, size: 40)
-                .task(id: e.id) { await search.loadThumbnail(e, client: model.coverArt) }
+                .task(id: "\(e.id) \(e.thumbnail?.absoluteString ?? "")") { await search.loadThumbnail(e, model: model) }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(e.title).lineLimit(1)
@@ -166,7 +251,7 @@ struct EditionResults: View {
                 Text(Self.detail(e)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
             Spacer(minLength: 0)
-            if let owned = model.collection.matches(releaseID: e.id, releaseGroupID: nil, albumKey: nil, barcode: nil, medium: nil).first {
+            if let owned = owned(e) {
                 Text(owned.sticker?.text ?? "Yours").font(.caption.weight(.medium)).foregroundStyle(.secondary)
                     .help("You already own a copy")
             }
@@ -174,17 +259,23 @@ struct EditionResults: View {
         .padding(.vertical, 2)
     }
 
-    /// "1959 · US · Columbia · CL 1355 · 12″ Vinyl · 074646493525".
+    /// A copy you already have of this release.
+    private func owned(_ e: CollectionEdition) -> CollectionItem? {
+        if let discogs = e.discogsReleaseID { return model.collection.items.first { $0.discogsReleaseID == discogs } }
+        return model.collection.matches(releaseID: e.id, releaseGroupID: nil, albumKey: nil, barcode: nil, medium: nil).first
+    }
+
+    /// "1959 · US · Columbia · CL 1355 · 12″ Vinyl · 074646493525", and from Discogs "LP, Album, Reissue, 180 gram".
     static func detail(_ e: CollectionEdition) -> String {
-        [e.year.map(String.init), e.country, e.recordLabel, e.catalogNumber, e.formatDetail, e.barcode]
+        [e.year.map(String.init), e.country, e.recordLabel, e.catalogNumber, e.formatDetail, e.formatNotes, e.barcode]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 }
 
 // MARK: Add to Collection
 
-/// Add to Collection… (⇧⌘N): pick the medium, find the edition on MusicBrainz (by barcode, or artist and album) or
-/// enter it yourself, then the label and purchase details. Add saves it and opens its page; Add & Next saves it and
+/// Add to Collection… (⇧⌘N): pick the medium, find the edition on MusicBrainz or Discogs (by barcode, or artist and
+/// album) or enter it yourself, then the label and purchase details. Add saves it and opens its page; Add & Next saves it and
 /// starts over with the next label, for going through a stack of CDs or records (a barcode scanner's Return picks a
 /// single match, and the next Return adds it).
 struct AddToCollectionSheet: View {
@@ -256,7 +347,7 @@ struct AddToCollectionSheet: View {
                         EditionResults(search: search, medium: chosenMedium, selection: $selection, focused: $searchFocused,
                                        submitCurrent: { add(next: true) }, onResults: autoSelect)
                     }
-                    Button(manualEntry ? "Search MusicBrainz Instead" : "Not on MusicBrainz? Enter it yourself") {
+                    Button(manualEntry ? "Search \(search.source.name) Instead" : "Not on \(search.source.name)? Enter it yourself") {
                         manualEntry.toggle()
                         selection = nil
                         updateMatch()
@@ -277,10 +368,10 @@ struct AddToCollectionSheet: View {
         .onChange(of: chosenMedium) { old, new in
             lastMedium = new.rawValue
             if old.series != new.series { number = new.series.map { model.nextNumber(in: $0) } }
-            // MusicBrainz is searched by format: the same words again, for the other medium.
+            // Editions are searched by format: the same words again, for the other medium.
             if !manualEntry, search.searched != nil, search.searched?.medium != new {
                 selection = nil
-                search.run(model.musicBrainz, medium: new, done: autoSelect)
+                search.run(model, medium: new, done: autoSelect)
             }
             updateMatch()
         }
@@ -467,7 +558,7 @@ struct AddToCollectionSheet: View {
         manual.barcode = prefill.barcode ?? ""
         manual.catalogNumber = prefill.catalogNumber ?? ""
         if !search.text.isEmpty {
-            search.run(model.musicBrainz, medium: chosenMedium) { found in
+            search.run(model, medium: chosenMedium) { found in
                 if let id = prefill.releaseID, found.contains(where: { $0.id == id }) { selection = id } else { autoSelect(found) }
             }
         }
@@ -484,7 +575,9 @@ struct AddToCollectionSheet: View {
         message = nil
         if !ownCover { cover = nil; coverSource = nil }
         updateMatch()
-        guard let e = edition, !ownCover else { return }
+        guard let e = edition else { return }
+        if e.isDiscogs { loadDiscogs(e); return }
+        guard !ownCover else { return }
         loadingCover = true
         let id = e.id, group = e.releaseGroupId
         Task {
@@ -497,6 +590,26 @@ struct AddToCollectionSheet: View {
                     coverSource = "Cover Art Archive"
                     return
                 }
+            }
+        }
+    }
+
+    /// A Discogs edition's whole release (its barcode, labels and track count; the track list is read again from
+    /// Discogs for the item's page) and its cover.
+    private func loadDiscogs(_ e: CollectionEdition) {
+        let id = e.id
+        loadingCover = !ownCover
+        Task {
+            defer { if selection == id { loadingCover = false } }
+            do {
+                guard let release = try await search.details(e, client: model.discogs), selection == id else { return }
+                updateMatch()
+                guard !ownCover, let url = release.images.first, let data = try await model.discogs.image(url),
+                      NSImage(data: data) != nil, selection == id, !ownCover else { return }
+                cover = data
+                coverSource = "Discogs"
+            } catch {
+                if selection == id { message = "Couldn't get this release from Discogs: \(error.localizedDescription)" }
             }
         }
     }
@@ -573,7 +686,7 @@ struct AddToCollectionSheet: View {
         let linkedCover = item.digitalSource != nil && libraryMatch.flatMap { model.coverURL(forAlbum: $0.album) } != nil
         let jpeg = (ownCover || !linkedCover) ? cover.flatMap(CoverImage.jpeg) : nil
         guard let saved = model.saveItem(item, cover: jpeg) else { return }
-        model.ensureAlbumInfo(for: saved)
+        model.updateAlbumInfo(forAdded: saved)
         added += 1
         if next {
             search.clear()
@@ -628,8 +741,8 @@ struct AddToCollectionSheet: View {
 
 // MARK: Change Edition
 
-/// Change Edition… on an item's page: the edition picker again. The edition picked replaces the item's release
-/// details (release, record label, catalog number, barcode, country, media, discs, tracks, year) and nothing else:
+/// Change Edition… on an item's page: the edition picker again (MusicBrainz or Discogs). The edition picked replaces
+/// the item's release details (release on either site, record label, catalog number, barcode, country, media, discs, tracks, year) and nothing else:
 /// its title, artist, link, label number and purchase stay.
 struct ChangeEditionSheet: View {
     @Environment(AppModel.self) private var model
@@ -667,8 +780,9 @@ struct ChangeEditionSheet: View {
             guard let item else { return }
             search.text = item.barcode ?? [item.artist, item.album].filter { !$0.isEmpty }.joined(separator: " ")
             searchFocused = true
-            search.run(model.musicBrainz, medium: item.medium) { found in
+            search.run(model, medium: item.medium) { found in
                 if let id = item.releaseID, found.contains(where: { $0.id == id }) { selection = id }
+                if let id = item.discogsReleaseID, let e = found.first(where: { $0.discogsReleaseID == id }) { selection = e.id }
             }
         }
     }
@@ -679,6 +793,7 @@ struct ChangeEditionSheet: View {
         let saved = model.changeItem(id: item.id) {
             $0.releaseID = draft.releaseID
             $0.releaseGroupID = draft.releaseGroupID
+            $0.discogsReleaseID = draft.discogsReleaseID
             $0.year = draft.year ?? $0.year
             $0.barcode = draft.barcode
             $0.catalogNumber = draft.catalogNumber

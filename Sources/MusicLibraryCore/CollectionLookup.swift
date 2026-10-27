@@ -1,7 +1,8 @@
 import Foundation
 
 // Adding to the collection: what the user types in Add to Collection (artist and album, or a barcode) becomes a
-// MusicBrainz release search filtered by medium, and the edition picked (or a library album) becomes an item.
+// MusicBrainz (or Discogs, `Discogs.swift`) release search filtered by medium, and the edition picked (or a library
+// album) becomes an item.
 
 /// What the user types to find a copy they own: artist and album words, or a barcode from the case or sleeve.
 public struct CollectionReleaseQuery: Hashable, Sendable {
@@ -66,7 +67,8 @@ public struct CollectionReleaseQuery: Hashable, Sendable {
     static let ignored: Set<String> = ["the", "a", "an", "and", "of", "by", "-"]
 }
 
-/// One release a copy may be: a MusicBrainz release with its media, labels and codes.
+/// One release a copy may be: a MusicBrainz release with its media, labels and codes, or a Discogs one
+/// (`discogsReleaseID`; its `id` is `discogsID(_:)`, never an MBID).
 public struct CollectionEdition: Identifiable, Hashable, Sendable {
     public var id: String
     public var title: String
@@ -87,6 +89,13 @@ public struct CollectionEdition: Identifiable, Hashable, Sendable {
     public var medium: CollectionMedium?
     /// "Official", "Bootleg"…
     public var status: String
+    /// A Discogs release, and the master it's a version of.
+    public var discogsReleaseID: Int?
+    public var discogsMasterID: Int?
+    /// Discogs' format descriptions: "LP, Album, Reissue, 180 gram".
+    public var formatNotes = ""
+    /// A small picture of its cover, when the source gives one (Discogs, once the release is looked up).
+    public var thumbnail: URL?
 
     public init(id: String, title: String, artist: String, date: String = "", country: String = "", recordLabel: String = "",
                 catalogNumber: String = "", barcode: String = "", formatDetail: String = "", discCount: Int = 0,
@@ -101,8 +110,12 @@ public struct CollectionEdition: Identifiable, Hashable, Sendable {
 
     public var year: Int? { date.count >= 4 ? Int(date.prefix(4)) : nil }
 
-    /// What results are grouped by: the release group, else the release itself.
-    public var groupKey: String { releaseGroupId ?? id }
+    /// What results are grouped by: the release group (or Discogs master), else the release itself.
+    public var groupKey: String { releaseGroupId ?? discogsMasterID.map { "discogs-master-\($0)" } ?? id }
+
+    public var isDiscogs: Bool { discogsReleaseID != nil }
+
+    public static func discogsID(_ release: Int) -> String { "discogs-\(release)" }
 }
 
 public enum CollectionEditionParser {
@@ -174,6 +187,7 @@ public enum CollectionDraft {
         item.year = edition.year.flatMap { (1000...9999).contains($0) ? $0 : nil }
         item.releaseID = MBID.validated(edition.id)
         item.releaseGroupID = MBID.validated(edition.releaseGroupId)
+        item.discogsReleaseID = edition.discogsReleaseID.flatMap { DiscogsLink.isValid($0) ? $0 : nil }
         item.barcode = barcode(edition.barcode)
         item.catalogNumber = field(edition.catalogNumber)
         item.recordLabel = field(edition.recordLabel)

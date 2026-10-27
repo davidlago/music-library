@@ -277,6 +277,8 @@ final class AppModel {
 
     @ObservationIgnored let musicBrainz: MusicBrainzClient
     @ObservationIgnored let coverArt = CoverArtClient()
+    /// Editions MusicBrainz doesn't list, and their track lists.
+    @ObservationIgnored let discogs = DiscogsClient()
     @ObservationIgnored let outputMatcher = OutputMatcher()
     @ObservationIgnored let player: Player
     /// Apple Music previews of catalog CDs.
@@ -662,7 +664,7 @@ final class AppModel {
 
     private var artistFetcher: InfoFetcher {
         let lastfm = scrobbler.hasCredentials ? LastFMClient(apiKey: scrobbler.apiKey, secret: scrobbler.sharedSecret) : nil
-        return InfoFetcher(musicBrainz: musicBrainz, lastfm: lastfm, lastfmUser: scrobbler.session?.username)
+        return InfoFetcher(musicBrainz: musicBrainz, discogs: discogs, lastfm: lastfm, lastfmUser: scrobbler.session?.username)
     }
 
     private func artistRequests(_ names: [String]) -> [(name: String, ids: [String])] {
@@ -704,19 +706,22 @@ final class AppModel {
             let counts = values.compactMap { $0 }.filter { !$0.isEmpty }.reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
             return counts.max { $0.value != $1.value ? $0.value < $1.value : $0.key > $1.key }?.key
         }
-        // Songs not matched on MusicBrainz go by the release of a copy you own.
+        // Songs not matched on MusicBrainz go by the release of a copy you own (on MusicBrainz, else on Discogs).
         let key = AlbumInfoStore.key(album)
-        let copy = collection.copies(albumKey: key).first { $0.origin == .stored && ($0.releaseID != nil || $0.releaseGroupID != nil) }
+        let copies = collection.copies(albumKey: key).filter { $0.origin == .stored }
+        let copy = copies.first { $0.releaseID != nil || $0.releaseGroupID != nil }
         return AlbumInfoStore.Request(key: key, title: album.album, artist: album.artist,
                                       releaseGroupId: mostCommon(ts.map { $0.metadata.extended.mbReleaseGroupId }) ?? copy?.releaseGroupID,
-                                      releaseId: mostCommon(ts.map(\.metadata.mbReleaseId)) ?? copy?.releaseID)
+                                      releaseId: mostCommon(ts.map(\.metadata.mbReleaseId)) ?? copy?.releaseID,
+                                      discogsReleaseId: copies.lazy.compactMap(\.discogsReleaseID).first)
     }
 
     /// The album info request for an item: its library album's, or for an item without songs, its own release.
     private func albumRequest(for item: CollectionItem) -> AlbumInfoStore.Request {
         if !collection.libraryTracks(item).isEmpty, let album = album(forKey: item.albumKey) { return albumRequest(album) }
         return AlbumInfoStore.Request(key: item.albumKey, title: item.album, artist: item.artist,
-                                      releaseGroupId: item.releaseGroupID, releaseId: item.releaseID)
+                                      releaseGroupId: item.releaseGroupID, releaseId: item.releaseID,
+                                      discogsReleaseId: item.discogsReleaseID)
     }
 
     /// Fetches info (track list, genres, reviews) for an item being viewed, if it isn't cached (and downloads are on).
@@ -727,6 +732,13 @@ final class AppModel {
 
     func refreshAlbumInfo(for item: CollectionItem) {
         albumInfo.refresh([albumRequest(for: item)], fetcher: artistFetcher)
+    }
+
+    /// After adding a copy: its album info downloaded again (when downloads are on), so its track list comes from the
+    /// edition just picked rather than from info cached for the same title before.
+    func updateAlbumInfo(forAdded item: CollectionItem) {
+        guard artistInfo.autoSync, !item.album.isEmpty else { return }
+        refreshAlbumInfo(for: item)
     }
 
     /// Fetches info for an album being viewed, if it isn't cached (and downloads are on).

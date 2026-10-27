@@ -145,7 +145,7 @@ private struct VinylSessionPage: View {
             }
             .padding(24)
         }
-        .onChange(of: item.releaseID) { vinyl.reloadRelease() }
+        .onChange(of: "\(item.releaseID ?? "")-\(item.discogsReleaseID ?? 0)") { vinyl.reloadRelease() }
         .confirmationDialog("Discard this recording?", isPresented: $confirmDiscard) {
             Button("Discard Recording", role: .destructive) { vinyl.discard() }
         } message: {
@@ -707,10 +707,10 @@ private struct VinylCutList: View {
         let options = vinyl.targetOptions
         let rate = Double(vinyl.session?.format.sampleRate ?? 44_100)
         VStack(alignment: .leading, spacing: 8) {
-            if item.releaseID == nil {
+            if item.releaseID == nil && item.discogsReleaseID == nil {
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: "info.circle").foregroundStyle(.secondary)
-                    Text("This record isn't matched to an edition on MusicBrainz, so name each track yourself, or choose the edition to name them from its track list.")
+                    Text("This record isn't matched to an edition on MusicBrainz or Discogs, so name each track yourself, or choose the edition to name them from its track list.")
                         .font(.callout)
                     Button("Change Edition…") { model.collectionSheet = .changeEdition(itemID: item.id) }
                 }
@@ -772,7 +772,7 @@ private struct VinylCutList: View {
                     }
                     .labelsHidden()
                     .frame(maxWidth: 380)
-                } else if item.releaseID == nil {
+                } else if item.releaseID == nil && item.discogsReleaseID == nil {
                     manualFields(seg)
                 } else {
                     Text("–").foregroundStyle(.secondary)

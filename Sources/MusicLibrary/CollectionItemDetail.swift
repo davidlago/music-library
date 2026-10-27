@@ -412,10 +412,15 @@ struct CollectionItemDetail: View {
                 Group {
                     if model.albumInfo.current == item.albumKey {
                         Label("Looking up the track list…", systemImage: "arrow.down.circle")
-                    } else if item.releaseID == nil && item.releaseGroupID == nil {
-                        Text("No track list: this item isn't matched to a release on MusicBrainz. Use Change Edition… below.")
+                    } else if item.releaseID == nil && item.releaseGroupID == nil && item.discogsReleaseID == nil {
+                        Text("No track list: this item isn't matched to a release on MusicBrainz or Discogs. Use Change Edition… below.")
                     } else {
-                        Text("No track list yet. Update Album Info (in the toolbar) downloads it.")
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(model.albumInfo.lastError.map { "No track list yet. \($0)" } ?? "No track list yet.")
+                            Button("Update Album Info") { model.refreshAlbumInfo(for: item) }
+                                .buttonStyle(.link)
+                                .disabled(item.album.isEmpty)
+                        }
                     }
                 }
                 .font(.callout).foregroundStyle(.secondary)

@@ -219,6 +219,8 @@ public struct CollectionItem: Identifiable, Hashable, Sendable {
     public var year: Int?
     public var releaseID: String?
     public var releaseGroupID: String?
+    /// The Discogs release, for a copy found there (MusicBrainz didn't list it): its track list is read from it.
+    public var discogsReleaseID: Int?
     public var barcode: String?
     public var catalogNumber: String?
     public var recordLabel: String?
@@ -305,6 +307,7 @@ public struct CollectionItem: Identifiable, Hashable, Sendable {
         item.year = year.flatMap { (1000...9999).contains($0) ? $0 : nil }
         item.releaseID = MBID.validated(releaseID)
         item.releaseGroupID = MBID.validated(releaseGroupID)
+        item.discogsReleaseID = DiscogsLink.isValid(discogsReleaseID) ? discogsReleaseID : nil
         item.barcode = barcode.flatMap { (6...20).contains($0.count) && $0.allSatisfy { ("0"..."9").contains($0) } ? $0 : nil }
         item.catalogNumber = field(catalogNumber, Self.maxField)
         item.recordLabel = field(recordLabel, Self.maxField)
