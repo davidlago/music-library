@@ -58,7 +58,7 @@ All optional; the app works without any of them.
 | AcoustID API key | Settings ▸ General ▸ AcoustID | Match songs by their sound when the tags don't say enough ([free key](https://acoustid.org/new-application)) |
 | Last.fm | Settings ▸ Last.fm | Scrobble what you play ([free API account](https://www.last.fm/api/account/create)) |
 | ZIP code and concert keys | Settings ▸ Concerts | Upcoming shows near you ([Concerts](concerts.md)) |
-| Claude API key | Settings ▸ Radio DJ | The [Radio DJ](radio-dj.md) |
+| Claude API or OpenRouter key | Settings ▸ Radio DJ | The [Radio DJ](radio-dj.md) |
 | Your public library | Settings ▸ Local Library | Browse its CDs ([Local Library CDs](local-library.md)) |
 
 The rest of the settings are described in [Settings](settings.md).

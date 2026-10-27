@@ -74,7 +74,11 @@ public final class RadioDJSession {
     @ObservationIgnored private var countedSegment = false
     /// A tool ran since the last words: the next words start a new paragraph.
     @ObservationIgnored private var breakBeforeText = false
-    @ObservationIgnored private let client: ClaudeClient
+    @ObservationIgnored private let client: any RadioDJClient
+    /// What the DJ talks with.
+    public let model: RadioDJModel
+    /// Photos can be shown (the model takes images).
+    public var seesPhotos: Bool { model.acceptsImages }
     /// The listener's collection, for `search_collection` (nil: no tool).
     @ObservationIgnored private let library: RadioDJLibrary?
     /// Links the DJ's references to what the listener owns (nil: plain text).
@@ -91,11 +95,12 @@ public final class RadioDJSession {
     @ObservationIgnored private let onUsage: @MainActor (RadioDJTally) -> Void
 
     /// `now`: the time the opener tells the DJ (it greets for the time of day).
-    public init(name: String, subject: RadioDJSubject, client: ClaudeClient, library: RadioDJLibrary? = nil,
+    public init(name: String, subject: RadioDJSubject, client: any RadioDJClient, model: RadioDJModel = .default,
+                library: RadioDJLibrary? = nil,
                 linker: RadioDJLinker? = nil, listenerName: String? = nil, wikipedia: WikipediaArticleFinder? = nil,
                 shop: (@MainActor (RadioDJShopRequest) async -> String)? = nil, now: @escaping () -> Date = Date.init,
                 onUsage: @escaping @MainActor (RadioDJTally) -> Void) {
-        self.name = name; self.subject = subject; self.client = client; self.library = library
+        self.name = name; self.subject = subject; self.client = client; self.model = model; self.library = library
         self.linker = linker; self.listenerName = listenerName; self.wikipedia = wikipedia; self.shop = shop
         self.now = now; self.onUsage = onUsage
         system = [RadioDJ.persona(name: name, listener: listenerName, canSearchCollection: library != nil, canShop: shop != nil),
@@ -136,7 +141,7 @@ public final class RadioDJSession {
     /// alone ask what they are). `page`: the page they're on now; when it's another album or artist than the
     /// conversation is about, the message tells the DJ (with what the app knows about it) and it becomes the topic.
     public func send(_ text: String, photos: [RadioDJPhoto] = [], page: RadioDJSubject? = nil) {
-        let photos = Array(photos.prefix(RadioDJPhoto.maxPerMessage))
+        let photos = seesPhotos ? Array(photos.prefix(RadioDJPhoto.maxPerMessage)) : []
         var text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if text.isEmpty, !photos.isEmpty { text = RadioDJ.photoQuestion(count: photos.count, canSearchCollection: library != nil) }
         guard !text.isEmpty, !isBusy else { return }
@@ -203,17 +208,17 @@ public final class RadioDJSession {
     /// Streams the reply to the last user message: resumes when the server pauses a long turn, and runs collection
     /// searches and sends their results back until the DJ has answered.
     private func reply(into lineID: UUID) async throws {
-        let tools = RadioDJ.tools + (library == nil ? [] : [RadioDJLibrary.tool, RadioDJLibrary.statsTool])
+        let tools = RadioDJ.tools(for: model) + (library == nil ? [] : [RadioDJLibrary.tool, RadioDJLibrary.statsTool])
             + (shop == nil ? [] : [RadioDJShopRequest.tool])
         var resuming = false
         breakBeforeText = false
         for _ in 0..<RadioDJ.maxRounds {
-            let request = ClaudeRequest(model: RadioDJ.model, maxTokens: RadioDJ.maxTokens, system: system,
-                                        messages: history, tools: tools)
-            let result = try await client.stream(request) { [weak self] event in await self?.show(event, in: lineID) }
-            let tally = RadioDJTally.billing(usage: result.usage, requestedModel: RadioDJ.model, servedModel: result.model)
-            cost += tally.dollars
-            onUsage(tally)
+            let request = ClaudeRequest(model: model.id, maxTokens: RadioDJ.maxTokens, system: system,
+                                        messages: history, tools: tools,
+                                        serverFallback: model.provider == .anthropic && model.claudeServerFallback)
+            let result = try await client.reply(to: request) { [weak self] event in await self?.show(event, in: lineID) }
+            cost += result.tally.dollars
+            onUsage(result.tally)
             if result.stopReason == "refusal" { throw ClaudeError.refused }
             // A resumed turn continues the same assistant message.
             if resuming, let last = history.indices.last, history[last].role == "assistant" {

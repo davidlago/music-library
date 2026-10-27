@@ -10,7 +10,11 @@ import SwiftUI
 /// button brings it back) and only its close button ends it.
 @Observable
 final class PhoneRadioDJ {
+    /// The Claude API key.
     private(set) var apiKey: String
+    private(set) var openRouterKey: String
+    /// What the DJ talks with (the Mac's choice).
+    private(set) var model: RadioDJModel
     private(set) var name: String
     /// The listener's own name, from the Mac (nil: none).
     private(set) var listenerName: String?
@@ -35,12 +39,29 @@ final class PhoneRadioDJ {
 
     init() {
         apiKey = KeychainStore.app.string(for: RadioDJ.keyAccount) ?? ""
+        openRouterKey = KeychainStore.app.string(for: RadioDJ.openRouterKeyAccount) ?? ""
+        model = RadioDJModel.load()
         name = RadioDJ.displayName(UserDefaults.standard.string(forKey: RadioDJ.nameKey))
         listenerName = UserDefaults.standard.string(forKey: RadioDJ.listenerNameKey)
         usage = RadioDJUsage.load(from: usageURL)
     }
 
-    var isEnabled: Bool { !apiKey.isEmpty }
+    /// On when the chosen model's provider has a key.
+    var isEnabled: Bool { !key(for: model.provider).isEmpty }
+
+    private func key(for provider: RadioDJProvider) -> String {
+        switch provider {
+        case .anthropic: apiKey
+        case .openRouter: openRouterKey
+        }
+    }
+
+    private var client: any RadioDJClient {
+        switch model.provider {
+        case .anthropic: ClaudeClient(apiKey: apiKey)
+        case .openRouter: OpenRouterClient(apiKey: openRouterKey, model: model)
+        }
+    }
 
     func begin(_ session: RadioDJSession) {
         self.session?.stop()
@@ -71,11 +92,15 @@ final class PhoneRadioDJ {
     /// Which page you're on, cheaply (an album or artist page as it was when it appeared), for showing.
     var hereTopic: RadioDJSubject? { page?.topic ?? location() }
 
-    /// The Mac's settings: a nil key turns the DJ off here too.
+    /// The Mac's settings: a nil key turns off what needs it here too.
     func adopt(_ settings: SyncRadioDJ) {
         let key = settings.apiKey?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if key != apiKey, KeychainStore.app.set(key, for: RadioDJ.keyAccount) { apiKey = key }
-        if apiKey.isEmpty { endSession() }
+        let openRouter = settings.openRouterKey?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if openRouter != openRouterKey, KeychainStore.app.set(openRouter, for: RadioDJ.openRouterKeyAccount) { openRouterKey = openRouter }
+        model = settings.model ?? .default
+        model.save()
+        if !isEnabled { endSession() }
         name = RadioDJ.displayName(settings.name)
         UserDefaults.standard.set(name, forKey: RadioDJ.nameKey)
         listenerName = settings.listenerName
@@ -84,7 +109,7 @@ final class PhoneRadioDJ {
 
     /// `library`: the collection the DJ can search while talking; `linker`: links its words to what you own.
     func makeSession(_ subject: RadioDJSubject, library: RadioDJLibrary?, linker: RadioDJLinker?) -> RadioDJSession {
-        RadioDJSession(name: name, subject: subject, client: ClaudeClient(apiKey: apiKey), library: library,
+        RadioDJSession(name: name, subject: subject, client: client, model: model, library: library,
                        linker: linker, listenerName: listenerName, wikipedia: WikipediaArticleFinder()) { [weak self] tally in
             self?.record(tally)
         }
@@ -456,7 +481,7 @@ struct RadioDJSheet: View {
         }
         .buttonStyle(.glass)
         .buttonBorderShape(.circle)
-        .disabled(photos.count >= RadioDJPhoto.maxPerMessage || session.isBusy)
+        .disabled(photos.count >= RadioDJPhoto.maxPerMessage || session.isBusy || !session.seesPhotos)
         .accessibilityLabel(hasCamera ? "Show \(session.name) a photo" : "Choose a photo for \(session.name)")
         .accessibilityHint(hasCamera ? "Opens the camera. Touch and hold to choose from your library." : "")
     }
@@ -499,6 +524,10 @@ struct RadioDJSheet: View {
 
     /// Scaled and re-encoded off the main thread.
     private func addPhoto(_ data: Data) async {
+        guard session.seesPhotos else {
+            photoNote = "\(session.model.name) can't see photos."
+            return
+        }
         guard photos.count < RadioDJPhoto.maxPerMessage else {
             photoNote = "\(RadioDJPhoto.maxPerMessage) photos at a time."
             return
@@ -829,6 +858,7 @@ struct RadioDJSettingsSection: View {
     var body: some View {
         Section {
             LabeledContent("DJ", value: dj.name)
+            LabeledContent("Model", value: dj.model.name)
             if let listener = dj.listenerName { LabeledContent("Calls you", value: listener) }
             LabeledContent("This month", value: DollarFormat.string(dj.usage.month().dollars))
             LabeledContent("All time", value: DollarFormat.string(dj.usage.allTime.dollars))
@@ -836,7 +866,7 @@ struct RadioDJSettingsSection: View {
         } header: {
             Text("Radio DJ")
         } footer: {
-            Text("Tap the radio button at the top of any page to put the DJ on the air; tap the camera beside its text field to show it a record or CD. The Claude API key, the DJ's name and yours come from your Mac when you sync; change them there. Spending on this iPhone (calendar months, UTC, as Anthropic bills) is estimated at Claude API list prices and shows on your Mac after the next sync.")
+            Text("Tap the radio button at the top of any page to put the DJ on the air; tap the camera beside its text field to show it a record or CD. The API keys, the model, the DJ's name and yours come from your Mac when you sync; change them there. Spending on this iPhone (calendar months, UTC) is estimated at Claude API list prices, or is what OpenRouter says each reply cost, and shows on your Mac after the next sync.")
         }
     }
 }

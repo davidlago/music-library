@@ -4,14 +4,16 @@ import Foundation
 /// with web search and web fetch to check facts. Off until a Claude API key is entered on the Mac (the key and the
 /// DJ's name go to the phone with each sync); summoned per page and never kept on across pages.
 public enum RadioDJ {
-    /// Not a choice the user makes: the current Opus at its default effort, with server-side fallback on refusals.
-    public static let model = "claude-opus-5-5"
+    /// The model unless another is chosen (`RadioDJModel`): the current Opus at its default effort, with server-side
+    /// fallback on refusals.
+    public static var model: String { RadioDJModel.default.id }
     public static let maxTokens = 16_000
     /// Requests one answer may take: resuming paused turns (`pause_turn`) and sending back collection searches.
     static let maxRounds = 10
     public static let defaultName = "Max Fidelity"
-    /// The keychain account of the API key (`KeychainStore.app`) on the Mac and the phone.
+    /// The keychain accounts of the API keys (`KeychainStore.app`) on the Mac and the phone.
     public static let keyAccount = "anthropicAPIKey"
+    public static let openRouterKeyAccount = "openRouterAPIKey"
     /// User defaults key of the DJ's name.
     public static let nameKey = "radioDJName"
     /// User defaults key of the listener's own name.
@@ -22,6 +24,16 @@ public enum RadioDJ {
         .object(["type": .string("web_fetch_20260209"), "name": .string("web_fetch"), "max_uses": .number(4),
                  "max_content_tokens": .number(20_000)]),
     ]
+
+    /// The web tools for a model: with dynamic filtering where it takes them, else the basic ones.
+    public static func tools(for model: RadioDJModel) -> [JSONValue] {
+        guard model.provider == .anthropic, !model.claudeDynamicWebTools else { return tools }
+        return [
+            .object(["type": .string("web_search_20250305"), "name": .string("web_search"), "max_uses": .number(5)]),
+            .object(["type": .string("web_fetch_20250910"), "name": .string("web_fetch"), "max_uses": .number(4),
+                     "max_content_tokens": .number(20_000)]),
+        ]
+    }
 
     /// The name to use: trimmed, at most 40 characters, the default when empty.
     public static func displayName(_ raw: String?) -> String {
@@ -492,14 +504,33 @@ public enum DollarFormat {
     }
 }
 
-/// What the Mac hands the phone at each sync: the API key (nil when it was removed on the Mac, which turns the DJ off
-/// on the phone too) and the DJ's name.
+/// What the Mac hands the phone at each sync: the API keys (nil when removed on the Mac, which turns the DJ off on the
+/// phone too unless the other one runs the chosen model), the model and the DJ's name. Phones before 1.27 read only
+/// `apiKey` and run Claude Opus 5.5 with it.
 public struct SyncRadioDJ: Codable, Equatable, Sendable {
+    /// The Claude API key.
     public var apiKey: String?
     public var name: String
     /// The listener's own name, for the DJ to use (optional: nil when not given).
     public var listenerName: String?
-    public init(apiKey: String?, name: String, listenerName: String? = nil) {
+    public var openRouterKey: String?
+    /// The chosen model (nil from Macs before 1.27: Claude Opus 5.5).
+    public var model: RadioDJModel?
+
+    public init(apiKey: String?, name: String, listenerName: String? = nil, openRouterKey: String? = nil, model: RadioDJModel? = nil) {
         self.apiKey = apiKey; self.name = name; self.listenerName = listenerName
+        self.openRouterKey = openRouterKey; self.model = model
+    }
+
+    private enum CodingKeys: String, CodingKey { case apiKey, name, listenerName, openRouterKey, model }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        apiKey = try c.decodeIfPresent(String.self, forKey: .apiKey)
+        name = try c.decode(String.self, forKey: .name)
+        listenerName = try c.decodeIfPresent(String.self, forKey: .listenerName)
+        openRouterKey = try? c.decodeIfPresent(String.self, forKey: .openRouterKey)
+        // A model this version can't read (a provider added later) mustn't fail the whole message: the default runs.
+        model = (try? c.decodeIfPresent(RadioDJModel.self, forKey: .model))?.sanitized
     }
 }

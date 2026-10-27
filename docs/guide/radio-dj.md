@@ -1,6 +1,6 @@
 # Radio DJ
 
-With your own Claude API key, Music Library has a radio DJ: press **On Air** and a host you name tells you the story
+With your own Claude API key (or an OpenRouter key), Music Library has a radio DJ: press **On Air** and a host you name tells you the story
 behind what you're looking at (who made it, who played on it, how it connects to everything else you own) and then
 takes your questions, checking facts on the web as it talks and showing its sources. It can search your own collection
 too. Without a key, none of this appears anywhere in the app.
@@ -9,14 +9,36 @@ too. Without a key, none of this appears anywhere in the app.
 
 ## Set it up
 
-1. Get an API key at [platform.claude.com](https://platform.claude.com) (you pay Anthropic for what you use; see
+1. Get an API key: a Claude API key at [platform.claude.com](https://platform.claude.com), an OpenRouter key at
+   [openrouter.ai](https://openrouter.ai/settings/keys), or both (you pay Anthropic or OpenRouter for what you use; see
    [What it costs](#what-it-costs)).
-2. In **Settings ▸ Radio DJ** on the Mac, paste it into **API key** and click **Check**. It's stored in your keychain.
-3. Optionally name your DJ (**DJ's name**, Max Fidelity by default) and tell it **Your name**, which it uses now and
+2. In **Settings ▸ Radio DJ** on the Mac, paste it into **API key** under **Claude API** or **OpenRouter** and click
+   **Check**. Keys are stored in your keychain.
+3. Under **Model**, click **Choose Model…** if you want another model than Claude Opus 5.5 (see
+   [Choose the model](#choose-the-model)).
+4. Optionally name your DJ (**DJ's name**, Max Fidelity by default) and tell it **Your name**, which it uses now and
    then, like a regular caller.
 
-The DJ picks the Claude model itself; there's nothing else to configure. The key, the DJ's name and yours go to your
-iPhone at the next sync, so the DJ works there too. Remove the key on the Mac to turn the DJ off on both.
+The keys, the model, the DJ's name and yours go to your iPhone at the next sync, so the DJ works there too. The DJ is on
+when the chosen model's provider has a key; remove it on the Mac to turn the DJ off on both.
+
+## Choose the model
+
+The DJ runs on **Claude Opus 5.5** unless you choose another. **Choose Model…** in Settings ▸ Radio DJ lists:
+
+- **Anthropic**: the Claude models the DJ runs well on (Claude Opus 5.5, Claude Fable 5.1, Claude Sonnet 5.5 and Claude
+  Haiku 5.5), with your Claude API key.
+- **OpenRouter**: every model on [OpenRouter](https://openrouter.ai/models) that can use tools (the DJ needs them to
+  search your collection), loaded from OpenRouter with today's prices; **Refresh** loads them again. Search by name, or
+  tick **Sees photos** to list only models that can look at photos.
+
+Each shows its price per million input and output tokens, its context window and whether it can see photos. Select one
+and click **Use Model** (or double-click it). Settings shows the chosen model and its price; **Use Claude Opus 5.5** goes
+back. A new model takes over the next time the DJ comes on the air.
+
+Other models know music differently, follow the app's links less closely and, through OpenRouter, search the web with
+OpenRouter's own search (there's no reading of whole pages). With a model that can't see photos, the photo button is
+off.
 
 ## On the air
 
@@ -88,18 +110,20 @@ they're on the phone; others link to their album.
 
 ## What it costs
 
-The DJ uses the Claude API with your key, so Anthropic bills you for it. Settings ▸ Radio DJ shows an estimate at
-Claude API list prices (Claude Opus 5.5: $4 per million input tokens and $20 per million output tokens; web searches
-$10 per 1,000): **This month**, **All time**, how many segments and web searches, and per device (each iPhone's
-spending arrives with its next sync). Months are calendar months in UTC, as Anthropic bills. The panel shows what the
-current segment has cost so far ("This segment: about $0.12").
+The DJ uses your key, so Anthropic or OpenRouter bills you for it. Settings ▸ Radio DJ shows the chosen model's price
+and what the DJ has cost: **This month**, **All time**, how many segments and web searches, and per device (each
+iPhone's spending arrives with its next sync). With the Claude API it's an estimate at list prices (Claude Opus 5.5: $4
+per million input tokens and $20 per million output tokens; web searches $10 per 1,000); with OpenRouter it's what
+OpenRouter says each reply cost. Months are calendar months in UTC. The panel shows what the current segment has cost so
+far ("This segment: about $0.12").
 
-Going on the air is free; a typical opening segment with a couple of follow-up questions costs a few tens of cents. Your actual bill is at
-[platform.claude.com](https://platform.claude.com).
+Going on the air is free; with Claude Opus 5.5 a typical opening segment with a couple of follow-up questions costs a
+few tens of cents (cheaper models cost less). Your actual bills are at [platform.claude.com](https://platform.claude.com)
+and [openrouter.ai](https://openrouter.ai/activity).
 
 ## Privacy
 
-What the DJ sends to Anthropic: the page's details (the album or artist, its credits, track list and description, your
+What the DJ sends to Anthropic (or, with an OpenRouter model, to OpenRouter and the company running that model): the page's details (the album or artist, its credits, track list and description, your
 copies and plays of it), your questions and any photos you show it (without their location or camera details), the rows
 of any collection search it runs, and what the Shop found when it opens it for you. Your library itself never
 leaves your device. See [Privacy](privacy.md).

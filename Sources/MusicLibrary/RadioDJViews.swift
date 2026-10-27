@@ -3,9 +3,10 @@ import MusicLibraryCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The Radio DJ's settings and spend on the Mac: the Claude API key (keychain; handed to the phone at each sync),
-/// the DJ's name, and what it has cost here, per month (Application Support `MusicLibrary/radio-dj-usage.json`).
-/// Without a key the feature is off and nothing of it shows outside Settings. Also the conversation on the air, which
+/// The Radio DJ's settings and spend on the Mac: the Claude API and OpenRouter keys (keychain; handed to the phone at
+/// each sync), the model (`RadioDJModel`, user defaults), the DJ's name, and what it has cost here, per month
+/// (Application Support `MusicLibrary/radio-dj-usage.json`). Without a key for the chosen model's provider the feature
+/// is off and nothing of it shows outside Settings. Also the conversation on the air, which
 /// stays open in a pane beside the window's pages while you browse, and the album or artist page showing now.
 @MainActor @Observable
 final class RadioDJStore {
@@ -21,6 +22,24 @@ final class RadioDJStore {
             if !isEnabled { endSession() }
         }
     }
+    var openRouterKey: String {
+        didSet {
+            KeychainStore.app.set(trimmedOpenRouterKey, for: RadioDJ.openRouterKeyAccount)
+            openRouterKeyStatus = .unchecked
+            if !isEnabled { endSession() }
+        }
+    }
+    /// What the DJ talks with; a change takes effect the next time it comes on the air.
+    var model: RadioDJModel {
+        didSet {
+            model.save()
+            if !isEnabled { endSession() }
+        }
+    }
+    /// OpenRouter's models (nil: not loaded yet), and why they couldn't be.
+    private(set) var openRouterModels: [RadioDJModel]?
+    private(set) var openRouterModelsError: String?
+    private(set) var loadingOpenRouterModels = false
     var name: String {
         didSet { UserDefaults.standard.set(name, forKey: RadioDJ.nameKey) }
     }
@@ -30,6 +49,7 @@ final class RadioDJStore {
     }
     private(set) var usage: RadioDJUsage
     private(set) var keyStatus: KeyStatus = .unchecked
+    private(set) var openRouterKeyStatus: KeyStatus = .unchecked
     /// The conversation on the air (nil: off).
     private(set) var session: RadioDJSession?
     /// About a preview the DJ's words point to: being looked up, or not found.
@@ -45,6 +65,8 @@ final class RadioDJStore {
     init(usageURL: URL = RadioDJStore.defaultUsageURL) {
         self.usageURL = usageURL
         apiKey = KeychainStore.app.string(for: RadioDJ.keyAccount) ?? ""
+        openRouterKey = KeychainStore.app.string(for: RadioDJ.openRouterKeyAccount) ?? ""
+        model = RadioDJModel.load()
         name = UserDefaults.standard.string(forKey: RadioDJ.nameKey) ?? ""
         listenerName = UserDefaults.standard.string(forKey: RadioDJ.listenerNameKey) ?? ""
         usage = RadioDJUsage.load(from: usageURL)
@@ -57,12 +79,28 @@ final class RadioDJStore {
     }
 
     private var trimmedKey: String { apiKey.trimmingCharacters(in: .whitespacesAndNewlines) }
-    var isEnabled: Bool { !trimmedKey.isEmpty }
+    private var trimmedOpenRouterKey: String { openRouterKey.trimmingCharacters(in: .whitespacesAndNewlines) }
+    func hasKey(_ provider: RadioDJProvider) -> Bool {
+        switch provider {
+        case .anthropic: !trimmedKey.isEmpty
+        case .openRouter: !trimmedOpenRouterKey.isEmpty
+        }
+    }
+    /// On when the chosen model's provider has a key.
+    var isEnabled: Bool { hasKey(model.provider) }
+
+    private var client: any RadioDJClient {
+        switch model.provider {
+        case .anthropic: ClaudeClient(apiKey: trimmedKey)
+        case .openRouter: OpenRouterClient(apiKey: trimmedOpenRouterKey, model: model)
+        }
+    }
     var displayName: String { RadioDJ.displayName(name) }
 
-    /// For the phone: the key (nil when removed, which turns the DJ off there too) and the name.
+    /// For the phone: the keys (nil when removed, which turns the DJ off there too), the model and the name.
     var syncSettings: SyncRadioDJ {
-        SyncRadioDJ(apiKey: isEnabled ? trimmedKey : nil, name: displayName, listenerName: trimmedListenerName)
+        SyncRadioDJ(apiKey: trimmedKey.isEmpty ? nil : trimmedKey, name: displayName, listenerName: trimmedListenerName,
+                    openRouterKey: trimmedOpenRouterKey.isEmpty ? nil : trimmedOpenRouterKey, model: model)
     }
 
     private var trimmedListenerName: String? {
@@ -74,7 +112,7 @@ final class RadioDJStore {
     /// opens the Shop on an album (`open_shop`).
     func makeSession(_ subject: RadioDJSubject, library: RadioDJLibrary?, linker: RadioDJLinker?,
                      shop: (@MainActor (RadioDJShopRequest) async -> String)?) -> RadioDJSession {
-        RadioDJSession(name: displayName, subject: subject, client: ClaudeClient(apiKey: trimmedKey), library: library,
+        RadioDJSession(name: displayName, subject: subject, client: client, model: model, library: library,
                        linker: linker, listenerName: trimmedListenerName, wikipedia: WikipediaArticleFinder(),
                        shop: shop) { [weak self] tally in
             self?.record(tally)
@@ -114,17 +152,46 @@ final class RadioDJStore {
         usage.save(to: usageURL)
     }
 
-    func checkKey() {
-        guard isEnabled else { return }
-        keyStatus = .checking
-        let client = ClaudeClient(apiKey: trimmedKey)
+    func checkKey(_ provider: RadioDJProvider) {
+        guard hasKey(provider) else { return }
+        let client: any RadioDJClient = provider == .anthropic ? ClaudeClient(apiKey: trimmedKey)
+            : OpenRouterClient(apiKey: trimmedOpenRouterKey, model: model)
+        setStatus(.checking, for: provider)
         Task {
             do {
                 try await client.checkKey()
-                keyStatus = .valid
+                setStatus(.valid, for: provider)
             } catch {
-                keyStatus = .invalid(error.localizedDescription)
+                setStatus(.invalid(error.localizedDescription), for: provider)
             }
+        }
+    }
+
+    func keyStatus(_ provider: RadioDJProvider) -> KeyStatus {
+        provider == .anthropic ? keyStatus : openRouterKeyStatus
+    }
+
+    private func setStatus(_ status: KeyStatus, for provider: RadioDJProvider) {
+        if provider == .anthropic { keyStatus = status } else { openRouterKeyStatus = status }
+    }
+
+    /// Loads OpenRouter's models (again with `force`); the list is public, the key is sent when there is one.
+    func loadOpenRouterModels(force: Bool = false) {
+        guard !loadingOpenRouterModels, force || openRouterModels == nil else { return }
+        loadingOpenRouterModels = true
+        openRouterModelsError = nil
+        let client = OpenRouterClient(apiKey: trimmedOpenRouterKey, model: model)
+        Task {
+            do {
+                openRouterModels = try await client.models()
+                // The chosen one with today's prices.
+                if model.provider == .openRouter, let current = openRouterModels?.first(where: { $0.id == model.id }), current != model {
+                    model = current
+                }
+            } catch {
+                openRouterModelsError = error.localizedDescription
+            }
+            loadingOpenRouterModels = false
         }
     }
 }
@@ -414,10 +481,11 @@ struct RadioDJPanel: View {
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .foregroundStyle(photos.count < RadioDJPhoto.maxPerMessage ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.tertiary))
-                .disabled(photos.count >= RadioDJPhoto.maxPerMessage)
+                .foregroundStyle(canAddPhoto ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.tertiary))
+                .disabled(!canAddPhoto)
                 .padding(.bottom, 6)
-                .help("Show \(session.name) a photo: a record or CD, its back or label, a shelf (or drop one on the panel)")
+                .help(session.seesPhotos ? "Show \(session.name) a photo: a record or CD, its back or label, a shelf (or drop one on the panel)"
+                      : "\(session.model.name) can't see photos. Pick another model in Settings ▸ Radio DJ.")
                 TextField(photos.isEmpty ? "Ask \(session.name) anything…" : "Ask about \(photos.count == 1 ? "this photo" : "these photos")…",
                           text: $draft, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -535,8 +603,14 @@ struct RadioDJPanel: View {
         }
     }
 
+    private var canAddPhoto: Bool { session.seesPhotos && photos.count < RadioDJPhoto.maxPerMessage }
+
     /// Scaled and re-encoded off the main thread.
     private func addPhoto(_ data: Data) async {
+        guard session.seesPhotos else {
+            photoNote = "\(session.model.name) can't see photos. Pick another model in Settings ▸ Radio DJ."
+            return
+        }
         guard photos.count < RadioDJPhoto.maxPerMessage else {
             photoNote = "\(RadioDJPhoto.maxPerMessage) photos at a time."
             return
@@ -801,6 +875,7 @@ private struct IconLinkRenderer: TextRenderer {
 
 struct RadioDJSettings: View {
     @Environment(AppModel.self) private var model
+    @State private var choosingModel = false
 
     var body: some View {
         @Bindable var dj = model.radioDJ
@@ -808,33 +883,35 @@ struct RadioDJSettings: View {
             Section {
                 HStack(alignment: .top, spacing: 14) {
                     Image(systemName: RadioDJIcon.name).font(.system(size: 28)).foregroundStyle(.orange)
-                    Text("Switch on a radio DJ on album and artist pages: they tell you the story behind the music, the people who made it and how it connects to everything else, and answer your questions, including about what's in your own collection and photos of records you show them. Powered by Claude, looking things up on the web as they talk (only the rows a collection search finds are sent). Off until you add an API key; summon them on each page with On Air in the toolbar.")
+                    Text("Switch on a radio DJ on album and artist pages: they tell you the story behind the music, the people who made it and how it connects to everything else, and answer your questions, including about what's in your own collection and photos of records you show them. Powered by Claude, or any model on OpenRouter, looking things up on the web as they talk (only the rows a collection search finds are sent). Off until you add an API key; summon them on each page with On Air in the toolbar.")
                         .font(.callout).foregroundStyle(.subtext)
                 }
             }
             Section {
-                HStack {
-                    SecureField("API key", text: $dj.apiKey)
-                        .font(.system(.body, design: .monospaced))
-                    Button("Check") { dj.checkKey() }
-                        .disabled(!dj.isEnabled || dj.keyStatus == .checking)
-                }
-                keyStatus(dj)
+                keyField(dj, .anthropic, text: $dj.apiKey)
                 Link("Get an API key at platform.claude.com", destination: URL(string: "https://platform.claude.com/settings/keys")!)
                     .font(.caption)
             } header: {
                 Text("Claude API")
+            }
+            Section {
+                keyField(dj, .openRouter, text: $dj.openRouterKey)
+                Link("Get an API key at openrouter.ai", destination: URL(string: "https://openrouter.ai/settings/keys")!)
+                    .font(.caption)
+            } header: {
+                Text("OpenRouter")
             } footer: {
-                Text("Stored in your keychain and handed to your iPhone when you sync. Remove it to turn the DJ off on both.")
+                Text("Either key or both. Stored in your keychain and handed to your iPhone when you sync. Remove them to turn the DJ off on both.")
                     .font(.caption).foregroundStyle(.subtext)
             }
+            modelSection(dj)
             Section {
                 TextField("DJ's name", text: $dj.name, prompt: Text(RadioDJ.defaultName))
                 TextField("Your name", text: $dj.listenerName, prompt: Text("Optional"))
             } header: {
                 Text("On the air")
             } footer: {
-                Text("What the DJ calls themself, and what they call you (now and then, like a regular caller). The DJ runs on the best Claude model for the job, chosen automatically.")
+                Text("What the DJ calls themself, and what they call you (now and then, like a regular caller).")
                     .font(.caption).foregroundStyle(.subtext)
             }
             spending(dj)
@@ -842,14 +919,27 @@ struct RadioDJSettings: View {
         .formStyle(.grouped)
         .themedScrollBackground()
         .frame(height: 720)
+        .sheet(isPresented: $choosingModel) { RadioDJModelPicker(dj: model.radioDJ) }
+    }
+
+    private func keyField(_ dj: RadioDJStore, _ provider: RadioDJProvider, text: Binding<String>) -> some View {
+        Group {
+            HStack {
+                SecureField("API key", text: text)
+                    .font(.system(.body, design: .monospaced))
+                Button("Check") { dj.checkKey(provider) }
+                    .disabled(!dj.hasKey(provider) || dj.keyStatus(provider) == .checking)
+            }
+            keyStatus(dj, provider)
+        }
     }
 
     @ViewBuilder
-    private func keyStatus(_ dj: RadioDJStore) -> some View {
-        switch dj.keyStatus {
+    private func keyStatus(_ dj: RadioDJStore, _ provider: RadioDJProvider) -> some View {
+        switch dj.keyStatus(provider) {
         case .unchecked:
             LabeledContent("Status") {
-                Text(dj.isEnabled ? "Ready (not checked yet)" : "Off: no API key").foregroundStyle(.subtext)
+                Text(dj.hasKey(provider) ? "Ready (not checked yet)" : "No API key").foregroundStyle(.subtext)
             }
         case .checking:
             LabeledContent("Status") { HStack { ProgressView().controlSize(.small); Text("Checking…").foregroundStyle(.subtext) } }
@@ -857,6 +947,37 @@ struct RadioDJSettings: View {
             LabeledContent("Status") { Label("The key works", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
         case .invalid(let message):
             LabeledContent("Status") { Label(message, systemImage: "exclamationmark.circle.fill").foregroundStyle(.orange) }
+        }
+    }
+
+    private func modelSection(_ dj: RadioDJStore) -> some View {
+        Section {
+            LabeledContent("Model") {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(dj.model.name)
+                    Text("\(dj.model.provider.name) · \(dj.model.id)").font(.caption).foregroundStyle(.subtext)
+                }
+            }
+            LabeledContent("Price") { Text(dj.model.priceSummary).monospacedDigit().foregroundStyle(.subtext) }
+            if !dj.model.acceptsImages {
+                Label("This model can't see photos, so the DJ can't look at the records you show them.", systemImage: "eye.slash")
+                    .font(.caption).foregroundStyle(.subtext)
+            }
+            if !dj.isEnabled {
+                Label("Add \(dj.model.provider == .anthropic ? "a Claude API" : "an OpenRouter") key above, or choose a model from \(dj.model.provider == .anthropic ? "OpenRouter" : "Anthropic"), to switch the DJ on.",
+                      systemImage: "exclamationmark.circle.fill")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+            HStack {
+                Spacer()
+                if dj.model != .default { Button("Use \(RadioDJModel.default.name)") { dj.model = .default } }
+                Button("Choose Model…") { choosingModel = true }
+            }
+        } header: {
+            Text("Model")
+        } footer: {
+            Text("Claude Opus 5.5 is the DJ the app was made with. Other models know music differently and may follow the app's links less closely. A new model takes over the next time the DJ comes on the air.")
+                .font(.caption).foregroundStyle(.subtext)
         }
     }
 
@@ -879,7 +1000,7 @@ struct RadioDJSettings: View {
         } header: {
             Text("Spending")
         } footer: {
-            Text("Calendar months (UTC), as Anthropic bills. Estimated at Claude API list prices (Claude Opus 5.5: $4 per million input tokens, $20 per million output tokens; web searches $10 per 1,000). iPhone amounts are as of each phone's last sync. Your actual bill is at platform.claude.com.")
+            Text("Calendar months (UTC). Claude API use is estimated at Anthropic's list prices (web searches $10 per 1,000); OpenRouter use is what OpenRouter says each reply cost. iPhone amounts are as of each phone's last sync. Your actual bills are at platform.claude.com and openrouter.ai.")
                 .font(.caption).foregroundStyle(.subtext)
         }
     }
@@ -887,6 +1008,125 @@ struct RadioDJSettings: View {
     private func amounts(_ usage: RadioDJUsage) -> some View {
         Text("\(DollarFormat.string(usage.month().dollars)) this month · \(DollarFormat.string(usage.allTime.dollars)) in all")
             .monospacedDigit().foregroundStyle(.subtext)
+    }
+}
+
+/// Picks the DJ's model: the Claude models it runs well on, or any of OpenRouter's that can use tools, with their prices.
+struct RadioDJModelPicker: View {
+    let dj: RadioDJStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var provider: RadioDJProvider = .anthropic
+    @State private var selection: RadioDJModel.ID?
+    @State private var search = ""
+    @State private var photosOnly = false
+    @State private var sortOrder = [KeyPathComparator(\RadioDJModel.name, comparator: .localizedStandard)]
+
+    private var models: [RadioDJModel] {
+        let all = provider == .anthropic ? RadioDJModel.anthropic : (dj.openRouterModels ?? [])
+        let words = search.split(separator: " ").map(String.init)
+        let found = all.filter { model in
+            (!photosOnly || model.acceptsImages)
+                && words.allSatisfy { model.name.localizedStandardContains($0) || model.id.localizedStandardContains($0) }
+        }
+        // Anthropic's few in the app's order unless sorted otherwise.
+        return provider == .anthropic && sortOrder.first?.keyPath == \RadioDJModel.name ? found : found.sorted(using: sortOrder)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Choose the DJ's Model").font(.headline)
+            HStack {
+                Picker("Provider", selection: $provider) {
+                    ForEach(RadioDJProvider.allCases, id: \.self) { Text($0.name).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 240)
+                Spacer()
+                Toggle("Sees photos", isOn: $photosOnly).toggleStyle(.checkbox)
+                TextField("Search", text: $search).textFieldStyle(.roundedBorder).frame(width: 200)
+            }
+            if !dj.hasKey(provider) {
+                Label("Add \(provider == .anthropic ? "a Claude API" : "an OpenRouter") key in Settings to use these.", systemImage: "key")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+            table
+            HStack {
+                if provider == .openRouter {
+                    Button("Refresh") { dj.loadOpenRouterModels(force: true) }.disabled(dj.loadingOpenRouterModels)
+                    Text("Prices per million tokens, from openrouter.ai.").font(.caption).foregroundStyle(.subtext)
+                } else {
+                    Text("Prices per million tokens; web searches $10 per 1,000.").font(.caption).foregroundStyle(.subtext)
+                }
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Use Model") { choose() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(chosen == nil)
+            }
+        }
+        .padding(20)
+        .frame(width: 760, height: 520)
+        .onAppear {
+            provider = dj.model.provider
+            selection = dj.model.id
+        }
+        .onChange(of: provider) { if provider == .openRouter { dj.loadOpenRouterModels() } }
+        .task { if dj.model.provider == .openRouter { dj.loadOpenRouterModels() } }
+    }
+
+    @ViewBuilder
+    private var table: some View {
+        if provider == .openRouter, dj.openRouterModels == nil {
+            VStack(spacing: 10) {
+                if let error = dj.openRouterModelsError {
+                    Label(error, systemImage: "exclamationmark.circle.fill").foregroundStyle(.orange)
+                    Button("Try Again") { dj.loadOpenRouterModels(force: true) }
+                } else {
+                    ProgressView()
+                    Text("Loading OpenRouter's models…").foregroundStyle(.subtext)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            Table(models, selection: $selection, sortOrder: $sortOrder) {
+                TableColumn("Model", value: \.name, comparator: .localizedStandard) { model in
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 4) {
+                            Text(model.name)
+                            if model.key == RadioDJModel.default.key { Text("Recommended").font(.caption2).foregroundStyle(.orange) }
+                        }
+                        Text(model.id).font(.caption).foregroundStyle(.subtext)
+                    }
+                }
+                TableColumn("Input", value: \.inputPrice) { Text(RadioDJModel.price($0.inputPrice)).monospacedDigit() }
+                    .width(70)
+                TableColumn("Output", value: \.outputPrice) { Text(RadioDJModel.price($0.outputPrice)).monospacedDigit() }
+                    .width(70)
+                TableColumn("Context") { model in
+                    Text(model.contextLength.map { $0 >= 1_000_000 ? "\($0 / 1_000_000)M" : "\($0 / 1_000)K" } ?? "—").monospacedDigit()
+                }
+                .width(60)
+                TableColumn("Photos") { model in
+                    Image(systemName: model.acceptsImages ? "checkmark" : "minus").foregroundStyle(model.acceptsImages ? .primary : .tertiary)
+                }
+                .width(50)
+            }
+            .contextMenu(forSelectionType: RadioDJModel.ID.self) { _ in } primaryAction: { ids in
+                if let id = ids.first { selection = id; choose() }
+            }
+        }
+    }
+
+    private var chosen: RadioDJModel? {
+        guard let selection else { return nil }
+        return models.first { $0.id == selection }
+    }
+
+    private func choose() {
+        guard let chosen else { return }
+        dj.model = chosen
+        dismiss()
     }
 }
 

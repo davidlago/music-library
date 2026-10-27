@@ -54,14 +54,16 @@
           page, the artist's name and the general area you chose on the Mac (a rough map square, not your address or ZIP
           code) are sent to <a href="https://www.ticketmaster.com">Ticketmaster</a> or
           <a href="https://www.jambase.com">JamBase</a>, whose own privacy policies apply.</li>
-        <li><strong>Radio DJ (only if you add a Claude API key on your Mac).</strong> While the DJ is on the air, the
+        <li><strong>Radio DJ (only if you add a Claude API or OpenRouter key on your Mac).</strong> While the DJ is on the air, the
           details of the page you're on (the album or artist, its credits, track list and description, and your copies
           and plays of it), your questions, any photos you show it (taken with the camera or picked from your library,
           scaled down and without their location or camera details), and the rows of any search of your collection the
           DJ runs are sent to
-          <a href="https://www.anthropic.com">Anthropic</a> with your own key, which your Mac hands to the iPhone when
-          you sync. Your library itself isn't sent. Anthropic's <a href="https://www.anthropic.com/legal/privacy">privacy
-          policy</a> applies to what it keeps. The names of songs the DJ mentions are sent to Apple's iTunes Search API
+          <a href="https://www.anthropic.com">Anthropic</a> with your own key (or, with a model chosen from
+          <a href="https://openrouter.ai">OpenRouter</a>, to OpenRouter and the company running that model), which your
+          Mac hands to the iPhone when you sync. Your library itself isn't sent. Anthropic's
+          <a href="https://www.anthropic.com/legal/privacy">privacy policy</a> (or OpenRouter's
+          <a href="https://openrouter.ai/privacy">privacy policy</a> and the model provider's) applies to what they keep. The names of songs the DJ mentions are sent to Apple's iTunes Search API
           to find their previews.</li>
         <li><strong>Widgets and Apple Watch.</strong> They show a small summary (counts, recent listening, recent
           additions to your physical collection, the song playing and a few small covers) kept on the iPhone and sent only to
@@ -83,7 +85,7 @@
         library's catalog website (your card number and PIN go only to that site), Apple's iTunes Search API (song
         previews), Apple's geocoder (to locate the ZIP code you enter), Ticketmaster and JamBase (artist names and
         the area searched), the stores the Shop compares (Discogs, eBay, CDandLP and Alibris, with the CD or record you're
-        looking for), and Anthropic (the Radio DJ, with your own Claude API key: the page you're on, your questions, photos
+        looking for), and Anthropic or OpenRouter (the Radio DJ, with your own key: the page you're on, your questions, photos
         you show it and the rows of collection searches it runs). API keys, secrets and your library PIN are kept in your keychain.</p>
     </section>
 

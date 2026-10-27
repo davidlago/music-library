@@ -44,7 +44,7 @@ playback, and a Claude-powered radio DJ who tells you the story behind every rec
   `genre:jazz decade:60s own:vinyl`; Music DNA maps who played with whom; Insights shows what you own, what your files
   are made of and how you listen. [Albums and artists →](docs/guide/albums-and-artists.md) ·
   [Search →](docs/guide/search.md) · [Music DNA →](docs/guide/music-dna.md) · [Insights →](docs/guide/insights.md)
-- **Put a DJ on the air.** With your own Claude API key, press **On Air** and your DJ tells you about what you're looking
+- **Put a DJ on the air.** With your own Claude API key (or an OpenRouter key for any model it serves), press **On Air** and your DJ tells you about what you're looking
   at, answers questions, checks the web and searches your own collection. Show it a photo of a record or CD (on iPhone,
   straight from the camera) to find out what it is, whether you have it and what to pay.
   [Radio DJ →](docs/guide/radio-dj.md)
@@ -105,7 +105,7 @@ every feature: [Getting started](docs/guide/getting-started.md), [Physical Colle
 
 No account, no cloud service, no ads, no tracking. Your library and listening history stay on your Mac and iPhone, which
 sync directly over your Wi-Fi, encrypted. The app talks to MusicBrainz, Wikipedia and the other services only to look
-things up, and to Last.fm, Ticketmaster, JamBase or Claude only with your own keys. Details in
+things up, and to Last.fm, Ticketmaster, JamBase, Claude or OpenRouter only with your own keys. Details in
 [Privacy](docs/guide/privacy.md).
 
 ## Building from source
