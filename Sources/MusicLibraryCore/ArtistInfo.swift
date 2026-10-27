@@ -392,12 +392,16 @@ public struct InfoFetcher: Sendable {
     public typealias Get = @Sendable (URL) async throws -> Data?
 
     let musicBrainz: MusicBrainzClient
+    /// For the track lists of copies found on Discogs.
+    let discogs: DiscogsClient?
     let lastfm: LastFMClient?
     let lastfmUser: String?
     let get: Get
 
-    public init(musicBrainz: MusicBrainzClient, lastfm: LastFMClient? = nil, lastfmUser: String? = nil, get: Get? = nil) {
+    public init(musicBrainz: MusicBrainzClient, discogs: DiscogsClient? = nil, lastfm: LastFMClient? = nil,
+                lastfmUser: String? = nil, get: Get? = nil) {
         self.musicBrainz = musicBrainz
+        self.discogs = discogs
         self.lastfm = lastfm
         self.lastfmUser = lastfmUser
         self.get = get ?? Self.download

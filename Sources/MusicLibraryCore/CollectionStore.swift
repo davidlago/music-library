@@ -17,7 +17,7 @@ extension Database {
     static let collectionColumns = [
         "id", "medium", "sticker", "album", "artist", "album_key", "year", "mb_release_id", "mb_release_group_id",
         "barcode", "catalog_number", "record_label", "country", "format_detail", "disc_count", "track_count",
-        "purchased_on", "price", "notes", "cover_file", "digital_source", "created_at", "updated_at",
+        "purchased_on", "price", "notes", "cover_file", "digital_source", "created_at", "updated_at", "discogs_release_id",
     ]
 
     /// The collection, created on open without a schema change (like `rip_checks`): phones on older versions read
@@ -32,6 +32,10 @@ extension Database {
             track_count INTEGER, purchased_on TEXT, price TEXT, notes TEXT, cover_file TEXT, digital_source TEXT,
             created_at REAL NOT NULL, updated_at REAL NOT NULL)
         """)
+        // Added in 1.28 (older versions' upserts name their columns and keep it).
+        if try !columns(of: "collection_items").contains("discogs_release_id") {
+            try exec("ALTER TABLE collection_items ADD COLUMN discogs_release_id INTEGER")
+        }
         try exec("CREATE INDEX IF NOT EXISTS collection_items_album ON collection_items(album_key)")
         try exec("CREATE INDEX IF NOT EXISTS collection_items_sticker ON collection_items(medium, sticker)")
         try exec("CREATE INDEX IF NOT EXISTS collection_items_release ON collection_items(mb_release_id)")
@@ -107,6 +111,7 @@ extension Database {
         item.coverFile = r.string(19).flatMap { CollectionCovers.isFileName($0) ? $0 : nil }
         item.digitalSource = r.string(20).flatMap(DigitalSource.init(rawValue:))
         item.updatedAt = date(22)
+        item.discogsReleaseID = r.int(23).flatMap { DiscogsLink.isValid($0) ? $0 : nil }
         return item
     }
 
@@ -342,6 +347,7 @@ extension Database {
             .int(item.discCount), .int(item.trackCount), .text(item.purchasedOn?.string), .text(AlbumPurchase.priceText(item.price)),
             .text(item.notes), .text(item.coverFile), .text(item.digitalSource?.rawValue),
             .double(item.createdAt.timeIntervalSince1970), .double(item.updatedAt.timeIntervalSince1970),
+            .int(item.discogsReleaseID),
         ])
     }
 

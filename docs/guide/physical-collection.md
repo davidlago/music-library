@@ -51,9 +51,20 @@ the catalog number. It lists the matching editions on MusicBrainz with their yea
 number, format and barcode, and their covers. Pick yours, check the label number, the purchase date and the price,
 and **Add**.
 
+**Search: MusicBrainz | Discogs** above the search field switches to [Discogs](https://www.discogs.com), which often
+lists records (and CDs) MusicBrainz doesn't; a MusicBrainz search that finds nothing offers **Search Discogs** too. It
+searches the same ways (barcode, words, catalog number), and you can also paste the link of a Discogs release page
+(`https://www.discogs.com/release/…`), whichever is picked. Discogs shows no covers in its results: the cover, the
+barcode and the track count arrive once you pick an edition. The copy remembers its Discogs release, and its page and
+[Digitize Vinyl](digitizing-vinyl.md) take the track list from it, sides and all ("A1", "B2"). Adding a copy downloads
+its album info and track list right away (unless downloading info is off in **Settings ▸ General**); a page still
+without one has an **Update Album Info** button under **Tracks**, as well as the ↻ button in the toolbar. Discogs is used without
+an account, so it allows about 20 lookups a minute; if it's busy, try again a minute later.
+
 - **Add & Next** (⌥⌘↩) keeps the sheet open for the next one. With a USB barcode scanner, cataloging a stack is one scan
   and Return per CD.
-- Something MusicBrainz doesn't list can be entered by hand ("Not on MusicBrainz? Enter it yourself").
+- Something neither site lists can be entered by hand ("Not on MusicBrainz? Enter it yourself").
+- **Change Edition…** on a copy's page searches the same way, MusicBrainz or Discogs.
 - Albums already in your digital collection can be added from their page (**Your Copies ▸ Add a Copy**), from the Albums
   grid's context menu (**I Own This ▸ As CD/As Vinyl/As Download**), or many at once with **Physical Collection ▸ Add
   Albums You Own…**, numbered in the order shown.

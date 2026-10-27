@@ -60,7 +60,7 @@ final class VinylController {
     var selectedSegmentID: String?
     private(set) var isPreviewing = false
 
-    // The record's release on MusicBrainz, for naming the tracks.
+    // The record's release on MusicBrainz (or Discogs), for naming the tracks.
     private(set) var release: ReleaseInfo?
     private(set) var isLoadingRelease = false
     private(set) var releaseError: String?
@@ -616,18 +616,22 @@ final class VinylController {
         releaseTask?.cancel()
         release = nil
         releaseError = nil
-        guard let item, let id = item.releaseID else { return }
+        guard let item, item.releaseID != nil || item.discogsReleaseID != nil else { return }
         isLoadingRelease = true
-        let mb = model.musicBrainz
+        let mb = model.musicBrainz, discogs = model.discogs
         releaseTask = Task {
             defer { isLoadingRelease = false }
             do {
-                let r = try await mb.fetchRelease(id: id)
+                // A record found on Discogs takes its track list from there (side and track, "A1").
+                let r: ReleaseInfo
+                if let id = item.releaseID { r = try await mb.fetchRelease(id: id) }
+                else { r = try await discogs.release(id: item.discogsReleaseID ?? 0).releaseInfo }
                 guard !Task.isCancelled, self.itemID == item.id else { return }
                 release = r
             } catch is CancellationError {
             } catch {
-                releaseError = "The track list couldn't be downloaded from MusicBrainz: \(error.localizedDescription)"
+                let source = item.releaseID == nil ? "Discogs" : "MusicBrainz"
+                releaseError = "The track list couldn't be downloaded from \(source): \(error.localizedDescription)"
             }
         }
     }
@@ -676,6 +680,10 @@ final class VinylController {
             var cover = await Task.detached { ownCover.flatMap { try? Data(contentsOf: $0) } }.value
             if cover == nil, let release {
                 cover = (try? await model.coverArt.fetchFront(releaseId: release.id, releaseGroupId: release.releaseGroupId)) ?? nil
+            }
+            if cover == nil, item.releaseID == nil, let id = item.discogsReleaseID,
+               let image = try? await model.discogs.release(id: id).images.first {
+                cover = (try? await model.discogs.image(image)) ?? nil
             }
             var saved = 0, failures: [String] = []
             for (n, cut) in cuts.enumerated() {

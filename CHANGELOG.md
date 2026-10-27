@@ -7,6 +7,11 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- New: **Add to Physical Collection** and **Change Edition…** can search [Discogs](https://www.discogs.com) as well as
+  MusicBrainz (**Search: MusicBrainz | Discogs**), by barcode, words, catalog number or a pasted Discogs release link,
+  for the records and CDs MusicBrainz doesn't list. The copy keeps its Discogs release: its cover, barcode and details
+  come from it, and its page and Digitize Vinyl take the track list from it, with the record's sides. Adding a copy
+  downloads its album info and track list right away.
 - New: **Listen Now**, the first row of the Mac sidebar and the page the app opens on. It leads with the album playing
   (or the one you played last), with Play, Shuffle and Open Album, then the albums you've been playing, your week in four
   numbers, what's up next, and the album's neighbors on the shelf.

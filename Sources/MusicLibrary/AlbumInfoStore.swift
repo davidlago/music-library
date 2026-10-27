@@ -11,6 +11,8 @@ final class AlbumInfoStore {
         var artist: String
         var releaseGroupId: String?
         var releaseId: String?
+        /// Used for the track list when there's no MusicBrainz release.
+        var discogsReleaseId: Int?
     }
 
     private(set) var infos: [String: AlbumInfo] = [:]
@@ -64,10 +66,19 @@ final class AlbumInfoStore {
         enqueue(requests, first: true, fetcher: fetcher)
     }
 
-    /// Fetches an album the user is looking at, ahead of the background queue, if it isn't cached.
-    func ensure(_ request: Request, fetcher: InfoFetcher) {
-        guard needsSync(request.key) else { return }
+    /// Fetches an album the user is looking at, ahead of the background queue, if it isn't cached, or if what's
+    /// cached has no track list although the request now names a release (a copy picked on MusicBrainz or Discogs
+    /// after a search by title found nothing).
+    func ensure(_ request: Request, fetcher: InfoFetcher, now: Date = Date()) {
+        guard needsSync(request.key) || lacksTrackList(request, now: now) else { return }
         enqueue([request], first: true, fetcher: fetcher)
+    }
+
+    /// Cached without a track list for more than a few minutes, while the request has a release to read it from.
+    func lacksTrackList(_ request: Request, now: Date = Date()) -> Bool {
+        guard let info = infos[request.key], info.tracklist.isEmpty, request.releaseId != nil || request.discogsReleaseId != nil
+        else { return false }
+        return now.timeIntervalSince(info.fetchedAt) > 600
     }
 
     private func enqueue(_ requests: [Request], first: Bool, fetcher: InfoFetcher) {
@@ -90,7 +101,8 @@ final class AlbumInfoStore {
             remaining = queue.count + 1
             do {
                 let info = try await fetcher.fetchAlbum(title: next.title, artist: next.artist,
-                                                        releaseGroupId: next.releaseGroupId, releaseId: next.releaseId)
+                                                        releaseGroupId: next.releaseGroupId, releaseId: next.releaseId,
+                                                        discogsReleaseId: next.discogsReleaseId)
                 guard !Task.isCancelled, let database else { break }
                 try? database.saveAlbumInfo(key: next.key, info)
                 infos[next.key] = info
