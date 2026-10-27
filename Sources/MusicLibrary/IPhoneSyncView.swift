@@ -29,7 +29,7 @@ struct IPhoneSyncView: View {
                             ExportItemRow(item: rule.item)
                             if !rule.include {
                                 Spacer()
-                                Label("Kept off the iPhone", systemImage: "minus.circle").font(.caption).foregroundStyle(.subtext)
+                                Label("Kept off the iPhone", systemImage: "minus.circle").font(.caption).foregroundStyle(.secondary)
                             }
                         }
                         .opacity(rule.include ? 1 : 0.75)
@@ -44,14 +44,13 @@ struct IPhoneSyncView: View {
                     }
                 }
                 .onDeleteCommand { store.remove(selection) }
-                .themedScrollBackground()
             }
             Divider()
             HStack {
-                Text(footer(songs: tracks.count)).foregroundStyle(.subtext)
+                Text(footer(songs: tracks.count)).foregroundStyle(.secondary)
                 Spacer()
                 Text("The iPhone keeps exactly this list: what you remove here is removed from it at the next sync. Downloads and removals made on the iPhone show up here too.")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 14).padding(.vertical, 8)
         }
@@ -87,7 +86,7 @@ struct IPhoneSyncView: View {
             if store.phones.isEmpty && store.pairingPeers.isEmpty {
                 Label("To pair, open Music Library on the iPhone, go to its Sync tab and tap Pair with a Mac. The iPhone and this Mac need to be on the same Wi-Fi network.",
                       systemImage: "iphone.radiowaves.left.and.right")
-                    .foregroundStyle(.subtext)
+                    .foregroundStyle(.secondary)
             }
             if let error = store.lastError {
                 Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
@@ -101,20 +100,20 @@ struct IPhoneSyncView: View {
     private func phoneRow(_ phone: SyncStore.PairedPhone, store: SyncStore, songs: Int) -> some View {
         let peer = store.peer(for: phone)
         return HStack(spacing: 12) {
-            Image(systemName: "iphone").font(.title).foregroundStyle(.subtext).frame(width: 28)
+            Image(systemName: "iphone").font(.title).foregroundStyle(.secondary).frame(width: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text(phone.name).font(.headline)
                 if case .syncing(phone.id, let progress) = store.activity {
-                    Text(progressText(progress)).font(.caption).foregroundStyle(.subtext)
+                    Text(progressText(progress)).font(.caption).foregroundStyle(.secondary)
                 } else if peer != nil {
                     Label("Ready to sync", systemImage: "circle.fill").font(.caption).foregroundStyle(.green)
                         .labelStyle(.titleAndIcon).imageScale(.small)
                 } else {
-                    Text("Sync from the iPhone, or open its Sync tab to sync from here.").font(.caption).foregroundStyle(.subtext)
+                    Text("Sync from the iPhone, or open its Sync tab to sync from here.").font(.caption).foregroundStyle(.secondary)
                 }
                 if let date = phone.lastSync {
                     (Text("Last synced ") + Text(date, style: .relative) + Text(" ago" + (phone.lastSummary.map { ": " + summaryText($0) } ?? "")))
-                        .font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 CollectionOnIPhoneRow(phone: phone, store: store)
             }
@@ -139,10 +138,10 @@ struct IPhoneSyncView: View {
 
     private func pairRow(_ peer: SyncPeer, store: SyncStore) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "iphone.radiowaves.left.and.right").font(.title).foregroundStyle(.subtext).frame(width: 28)
+            Image(systemName: "iphone.radiowaves.left.and.right").font(.title).foregroundStyle(.secondary).frame(width: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text(peer.name).font(.headline)
-                Text("Wants to pair. Enter the code it shows.").font(.caption).foregroundStyle(.subtext)
+                Text("Wants to pair. Enter the code it shows.").font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             TextField("Code", text: Binding(get: { codes[peer.id] ?? "" }, set: { codes[peer.id] = $0 }))
@@ -201,7 +200,7 @@ struct CollectionOnIPhoneRow: View {
             .controlSize(.small)
             .help("Also put the digital copies of what you own on this iPhone, besides the list below")
             if let summary = summary(scope, songs: songs.count) {
-                Text(summary).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                Text(summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
         .padding(.top, 2)

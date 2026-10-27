@@ -9,7 +9,7 @@ struct FormatCaption: View {
     var body: some View {
         if let format = player.currentTrack?.audioFormat {
             HStack(spacing: 0) {
-                Text(format.summary).foregroundStyle(.subtext)
+                Text(format.summary).foregroundStyle(.secondary)
                 if let out = player.outputState {
                     Text(" → \(out.summary)")
                         .foregroundStyle(out.matched ? Color.secondary : Color.orange)
@@ -75,7 +75,7 @@ struct VolumeControl: View {
     var body: some View {
         let player = model.player
         HStack(spacing: 6) {
-            Image(systemName: "speaker.fill").foregroundStyle(.subtext)
+            Image(systemName: "speaker.fill").foregroundStyle(.secondary)
             Slider(value: Binding(get: { Double(player.volume) }, set: { player.volume = Float($0) }), in: 0...1)
                 .frame(width: width)
         }
@@ -85,7 +85,6 @@ struct VolumeControl: View {
 /// Shows or hides the queue inspector; from the expanded Now Playing view it also collapses that.
 struct QueueButton: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
 
     var body: some View {
         let shown = model.showsQueue && !model.nowPlayingExpanded
@@ -100,7 +99,7 @@ struct QueueButton: View {
             }
         } label: {
             Image(systemName: "list.bullet").font(.title3)
-                .foregroundStyle(shown ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.subtext))
+                .foregroundStyle(shown ? AnyShapeStyle(AppColor.accent) : AnyShapeStyle(.secondary))
         }
         .buttonStyle(.borderless)
         .help(shown ? "Hide Queue" : "Show Queue")
@@ -110,7 +109,6 @@ struct QueueButton: View {
 
 struct NowPlayingBar: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     @State private var hovering = false
 
     var body: some View {
@@ -124,7 +122,7 @@ struct NowPlayingBar: View {
                         if let cover = player.cover {
                             Image(nsImage: cover).resizable().scaledToFill()
                         } else {
-                            ZStack { Rectangle().fill(.quaternary); Image(systemName: "music.note").foregroundStyle(.subtext) }
+                            ZStack { Rectangle().fill(.quaternary); Image(systemName: "music.note").foregroundStyle(.secondary) }
                         }
                     }
                     .frame(width: 48, height: 48)
@@ -139,7 +137,7 @@ struct NowPlayingBar: View {
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                     VStack(alignment: .leading, spacing: 2) {
                         Text(player.currentTrack?.title ?? "Not Playing").font(.headline).lineLimit(1)
-                        Text(player.currentTrack?.artist ?? "").font(.subheadline).foregroundStyle(.subtext).lineLimit(1)
+                        Text(player.currentTrack?.artist ?? "").font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                         FormatCaption(player: player)
                     }
                     Spacer(minLength: 0)
@@ -162,7 +160,7 @@ struct NowPlayingBar: View {
             QueueButton()
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
-        .background(theme.bar)
+        .background(.bar)
         .overlay(alignment: .top) {
             if let err = player.lastError { Text(err).font(.caption).foregroundStyle(.red).offset(y: -16) }
         }

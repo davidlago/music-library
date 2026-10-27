@@ -22,13 +22,13 @@ struct CollectionItemEditor: View {
                 derived
             } else if !item.isEditable {
                 Label("Added by a newer version of Music Library", systemImage: "shippingbox")
-                    .font(.callout).foregroundStyle(.subtext)
+                    .font(.callout).foregroundStyle(.secondary)
                 readOnlyDetails
             } else {
                 editor
             }
             if let summary {
-                Text(summary).font(.caption).foregroundStyle(.subtext)
+                Text(summary).font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -38,7 +38,7 @@ struct CollectionItemEditor: View {
     private var editor: some View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
             GridRow {
-                Text("Medium").foregroundStyle(.subtext)
+                Text("Medium").foregroundStyle(.secondary)
                 Picker("Medium", selection: mediumBinding) {
                     ForEach(CollectionMedium.known, id: \.self) { Text($0.name).tag($0) }
                 }
@@ -57,20 +57,20 @@ struct CollectionItemEditor: View {
             }
             if let series = item.medium.series {
                 GridRow(alignment: .firstTextBaseline) {
-                    Text("Label").foregroundStyle(.subtext)
+                    Text("Label").foregroundStyle(.secondary)
                     StickerField(series: series, number: binding(\.stickerNumber), itemID: item.id)
                 }
             }
             GridRow {
-                Text("Bought").foregroundStyle(.subtext)
+                Text("Bought").foregroundStyle(.secondary)
                 PurchaseDateField(day: binding(\.purchasedOn))
             }
             GridRow {
-                Text("Paid").foregroundStyle(.subtext)
+                Text("Paid").foregroundStyle(.secondary)
                 PurchasePriceField(price: binding(\.price))
             }
             GridRow(alignment: .firstTextBaseline) {
-                Text("Notes").foregroundStyle(.subtext)
+                Text("Notes").foregroundStyle(.secondary)
                 CommitTextField(title: "Notes", value: item.notes, prompt: "Where you got it, its condition…", axis: .vertical) { v in
                     model.changeItem(id: item.id) { $0.notes = v }
                 }
@@ -83,7 +83,7 @@ struct CollectionItemEditor: View {
             textRow("Country", \.country, prompt: "US")
             textRow("Media", \.formatDetail, prompt: item.medium == .vinyl ? "12\" Vinyl" : "CD")
             GridRow {
-                Text("Discs").foregroundStyle(.subtext)
+                Text("Discs").foregroundStyle(.secondary)
                 CommitTextField(title: "Discs", value: item.discCount.map(String.init), prompt: "1", width: 60) { v in
                     model.changeItem(id: item.id) { $0.discCount = v.flatMap { Int($0) }.flatMap { (1...99).contains($0) ? $0 : nil } }
                 }
@@ -99,7 +99,7 @@ struct CollectionItemEditor: View {
 
     private func textRow(_ title: String, _ path: WritableKeyPath<CollectionItem, String?>, prompt: String, help: String? = nil) -> some View {
         GridRow {
-            Text(title).foregroundStyle(.subtext)
+            Text(title).foregroundStyle(.secondary)
             CommitTextField(title: title, value: item[keyPath: path], prompt: prompt, width: 240) { v in
                 let value = path == \CollectionItem.barcode ? v?.filter(\.isNumber) : v
                 model.changeItem(id: item.id) { $0[keyPath: path] = value }
@@ -191,7 +191,7 @@ struct CollectionItemEditor: View {
         return Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
             ForEach(rows, id: \.0) { k, v in
                 GridRow {
-                    Text(k).foregroundStyle(.subtext)
+                    Text(k).foregroundStyle(.secondary)
                     Text(v).textSelection(.enabled)
                 }
             }
@@ -282,7 +282,7 @@ struct StickerField: View {
         let next = model.nextNumber(in: series)
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text(series == .cd ? "CD #" : "Vinyl #").foregroundStyle(.subtext)
+                Text(series == .cd ? "CD #" : "Vinyl #").foregroundStyle(.secondary)
                 TextField("Label number", text: $text, prompt: Text(String(next)))
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
@@ -406,7 +406,7 @@ struct LinkAlbumPicker: View {
         return VStack(alignment: .leading, spacing: 12) {
             Text("Link the Digital Copy").font(.title2.bold())
             HStack(spacing: 6) {
-                Text("Which album in your digital collection is the digital copy of").foregroundStyle(.subtext)
+                Text("Which album in your digital collection is the digital copy of").foregroundStyle(.secondary)
                 if let s = item.sticker { StickerPill(sticker: s, size: 10) }
                 Text("“\(item.album)”?").lineLimit(1)
             }
@@ -469,13 +469,13 @@ struct LinkAlbumPicker: View {
                 Text(album.album.isEmpty ? "Unknown Album" : album.album).lineLimit(1)
                 Text([album.artist, album.year.map(String.init), songCount(album.trackCount)].compactMap { $0 }.filter { !$0.isEmpty }
                     .joined(separator: " · "))
-                    .font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
             if AlbumInfoStore.key(album) == item.albumKey, !model.collection.libraryTracks(item).isEmpty {
-                Text("Linked").font(.caption).foregroundStyle(.subtext)
+                Text("Linked").font(.caption).foregroundStyle(.secondary)
             } else if let other = model.collection.copies(albumKey: AlbumInfoStore.key(album)).first {
-                Text(other.sticker?.text ?? "Your \(other.medium.name.lowercased())").font(.caption).foregroundStyle(.subtext)
+                Text(other.sticker?.text ?? "Your \(other.medium.name.lowercased())").font(.caption).foregroundStyle(.secondary)
             }
         }
         .tag(album.id)
@@ -546,7 +546,7 @@ struct BulkAddSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Add Albums You Own").font(.title2.bold())
             Text("Check the albums in your digital collection that you own on CD, on vinyl or as a download, and say how. Albums you already own aren't listed.")
-                .font(.callout).foregroundStyle(.subtext)
+                .font(.callout).foregroundStyle(.secondary)
             HStack {
                 TextField("Filter", text: $filter, prompt: Text("Filter albums"))
                     .textFieldStyle(.roundedBorder).frame(maxWidth: 260)
@@ -580,7 +580,7 @@ struct BulkAddSheet: View {
                 TableColumn("Label") { a in
                     if let series = (rows[a.id] ?? Row()).medium.series {
                         HStack(spacing: 2) {
-                            Text(series == .cd ? "CD #" : "Vinyl #").font(.caption).foregroundStyle(.subtext)
+                            Text(series == .cd ? "CD #" : "Vinyl #").font(.caption).foregroundStyle(.secondary)
                             // Set as typed (a number field only takes it on Return), and checked when adding.
                             TextField("Label", text: Binding(get: { StickerField.format(rows[a.id]?.number) },
                                                              set: { rows[a.id, default: Row()].number = StickerField.parse($0); message = nil }))
@@ -595,7 +595,7 @@ struct BulkAddSheet: View {
                 if let message {
                     Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.callout).lineLimit(2)
                 } else {
-                    Text("\(checked.count) checked").font(.callout).foregroundStyle(.subtext)
+                    Text("\(checked.count) checked").font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)

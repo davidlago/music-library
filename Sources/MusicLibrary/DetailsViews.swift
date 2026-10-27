@@ -8,7 +8,7 @@ struct DetailRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(label).foregroundStyle(.subtext).frame(width: labelWidth, alignment: .trailing)
+            Text(label).foregroundStyle(.secondary).frame(width: labelWidth, alignment: .trailing)
             Text(value).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.callout)
@@ -24,7 +24,7 @@ struct PeopleRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(label).foregroundStyle(.subtext).frame(width: labelWidth, alignment: .trailing)
+            Text(label).foregroundStyle(.secondary).frame(width: labelWidth, alignment: .trailing)
             PersonLinks(names: names, open: open).frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.callout)
@@ -64,7 +64,7 @@ struct MetadataDetailsView: View {
                 }
             }
             if showsEmptyState && metadata.extended.displayFields.isEmpty && people.isEmpty {
-                Text("No extra details").foregroundStyle(.subtext)
+                Text("No extra details").foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -88,7 +88,7 @@ struct TrackInfoSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(m.title).font(.title2.bold())
                     Text(m.artist)
-                    Text(m.album).foregroundStyle(.subtext)
+                    Text(m.album).foregroundStyle(.secondary)
                 }
                 Spacer()
             }
@@ -137,7 +137,7 @@ struct TrackInfoSheet: View {
     private func info(_ key: String, _ value: String) -> some View {
         if !value.isEmpty {
             HStack(alignment: .firstTextBaseline) {
-                Text(key).foregroundStyle(.subtext).frame(width: 170, alignment: .trailing)
+                Text(key).foregroundStyle(.secondary).frame(width: 170, alignment: .trailing)
                 Text(value).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
             }
             .font(.callout)

@@ -7,7 +7,6 @@ import SwiftUI
 /// An artist's photo from the info cache, or their initials until one is downloaded.
 struct ArtistPhoto: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let name: String
     var size: CGFloat = 140
     @State private var image: NSImage?
@@ -23,7 +22,7 @@ struct ArtistPhoto: View {
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
-        .overlay(Circle().strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+        .overlay(Circle().strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
         .task(id: file) { image = await model.artistInfo.image(for: name) }
     }
 }
@@ -32,7 +31,6 @@ struct ArtistPhoto: View {
 
 struct ArtistsView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     @State private var filter = ""
     @State private var photoArtist: ArtistSummary?
     @AppStorage("artistSort") private var sort = ArtistSort.name
@@ -72,7 +70,7 @@ struct ArtistsView: View {
                 ContentUnavailableView.search(text: filter)
             }
         }
-        .sheet(item: $photoArtist) { ArtistPhotoSheet(name: $0.name, request: CoverSheetRequest()).themedSheet() }
+        .sheet(item: $photoArtist) { ArtistPhotoSheet(name: $0.name, request: CoverSheetRequest()) }
         .navigationTitle("Artists")
         .navigationSubtitle(filter.isEmpty ? "\(model.allArtists.count) artists" : "\(shown.count) of \(model.allArtists.count) artists")
     }
@@ -80,16 +78,16 @@ struct ArtistsView: View {
     private func header(shownCount: Int) -> some View {
         HStack(spacing: 12) {
             HStack(spacing: 6) {
-                Image(systemName: "line.3.horizontal.decrease").foregroundStyle(.subtext)
+                Image(systemName: "line.3.horizontal.decrease").foregroundStyle(.secondary)
                 TextField("Filter artists, genres, countries", text: $filter)
                     .textFieldStyle(.plain)
                 if !filter.isEmpty {
                     Button { filter = "" } label: { Image(systemName: "xmark.circle.fill") }
-                        .buttonStyle(.plain).foregroundStyle(.subtext)
+                        .buttonStyle(.plain).foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 8).fill(theme.fill))
+            .background(RoundedRectangle(cornerRadius: 8).fill(AppColor.fill))
             .frame(maxWidth: 320)
             Picker("Sort by", selection: $sort) {
                 ForEach(ArtistSort.allCases) { Text($0.rawValue).tag($0) }
@@ -143,10 +141,10 @@ struct ArtistCard: View {
             // An artist you only own on CD or vinyl has albums but no songs.
             Text(artist.trackCount == 0 ? "\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") you own"
                                         : "\(artist.albumCount) album\(artist.albumCount == 1 ? "" : "s") · \(songCount(artist.trackCount))")
-                .font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             if listened >= 1 {
                 Label(formatListened(listened), systemImage: "headphones")
-                    .font(.caption2).foregroundStyle(.subtext).lineLimit(1)
+                    .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
             }
         }
         .frame(maxWidth: .infinity)
@@ -165,7 +163,7 @@ struct SyncStatus: View {
         if store.isSyncing {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                Text("Updating artist info · \(store.remaining) left").font(.caption).foregroundStyle(.subtext)
+                Text("Updating artist info · \(store.remaining) left").font(.caption).foregroundStyle(.secondary)
                 Button("Stop") { store.cancel() }.controlSize(.small)
             }
         } else if let error = store.lastError {
@@ -190,7 +188,6 @@ struct ArtistRoute: Hashable {
 /// never digitized included). The page stays open while either is left.
 struct ArtistDetail: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
     let artistName: String
     @State private var tracks: [Track] = []
@@ -241,7 +238,7 @@ struct ArtistDetail: View {
                 .help("Download the latest photo, bio and links")
             }
         }
-        .sheet(item: $photoSheet) { ArtistPhotoSheet(name: artistName, request: $0).themedSheet() }
+        .sheet(item: $photoSheet) { ArtistPhotoSheet(name: artistName, request: $0) }
         .onAppear(perform: load)
         .onChange(of: model.libraryVersion) {
             load()
@@ -291,13 +288,13 @@ struct ArtistDetail: View {
         HStack(alignment: .center, spacing: 28) {
             photo(size: 190)
             VStack(alignment: .leading, spacing: 8) {
-                Text("ARTIST").font(.caption.weight(.semibold)).foregroundStyle(.subtext).tracking(1.2)
+                Text("ARTIST").font(.caption.weight(.semibold)).foregroundStyle(.secondary).tracking(1.2)
                 Text(name).font(.system(size: 36, weight: .bold)).lineLimit(2).minimumScaleFactor(0.6)
                 if let info {
                     let summary = info.summary()
                     if !summary.isEmpty || info.disambiguation != nil {
                         Text([summary, info.disambiguation].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
-                            .font(.title3).foregroundStyle(.subtext)
+                            .font(.title3).foregroundStyle(.secondary)
                     }
                     if !info.genres.isEmpty {
                         FlowLayout(spacing: 6) {
@@ -305,7 +302,7 @@ struct ArtistDetail: View {
                                 Button { model.search(SearchFilterKey.token("genre", g)) } label: {
                                     Text(g.capitalized).font(.caption)
                                         .padding(.horizontal, 9).padding(.vertical, 4)
-                                        .background(Capsule().fill(theme.fill))
+                                        .background(Capsule().fill(AppColor.fill))
                                 }
                                 .buttonStyle(.plain)
                                 .help("Search your digital collection for \(g)")
@@ -313,7 +310,7 @@ struct ArtistDetail: View {
                         }
                     }
                 } else if model.artistInfo.isFetching(artistName) {
-                    Label("Looking up artist info…", systemImage: "arrow.down.circle").font(.callout).foregroundStyle(.subtext)
+                    Label("Looking up artist info…", systemImage: "arrow.down.circle").font(.callout).foregroundStyle(.secondary)
                 }
                 HStack(spacing: 10) {
                     Button { play(tracks, at: 0) } label: { Label("Play", systemImage: "play.fill").frame(minWidth: 70) }
@@ -342,12 +339,12 @@ struct ArtistDetail: View {
         .padding(24)
         .background {
             ZStack {
-                theme.card
+                AppColor.card
                 ArtistBackdrop(name: artistName)
             }
             .clipShape(RoundedRectangle(cornerRadius: 18))
         }
-        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
     }
 
     /// The photo, with "Change Photo…" on hover; dropping an image on it opens the photo sheet with that image.
@@ -360,7 +357,7 @@ struct ArtistDetail: View {
                     .padding(.bottom, 14)
             }
         }
-        .overlay { if photoDropTargeted { Circle().strokeBorder(theme.accent, lineWidth: 3) } }
+        .overlay { if photoDropTargeted { Circle().strokeBorder(AppColor.accent, lineWidth: 3) } }
         .shadow(color: .black.opacity(0.25), radius: 16, y: 6)
         .onHover { hoveringPhoto = $0 }
         .contextMenu {
@@ -413,14 +410,14 @@ struct ArtistDetail: View {
                     if let url = info.bioURL?.webLink {
                         Link("From \(source)", destination: url).font(.caption)
                     } else {
-                        Text("From \(source)").font(.caption).foregroundStyle(.subtext)
+                        Text("From \(source)").font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 if let credit = model.artistInfo.photoCredit(for: artistName) {
                     if let url = credit.url?.webLink {
                         Link("Photo: \(credit.label)", destination: url).font(.caption)
                     } else {
-                        Text("Photo: \(credit.label)").font(.caption).foregroundStyle(.subtext)
+                        Text("Photo: \(credit.label)").font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -436,7 +433,7 @@ struct ArtistDetail: View {
                         Label(link.title, systemImage: Self.icon(link.kind))
                             .font(.callout)
                             .padding(.horizontal, 11).padding(.vertical, 6)
-                            .background(Capsule().fill(theme.fill))
+                            .background(Capsule().fill(AppColor.fill))
                     }
                     .buttonStyle(.plain)
                     .help(link.url.absoluteString)
@@ -456,7 +453,7 @@ struct ArtistDetail: View {
                                        mark: model.copyMark(for: a))
                             Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.callout.weight(.medium)).lineLimit(1)
                             Text([a.year.map(String.init), songCount(a.trackCount)].compactMap { $0 }.joined(separator: " · "))
-                                .font(.caption).foregroundStyle(.subtext)
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                         .frame(width: 140, alignment: .leading)
                     }
@@ -491,8 +488,8 @@ struct ArtistDetail: View {
                 }
             }
             .padding(.vertical, 4)
-            .background(RoundedRectangle(cornerRadius: 12).fill(theme.card))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+            .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
         }
     }
 
@@ -531,7 +528,6 @@ struct ArtistDetail: View {
 /// The artist's photo, blurred, behind the header.
 private struct ArtistBackdrop: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let name: String
     @State private var image: NSImage?
 
@@ -543,7 +539,7 @@ private struct ArtistBackdrop: View {
                     .blur(radius: 50).opacity(0.35)
                     .clipped()
                     // Keeps the header text readable however busy the photo is.
-                    .overlay(LinearGradient(colors: [theme.card.opacity(0.8), theme.card.opacity(0.45)],
+                    .overlay(LinearGradient(colors: [AppColor.card.opacity(0.8), AppColor.card.opacity(0.45)],
                                             startPoint: .leading, endPoint: .trailing))
             }
         }
@@ -557,27 +553,25 @@ struct SectionHeader: View {
 }
 
 struct StatTile: View {
-    @Environment(\.theme) private var theme
     let value: String
     let label: String
     let icon: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Image(systemName: icon).font(.callout).foregroundStyle(.subtext)
+            Image(systemName: icon).font(.callout).foregroundStyle(.secondary)
             Text(value).font(.system(size: 22, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.6)
-            Text(label).font(.caption).foregroundStyle(.subtext)
+            Text(label).font(.caption).foregroundStyle(.secondary)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(theme.card))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
     }
 }
 
 struct ArtistSongRow: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let index: Int
     let track: Track
     let total: PlayTotal?
@@ -591,26 +585,26 @@ struct ArtistSongRow: View {
                 if hovering {
                     Image(systemName: "play.fill").font(.caption)
                 } else if isCurrent {
-                    Image(systemName: "speaker.wave.2.fill").font(.caption).foregroundStyle(theme.accent)
+                    Image(systemName: "speaker.wave.2.fill").font(.caption).foregroundStyle(AppColor.accent)
                 } else {
-                    Text("\(index)").monospacedDigit().foregroundStyle(.subtext)
+                    Text("\(index)").monospacedDigit().foregroundStyle(.secondary)
                 }
             }
             .frame(width: 26)
             VStack(alignment: .leading, spacing: 1) {
                 Text(track.title).lineLimit(1).fontWeight(isCurrent ? .semibold : .regular)
                 Text([track.album, track.year.map(String.init)].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
-                    .font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
             LikeButton(model: model, track: track, showsUnliked: hovering)
             if let plays = total?.plays, plays > 0 {
-                Text("\(plays) play\(plays == 1 ? "" : "s")").font(.caption).foregroundStyle(.subtext).monospacedDigit()
+                Text("\(plays) play\(plays == 1 ? "" : "s")").font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
-            Text(formatTime(track.duration)).monospacedDigit().foregroundStyle(.subtext).frame(width: 48, alignment: .trailing)
+            Text(formatTime(track.duration)).monospacedDigit().foregroundStyle(.secondary).frame(width: 48, alignment: .trailing)
         }
         .padding(.horizontal, 12).padding(.vertical, 7)
-        .background(hovering ? theme.fill : Color.clear)
+        .background(hovering ? AppColor.fill : Color.clear)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(count: 2, perform: play)

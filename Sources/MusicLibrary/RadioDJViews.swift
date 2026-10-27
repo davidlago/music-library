@@ -326,7 +326,6 @@ struct RadioDJPanel: View {
     static let width: CGFloat = 370
     private static let bottom = "bottom"
 
-    @Environment(\.theme) private var theme
     let session: RadioDJSession
     let dj: RadioDJStore
     let previews: PreviewPlayer
@@ -368,11 +367,11 @@ struct RadioDJPanel: View {
             Divider()
             composer
         }
-        .background(theme.background)
-        .overlay(alignment: .leading) { Rectangle().fill(theme.separator).frame(width: 1) }
+        .background(AppColor.background)
+        .overlay(alignment: .leading) { Rectangle().fill(AppColor.separator).frame(width: 1) }
         .overlay {
             if dropTargeted {
-                RoundedRectangle(cornerRadius: 8).strokeBorder(theme.accent, lineWidth: 3).padding(4).allowsHitTesting(false)
+                RoundedRectangle(cornerRadius: 8).strokeBorder(AppColor.accent, lineWidth: 3).padding(4).allowsHitTesting(false)
             }
         }
         .onDrop(of: [.image, .fileURL, .url], isTargeted: $dropTargeted) { providers in
@@ -387,18 +386,18 @@ struct RadioDJPanel: View {
             OnAirSign(live: session.isBusy)
             VStack(alignment: .leading, spacing: 1) {
                 Text(session.name).font(.headline).lineLimit(1)
-                Text(RadioDJ.attributed(session.subject.headline)).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                Text(RadioDJ.attributed(session.subject.headline)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 0)
             Button { dj.endSession() } label: {
                 Image(systemName: "xmark.circle.fill").font(.title3).symbolRenderingMode(.hierarchical)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.subtext)
+            .foregroundStyle(.secondary)
             .help("Off the air")
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
-        .background(theme.card.opacity(0.6))
+        .background(AppColor.card.opacity(0.6))
     }
 
     /// The questions to start with, under the greeting (gone once one is asked, or when you've moved elsewhere,
@@ -412,8 +411,8 @@ struct RadioDJPanel: View {
                         Text(question)
                             .font(.callout)
                             .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(Capsule().fill(theme.fill))
-                            .overlay(Capsule().strokeBorder(theme.accent.opacity(question == session.suggestions.first ? 0.6 : 0), lineWidth: 1))
+                            .background(Capsule().fill(AppColor.fill))
+                            .overlay(Capsule().strokeBorder(AppColor.accent.opacity(question == session.suggestions.first ? 0.6 : 0), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                     .help("Ask \(session.name) this")
@@ -443,10 +442,10 @@ struct RadioDJPanel: View {
     @ViewBuilder
     private var previewRow: some View {
         if let note = dj.previewNote {
-            Label(note, systemImage: "headphones").font(.caption).foregroundStyle(.subtext)
+            Label(note, systemImage: "headphones").font(.caption).foregroundStyle(.secondary)
         } else if let track = previews.current, previews.isPlaying {
             HStack(spacing: 8) {
-                Image(systemName: "headphones").foregroundStyle(theme.accent)
+                Image(systemName: "headphones").foregroundStyle(AppColor.accent)
                 Text("Preview: “\(track.title)” — \(track.artist)").font(.caption).lineLimit(1)
                 Spacer(minLength: 0)
                 Button("Stop") { previews.stop() }.controlSize(.small)
@@ -464,7 +463,7 @@ struct RadioDJPanel: View {
                     Label { Text(RadioDJ.attributed("Tell me about \(page.headline)")).lineLimit(1) } icon: { Image(systemName: RadioDJIcon.name) }
                         .font(.callout)
                         .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(Capsule().fill(theme.fill))
+                        .background(Capsule().fill(AppColor.fill))
                 }
                 .buttonStyle(.plain)
                 .help("Ask \(session.name) about the page you're on")
@@ -481,7 +480,7 @@ struct RadioDJPanel: View {
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .foregroundStyle(canAddPhoto ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.tertiary))
+                .foregroundStyle(canAddPhoto ? AnyShapeStyle(AppColor.accent) : AnyShapeStyle(.tertiary))
                 .disabled(!canAddPhoto)
                 .padding(.bottom, 6)
                 .help(session.seesPhotos ? "Show \(session.name) a photo: a record or CD, its back or label, a shelf (or drop one on the panel)"
@@ -493,17 +492,17 @@ struct RadioDJPanel: View {
                     .focused($focused)
                     .onSubmit { send() }
                     .padding(.horizontal, 12).padding(.vertical, 8)
-                    .background(RoundedRectangle(cornerRadius: 16).fill(theme.fill))
+                    .background(RoundedRectangle(cornerRadius: 16).fill(AppColor.fill))
                 Button { send() } label: {
                     Image(systemName: "arrow.up.circle.fill").font(.system(size: 26))
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(canSend ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.tertiary))
+                .foregroundStyle(canSend ? AnyShapeStyle(AppColor.accent) : AnyShapeStyle(.tertiary))
                 .disabled(!canSend)
                 .help("Send")
             }
             Text("This segment: about \(DollarFormat.string(session.cost))")
-                .font(.caption2).foregroundStyle(.subtext)
+                .font(.caption2).foregroundStyle(.secondary)
                 .padding(.leading, 4)
         }
         .padding(12)
@@ -527,7 +526,7 @@ struct RadioDJPanel: View {
     @ViewBuilder
     private var attachedPhotos: some View {
         if let photoNote {
-            Label(photoNote, systemImage: "photo").font(.caption).foregroundStyle(.subtext)
+            Label(photoNote, systemImage: "photo").font(.caption).foregroundStyle(.secondary)
         }
         if !photos.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
@@ -552,7 +551,7 @@ struct RadioDJPanel: View {
                         Button { send(question) } label: {
                             Text(question).font(.callout)
                                 .padding(.horizontal, 10).padding(.vertical, 5)
-                                .background(Capsule().fill(theme.fill))
+                                .background(Capsule().fill(AppColor.fill))
                         }
                         .buttonStyle(.plain)
                         .help("Ask \(session.name) this about the photo")
@@ -634,7 +633,7 @@ struct RadioDJPhotoThumb: View {
             if let image = NSImage(data: photo.thumbnail) {
                 Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
             } else {
-                Image(systemName: "photo").foregroundStyle(.subtext)
+                Image(systemName: "photo").foregroundStyle(.secondary)
             }
         }
         .frame(width: size, height: size)
@@ -644,7 +643,6 @@ struct RadioDJPhotoThumb: View {
 }
 
 private struct RadioDJLineView: View {
-    @Environment(\.theme) private var theme
     let line: RadioDJSession.Line
     let segments: [RadioDJSegment]
     let speaking: Bool
@@ -665,7 +663,7 @@ private struct RadioDJLineView: View {
                         .textSelection(.enabled)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 12).padding(.vertical, 8)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(theme.accent))
+                        .background(RoundedRectangle(cornerRadius: 14).fill(AppColor.accent))
                 }
             }
         case .dj:
@@ -673,7 +671,7 @@ private struct RadioDJLineView: View {
                 DJAvatar(speaking: speaking)
                 VStack(alignment: .leading, spacing: 10) {
                     // Not selectable: on the Mac, selectable text opens its links with the system, not `openURL`.
-                    RadioDJText.text(segments, accent: theme.accent)
+                    RadioDJText.text(segments, accent: AppColor.accent)
                         .font(.body)
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
@@ -690,7 +688,7 @@ private struct RadioDJLineView: View {
                                 Link(destination: source.url) {
                                     Label(source.host, systemImage: "link").font(.caption).lineLimit(1)
                                         .padding(.horizontal, 8).padding(.vertical, 3)
-                                        .background(Capsule().fill(theme.fill))
+                                        .background(Capsule().fill(AppColor.fill))
                                 }
                                 .buttonStyle(.plain)
                                 .help(source.title)
@@ -709,7 +707,7 @@ private struct RadioDJStatusRow: View {
     var body: some View {
         HStack(spacing: 10) {
             EqualizerBars().frame(width: 28, height: 16)
-            Text(text).font(.callout).italic().foregroundStyle(.subtext).lineLimit(2)
+            Text(text).font(.callout).italic().foregroundStyle(.secondary).lineLimit(2)
         }
         .padding(.leading, 2)
     }
@@ -884,7 +882,7 @@ struct RadioDJSettings: View {
                 HStack(alignment: .top, spacing: 14) {
                     Image(systemName: RadioDJIcon.name).font(.system(size: 28)).foregroundStyle(.orange)
                     Text("Switch on a radio DJ on album and artist pages: they tell you the story behind the music, the people who made it and how it connects to everything else, and answer your questions, including about what's in your own collection and photos of records you show them. Powered by Claude, or any model on OpenRouter, looking things up on the web as they talk (only the rows a collection search finds are sent). Off until you add an API key; summon them on each page with On Air in the toolbar.")
-                        .font(.callout).foregroundStyle(.subtext)
+                        .font(.callout).foregroundStyle(.secondary)
                 }
             }
             Section {
@@ -902,7 +900,7 @@ struct RadioDJSettings: View {
                 Text("OpenRouter")
             } footer: {
                 Text("Either key or both. Stored in your keychain and handed to your iPhone when you sync. Remove them to turn the DJ off on both.")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             modelSection(dj)
             Section {
@@ -912,12 +910,11 @@ struct RadioDJSettings: View {
                 Text("On the air")
             } footer: {
                 Text("What the DJ calls themself, and what they call you (now and then, like a regular caller).")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             spending(dj)
         }
         .formStyle(.grouped)
-        .themedScrollBackground()
         .frame(height: 720)
         .sheet(isPresented: $choosingModel) { RadioDJModelPicker(dj: model.radioDJ) }
     }
@@ -939,10 +936,10 @@ struct RadioDJSettings: View {
         switch dj.keyStatus(provider) {
         case .unchecked:
             LabeledContent("Status") {
-                Text(dj.hasKey(provider) ? "Ready (not checked yet)" : "No API key").foregroundStyle(.subtext)
+                Text(dj.hasKey(provider) ? "Ready (not checked yet)" : "No API key").foregroundStyle(.secondary)
             }
         case .checking:
-            LabeledContent("Status") { HStack { ProgressView().controlSize(.small); Text("Checking…").foregroundStyle(.subtext) } }
+            LabeledContent("Status") { HStack { ProgressView().controlSize(.small); Text("Checking…").foregroundStyle(.secondary) } }
         case .valid:
             LabeledContent("Status") { Label("The key works", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
         case .invalid(let message):
@@ -955,13 +952,13 @@ struct RadioDJSettings: View {
             LabeledContent("Model") {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(dj.model.name)
-                    Text("\(dj.model.provider.name) · \(dj.model.id)").font(.caption).foregroundStyle(.subtext)
+                    Text("\(dj.model.provider.name) · \(dj.model.id)").font(.caption).foregroundStyle(.secondary)
                 }
             }
-            LabeledContent("Price") { Text(dj.model.priceSummary).monospacedDigit().foregroundStyle(.subtext) }
+            LabeledContent("Price") { Text(dj.model.priceSummary).monospacedDigit().foregroundStyle(.secondary) }
             if !dj.model.acceptsImages {
                 Label("This model can't see photos, so the DJ can't look at the records you show them.", systemImage: "eye.slash")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             if !dj.isEnabled {
                 Label("Add \(dj.model.provider == .anthropic ? "a Claude API" : "an OpenRouter") key above, or choose a model from \(dj.model.provider == .anthropic ? "OpenRouter" : "Anthropic"), to switch the DJ on.",
@@ -977,7 +974,7 @@ struct RadioDJSettings: View {
             Text("Model")
         } footer: {
             Text("Claude Opus 5.5 is the DJ the app was made with. Other models know music differently and may follow the app's links less closely. A new model takes over the next time the DJ comes on the air.")
-                .font(.caption).foregroundStyle(.subtext)
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -995,19 +992,19 @@ struct RadioDJSettings: View {
                 }
             }
             LabeledContent("Segments") {
-                Text("\(all.segments) on the air, \(all.webSearches) web search\(all.webSearches == 1 ? "" : "es")").foregroundStyle(.subtext)
+                Text("\(all.segments) on the air, \(all.webSearches) web search\(all.webSearches == 1 ? "" : "es")").foregroundStyle(.secondary)
             }
         } header: {
             Text("Spending")
         } footer: {
             Text("Calendar months (UTC). Claude API use is estimated at Anthropic's list prices (web searches $10 per 1,000); OpenRouter use is what OpenRouter says each reply cost. iPhone amounts are as of each phone's last sync. Your actual bills are at platform.claude.com and openrouter.ai.")
-                .font(.caption).foregroundStyle(.subtext)
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
     private func amounts(_ usage: RadioDJUsage) -> some View {
         Text("\(DollarFormat.string(usage.month().dollars)) this month · \(DollarFormat.string(usage.allTime.dollars)) in all")
-            .monospacedDigit().foregroundStyle(.subtext)
+            .monospacedDigit().foregroundStyle(.secondary)
     }
 }
 
@@ -1054,9 +1051,9 @@ struct RadioDJModelPicker: View {
             HStack {
                 if provider == .openRouter {
                     Button("Refresh") { dj.loadOpenRouterModels(force: true) }.disabled(dj.loadingOpenRouterModels)
-                    Text("Prices per million tokens, from openrouter.ai.").font(.caption).foregroundStyle(.subtext)
+                    Text("Prices per million tokens, from openrouter.ai.").font(.caption).foregroundStyle(.secondary)
                 } else {
-                    Text("Prices per million tokens; web searches $10 per 1,000.").font(.caption).foregroundStyle(.subtext)
+                    Text("Prices per million tokens; web searches $10 per 1,000.").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
@@ -1084,7 +1081,7 @@ struct RadioDJModelPicker: View {
                     Button("Try Again") { dj.loadOpenRouterModels(force: true) }
                 } else {
                     ProgressView()
-                    Text("Loading OpenRouter's models…").foregroundStyle(.subtext)
+                    Text("Loading OpenRouter's models…").foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1096,7 +1093,7 @@ struct RadioDJModelPicker: View {
                             Text(model.name)
                             if model.key == RadioDJModel.default.key { Text("Recommended").font(.caption2).foregroundStyle(.orange) }
                         }
-                        Text(model.id).font(.caption).foregroundStyle(.subtext)
+                        Text(model.id).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 TableColumn("Input", value: \.inputPrice) { Text(RadioDJModel.price($0.inputPrice)).monospacedDigit() }

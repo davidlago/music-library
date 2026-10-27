@@ -25,19 +25,11 @@ device's format for all apps while playing, and restore it when you quit or turn
 
 ## Appearance
 
-Themes color the whole window, the player and the Insights charts:
+**System** (the default) follows your Mac's light or dark setting. **Light** and **Dark** keep the app in one mode,
+whatever the Mac uses. The same choice is in **View ▸ Appearance**, and the iPhone app has its own in its Settings.
 
-- **System** (follows your Mac's light or dark appearance)
-- **Catppuccin** (follows light or dark), **Latte**, **Frappé**, **Macchiato**, **Mocha**
-- **Nord**, **Dracula**, **Gruvbox**, **Tokyo Night**
-- **Solarized** (follows light or dark), **Solarized Light**, **Solarized Dark**
-- **Rosé Pine** (follows light or dark), **Rosé Pine Main**, **Rosé Pine Dawn**
-
-Every theme is checked for contrast. The same list is in **View ▸ Theme**.
-
-| Catppuccin Mocha | Rosé Pine Dawn |
-|---|---|
-| ![An album page in the Catppuccin Mocha theme](../screenshots/theme-catppuccin-mocha.png) | ![An album page in the Rosé Pine Dawn theme](../screenshots/theme-rose-pine-dawn.png) |
+> Versions before 1.28 had color themes. They're gone: a theme you had picked became its mode the first time you opened
+> this version. Themes that came in light and dark became **System**, and the others became **Light** or **Dark**.
 
 ## Last.fm
 

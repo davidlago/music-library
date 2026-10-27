@@ -5,11 +5,23 @@ struct SettingsView: View {
     @Environment(PhoneModel.self) private var model
     @Environment(PhonePlayer.self) private var player
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(AppearanceMode.defaultsKey) private var appearance = AppearanceMode.system
 
     var body: some View {
         @Bindable var player = player
         NavigationStack {
             Form {
+                Section {
+                    Picker("Appearance", selection: $appearance) {
+                        ForEach(AppearanceMode.allCases) { Text($0.name).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                } header: {
+                    Text("Appearance")
+                } footer: {
+                    Text(appearance == .system ? "Follows your iPhone's light or dark setting." : "Always \(appearance.name.lowercased()), whatever your iPhone uses.")
+                }
                 Section {
                     Toggle("Match the DAC's sample rate", isOn: $player.matchSampleRate)
                     if let output = player.output {

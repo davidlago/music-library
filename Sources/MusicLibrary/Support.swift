@@ -51,7 +51,7 @@ struct CoverThumb: View {
                 Image(nsImage: image).resizable().scaledToFill()
             } else {
                 Rectangle().fill(.quaternary)
-                Image(systemName: "music.note").font(.system(size: size / 3)).foregroundStyle(.subtext)
+                Image(systemName: "music.note").font(.system(size: size / 3)).foregroundStyle(.secondary)
             }
             if let mark {
                 CoverCopyMark(mark: mark, size: size)
@@ -67,7 +67,7 @@ struct CoverThumb: View {
     }
 }
 
-/// The colours of the label stickers, fixed like the real ones (so every theme shows them the same).
+/// The colours of the label stickers, fixed like the real ones (the same in light and dark).
 enum StickerColors {
     /// The sticker: a white strip, the same on CDs and records (a case and a sleeve are told apart at a glance).
     static let sticker = Color(white: 0.97)
@@ -226,7 +226,7 @@ struct DigitalStatusLabel: View {
                 Text(text)
             }
         }
-        .foregroundStyle(.subtext)
+        .foregroundStyle(.secondary)
         .lineLimit(1)
     }
 
@@ -274,7 +274,7 @@ struct DataImage: View {
                 Image(nsImage: img).resizable().scaledToFill()
             } else {
                 Rectangle().fill(.quaternary)
-                Image(systemName: "photo").font(.system(size: size / 4)).foregroundStyle(.subtext)
+                Image(systemName: "photo").font(.system(size: size / 4)).foregroundStyle(.secondary)
             }
         }
         .frame(width: size, height: size)

@@ -13,7 +13,7 @@ struct CDCollectionPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 12) {
-                Image(systemName: "books.vertical").foregroundStyle(.subtext)
+                Image(systemName: "books.vertical").foregroundStyle(.secondary)
                 CDCollectionChoiceControl(disc: disc)
                 if disc.collectionChoice == .new || disc.itemID != nil {
                     Divider().frame(height: 18)
@@ -22,7 +22,7 @@ struct CDCollectionPanel: View {
                 Spacer(minLength: 0)
             }
             if let line = statusLine {
-                Text(line).font(.caption).foregroundStyle(.subtext).padding(.leading, 30)
+                Text(line).font(.caption).foregroundStyle(.secondary).padding(.leading, 30)
             }
             if let id = disc.catalogedItemID, let item = model.item(id: id) {
                 HStack(spacing: 6) {
@@ -106,20 +106,20 @@ struct CDCopyFields: View {
 
     var body: some View {
         if let id = disc.itemID, let item = model.item(id: id) {
-            Text("Bought").foregroundStyle(.subtext)
+            Text("Bought").foregroundStyle(.secondary)
             PurchaseDateField(day: field(item, \.purchasedOn))
-            Text("Paid").foregroundStyle(.subtext)
+            Text("Paid").foregroundStyle(.secondary)
             PurchasePriceField(price: field(item, \.price))
             if item.isEditable {
-                Text("Label").foregroundStyle(.subtext)
+                Text("Label").foregroundStyle(.secondary)
                 StickerField(series: .cd, number: field(item, \.stickerNumber), itemID: item.id)
             }
         } else {
-            Text("Bought").foregroundStyle(.subtext)
+            Text("Bought").foregroundStyle(.secondary)
             PurchaseDateField(day: $disc.newPurchasedOn)
-            Text("Paid").foregroundStyle(.subtext)
+            Text("Paid").foregroundStyle(.secondary)
             PurchasePriceField(price: $disc.newPrice)
-            Text("Label").foregroundStyle(.subtext)
+            Text("Label").foregroundStyle(.secondary)
             StickerField(series: .cd, number: $disc.newSticker, live: true)
         }
     }
@@ -142,9 +142,9 @@ struct CDCollectionSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Is this CD yours?").font(.title3.bold())
             if let release = disc.release {
-                Text("\(release.album) — \(release.albumArtist)").foregroundStyle(.subtext)
+                Text("\(release.album) — \(release.albumArtist)").foregroundStyle(.secondary)
             } else if !disc.searchAlbum.isEmpty {
-                Text([disc.searchAlbum, disc.searchArtist].filter { !$0.isEmpty }.joined(separator: " — ")).foregroundStyle(.subtext)
+                Text([disc.searchAlbum, disc.searchArtist].filter { !$0.isEmpty }.joined(separator: " — ")).foregroundStyle(.secondary)
             }
             Picker("Is this CD yours?", selection: Binding(get: { disc.collectionChoice }, set: { model.cd.setChoice(disc, $0) })) {
                 Text("Yes").tag(CDCollectionChoice?.some(.new))
@@ -154,21 +154,21 @@ struct CDCollectionSheet: View {
             if disc.collectionChoice == .new {
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
                     GridRow(alignment: .firstTextBaseline) {
-                        Text("Label").foregroundStyle(.subtext)
+                        Text("Label").foregroundStyle(.secondary)
                         StickerField(series: .cd, number: $disc.newSticker, live: true)
                     }
                     GridRow {
-                        Text("Bought").foregroundStyle(.subtext)
+                        Text("Bought").foregroundStyle(.secondary)
                         PurchaseDateField(day: $disc.newPurchasedOn)
                     }
                     GridRow {
-                        Text("Paid").foregroundStyle(.subtext)
+                        Text("Paid").foregroundStyle(.secondary)
                         PurchasePriceField(price: $disc.newPrice)
                     }
                 }
             }
             Text("It's added to your physical collection when ripping starts. You can change it later on its page.")
-                .font(.caption).foregroundStyle(.subtext)
+                .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)

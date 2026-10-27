@@ -8,7 +8,6 @@ import SwiftUI
 /// dismisses itself for lack of tracks.
 struct CollectionItemDetail: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let id: String
     @State private var cover: NSImage?
     @State private var hoveringCover = false
@@ -93,14 +92,14 @@ struct CollectionItemDetail: View {
                 .font(.system(size: 30, weight: .bold)).lineLimit(3).minimumScaleFactor(0.7)
                 .textSelection(.enabled)
             artistButton(item)
-            if let meta = metaLine(item) { Text(meta).font(.callout).foregroundStyle(.subtext).textSelection(.enabled) }
+            if let meta = metaLine(item) { Text(meta).font(.callout).foregroundStyle(.secondary).textSelection(.enabled) }
             if let info, let rating = info.rating { RatingView(rating: rating, votes: info.ratingVotes) }
             if let genres = info?.genres, !genres.isEmpty {
                 FlowLayout(spacing: 6) {
                     ForEach(genres, id: \.self) { g in
                         Text(g.capitalized).font(.caption)
                             .padding(.horizontal, 9).padding(.vertical, 4)
-                            .background(Capsule().fill(theme.fill))
+                            .background(Capsule().fill(AppColor.fill))
                     }
                 }
             }
@@ -137,7 +136,7 @@ struct CollectionItemDetail: View {
             }
             .overlay {
                 if coverDropTargeted {
-                    RoundedRectangle(cornerRadius: JewelCase<EmptyView>.cornerRadius(width: size)).strokeBorder(theme.accent, lineWidth: 3)
+                    RoundedRectangle(cornerRadius: JewelCase<EmptyView>.cornerRadius(width: size)).strokeBorder(AppColor.accent, lineWidth: 3)
                 }
             }
             .onHover { hoveringCover = $0 }
@@ -166,7 +165,7 @@ struct CollectionItemDetail: View {
                 HStack(spacing: 8) {
                     ArtistPhoto(name: item.artist, size: 26)
                     Text(name).font(.title3.weight(.medium))
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.subtext)
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 }
             }
             .buttonStyle(.plain)
@@ -284,7 +283,7 @@ struct CollectionItemDetail: View {
                 case .otherCopy(_, let fromID):
                     let from = fromID.flatMap { model.item(id: $0) }
                     HStack(spacing: 6) {
-                        Image(systemName: "arrow.triangle.2.circlepath").foregroundStyle(.subtext)
+                        Image(systemName: "arrow.triangle.2.circlepath").foregroundStyle(.secondary)
                         Text("Same album in your digital collection, from").fixedSize()
                         if let from {
                             Button(from.sticker.map { "your \($0.text)" } ?? "your \(from.medium.name.lowercased())") {
@@ -296,7 +295,7 @@ struct CollectionItemDetail: View {
                         }
                     }
                     .font(.callout)
-                    Text(songsLine(songs)).font(.caption).foregroundStyle(.subtext)
+                    Text(songsLine(songs)).font(.caption).foregroundStyle(.secondary)
                     albumButton(album)
                 case .none:
                     noCopy(item, disc: disc)
@@ -322,8 +321,8 @@ struct CollectionItemDetail: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 12).fill(theme.card.opacity(0.85)))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+            .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card.opacity(0.85)))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
         }
     }
 
@@ -406,7 +405,7 @@ struct CollectionItemDetail: View {
                 SectionHeader(title: "Tracks")
                 Spacer()
                 if missing > 0, !playable.isEmpty {
-                    Text("\(playable.count) of \(rows.count) in your digital collection").font(.callout).foregroundStyle(.subtext)
+                    Text("\(playable.count) of \(rows.count) in your digital collection").font(.callout).foregroundStyle(.secondary)
                 }
             }
             if rows.isEmpty {
@@ -419,13 +418,13 @@ struct CollectionItemDetail: View {
                         Text("No track list yet. Update Album Info (in the toolbar) downloads it.")
                     }
                 }
-                .font(.callout).foregroundStyle(.subtext)
+                .font(.callout).foregroundStyle(.secondary)
             } else {
                 VStack(spacing: 0) {
                     ForEach(discs, id: \.self) { disc in
                         if discs.count > 1 {
                             HStack {
-                                Image(systemName: positions ? "record.circle" : "opticaldisc").foregroundStyle(.subtext)
+                                Image(systemName: positions ? "record.circle" : "opticaldisc").foregroundStyle(.secondary)
                                 Text("\(positions ? "Record" : "Disc") \(disc)").font(.callout.weight(.semibold))
                                 Spacer()
                             }
@@ -441,12 +440,12 @@ struct CollectionItemDetail: View {
                     }
                 }
                 .padding(.vertical, 6)
-                .background(RoundedRectangle(cornerRadius: 14).fill(theme.card.opacity(0.72)))
-                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(theme.separator.opacity(0.5), lineWidth: 0.5))
+                .background(RoundedRectangle(cornerRadius: 14).fill(AppColor.card.opacity(0.72)))
+                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(AppColor.separator.opacity(0.5), lineWidth: 0.5))
                 if missing > 0 {
                     Text(playable.isEmpty ? "The release's tracks. None of them is in your digital collection yet."
                          : "Greyed-out tracks are on this release but not in your digital collection.")
-                        .font(.caption).foregroundStyle(.subtext)
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
@@ -465,8 +464,8 @@ struct CollectionItemDetail: View {
             CollectionItemEditor(item: item)
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 12).fill(theme.card.opacity(0.85)))
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+                .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card.opacity(0.85)))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
         }
     }
 
@@ -483,8 +482,8 @@ struct CollectionItemDetail: View {
                         if other.id != others.last?.id { Divider().opacity(0.5) }
                     }
                 }
-                .background(RoundedRectangle(cornerRadius: 12).fill(theme.card.opacity(0.85)))
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+                .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card.opacity(0.85)))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
             }
         }
     }
@@ -504,7 +503,7 @@ struct CollectionItemDetail: View {
                     }
                     if let source = info.descriptionSource {
                         if let url = info.descriptionURL?.webLink { Link("From \(source)", destination: url).font(.caption) }
-                        else { Text("From \(source)").font(.caption).foregroundStyle(.subtext) }
+                        else { Text("From \(source)").font(.caption).foregroundStyle(.secondary) }
                     }
                 }
             }
@@ -523,7 +522,7 @@ struct CollectionItemDetail: View {
                             Label(link.title, systemImage: ArtistDetail.icon(link.kind))
                                 .font(.callout)
                                 .padding(.horizontal, 11).padding(.vertical, 6)
-                                .background(Capsule().fill(theme.fill))
+                                .background(Capsule().fill(AppColor.fill))
                         }
                         .buttonStyle(.plain)
                         .help(url.absoluteString)
@@ -537,7 +536,6 @@ struct CollectionItemDetail: View {
 /// One copy in a list of copies: its small case or sleeve, label, medium, purchase and digital copy.
 struct CopyRow: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let item: CollectionItem
     @State private var hovering = false
 
@@ -551,14 +549,14 @@ struct CopyRow: View {
                     if let s = item.sticker { StickerPill(sticker: s, size: 10) }
                     Text(item.formatDetail ?? item.medium.name).font(.callout.weight(.medium)).lineLimit(1)
                 }
-                if let line = LabelLookupCard.purchaseLine(item) { Text(line).font(.caption).foregroundStyle(.subtext) }
+                if let line = LabelLookupCard.purchaseLine(item) { Text(line).font(.caption).foregroundStyle(.secondary) }
                 DigitalStatusLabel(state: state, medium: item.medium, from: LabelLookupCard.from(state, in: model)).font(.caption)
             }
             Spacer()
-            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.subtext)
+            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(hovering ? theme.fill : Color.clear)
+        .background(hovering ? AppColor.fill : Color.clear)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
     }

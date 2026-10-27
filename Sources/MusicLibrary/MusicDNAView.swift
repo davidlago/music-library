@@ -8,7 +8,6 @@ import SwiftUI
 /// `open` (usually `model.showMusicDNA`) comes from the parent rather than the environment: these links are
 /// used in `Table` cells, which don't always get the app model from the environment and crash reading it.
 struct PersonLink: View {
-    @Environment(\.theme) private var theme
     let name: String
     let open: (String) -> Void
     @State private var hovering = false
@@ -19,7 +18,7 @@ struct PersonLink: View {
         } label: {
             Text(name)
                 .underline(hovering)
-                .foregroundStyle(hovering ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.primary))
+                .foregroundStyle(hovering ? AnyShapeStyle(AppColor.accent) : AnyShapeStyle(.primary))
         }
         .buttonStyle(.plain)
         .onHover { h in
@@ -73,7 +72,6 @@ enum DNAColor {
 
 struct MusicDNAView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     @State private var hovered: Int?
 
     var body: some View {
@@ -120,7 +118,7 @@ struct MusicDNAView: View {
             Spacer()
             if center != nil {
                 HStack(spacing: 6) {
-                    Text("Levels").font(.callout).foregroundStyle(.subtext)
+                    Text("Levels").font(.callout).foregroundStyle(.secondary)
                     Picker("Levels", selection: $model.dnaDepth) {
                         Text("1").tag(1); Text("2").tag(2); Text("3").tag(3)
                     }
@@ -140,7 +138,7 @@ struct DNALegend: View {
             ForEach(CollaborationGraph.Category.allCases, id: \.self) { c in
                 HStack(spacing: 4) {
                     Circle().fill(DNAColor.of(c)).frame(width: 9, height: 9)
-                    Text(c.rawValue).font(.caption).foregroundStyle(.subtext)
+                    Text(c.rawValue).font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
@@ -151,21 +149,20 @@ struct DNALegend: View {
 /// A search field that suggests people from the credits.
 struct PersonPicker: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     @State private var text = ""
     @FocusState private var focused: Bool
 
     var body: some View {
         let results = model.collaborations.search(text, limit: 8)
         HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.subtext)
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
             TextField("Find anyone in your credits", text: $text)
                 .textFieldStyle(.plain)
                 .focused($focused)
                 .onSubmit { if let first = results.first { pick(first.name) } }
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 8).fill(theme.fill))
+        .background(RoundedRectangle(cornerRadius: 8).fill(AppColor.fill))
         .frame(width: 300)
         .overlay(alignment: .topLeading) {
             if focused, !results.isEmpty {
@@ -176,7 +173,7 @@ struct PersonPicker: View {
                                 Circle().fill(DNAColor.of(p.category)).frame(width: 8, height: 8)
                                 Text(p.name).lineLimit(1)
                                 Spacer()
-                                Text(p.roles.first ?? "").font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                                Text(p.roles.first ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             }
                             .padding(.horizontal, 10).padding(.vertical, 6)
                             .contentShape(Rectangle())
@@ -186,8 +183,8 @@ struct PersonPicker: View {
                 }
                 .padding(.vertical, 4)
                 .frame(width: 300)
-                .background(RoundedRectangle(cornerRadius: 8).fill(theme.isThemed ? theme.card : Color(nsColor: .windowBackgroundColor)))
-                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(theme.separator, lineWidth: 0.5))
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .windowBackgroundColor)))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(AppColor.separator, lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
                 .offset(y: 36)
             }
@@ -211,7 +208,7 @@ struct DNALanding: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Music DNA").font(.largeTitle.bold())
                     Text("See who played, wrote and produced with whom across your digital and physical collections. Pick someone to put them at the center; click any bubble to follow the connections.")
-                        .foregroundStyle(.subtext).frame(maxWidth: 640, alignment: .leading)
+                        .foregroundStyle(.secondary).frame(maxWidth: 640, alignment: .leading)
                 }
                 SectionHeader(title: "Most connected in your collections")
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 16)], alignment: .leading, spacing: 18) {
@@ -220,7 +217,7 @@ struct DNALanding: View {
                             VStack(spacing: 6) {
                                 PersonBubble(person: p, size: 72)
                                 Text(p.name).font(.callout.weight(.medium)).lineLimit(1)
-                                Text("\(p.degree) collaborator\(p.degree == 1 ? "" : "s")").font(.caption).foregroundStyle(.subtext)
+                                Text("\(p.degree) collaborator\(p.degree == 1 ? "" : "s")").font(.caption).foregroundStyle(.secondary)
                             }
                             .frame(maxWidth: .infinity)
                             .contentShape(Rectangle())
@@ -237,7 +234,6 @@ struct DNALanding: View {
 /// A circle in the person's category color with their photo (if they're an artist with one) or initials.
 struct PersonBubble: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let person: CollaborationGraph.Person
     let size: CGFloat
     var highlighted = false
@@ -246,7 +242,7 @@ struct PersonBubble: View {
         let color = DNAColor.of(person.category)
         let hasPhoto = model.artistInfo.imageFile(for: person.name) != nil
         ZStack {
-            Circle().fill(theme.isThemed ? theme.card : Color(nsColor: .controlBackgroundColor))
+            Circle().fill(Color(nsColor: .controlBackgroundColor))
             Circle().fill(color.opacity(0.16))
             if hasPhoto {
                 ArtistPhoto(name: person.name, size: size - 6)
@@ -288,7 +284,6 @@ struct EdgeShape: Shape {
 }
 
 struct DNAGraphView: View {
-    @Environment(\.theme) private var theme
     let neighborhood: CollaborationGraph.Neighborhood
     @Binding var hovered: Int?
     let onSelect: (CollaborationGraph.Person) -> Void
@@ -329,7 +324,7 @@ struct DNAGraphView: View {
                 // Rings for the levels.
                 ForEach(1...maxLevel, id: \.self) { level in
                     Circle()
-                        .stroke(theme.separator.opacity(0.35), lineWidth: 0.5)
+                        .stroke(AppColor.separator.opacity(0.35), lineWidth: 0.5)
                         .frame(width: unit * CGFloat(level) * 2, height: unit * CGFloat(level) * 2)
                         .position(origin)
                         .allowsHitTesting(false)
@@ -337,7 +332,7 @@ struct DNAGraphView: View {
                 ForEach(neighborhood.edges) { e in
                     let active = hovered == e.a || hovered == e.b
                     EdgeShape(from: point(e.a), to: point(e.b))
-                        .stroke(active ? theme.accent : Color.primary.opacity(e.isTree ? 0.3 : 0.1),
+                        .stroke(active ? AppColor.accent : Color.primary.opacity(e.isTree ? 0.3 : 0.1),
                                 lineWidth: active ? 2 : (e.isTree ? min(4, 1 + log2(CGFloat(e.weight))) : 0.75))
                         .allowsHitTesting(false)
                 }
@@ -389,7 +384,7 @@ struct DNAGraphView: View {
             Button { withAnimation { zoom = min(3, zoom * 1.25) } } label: { Image(systemName: "plus.magnifyingglass") }
                 .help("Zoom in")
             if neighborhood.hidden > 0 {
-                Text("+\(neighborhood.hidden) more collaborators not shown").font(.caption).foregroundStyle(.subtext)
+                Text("+\(neighborhood.hidden) more collaborators not shown").font(.caption).foregroundStyle(.secondary)
             }
         }
         .buttonStyle(.borderless)
@@ -445,7 +440,6 @@ struct DNANodeView: View {
 
 struct DNADetailPanel: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let center: CollaborationGraph.Person
     let hovered: CollaborationGraph.Person?
 
@@ -460,17 +454,17 @@ struct DNADetailPanel: View {
                         Text(person.name).font(.title3.bold()).lineLimit(2)
                         HStack(spacing: 4) {
                             Circle().fill(DNAColor.of(person.category)).frame(width: 7, height: 7)
-                            Text(person.category.rawValue).font(.caption).foregroundStyle(.subtext)
+                            Text(person.category.rawValue).font(.caption).foregroundStyle(.secondary)
                         }
                         Text("\(songCount(person.trackCount)) · \(person.degree) collaborator\(person.degree == 1 ? "" : "s")")
-                            .font(.caption).foregroundStyle(.subtext)
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 if !person.roles.isEmpty {
                     FlowLayout(spacing: 5) {
                         ForEach(person.roles.prefix(8), id: \.self) { r in
                             Text(r).font(.caption).padding(.horizontal, 7).padding(.vertical, 3)
-                                .background(Capsule().fill(theme.fill))
+                                .background(Capsule().fill(AppColor.fill))
                         }
                     }
                 }
@@ -489,12 +483,12 @@ struct DNADetailPanel: View {
                 if let hovered, hovered.id != center.id {
                     let shared = graph.sharedTracks(center.id, hovered.id)
                     if shared.isEmpty {
-                        Text("Connected to \(center.name) through other collaborators.").font(.callout).foregroundStyle(.subtext)
+                        Text("Connected to \(center.name) through other collaborators.").font(.callout).foregroundStyle(.secondary)
                     } else {
                         trackList("With \(center.name)", shared)
                         physicalList("With \(center.name), in your physical collection", shared)
                     }
-                    Text("Click the bubble to put \(hovered.name) at the center.").font(.caption).foregroundStyle(.subtext)
+                    Text("Click the bubble to put \(hovered.name) at the center.").font(.caption).foregroundStyle(.secondary)
                 } else {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Top collaborators").font(.headline)
@@ -503,7 +497,7 @@ struct DNADetailPanel: View {
                                 Circle().fill(DNAColor.of(c.person.category)).frame(width: 7, height: 7)
                                 PersonLink(name: c.person.name) { model.showMusicDNA($0) }
                                 Spacer()
-                                Text("\(c.shared)").font(.caption).monospacedDigit().foregroundStyle(.subtext)
+                                Text("\(c.shared)").font(.caption).monospacedDigit().foregroundStyle(.secondary)
                                     .help("\(c.shared) shared track\(c.shared == 1 ? "" : "s")")
                             }
                             .font(.callout)
@@ -532,7 +526,7 @@ struct DNADetailPanel: View {
                 Button { play(tracks, at: i) } label: {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(t.title).lineLimit(1)
-                        Text([t.artist, t.album].filter { !$0.isEmpty }.joined(separator: " — ")).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                        Text([t.artist, t.album].filter { !$0.isEmpty }.joined(separator: " — ")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
@@ -540,7 +534,7 @@ struct DNADetailPanel: View {
                 .buttonStyle(.plain)
                 .help("Play")
             }
-            if tracks.count > 25 { Text("and \(tracks.count - 25) more").font(.caption).foregroundStyle(.subtext) }
+            if tracks.count > 25 { Text("and \(tracks.count - 25) more").font(.caption).foregroundStyle(.secondary) }
         }
     }
 
@@ -558,11 +552,11 @@ struct DNADetailPanel: View {
                         HStack(spacing: 8) {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(entry.song.title).lineLimit(1)
-                                Text(entry.item.album).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                                Text(entry.item.album).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             }
                             Spacer(minLength: 6)
                             if let sticker = entry.item.sticker { StickerPill(sticker: sticker, size: 9) }
-                            else { Text(entry.item.medium.name).font(.caption2.weight(.semibold)).foregroundStyle(.subtext) }
+                            else { Text(entry.item.medium.name).font(.caption2.weight(.semibold)).foregroundStyle(.secondary) }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
@@ -570,7 +564,7 @@ struct DNADetailPanel: View {
                     .buttonStyle(.plain)
                     .help("Open your \(entry.item.sticker?.text ?? entry.item.medium.name)")
                 }
-                if songs.count > 25 { Text("and \(songs.count - 25) more").font(.caption).foregroundStyle(.subtext) }
+                if songs.count > 25 { Text("and \(songs.count - 25) more").font(.caption).foregroundStyle(.secondary) }
             }
         }
     }

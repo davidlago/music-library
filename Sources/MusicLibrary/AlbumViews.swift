@@ -6,7 +6,6 @@ import SwiftUI
 /// the right (stacked in narrow windows). Online info comes from the album info cache.
 struct AlbumDetail: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
     let album: AlbumSummary
     @State private var tracks: [Track] = []
@@ -73,7 +72,7 @@ struct AlbumDetail: View {
             // The album was removed from the library.
             if tracks.isEmpty { dismiss() }
         }
-        .sheet(item: $coverSheet) { AlbumCoverSheet(album: album, tracks: tracks, request: $0).themedSheet() }
+        .sheet(item: $coverSheet) { AlbumCoverSheet(album: album, tracks: tracks, request: $0) }
         .task(id: "\(album.id)|\(model.coverRevision)") {
             guard let url = model.coverURL(forAlbum: album) else { cover = nil; return }
             let data = await Task.detached { try? Data(contentsOf: url) }.value
@@ -100,11 +99,11 @@ struct AlbumDetail: View {
         VStack(alignment: .leading, spacing: 10) {
             coverArt(size: coverSize).padding(.bottom, 10)
 
-            Text(typeLine(info)).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.subtext)
+            Text(typeLine(info)).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.secondary)
             Text(title).font(.system(size: 30, weight: .bold)).lineLimit(3).minimumScaleFactor(0.7)
                 .textSelection(.enabled)
             artistButton
-            if let meta = metaLine(info) { Text(meta).font(.callout).foregroundStyle(.subtext) }
+            if let meta = metaLine(info) { Text(meta).font(.callout).foregroundStyle(.secondary) }
             if let info, let rating = info.rating { RatingView(rating: rating, votes: info.ratingVotes) }
             let genres = displayGenres(info)
             if !genres.isEmpty {
@@ -113,7 +112,7 @@ struct AlbumDetail: View {
                         Button { model.search(SearchFilterKey.token("genre", g)) } label: {
                             Text(g.capitalized).font(.caption)
                                 .padding(.horizontal, 9).padding(.vertical, 4)
-                                .background(Capsule().fill(theme.fill))
+                                .background(Capsule().fill(AppColor.fill))
                         }
                         .buttonStyle(.plain)
                     }
@@ -186,7 +185,7 @@ struct AlbumDetail: View {
         }
         .overlay {
             if coverDropTargeted {
-                RoundedRectangle(cornerRadius: JewelCase<EmptyView>.cornerRadius(width: size)).strokeBorder(theme.accent, lineWidth: 3)
+                RoundedRectangle(cornerRadius: JewelCase<EmptyView>.cornerRadius(width: size)).strokeBorder(AppColor.accent, lineWidth: 3)
             }
         }
         .onHover { hoveringCover = $0 }
@@ -210,9 +209,9 @@ struct AlbumDetail: View {
                 .frame(width: side, height: side).clipped()
         } else {
             ZStack {
-                Rectangle().fill(theme.fill)
+                Rectangle().fill(AppColor.fill)
                 VStack(spacing: 12) {
-                    Image(systemName: "music.note").font(.system(size: side / 4)).foregroundStyle(.subtext)
+                    Image(systemName: "music.note").font(.system(size: side / 4)).foregroundStyle(.secondary)
                     if !tracks.isEmpty {
                         Button("Add Cover…") { coverSheet = CoverSheetRequest() }
                     }
@@ -230,7 +229,7 @@ struct AlbumDetail: View {
                 HStack(spacing: 8) {
                     ArtistPhoto(name: artist.name, size: 26)
                     Text(name).font(.title3.weight(.medium))
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.subtext)
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 }
             }
             .buttonStyle(.plain)
@@ -301,7 +300,7 @@ struct AlbumDetail: View {
         }
         if let text = info?.description { about(text, info!) }
         else if model.albumInfo.isFetching(album) {
-            Label("Looking up album info…", systemImage: "arrow.down.circle").font(.callout).foregroundStyle(.subtext)
+            Label("Looking up album info…", systemImage: "arrow.down.circle").font(.callout).foregroundStyle(.secondary)
         }
         if let reviews = info?.reviews.filter(\.url.isWebLink), !reviews.isEmpty { linkChips("Reviews", reviews) }
         details
@@ -320,7 +319,7 @@ struct AlbumDetail: View {
                 }
                 if let source = info.descriptionSource {
                     if let url = info.descriptionURL?.webLink { Link("From \(source)", destination: url).font(.caption) }
-                    else { Text("From \(source)").font(.caption).foregroundStyle(.subtext) }
+                    else { Text("From \(source)").font(.caption).foregroundStyle(.secondary) }
                 }
             }
         }
@@ -335,7 +334,7 @@ struct AlbumDetail: View {
                         Label(link.title, systemImage: ArtistDetail.icon(link.kind))
                             .font(.callout)
                             .padding(.horizontal, 11).padding(.vertical, 6)
-                            .background(Capsule().fill(theme.fill))
+                            .background(Capsule().fill(AppColor.fill))
                     }
                     .buttonStyle(.plain)
                     .help(link.url.absoluteString)
@@ -363,7 +362,7 @@ struct AlbumDetail: View {
                 Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
                     ForEach(rows, id: \.0) { k, v in
                         GridRow {
-                            Text(k).foregroundStyle(.subtext)
+                            Text(k).foregroundStyle(.secondary)
                             Text(v).textSelection(.enabled)
                         }
                         .font(.callout)
@@ -408,11 +407,11 @@ struct AlbumDetail: View {
                                 Button("Show Music DNA") { model.showMusicDNA(p.name) }
                                 Button("Find Songs They're Credited On") { model.search(SearchFilterKey.token("credit", p.name)) }
                             }
-                        Text(p.roles.prefix(3).joined(separator: ", ")).foregroundStyle(.subtext).lineLimit(1)
+                        Text(p.roles.prefix(3).joined(separator: ", ")).foregroundStyle(.secondary).lineLimit(1)
                         Spacer(minLength: 8)
                         if tracks.count > 1 {
                             Text(p.tracks == tracks.count ? "all tracks" : "\(p.tracks) track\(p.tracks == 1 ? "" : "s")")
-                                .font(.caption).foregroundStyle(.subtext)
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                     }
                     .font(.callout)
@@ -437,14 +436,14 @@ struct AlbumDetail: View {
                 SectionHeader(title: "Tracks")
                 Spacer()
                 if missing > 0 {
-                    Text("\(playable.count) of \(rows.count) in your digital collection").font(.callout).foregroundStyle(.subtext)
+                    Text("\(playable.count) of \(rows.count) in your digital collection").font(.callout).foregroundStyle(.secondary)
                 }
             }
             VStack(spacing: 0) {
                 ForEach(discs, id: \.self) { disc in
                     if discs.count > 1 {
                         HStack {
-                            Image(systemName: "opticaldisc").foregroundStyle(.subtext)
+                            Image(systemName: "opticaldisc").foregroundStyle(.secondary)
                             Text("Disc \(disc)").font(.callout.weight(.semibold))
                             Spacer()
                         }
@@ -458,10 +457,10 @@ struct AlbumDetail: View {
                 }
             }
             .padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 14).fill(theme.card.opacity(0.72)))
-            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(theme.separator.opacity(0.5), lineWidth: 0.5))
+            .background(RoundedRectangle(cornerRadius: 14).fill(AppColor.card.opacity(0.72)))
+            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(AppColor.separator.opacity(0.5), lineWidth: 0.5))
             if missing > 0 {
-                Text("Greyed-out tracks are on this release but not in your digital collection.").font(.caption).foregroundStyle(.subtext)
+                Text("Greyed-out tracks are on this release but not in your digital collection.").font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -479,7 +478,6 @@ struct AlbumDetail: View {
 
 struct AlbumTrackRow: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let row: AlbumTracklist.Row
     let albumArtist: String
     let total: PlayTotal?
@@ -500,10 +498,10 @@ struct AlbumTrackRow: View {
         return HStack(spacing: 12) {
             ZStack {
                 if hovering { Image(systemName: "play.fill").font(.caption) }
-                else if isCurrent { Image(systemName: "speaker.wave.2.fill").font(.caption).foregroundStyle(theme.accent) }
+                else if isCurrent { Image(systemName: "speaker.wave.2.fill").font(.caption).foregroundStyle(AppColor.accent) }
                 else {
                     Text((showsPositions ? entry?.position : nil) ?? track.trackNo.map(String.init) ?? entry.map { String($0.number) } ?? "")
-                        .monospacedDigit().foregroundStyle(.subtext)
+                        .monospacedDigit().foregroundStyle(.secondary)
                 }
             }
             .frame(width: 24)
@@ -517,12 +515,12 @@ struct AlbumTrackRow: View {
             RipCheckMark(check: model.ripChecks[track.id])
             LikeButton(model: model, track: track, showsUnliked: hovering)
             if let plays = total?.plays, plays > 0 {
-                Text("\(plays)×").font(.caption).foregroundStyle(.subtext).monospacedDigit().help("\(plays) plays")
+                Text("\(plays)×").font(.caption).foregroundStyle(.secondary).monospacedDigit().help("\(plays) plays")
             }
-            Text(formatTime(track.duration)).monospacedDigit().foregroundStyle(.subtext).frame(width: 46, alignment: .trailing)
+            Text(formatTime(track.duration)).monospacedDigit().foregroundStyle(.secondary).frame(width: 46, alignment: .trailing)
         }
         .padding(.horizontal, 14).padding(.vertical, 7)
-        .background(hovering ? theme.fill : Color.clear)
+        .background(hovering ? AppColor.fill : Color.clear)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(count: 2, perform: play)
@@ -550,10 +548,10 @@ struct AlbumTrackRow: View {
             Spacer()
             Text("Not in digital collection").font(.caption2)
                 .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(Capsule().strokeBorder(theme.separator, lineWidth: 0.5))
+                .background(Capsule().strokeBorder(AppColor.separator, lineWidth: 0.5))
             Text(entry.duration.map(formatTime) ?? "").monospacedDigit().frame(width: 46, alignment: .trailing)
         }
-        .foregroundStyle(.subtext)
+        .foregroundStyle(.secondary)
         .opacity(0.6)
         .padding(.horizontal, 14).padding(.vertical, 7)
     }
@@ -561,7 +559,6 @@ struct AlbumTrackRow: View {
 
 /// Five stars with halves, plus the vote count.
 struct RatingView: View {
-    @Environment(\.theme) private var theme
     let rating: Double
     let votes: Int
 
@@ -573,31 +570,30 @@ struct RatingView: View {
                     Image(systemName: fill >= 0.75 ? "star.fill" : (fill >= 0.25 ? "star.leadinghalf.filled" : "star"))
                 }
             }
-            .foregroundStyle(theme.accent)
+            .foregroundStyle(AppColor.accent)
             Text(String(format: "%.1f", rating)).monospacedDigit().fontWeight(.semibold)
-            Text("· \(votes) MusicBrainz rating\(votes == 1 ? "" : "s")").foregroundStyle(.subtext)
+            Text("· \(votes) MusicBrainz rating\(votes == 1 ? "" : "s")").foregroundStyle(.secondary)
         }
         .font(.callout)
         .help("Community rating on MusicBrainz")
     }
 }
 
-/// The cover, blurred and tinted toward the theme background, filling the page.
+/// The cover, blurred and tinted toward the window background, filling the page.
 struct AlbumBackdrop: View {
-    @Environment(\.theme) private var theme
     let image: NSImage?
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                theme.background
+                AppColor.background
                 if let image {
                     Image(nsImage: image).resizable().scaledToFill()
                         .frame(width: geo.size.width, height: geo.size.height)
                         .blur(radius: 70)
                         .opacity(0.55)
                         .clipped()
-                    LinearGradient(colors: [theme.background.opacity(0.35), theme.background.opacity(0.8)],
+                    LinearGradient(colors: [AppColor.background.opacity(0.35), AppColor.background.opacity(0.8)],
                                    startPoint: .top, endPoint: .bottom)
                 }
             }

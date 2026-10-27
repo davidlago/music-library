@@ -89,15 +89,6 @@ tabs.forEach((tab) => {
   });
 });
 
-// Themes: preview the two themes we have screenshots of.
-const themeButtons = document.querySelectorAll("[data-theme-shot]");
-themeButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    themeButtons.forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
-    swapShot(document.getElementById("theme-shot"), button.dataset.themeShot, button.dataset.themeAlt);
-  });
-});
-
 // Click a screenshot (or a picture in the docs) to see it full size.
 const lightbox = document.getElementById("lightbox");
 if (lightbox && typeof lightbox.showModal === "function") {

@@ -74,7 +74,7 @@ struct AlbumRipSummary: View {
             }
         }
         .font(.callout)
-        .foregroundStyle(.subtext)
+        .foregroundStyle(.secondary)
     }
 
     /// "Checking with AccurateRip: track 3 of 12", and which pressing when several CDs could be the one ripped.

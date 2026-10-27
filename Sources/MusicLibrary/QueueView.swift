@@ -5,7 +5,6 @@ import SwiftUI
 /// the list (what playback started from, plus anything added with Add to Queue). Double-click plays a song, drag reorders, Delete removes.
 struct QueueView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     @State private var selection = Set<PlayQueue.Entry.ID>()
 
     var body: some View {
@@ -47,7 +46,6 @@ struct QueueView: View {
                     }
                 }
             }
-            .themedScrollBackground()
             .contextMenu(forSelectionType: PlayQueue.Entry.ID.self) { ids in
                 if !ids.isEmpty {
                     if ids.count == 1, let id = ids.first { Button("Play") { player.jump(to: id) } }
@@ -65,7 +63,6 @@ struct QueueView: View {
                 }
             }
         }
-        .background(theme.isThemed ? theme.sidebar : Color.clear)
     }
 
     private func remove(_ ids: Set<PlayQueue.Entry.ID>) {
@@ -76,7 +73,6 @@ struct QueueView: View {
 
 private struct QueueRow: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let track: Track
     var isCurrent = false
 
@@ -86,11 +82,11 @@ private struct QueueRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(track.title).lineLimit(1)
                     .fontWeight(isCurrent ? .semibold : .regular)
-                    .foregroundStyle(isCurrent ? AnyShapeStyle(theme.accent) : theme.primaryText)
-                Text(track.artist).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                    .foregroundStyle(isCurrent ? AnyShapeStyle(AppColor.accent) : AnyShapeStyle(.primary))
+                Text(track.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 4)
-            Text(formatTime(track.duration)).font(.caption).monospacedDigit().foregroundStyle(.subtext)
+            Text(formatTime(track.duration)).font(.caption).monospacedDigit().foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
         .help(isCurrent ? track.title : "Double-click to play")

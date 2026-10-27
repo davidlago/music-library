@@ -140,7 +140,6 @@ struct InsightsStack: View {
 // MARK: Building blocks
 
 struct InsightCard<Content: View, Accessory: View>: View {
-    @Environment(\.theme) private var theme
     let title: String
     var subtitle: String?
     @ViewBuilder var accessory: () -> Accessory
@@ -151,7 +150,7 @@ struct InsightCard<Content: View, Accessory: View>: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.headline)
-                    if let subtitle { Text(subtitle).font(.caption).foregroundStyle(.subtext) }
+                    if let subtitle { Text(subtitle).font(.caption).foregroundStyle(.secondary) }
                 }
                 Spacer()
                 accessory()
@@ -160,8 +159,8 @@ struct InsightCard<Content: View, Accessory: View>: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(theme.card))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
     }
 }
 
@@ -189,7 +188,6 @@ struct RankedItem: Identifiable {
 
 /// A clickable ranked list with proportional bars; shows the top few and expands to the rest.
 struct RankedBars: View {
-    @Environment(\.theme) private var theme
     @Environment(AppModel.self) private var model
     let items: [RankedItem]
     var initialCount = 8
@@ -209,23 +207,23 @@ struct RankedBars: View {
                     HStack(spacing: 10) {
                         VStack(alignment: .leading, spacing: 0) {
                             Text(item.name).lineLimit(1)
-                            if let subtitle = item.subtitle { Text(subtitle).font(.caption).foregroundStyle(.subtext).lineLimit(1) }
+                            if let subtitle = item.subtitle { Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
                         }
                         .frame(width: 150, alignment: .leading)
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
-                                Capsule().fill(theme.track)
-                                Capsule().fill(theme.series)
+                                Capsule().fill(AppColor.track)
+                                Capsule().fill(AppColor.series)
                                     .frame(width: max(4, geo.size.width * item.value / top))
                             }
                         }
                         .frame(height: 8)
-                        Text(item.detail).monospacedDigit().foregroundStyle(.subtext)
+                        Text(item.detail).monospacedDigit().foregroundStyle(.secondary)
                             .lineLimit(1).frame(minWidth: 70, alignment: .trailing)
                     }
                     .font(.callout)
                     .padding(.vertical, 3).padding(.horizontal, 6)
-                    .background(RoundedRectangle(cornerRadius: 5).fill(hovered == item.id && (item.query != nil || item.person != nil || item.shelfQuery != nil) ? theme.fill : .clear))
+                    .background(RoundedRectangle(cornerRadius: 5).fill(hovered == item.id && (item.query != nil || item.person != nil || item.shelfQuery != nil) ? AppColor.fill : .clear))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -251,7 +249,6 @@ struct ColumnDatum: Identifiable {
 
 /// A single-series column chart with hover readout; clicking a column searches for its songs.
 struct ColumnChart: View {
-    @Environment(\.theme) private var theme
     @Environment(AppModel.self) private var model
     let data: [ColumnDatum]
     var axisLabels: [String]?
@@ -265,13 +262,13 @@ struct ColumnChart: View {
                 if let h = hovered, let d = data.first(where: { $0.label == h }) {
                     Text("\(d.label) · \(d.value.formatted()) \(d.value == 1 ? String(unit.dropLast()) : unit)").foregroundStyle(.primary)
                 } else {
-                    Text("Hover for details, click a column to see its songs").foregroundStyle(.subtext)
+                    Text("Hover for details, click a column to see its songs").foregroundStyle(.secondary)
                 }
             }
             .font(.caption).monospacedDigit()
             Chart(data) { d in
                 BarMark(x: .value("Bucket", d.label), y: .value("Songs", d.value), width: .ratio(0.82))
-                    .foregroundStyle(theme.series.opacity(hovered == nil || hovered == d.label ? 1 : 0.35))
+                    .foregroundStyle(AppColor.series.opacity(hovered == nil || hovered == d.label ? 1 : 0.35))
                     .cornerRadius(2)
             }
             .chartXAxis {
@@ -359,7 +356,6 @@ struct FlowLayout: Layout {
 }
 
 struct Chip: View {
-    @Environment(\.theme) private var theme
     let text: String
     var query: String?
     @Environment(AppModel.self) private var model
@@ -368,7 +364,7 @@ struct Chip: View {
         Button { if let query { model.search(query) } } label: {
             Text(text).font(.caption).monospacedDigit()
                 .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(Capsule().fill(theme.fill))
+                .background(Capsule().fill(AppColor.fill))
         }
         .buttonStyle(.plain)
         .help(query.map { "Search \($0)" } ?? "")
@@ -404,7 +400,6 @@ struct TileGrid<Content: View>: View {
 
 /// A big number with a label, and optionally a line of context under it.
 struct InsightTile: View {
-    @Environment(\.theme) private var theme
     let value: String
     let label: String
     let icon: String
@@ -412,15 +407,15 @@ struct InsightTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Image(systemName: icon).font(.callout).foregroundStyle(.subtext)
+            Image(systemName: icon).font(.callout).foregroundStyle(.secondary)
             Text(value).font(.system(size: 26, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.6)
-            Text(label).font(.caption).foregroundStyle(.subtext)
-            if let detail { Text(detail).font(.caption2).foregroundStyle(.subtext).lineLimit(1).minimumScaleFactor(0.8) }
+            Text(label).font(.caption).foregroundStyle(.secondary)
+            if let detail { Text(detail).font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8) }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(theme.card))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
     }
 }
 
@@ -504,7 +499,6 @@ struct ArtistsCard: View {
 }
 
 struct QualityCard: View {
-    @Environment(\.theme) private var theme
     @Environment(AppModel.self) private var model
     let stats: LibraryStats
 
@@ -514,7 +508,7 @@ struct QualityCard: View {
             HStack(alignment: .center, spacing: 20) {
                 Chart(stats.qualityTiers) { t in
                     SectorMark(angle: .value("Songs", t.count), innerRadius: .ratio(0.62), angularInset: 1.5)
-                        .foregroundStyle(theme.tier(t.tier))
+                        .foregroundStyle(AppColor.tier(t.tier))
                         .cornerRadius(2)
                 }
                 .chartLegend(.hidden)
@@ -522,7 +516,7 @@ struct QualityCard: View {
                     VStack(spacing: 0) {
                         Text((Double(stats.losslessCount) / Double(total)).formatted(.percent.precision(.fractionLength(0))))
                             .font(.title3.weight(.semibold)).monospacedDigit()
-                        Text("lossless").font(.caption2).foregroundStyle(.subtext)
+                        Text("lossless").font(.caption2).foregroundStyle(.secondary)
                     }
                 }
                 .frame(width: 130, height: 130)
@@ -530,10 +524,10 @@ struct QualityCard: View {
                     ForEach(stats.qualityTiers) { t in
                         Button { if let q = t.tier.query { model.search(q) } } label: {
                             HStack(spacing: 8) {
-                                RoundedRectangle(cornerRadius: 3).fill(theme.tier(t.tier)).frame(width: 12, height: 12)
+                                RoundedRectangle(cornerRadius: 3).fill(AppColor.tier(t.tier)).frame(width: 12, height: 12)
                                 Text(t.tier.rawValue)
                                 Spacer()
-                                Text(songCount(t.count)).foregroundStyle(.subtext).monospacedDigit()
+                                Text(songCount(t.count)).foregroundStyle(.secondary).monospacedDigit()
                                 Text((Double(t.count) / Double(total)).formatted(.percent.precision(.fractionLength(0))))
                                     .monospacedDigit().frame(width: 44, alignment: .trailing)
                             }
@@ -557,14 +551,13 @@ struct QualityCard: View {
 
     private func chipRow(_ title: String, _ chips: [(String, String)]) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(title).font(.caption).foregroundStyle(.subtext).frame(width: 84, alignment: .leading)
+            Text(title).font(.caption).foregroundStyle(.secondary).frame(width: 84, alignment: .leading)
             FlowLayout { ForEach(chips, id: \.0) { Chip(text: $0.0, query: $0.1) } }
         }
     }
 }
 
 struct GrowthCard: View {
-    @Environment(\.theme) private var theme
     let stats: LibraryStats
     @State private var hovered: LibraryStats.GrowthPoint?
 
@@ -576,7 +569,7 @@ struct GrowthCard: View {
                         if let h = hovered {
                             Text("\(period(h.date)) · +\(h.added.formatted()) → \(songCount(h.total))").foregroundStyle(.primary)
                         } else {
-                            Text("Songs in your digital collection over time").foregroundStyle(.subtext)
+                            Text("Songs in your digital collection over time").foregroundStyle(.secondary)
                         }
                     }
                     .font(.caption).monospacedDigit()
@@ -584,16 +577,16 @@ struct GrowthCard: View {
                         ForEach(stats.growth) { p in
                             AreaMark(x: .value("Date", p.date), y: .value("Songs", p.total))
                                 .interpolationMethod(.stepEnd)
-                                .foregroundStyle(LinearGradient(colors: [theme.series.opacity(0.28), theme.series.opacity(0.03)], startPoint: .top, endPoint: .bottom))
+                                .foregroundStyle(LinearGradient(colors: [AppColor.series.opacity(0.28), AppColor.series.opacity(0.03)], startPoint: .top, endPoint: .bottom))
                             LineMark(x: .value("Date", p.date), y: .value("Songs", p.total))
                                 .interpolationMethod(.stepEnd)
                                 .lineStyle(StrokeStyle(lineWidth: 2))
-                                .foregroundStyle(theme.series)
+                                .foregroundStyle(AppColor.series)
                         }
                         if let h = hovered {
                             RuleMark(x: .value("Date", h.date)).lineStyle(StrokeStyle(lineWidth: 1)).foregroundStyle(Color.secondary.opacity(0.6))
                             PointMark(x: .value("Date", h.date), y: .value("Songs", h.total))
-                                .symbolSize(70).foregroundStyle(theme.series)
+                                .symbolSize(70).foregroundStyle(AppColor.series)
                         }
                     }
                     .chartYAxis {
@@ -615,9 +608,9 @@ struct GrowthCard: View {
                 }
             } else {
                 VStack(alignment: .leading, spacing: 6) {
-                    Image(systemName: "chart.line.uptrend.xyaxis").font(.title2).foregroundStyle(.subtext)
+                    Image(systemName: "chart.line.uptrend.xyaxis").font(.title2).foregroundStyle(.secondary)
                     Text("All \(songCount(stats.trackCount)) arrived \(stats.firstAdded.map { "on " + $0.formatted(date: .long, time: .omitted) } ?? "together").")
-                    Text("Your growth curve starts with your next import.").foregroundStyle(.subtext)
+                    Text("Your growth curve starts with your next import.").foregroundStyle(.secondary)
                 }
                 .font(.callout)
                 .frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
@@ -679,7 +672,7 @@ struct LabelsCard: View {
             }
             if !stats.countries.isEmpty {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("Released in").font(.caption).foregroundStyle(.subtext)
+                    Text("Released in").font(.caption).foregroundStyle(.secondary)
                     FlowLayout {
                         ForEach(stats.countries) { c in
                             Chip(text: "\(Self.countryName(c.name)) \(c.count.formatted())", query: SearchFilterKey.token("country", c.name))
@@ -698,7 +691,6 @@ struct LabelsCard: View {
 }
 
 struct HealthCard: View {
-    @Environment(\.theme) private var theme
     @Environment(AppModel.self) private var model
     let stats: LibraryStats
 
@@ -713,8 +705,8 @@ struct HealthCard: View {
                         Text(c.label).font(.callout).frame(width: 130, alignment: .leading)
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
-                                Capsule().fill(theme.track)
-                                Capsule().fill(theme.series).frame(width: c.present == 0 ? 0 : max(4, geo.size.width * fraction))
+                                Capsule().fill(AppColor.track)
+                                Capsule().fill(AppColor.series).frame(width: c.present == 0 ? 0 : max(4, geo.size.width * fraction))
                             }
                         }
                         .frame(height: 8)
@@ -725,7 +717,7 @@ struct HealthCard: View {
                                 Button("\(missing.formatted()) missing") { model.search("missing:\(c.field.rawValue)") }
                                     .buttonStyle(.link)
                             } else {
-                                Label("Complete", systemImage: "checkmark").foregroundStyle(.subtext)
+                                Label("Complete", systemImage: "checkmark").foregroundStyle(.secondary)
                             }
                         }
                         .font(.caption).frame(width: 90, alignment: .leading)
@@ -751,7 +743,6 @@ struct FunFact: Identifiable {
 
 /// A grid of fun facts; facts with a query search for it when clicked.
 struct FactsGrid: View {
-    @Environment(\.theme) private var theme
     @Environment(AppModel.self) private var model
     let facts: [FunFact]
 
@@ -764,17 +755,17 @@ struct FactsGrid: View {
                     else if let q = f.query { model.search(q) }
                 } label: {
                     HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: f.icon).font(.title3).foregroundStyle(theme.series).frame(width: 26)
+                        Image(systemName: f.icon).font(.title3).foregroundStyle(AppColor.series).frame(width: 26)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(f.title).font(.caption).foregroundStyle(.subtext)
+                            Text(f.title).font(.caption).foregroundStyle(.secondary)
                             Text(f.value).font(.title3.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.7)
-                            Text(f.detail).font(.caption).foregroundStyle(.subtext).lineLimit(2)
+                            Text(f.detail).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                         }
                         Spacer(minLength: 0)
                     }
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(theme.fill.opacity(0.7)))
+                    .background(RoundedRectangle(cornerRadius: 8).fill(AppColor.fill.opacity(0.7)))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

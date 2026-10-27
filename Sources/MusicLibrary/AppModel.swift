@@ -80,7 +80,6 @@ final class AppModel {
         static let askCDOwnership = "collectionAskOnInsert"
         static let ejectAfterCataloging = "collectionEjectAfterCataloging"
         static let recentSearches = "recentSearches"
-        static let theme = "theme"
         static let dnaDepth = "musicDNADepth"
         static let exportList = "exportList"
         static let exportDatabase = "exportBackupDatabase"
@@ -89,13 +88,13 @@ final class AppModel {
         static let showsQueue = "showsQueue"
     }
 
-    var themeID: String {
+    /// System, Light or Dark. A theme chosen in an older version becomes its mode (`AppearanceMode.resolve`).
+    var appearance: AppearanceMode {
         didSet {
-            UserDefaults.standard.set(themeID, forKey: Keys.theme)
+            UserDefaults.standard.set(appearance.rawValue, forKey: AppearanceMode.defaultsKey)
             applyAppearance()
         }
     }
-    var theme: Theme { Theme.named(themeID) }
 
     /// Songs until the collection is first loaded, then the Shelf when there's anything on it (unless something else
     /// was picked meanwhile).
@@ -306,7 +305,8 @@ final class AppModel {
         autoMatch = defaults.object(forKey: Keys.autoMatch) == nil ? true : defaults.bool(forKey: Keys.autoMatch)
         musicBrainz = MusicBrainzClient(contact: defaults.string(forKey: Keys.contact) ?? "")
         recentSearches = defaults.stringArray(forKey: Keys.recentSearches) ?? []
-        themeID = defaults.string(forKey: Keys.theme) ?? Theme.system.id
+        appearance = AppearanceMode.resolve(stored: defaults.string(forKey: AppearanceMode.defaultsKey),
+                                            legacyTheme: defaults.string(forKey: AppearanceMode.legacyThemeKey))
         dnaDepth = min(3, max(1, defaults.object(forKey: Keys.dnaDepth) == nil ? 2 : defaults.integer(forKey: Keys.dnaDepth)))
         exportList = defaults.data(forKey: Keys.exportList).flatMap { try? JSONDecoder().decode([ExportItem].self, from: $0) } ?? []
         exportBackupDatabase = defaults.bool(forKey: Keys.exportDatabase)
@@ -375,12 +375,12 @@ final class AppModel {
 
     // MARK: Appearance
 
-    /// Menus, sheets and the Settings window follow a theme that only comes in light or dark.
+    /// Every window, menu and sheet follows the chosen mode; System clears the override.
     func applyAppearance() {
-        switch theme.forcedDark {
-        case true?: NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
-        case false?: NSApplication.shared.appearance = NSAppearance(named: .aqua)
-        case nil: NSApplication.shared.appearance = nil
+        switch appearance {
+        case .dark: NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
+        case .light: NSApplication.shared.appearance = NSAppearance(named: .aqua)
+        case .system: NSApplication.shared.appearance = nil
         }
     }
 

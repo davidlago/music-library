@@ -7,6 +7,11 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- Changed: **themes are gone**. Music Library now has one look in **Light** and **Dark**, following your Mac or iPhone,
+  with **System**, **Light** or **Dark** in **Settings ▸ Appearance** on the Mac (also **View ▸ Appearance**) and under
+  **Appearance** in the iPhone app's Settings. A theme you had picked becomes its mode: themes that came in light and
+  dark follow the system, the others stay light or dark.
+
 ## 1.27.0
 
 - New: choose the **Radio DJ**'s model. Add a Claude API key, an [OpenRouter](https://openrouter.ai) key, or both, in

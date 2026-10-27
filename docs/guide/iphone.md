@@ -112,6 +112,7 @@ as the Mac, including `own:` and labels like `cd 12`.
 
 The gear on the Digital tab:
 
+- **Appearance**: **System** (follows your iPhone's light or dark setting), **Light** or **Dark**.
 - **Match the DAC's sample rate** (on by default) and the current output.
 - **Radio DJ**: the DJ's name, yours, and this phone's spending (set up on the Mac; see [Radio DJ](radio-dj.md)).
 - **Last.fm**: connected from the Mac at the first sync, or enter an API key and shared secret and tap **Connect…**. The

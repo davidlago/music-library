@@ -29,12 +29,12 @@ struct CDView: View {
             footer.padding(12)
         }
         .navigationTitle(disc.title)
-        .sheet(isPresented: $showCoverSheet) { CDCoverSheet(disc: disc).themedSheet() }
+        .sheet(isPresented: $showCoverSheet) { CDCoverSheet(disc: disc) }
         .onAppear { showWrongAlbum = disc.lookup == .matched && !hasExactMatch }
         .onChange(of: disc.lookup) { _, new in
             if new == .matched { showWrongAlbum = !hasExactMatch }
         }
-        .sheet(isPresented: $askOwnership) { CDCollectionSheet(disc: disc) { model.cd.rip(disc) }.themedSheet() }
+        .sheet(isPresented: $askOwnership) { CDCollectionSheet(disc: disc) { model.cd.rip(disc) } }
     }
 
     @ViewBuilder
@@ -86,12 +86,12 @@ struct CDView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(disc.title).font(.title2.bold()).lineLimit(2)
                 if let release = disc.release {
-                    Text(release.albumArtist).font(.title3).foregroundStyle(.subtext)
-                    Text(details(release)).font(.callout).foregroundStyle(.subtext)
+                    Text(release.albumArtist).font(.title3).foregroundStyle(.secondary)
+                    Text(details(release)).font(.callout).foregroundStyle(.secondary)
                 } else {
-                    if !disc.searchArtist.isEmpty { Text(disc.searchArtist).font(.title3).foregroundStyle(.subtext) }
+                    if !disc.searchArtist.isEmpty { Text(disc.searchArtist).font(.title3).foregroundStyle(.secondary) }
                     Text("Audio CD · \(disc.volume.toc.audioTracks.count) tracks · \(formatTime(totalDuration))")
-                        .font(.callout).foregroundStyle(.subtext)
+                        .font(.callout).foregroundStyle(.secondary)
                 }
                 if disc.candidates.count > 0 { editionPicker }
                 Spacer(minLength: 0)
@@ -144,7 +144,7 @@ struct CDView: View {
         case .looking:
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text("Looking up disc on MusicBrainz…").foregroundStyle(.subtext)
+                Text("Looking up disc on MusicBrainz…").foregroundStyle(.secondary)
                 Spacer()
             }
             .padding(10)
@@ -166,10 +166,10 @@ struct CDView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("This disc isn't in MusicBrainz yet.").font(.headline)
             Text("Search for the album by name, or rip it as you name it here: the album and artist below, the song titles in the list (click one to change it) and the cover go into the files. Submit this disc so it is known next time.")
-                .font(.callout).foregroundStyle(.subtext)
+                .font(.callout).foregroundStyle(.secondary)
             if !disc.volume.names.titles.isEmpty {
                 Label("The song titles start as the names macOS shows for this disc.", systemImage: "text.quote")
-                    .font(.callout).foregroundStyle(.subtext)
+                    .font(.callout).foregroundStyle(.secondary)
             }
             searchControls
         }
@@ -188,7 +188,7 @@ struct CDView: View {
             }
             .textFieldStyle(.roundedBorder)
             .onSubmit { Task { await model.cd.searchManually(disc) } }
-            if let message = disc.message { Text(message).font(.callout).foregroundStyle(.subtext) }
+            if let message = disc.message { Text(message).font(.callout).foregroundStyle(.secondary) }
             Button("Submit this disc to MusicBrainz…") { model.cd.submit(disc) }
         }
     }
@@ -209,14 +209,14 @@ struct CDView: View {
                 Text("Time").frame(width: 50, alignment: .trailing)
                 Text("Status").frame(width: 250, alignment: .leading)
             }
-            .font(.caption.bold()).foregroundStyle(.subtext)
+            .font(.caption.bold()).foregroundStyle(.secondary)
 
             ForEach($disc.rows) { $row in
                 HStack(spacing: 10) {
                     Toggle("", isOn: $row.selected)
                         .labelsHidden()
                         .disabled(disc.isRipping || row.status.isFinished)
-                    Text("\(row.id)").monospacedDigit().foregroundStyle(.subtext).frame(width: 28, alignment: .trailing)
+                    Text("\(row.id)").monospacedDigit().foregroundStyle(.secondary).frame(width: 28, alignment: .trailing)
                     if disc.isUnmatched, !disc.isRipping, !row.status.isFinished {
                         // No release to name the songs: they're ripped with the titles typed here.
                         TextField("Title", text: $row.title).textFieldStyle(.plain).lineLimit(1)
@@ -225,13 +225,12 @@ struct CDView: View {
                         Text(row.title).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                     }
                     Text(row.artist.isEmpty && disc.isUnmatched ? disc.searchArtist : row.artist)
-                        .lineLimit(1).foregroundStyle(.subtext).frame(width: 180, alignment: .leading)
-                    Text(formatTime(row.duration)).monospacedDigit().foregroundStyle(.subtext).frame(width: 50, alignment: .trailing)
+                        .lineLimit(1).foregroundStyle(.secondary).frame(width: 180, alignment: .leading)
+                    Text(formatTime(row.duration)).monospacedDigit().foregroundStyle(.secondary).frame(width: 50, alignment: .trailing)
                     statusView(row).frame(width: 250, alignment: .leading)
                 }
             }
         }
-        .themedScrollBackground()
     }
 
     @ViewBuilder
@@ -269,9 +268,9 @@ struct CDView: View {
         case .done:
             Label("Imported", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.green)
         case .queued:
-            Label("Sent to Import", systemImage: "tray.and.arrow.down").font(.caption).foregroundStyle(.subtext)
+            Label("Sent to Import", systemImage: "tray.and.arrow.down").font(.caption).foregroundStyle(.secondary)
         case .inLibrary:
-            Text("In digital collection" + (ripped.map { " · \($0.text) · ripped" } ?? "")).font(.caption).foregroundStyle(.subtext)
+            Text("In digital collection" + (ripped.map { " · \($0.text) · ripped" } ?? "")).font(.caption).foregroundStyle(.secondary)
         case .failed(let message):
             Text(message).font(.caption).foregroundStyle(.red).lineLimit(1).help(message)
         }

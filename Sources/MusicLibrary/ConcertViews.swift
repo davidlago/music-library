@@ -6,26 +6,24 @@ import SwiftUI
 
 /// A calendar-page date: "NOV" over "2".
 struct ConcertDateTile: View {
-    @Environment(\.theme) private var theme
     let day: PurchaseDay
 
     var body: some View {
         let date = day.date()
         VStack(spacing: 0) {
             Text(date.formatted(.dateTime.month(.abbreviated)).uppercased())
-                .font(.caption2.weight(.bold)).foregroundStyle(theme.accent)
+                .font(.caption2.weight(.bold)).foregroundStyle(AppColor.accent)
             Text(date.formatted(.dateTime.day())).font(.system(size: 20, weight: .semibold, design: .rounded))
-            Text(date.formatted(.dateTime.weekday(.abbreviated))).font(.caption2).foregroundStyle(.subtext)
+            Text(date.formatted(.dateTime.weekday(.abbreviated))).font(.caption2).foregroundStyle(.secondary)
         }
         .frame(width: 48, height: 56)
-        .background(RoundedRectangle(cornerRadius: 8).fill(theme.fill))
+        .background(RoundedRectangle(cornerRadius: 8).fill(AppColor.fill))
     }
 }
 
 /// One concert. With `artist` set, the row leads with that artist (the Concerts page); without, with the venue
 /// (an artist's own page, `pageArtist`).
 struct ConcertRow: View {
-    @Environment(\.theme) private var theme
     let concert: Concert
     let store: ConcertStore
     /// The artist whose page this is, to leave out of "with …".
@@ -56,12 +54,12 @@ struct ConcertRow: View {
                         statusBadge
                     }
                 }
-                Text(details).font(.caption).foregroundStyle(.subtext).lineLimit(1)
-                if let extra { Text(extra).font(.caption).foregroundStyle(.subtext).lineLimit(1) }
+                Text(details).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                if let extra { Text(extra).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
             }
             Spacer(minLength: 8)
             if let price = priceText {
-                Text(price).font(.caption).foregroundStyle(.subtext).monospacedDigit()
+                Text(price).font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
             if let url = concert.url?.webLink {
                 Link(destination: url) {
@@ -72,7 +70,7 @@ struct ConcertRow: View {
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(hovering ? theme.fill.opacity(0.6) : Color.clear)
+        .background(hovering ? AppColor.fill.opacity(0.6) : Color.clear)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .contextMenu {
@@ -131,9 +129,9 @@ struct ConcertAttribution: View {
     var body: some View {
         if !sources.isEmpty {
             HStack(spacing: 4) {
-                Text("Concert listings from").foregroundStyle(.subtext)
+                Text("Concert listings from").foregroundStyle(.secondary)
                 ForEach(Array(sources.enumerated()), id: \.element) { i, s in
-                    if i > 0 { Text(i == sources.count - 1 ? "and" : ",").foregroundStyle(.subtext) }
+                    if i > 0 { Text(i == sources.count - 1 ? "and" : ",").foregroundStyle(.secondary) }
                     Link(s.name, destination: s.homepage)
                 }
             }
@@ -147,7 +145,6 @@ struct ConcertAttribution: View {
 /// Upcoming concerts near home on an artist's page.
 struct ArtistConcertsSection: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let artist: String
     let mbid: String?
     @State private var showAll = false
@@ -159,7 +156,7 @@ struct ArtistConcertsSection: View {
                 HStack(alignment: .firstTextBaseline) {
                     SectionHeader(title: "Concerts Near You")
                     if store.isConfigured {
-                        Text(store.areaDescription).font(.callout).foregroundStyle(.subtext)
+                        Text(store.areaDescription).font(.callout).foregroundStyle(.secondary)
                     }
                     Spacer()
                     if store.isConfigured {
@@ -182,11 +179,11 @@ struct ArtistConcertsSection: View {
     private func content(_ store: ConcertStore) -> some View {
         if !store.isConfigured {
             HStack(spacing: 10) {
-                Image(systemName: "ticket").foregroundStyle(.subtext)
+                Image(systemName: "ticket").foregroundStyle(.secondary)
                 Text(store.home == nil
                      ? "Add your \(store.codeName) and a free concert listings key to see when artists play near you."
                      : "Add a free Ticketmaster or JamBase key to see when artists play near you.")
-                    .foregroundStyle(.subtext)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 SettingsLink { Text("Open Settings…") }
             }
@@ -195,7 +192,7 @@ struct ArtistConcertsSection: View {
             let concerts = found.concerts
             if concerts.isEmpty {
                 Text(store.isLoading(artist) ? "Checking for new dates…" : "No upcoming concerts \(store.areaDescription).")
-                    .font(.callout).foregroundStyle(.subtext)
+                    .font(.callout).foregroundStyle(.secondary)
             } else {
                 let shown = showAll ? concerts : Array(concerts.prefix(5))
                 VStack(spacing: 0) {
@@ -205,8 +202,8 @@ struct ArtistConcertsSection: View {
                     }
                 }
                 .padding(.vertical, 4)
-                .background(RoundedRectangle(cornerRadius: 12).fill(theme.card))
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+                .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
                 if concerts.count > 5 {
                     Button(showAll ? "Show Fewer" : "Show All \(concerts.count) Concerts") { withAnimation(.snappy) { showAll.toggle() } }
                         .buttonStyle(.link)
@@ -216,7 +213,7 @@ struct ArtistConcertsSection: View {
         } else if store.isLoading(artist) {
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text("Looking for concerts \(store.areaDescription)…").font(.callout).foregroundStyle(.subtext)
+                Text("Looking for concerts \(store.areaDescription)…").font(.callout).foregroundStyle(.secondary)
             }
         }
         if let error = store.error(for: artist) {
@@ -231,7 +228,7 @@ struct ArtistConcertsSection: View {
         HStack(spacing: 14) {
             if found.elsewhereCount > 0 {
                 Text("\(found.elsewhereCount) more show\(found.elsewhereCount == 1 ? "" : "s") farther away")
-                    .foregroundStyle(.subtext)
+                    .foregroundStyle(.secondary)
             }
             ForEach(found.bySource.filter { $0.artistURL?.webLink != nil }, id: \.source) { s in
                 Link("All dates on \(s.source.name)", destination: s.artistURL!)
@@ -248,7 +245,6 @@ struct ArtistConcertsSection: View {
 /// Upcoming concerts near home by artists in the library.
 struct ConcertsView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     @State private var filter = ""
     @AppStorage("concertsListenedOnly") private var listenedOnly = false
 
@@ -270,8 +266,8 @@ struct ConcertsView: View {
                                 }
                             }
                             .padding(.vertical, 4)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(theme.card))
-                            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+                            .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
+                            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
                         }
                     }
                     if let scan = store.scan, !items.isEmpty { ConcertAttribution(sources: scan.sources) }
@@ -301,15 +297,15 @@ struct ConcertsView: View {
     private func header(_ store: ConcertStore, count: Int) -> some View {
         HStack(spacing: 12) {
             HStack(spacing: 6) {
-                Image(systemName: "line.3.horizontal.decrease").foregroundStyle(.subtext)
+                Image(systemName: "line.3.horizontal.decrease").foregroundStyle(.secondary)
                 TextField("Filter artists, venues, cities", text: $filter).textFieldStyle(.plain)
                 if !filter.isEmpty {
                     Button { filter = "" } label: { Image(systemName: "xmark.circle.fill") }
-                        .buttonStyle(.plain).foregroundStyle(.subtext)
+                        .buttonStyle(.plain).foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 8).fill(theme.fill))
+            .background(RoundedRectangle(cornerRadius: 8).fill(AppColor.fill))
             .frame(maxWidth: 300)
             Picker("Artists", selection: $listenedOnly) {
                 Text("All Artists").tag(false)
@@ -327,7 +323,7 @@ struct ConcertsView: View {
         if store.isScanning {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                Text("Looking for concerts…").font(.caption).foregroundStyle(.subtext)
+                Text("Looking for concerts…").font(.caption).foregroundStyle(.secondary)
             }
         } else if let error = store.scanError {
             Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange).lineLimit(1).help(error)
@@ -335,7 +331,7 @@ struct ConcertsView: View {
             Label(warning, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange).lineLimit(1)
                 .help(store.scanWarnings.joined(separator: "\n"))
         } else if let scan = store.scan {
-            Text("Updated \(scan.scannedAt.formatted(.relative(presentation: .named)))").font(.caption).foregroundStyle(.subtext)
+            Text("Updated \(scan.scannedAt.formatted(.relative(presentation: .named)))").font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -398,7 +394,7 @@ struct ConcertSettings: View {
         Form {
             Section {
                 Text("See upcoming concerts near you on artist pages, and every artist in your digital and physical collections on the Concerts page.")
-                    .font(.callout).foregroundStyle(.subtext)
+                    .font(.callout).foregroundStyle(.secondary)
             }
             Section("Where you live") {
                 PostalCodeField(store: store)
@@ -416,27 +412,26 @@ struct ConcertSettings: View {
                 Text("Concert listings")
             } footer: {
                 Text("Use either or both; shows listed by both appear once. Keys are stored in your keychain on this Mac. Results are saved for a day (two for all your artists) to stay within the free limits.")
-                    .font(.caption).foregroundStyle(.subtext)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Artist pages") {
                 Toggle("Show upcoming concerts on artist pages", isOn: $store.showsOnArtistPages)
             }
         }
         .formStyle(.grouped)
-        .themedScrollBackground()
         .frame(height: 600)
     }
 
     @ViewBuilder
     private func locationStatus(_ store: ConcertStore) -> some View {
         if store.isLocating {
-            HStack { ProgressView().controlSize(.small); Text("Looking up…").foregroundStyle(.subtext) }
+            HStack { ProgressView().controlSize(.small); Text("Looking up…").foregroundStyle(.secondary) }
         } else if let error = store.locationError {
             Label(error, systemImage: "exclamationmark.circle.fill").foregroundStyle(.orange)
         } else if let home = store.home {
             Label(home.place, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
         } else {
-            Text("Not set").foregroundStyle(.subtext)
+            Text("Not set").foregroundStyle(.secondary)
         }
     }
 
@@ -445,7 +440,7 @@ struct ConcertSettings: View {
             TextField(text: text) { Text(title).font(.body) }
                 .font(.system(.body, design: .monospaced))
             HStack(alignment: .firstTextBaseline) {
-                Text(note).font(.caption).foregroundStyle(.subtext)
+                Text(note).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Link("Get a key", destination: source.signupURL).font(.caption)
             }

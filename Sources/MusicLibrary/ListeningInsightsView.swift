@@ -24,7 +24,7 @@ struct ListeningContent: View {
                     if stats.listens == 0 {
                         InsightCard(title: "Nothing played in the last \(stats.period.rawValue.lowercased())") {
                             Text("Your listening history goes back to \(stats.firstListen!.formatted(date: .long, time: .omitted)). Pick a longer period above, or press play.")
-                                .font(.callout).foregroundStyle(.subtext)
+                                .font(.callout).foregroundStyle(.secondary)
                         }
                     } else {
                         ListeningHero(stats: stats)
@@ -70,7 +70,7 @@ struct ListeningContent: View {
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(range).font(.callout.weight(.medium)).foregroundStyle(.subtext)
+            Text(range).font(.callout.weight(.medium)).foregroundStyle(.secondary)
             Spacer()
             Picker("Period", selection: $period) { ForEach(ListeningStats.Period.allCases) { Text($0.rawValue).tag($0) } }
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
@@ -202,7 +202,7 @@ private struct ListeningArt: View {
                 GeometryReader { geo in
                     Image(systemName: kind == .artist ? "music.mic" : "music.note")
                         .font(.system(size: max(10, min(geo.size.width, geo.size.height) / 3)))
-                        .foregroundStyle(.subtext)
+                        .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
@@ -242,15 +242,14 @@ private func panelTint(_ image: NSImage?) -> RGB? {
     return ArtworkTint.panel(from: average)
 }
 
-private extension ThemeColors {
+private extension AppColor {
     /// The panel color when there's no picture to take one from.
-    var defaultPanel: RGB { ArtworkTint.panel(from: palette?.series ?? RGB(0x2a78d6)) }
+    static let defaultPanel = ArtworkTint.panel(from: RGB(0x2a78d6))
 }
 
 /// One ranked item: rank, picture, name and the measure; clicking opens it.
 private struct ListeningRow: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     var rank: Int?
     let item: ListeningStats.Item
     let kind: ListeningKind
@@ -262,7 +261,7 @@ private struct ListeningRow: View {
         Button { open(item, kind, model) } label: {
             HStack(spacing: 10) {
                 if let rank {
-                    Text("#\(rank)").font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(.subtext)
+                    Text("#\(rank)").font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(.secondary)
                         .frame(minWidth: 28, alignment: .leading)
                 }
                 ListeningArt(item: item, kind: kind)
@@ -271,15 +270,15 @@ private struct ListeningRow: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(item.name).lineLimit(1)
                     if kind != .artist, !item.subtitle.isEmpty {
-                        Text(item.subtitle).font(.caption).foregroundStyle(.subtext).lineLimit(1)
+                        Text(item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
                 Spacer(minLength: 8)
-                Text(detail).monospacedDigit().foregroundStyle(.subtext).lineLimit(1)
+                Text(detail).monospacedDigit().foregroundStyle(.secondary).lineLimit(1)
             }
             .font(.callout)
             .padding(.vertical, 3).padding(.horizontal, 8)
-            .background(RoundedRectangle(cornerRadius: 6).fill(hovered ? theme.fill : .clear))
+            .background(RoundedRectangle(cornerRadius: 6).fill(hovered ? AppColor.fill : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -341,7 +340,6 @@ private struct EvenRow<Content: View>: View {
 
 /// A bold section title with a short rule under it.
 private struct ListeningSection<Accessory: View>: View {
-    @Environment(\.theme) private var theme
     let title: String
     @ViewBuilder var accessory: () -> Accessory
 
@@ -349,7 +347,7 @@ private struct ListeningSection<Accessory: View>: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 5) {
                 Text(title).font(.system(size: 20, weight: .bold, design: .rounded))
-                Capsule().fill(theme.series).frame(width: 34, height: 3)
+                Capsule().fill(AppColor.series).frame(width: 34, height: 3)
             }
             Spacer()
             accessory()
@@ -373,7 +371,7 @@ private struct DeltaLabel: View {
             Image(systemName: up ? "arrow.up" : "arrow.down").fontWeight(.bold)
                 .foregroundStyle(onPanel ? AnyShapeStyle(.white) : AnyShapeStyle(up ? Color.green : Color.red))
             Text(abs(delta).formatted(.percent.precision(.fractionLength(0))))
-                .foregroundStyle(onPanel ? AnyShapeStyle(.white.opacity(0.9)) : AnyShapeStyle(.subtext))
+                .foregroundStyle(onPanel ? AnyShapeStyle(.white.opacity(0.9)) : AnyShapeStyle(.secondary))
         }
         .font(.caption.weight(.semibold)).monospacedDigit()
     }
@@ -385,7 +383,6 @@ private struct DeltaLabel: View {
 /// same span before.
 private struct ListeningHero: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let stats: ListeningStats
     @State private var backdrop: NSImage?
     @State private var hovered: Int?
@@ -444,7 +441,7 @@ private struct ListeningHero: View {
     }
 
     @ViewBuilder private var background: some View {
-        let base = Color(theme.defaultPanel)
+        let base = Color(AppColor.defaultPanel)
         ZStack {
             base
             if let backdrop {
@@ -570,7 +567,6 @@ private struct HeroChart: View {
 /// Your top artist, album or song: a colored panel with how many you played, the #1 with its picture, then the next.
 private struct SpotlightCard: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     let kind: ListeningKind
     let ranking: ListeningStats.Ranking
     let previous: Int?
@@ -580,7 +576,7 @@ private struct SpotlightCard: View {
 
     var body: some View {
         let list = measure == .plays ? ranking.byPlays : ranking.byTime
-        let panel = Color(tint ?? theme.defaultPanel)
+        let panel = Color(tint ?? AppColor.defaultPanel)
         VStack(alignment: .leading, spacing: 0) {
             header(list, panel: panel)
             if let first = list.first {
@@ -599,9 +595,9 @@ private struct SpotlightCard: View {
                 .padding(.vertical, 8).padding(.horizontal, 6)
             }
         }
-        .background(RoundedRectangle(cornerRadius: 12).fill(theme.card))
+        .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
         .animation(.easeInOut(duration: 0.35), value: tint)
     }
 
@@ -678,7 +674,6 @@ private struct MiniBars: View {
 
 /// The share of artists, albums or songs played for the first time during the period, and the top one.
 private struct DiscoveryTile: View {
-    @Environment(\.theme) private var theme
     let kind: ListeningKind
     let new: ListeningStats.Ranking
     let all: Int
@@ -688,14 +683,14 @@ private struct DiscoveryTile: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("New \(kind.plural)").font(.callout.weight(.semibold)).foregroundStyle(.subtext)
+                    Text("New \(kind.plural)").font(.callout.weight(.semibold)).foregroundStyle(.secondary)
                     Text(share.formatted(.percent.precision(.fractionLength(0)))).font(.system(size: 30, weight: .bold, design: .rounded))
-                    Text("\(new.total.formatted()) of \(kind.count(all)) first heard").font(.caption).foregroundStyle(.subtext)
+                    Text("\(new.total.formatted()) of \(kind.count(all)) first heard").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 ZStack {
-                    Circle().stroke(theme.track, lineWidth: 7)
-                    Circle().trim(from: 0, to: share).stroke(theme.series, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    Circle().stroke(AppColor.track, lineWidth: 7)
+                    Circle().trim(from: 0, to: share).stroke(AppColor.series, style: StrokeStyle(lineWidth: 7, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
                 .frame(width: 48, height: 48)
@@ -708,8 +703,8 @@ private struct DiscoveryTile: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(theme.card))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
     }
 }
 
@@ -717,7 +712,6 @@ private struct DiscoveryTile: View {
 
 /// Listening by hour on a 24-hour dial, with the busiest hour and day.
 private struct ListeningClockCard: View {
-    @Environment(\.theme) private var theme
     let stats: ListeningStats
     @State private var hovered: Int?
 
@@ -730,7 +724,7 @@ private struct ListeningClockCard: View {
                         if let h = hovered {
                             Text("\(hourLabel(h)) · \(formatListened(hours[h])) · \(playCount(stats.hourPlays[h]))")
                         } else {
-                            Text("Hover an hour for details").foregroundStyle(.subtext)
+                            Text("Hover an hour for details").foregroundStyle(.secondary)
                         }
                     }
                     .font(.caption).monospacedDigit().lineLimit(1)
@@ -752,9 +746,9 @@ private struct ListeningClockCard: View {
 
     private func stat(_ title: String, _ value: String, detail: String?) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(title).font(.caption).foregroundStyle(.subtext)
+            Text(title).font(.caption).foregroundStyle(.secondary)
             Text(value).font(.system(size: 22, weight: .bold, design: .rounded))
-            if let detail { Text(detail).font(.caption).foregroundStyle(.subtext) }
+            if let detail { Text(detail).font(.caption).foregroundStyle(.secondary) }
         }
     }
 
@@ -766,7 +760,6 @@ private struct ListeningClockCard: View {
 
 /// 24 wedges, midnight at the top, each as long as the listening in that hour.
 private struct RadialClock: View {
-    @Environment(\.theme) private var theme
     let values: [Double]
     @Binding var hovered: Int?
 
@@ -778,10 +771,10 @@ private struct RadialClock: View {
             ForEach(0..<24, id: \.self) { h in
                 let reach = values[h] == 0 ? 0 : Self.inner + (1 - Self.inner) * max(0.08, (values[h] / peak).squareRoot())
                 ZStack {
-                    Wedge(hour: h, inner: Self.inner, outer: 1).fill(theme.track)
+                    Wedge(hour: h, inner: Self.inner, outer: 1).fill(AppColor.track)
                     if reach > 0 {
                         Wedge(hour: h, inner: Self.inner, outer: reach)
-                            .fill(theme.series.opacity(hovered == nil || hovered == h ? 1 : 0.45))
+                            .fill(AppColor.series.opacity(hovered == nil || hovered == h ? 1 : 0.45))
                     }
                 }
                 .contentShape(Wedge(hour: h, inner: Self.inner, outer: 1))
@@ -792,7 +785,7 @@ private struct RadialClock: View {
                 let c = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
                 ForEach([0, 6, 12, 18], id: \.self) { h in
                     let angle = Double(h) / 24 * 2 * .pi - .pi / 2
-                    Text(String(format: "%02d", h)).font(.system(size: 9, weight: .medium)).foregroundStyle(.subtext)
+                    Text(String(format: "%02d", h)).font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary)
                         .position(x: c.x + r * cos(angle), y: c.y + r * sin(angle))
                 }
             }
@@ -820,7 +813,6 @@ private struct Wedge: Shape {
 }
 
 private struct WeekdayBars: View {
-    @Environment(\.theme) private var theme
     let stats: ListeningStats
 
     var body: some View {
@@ -830,9 +822,9 @@ private struct WeekdayBars: View {
             ForEach(0..<7, id: \.self) { d in
                 VStack(spacing: 3) {
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(d == stats.peakWeekday ? theme.series : theme.series.opacity(0.4))
+                        .fill(d == stats.peakWeekday ? AppColor.series : AppColor.series.opacity(0.4))
                         .frame(width: 14, height: max(2, 44 * totals[d] / top))
-                    Text(stats.weekdaySymbols[d].prefix(1)).font(.caption2).foregroundStyle(.subtext)
+                    Text(stats.weekdaySymbols[d].prefix(1)).font(.caption2).foregroundStyle(.secondary)
                 }
                 .help("\(weekdayName(d)): \(formatListened(totals[d]))")
             }
@@ -843,7 +835,6 @@ private struct WeekdayBars: View {
 
 /// Listening by release decade, with where the digital collection stands, and the top album of your top decade.
 private struct DecadesCard: View {
-    @Environment(\.theme) private var theme
     @Environment(AppModel.self) private var model
     let stats: ListeningStats
     @State private var hovered: Int?
@@ -854,15 +845,15 @@ private struct DecadesCard: View {
         InsightCard(title: "Music by Decade", subtitle: subtitle) {
             HStack(spacing: 14) {
                 HStack(spacing: 5) {
-                    Capsule().fill(theme.series).frame(width: 14, height: 7)
+                    Capsule().fill(AppColor.series).frame(width: 14, height: 7)
                     Text("Your listening")
                 }
                 HStack(spacing: 5) {
-                    Capsule().fill(theme.primaryText).frame(width: 2, height: 11)
+                    Capsule().fill(Color.primary).frame(width: 2, height: 11)
                     Text("Your digital collection")
                 }
             }
-            .font(.caption).foregroundStyle(.subtext)
+            .font(.caption).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 3) {
                 ForEach(stats.eras) { e in
                     Button { model.search("decade:\(e.decade)s") } label: {
@@ -870,11 +861,11 @@ private struct DecadesCard: View {
                             Text("\(String(e.decade))s").font(.callout).monospacedDigit().frame(width: 52, alignment: .leading)
                             GeometryReader { geo in
                                 ZStack(alignment: .leading) {
-                                    Capsule().fill(theme.track)
-                                    Capsule().fill(theme.series.opacity(e.decade == favorite?.decade ? 1 : 0.7))
+                                    Capsule().fill(AppColor.track)
+                                    Capsule().fill(AppColor.series.opacity(e.decade == favorite?.decade ? 1 : 0.7))
                                         .frame(width: e.listening == 0 ? 0 : max(6, geo.size.width * e.listening / top))
                                     if e.library > 0 {
-                                        Capsule().fill(theme.primaryText).frame(width: 2, height: 16)
+                                        Capsule().fill(Color.primary).frame(width: 2, height: 16)
                                             .offset(x: geo.size.width * e.library / top - 1)
                                     }
                                 }
@@ -883,10 +874,10 @@ private struct DecadesCard: View {
                             }
                             .frame(height: 18)
                             Text(e.listening.formatted(.percent.precision(.fractionLength(0)))).font(.callout).monospacedDigit()
-                                .foregroundStyle(.subtext).frame(width: 40, alignment: .trailing)
+                                .foregroundStyle(.secondary).frame(width: 40, alignment: .trailing)
                         }
                         .padding(.vertical, 2).padding(.horizontal, 6)
-                        .background(RoundedRectangle(cornerRadius: 5).fill(hovered == e.decade ? theme.fill : .clear))
+                        .background(RoundedRectangle(cornerRadius: 5).fill(hovered == e.decade ? AppColor.fill : .clear))
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -897,7 +888,7 @@ private struct DecadesCard: View {
             if let favorite, let album = favorite.topAlbum {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Top album · \(String(favorite.decade))s").font(.caption).foregroundStyle(.subtext).padding(.leading, 8)
+                    Text("Top album · \(String(favorite.decade))s").font(.caption).foregroundStyle(.secondary).padding(.leading, 8)
                     ListeningRow(item: album, kind: .album, detail: formatListened(album.listened), size: 40)
                 }
                 .padding(.horizontal, -8)
@@ -977,7 +968,6 @@ private struct RediscoverCard: View {
 
 /// The period's headline numbers against the span before.
 private struct QuickFacts: View {
-    @Environment(\.theme) private var theme
     let stats: ListeningStats
 
     var body: some View {
@@ -1006,8 +996,8 @@ private struct QuickFacts: View {
     private func tile(_ title: String, _ value: String, icon: String, detail: String? = nil, delta: Double? = nil, vs: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                Image(systemName: icon).foregroundStyle(theme.series)
-                Text(title).foregroundStyle(.subtext)
+                Image(systemName: icon).foregroundStyle(AppColor.series)
+                Text(title).foregroundStyle(.secondary)
             }
             .font(.callout)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -1023,12 +1013,12 @@ private struct QuickFacts: View {
                     Text(" ")
                 }
             }
-            .font(.caption).foregroundStyle(.subtext).lineLimit(1).minimumScaleFactor(0.8)
+            .font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(theme.card))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.separator.opacity(0.6), lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
     }
 }
 

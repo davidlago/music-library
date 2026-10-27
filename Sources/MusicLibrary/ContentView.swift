@@ -6,14 +6,12 @@ struct ContentView: View {
 
     var body: some View {
         MainWindow()
-            .themedRoot(model.theme)
             .onAppear { model.applyAppearance() }
     }
 }
 
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     @State private var dropTargeted = false
 
     var body: some View {
@@ -63,8 +61,6 @@ struct MainWindow: View {
         @Bindable var model = model
         return NavigationSplitView {
             SidebarView()
-                .scrollContentBackground(theme.isThemed ? .hidden : .automatic)
-                .background(theme.sidebar)
                 .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
         } detail: {
             VStack(spacing: 0) {
@@ -79,10 +75,8 @@ struct MainWindow: View {
                         .navigationDestination(for: CollectionItemRoute.self) { CollectionItemDetail(id: $0.id) }
                 }
             }
-            .background(theme.isThemed ? theme.background : Color.clear)
         }
-        .toolbarBackground(theme.toolbar, for: .windowToolbar)
-        .toolbarBackground(theme.isThemed ? .visible : .automatic, for: .windowToolbar)
+        .toolbarBackground(.windowBackground, for: .windowToolbar)
         .searchable(text: $model.searchText, placement: .toolbar, prompt: "Search or filter (genre:jazz)")
         .toolbar {
             if model.radioDJ.isEnabled {
@@ -105,18 +99,18 @@ struct MainWindow: View {
             Button("OK") { model.errorMessage = nil }
         } message: { Text(model.errorMessage ?? "") }
         .sheet(isPresented: Binding(get: { model.exportState != nil }, set: { if !$0 { model.exportState = nil } })) {
-            ExportSheet().themedSheet()
+            ExportSheet()
         }
-        .sheet(item: $model.smartPlaylistDraft) { SmartPlaylistEditor(draft: $0).themedSheet() }
+        .sheet(item: $model.smartPlaylistDraft) { SmartPlaylistEditor(draft: $0) }
         .sheet(item: $model.collectionSheet) { sheet in
             switch sheet {
-            case .add(let medium, let prefill): AddToCollectionSheet(medium: medium, prefill: prefill).themedSheet()
-            case .findByLabel(let sticker): FindByLabelPanel(initial: sticker).themedSheet()
-            case .addLibraryAlbums: BulkAddSheet().themedSheet()
-            case .labelCheck: LabelCheckSheet().themedSheet()
-            case .link(let id): LinkAlbumPicker(itemID: id).themedSheet()
-            case .cover(let id, let request): CollectionCoverSheet(itemID: id, request: request).themedSheet()
-            case .changeEdition(let id): ChangeEditionSheet(itemID: id).themedSheet()
+            case .add(let medium, let prefill): AddToCollectionSheet(medium: medium, prefill: prefill)
+            case .findByLabel(let sticker): FindByLabelPanel(initial: sticker)
+            case .addLibraryAlbums: BulkAddSheet()
+            case .labelCheck: LabelCheckSheet()
+            case .link(let id): LinkAlbumPicker(itemID: id)
+            case .cover(let id, let request): CollectionCoverSheet(itemID: id, request: request)
+            case .changeEdition(let id): ChangeEditionSheet(itemID: id)
             }
         }
         .removeFromLibraryConfirmation(model)
@@ -149,43 +143,43 @@ struct SidebarView: View {
                     let count = model.collection.count(scope)
                     // To Digitize only while something is waiting (or it's the page showing).
                     if scope != .toDigitize || count > 0 || model.sidebar == .collection(.toDigitize) {
-                        Label(scope.title, systemImage: scope.symbol).sidebarBadge(count).tag(SidebarItem.collection(scope))
+                        Label(scope.title, systemImage: scope.symbol).badge(count).tag(SidebarItem.collection(scope))
                     }
                 }
             }
             Section("Digital Collection") {
-                Label("Songs", systemImage: "music.note").sidebarBadge(model.tracks.count).tag(SidebarItem.songs)
-                Label("Albums", systemImage: "square.stack").sidebarBadge(model.albums.count).tag(SidebarItem.albums)
+                Label("Songs", systemImage: "music.note").badge(model.tracks.count).tag(SidebarItem.songs)
+                Label("Albums", systemImage: "square.stack").badge(model.albums.count).tag(SidebarItem.albums)
                 Label(CollectionScope.downloads.title, systemImage: CollectionScope.downloads.symbol)
-                    .sidebarBadge(model.collection.count(.downloads))
+                    .badge(model.collection.count(.downloads))
                     .tag(SidebarItem.collection(.downloads))
             }
             Section("Explore") {
                 // Artists from both collections, so they're with Insights, Music DNA and Concerts.
-                Label("Artists", systemImage: "music.mic").sidebarBadge(model.allArtists.count).tag(SidebarItem.artists)
+                Label("Artists", systemImage: "music.mic").badge(model.allArtists.count).tag(SidebarItem.artists)
                 Label("Insights", systemImage: "chart.bar.xaxis").tag(SidebarItem.insights)
                 Label("Music DNA", systemImage: "point.3.connected.trianglepath.dotted").tag(SidebarItem.musicDNA)
                 Label("Concerts", systemImage: "ticket").tag(SidebarItem.concerts)
             }
             Section("Import") {
                 Label("Import", systemImage: "square.and.arrow.down")
-                    .sidebarBadge(model.importer.pendingCount)
+                    .badge(model.importer.pendingCount)
                     .tag(SidebarItem.importQueue)
                 Label("Digitize Vinyl", systemImage: "waveform.badge.mic")
                     .tag(SidebarItem.digitizeVinyl)
                 ForEach(model.cd.discs) { disc in
                     Label(disc.title, systemImage: "opticaldisc")
-                        .sidebarBadge(disc.isRipping ? disc.remainingCount : 0)
+                        .badge(disc.isRipping ? disc.remainingCount : 0)
                         .tag(SidebarItem.cd(disc.id))
                 }
             }
             Section("Local Library") {
                 Label("Local Library CDs", systemImage: "building.columns").tag(SidebarItem.catalog)
                 Label("My Checkouts", systemImage: "books.vertical")
-                    .sidebarBadge(model.catalog.cdCheckouts.count)
+                    .badge(model.catalog.cdCheckouts.count)
                     .tag(SidebarItem.catalogCheckouts)
                 Label(model.catalog.listTitle, systemImage: "bookmark")
-                    .sidebarBadge(model.catalog.listEntries.count)
+                    .badge(model.catalog.listEntries.count)
                     .tag(SidebarItem.catalogList)
             }
             Section("Shopping") {
@@ -193,15 +187,15 @@ struct SidebarView: View {
             }
             Section("Export") {
                 Label("Export List", systemImage: "externaldrive")
-                    .sidebarBadge(model.exportList.count)
+                    .badge(model.exportList.count)
                     .tag(SidebarItem.exportList)
                 Label("iPhone", systemImage: "iphone")
-                    .sidebarBadge(model.iPhone.selection.included.count)
+                    .badge(model.iPhone.selection.included.count)
                     .tag(SidebarItem.iPhone)
             }
             Section {
                 Label(AppModel.likedSongsName, systemImage: "heart.fill")
-                    .sidebarBadge(model.likedDates.count)
+                    .badge(model.likedDates.count)
                     .tag(SidebarItem.likedSongs)
                     .contextMenu {
                         Button("Play") { model.player.play(queue: model.likedTracks, startAt: 0, source: AppModel.likedSongsName) }
@@ -224,7 +218,7 @@ struct SidebarView: View {
             Section {
                 ForEach(model.smartPlaylists) { p in
                     Label(p.name, systemImage: "gearshape")
-                        .sidebarBadge(model.smartPlaylistCounts[p.id] ?? 0)
+                        .badge(model.smartPlaylistCounts[p.id] ?? 0)
                         .tag(SidebarItem.smartPlaylist(p.id))
                         .contextMenu {
                             Button("Play") { model.player.play(queue: model.smartPlaylistTracks(p), startAt: 0, source: p.name) }
@@ -263,7 +257,7 @@ struct PlaylistRow: View {
                     .onExitCommand { model.renamingPlaylistID = nil }
                     .onAppear { draft = playlist.name; focused = true }
             } else {
-                Label(playlist.name, systemImage: "music.note.list").sidebarBadge(playlist.trackCount)
+                Label(playlist.name, systemImage: "music.note.list").badge(playlist.trackCount)
             }
         }
         .contextMenu {

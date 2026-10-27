@@ -17,7 +17,6 @@ struct CoverCandidate: Identifiable, Hashable {
 /// to `onPick` with a line saying where it's from.
 struct CoverSearchPane: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
     @Binding var album: String
     @Binding var artist: String
     /// The release picked last; cleared by the sheet when the image comes from somewhere else.
@@ -43,7 +42,7 @@ struct CoverSearchPane: View {
             }
             .textFieldStyle(.roundedBorder)
             .onSubmit { Task { await runSearch() } }
-            Text("Covers from the Cover Art Archive, for releases on MusicBrainz").font(.caption).foregroundStyle(.subtext)
+            Text("Covers from the Cover Art Archive, for releases on MusicBrainz").font(.caption).foregroundStyle(.secondary)
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 12, alignment: .top)], spacing: 12) {
                     ForEach(shown) { c in candidateCell(c) }
@@ -54,10 +53,10 @@ struct CoverSearchPane: View {
                 if searching {
                     ProgressView("Searching MusicBrainz…")
                 } else if shown.isEmpty, let searchMessage {
-                    Text(searchMessage).foregroundStyle(.subtext).multilineTextAlignment(.center).padding()
+                    Text(searchMessage).foregroundStyle(.secondary).multilineTextAlignment(.center).padding()
                 } else if shown.isEmpty, !candidates.isEmpty, candidates.allSatisfy({ noArt.contains($0.id) || thumbnails[$0.id] != nil }) {
                     Text("None of these releases has a cover on the Cover Art Archive. Try fewer words, just the artist, or choose an image.")
-                        .foregroundStyle(.subtext).multilineTextAlignment(.center).padding()
+                        .foregroundStyle(.secondary).multilineTextAlignment(.center).padding()
                 }
             }
         }
@@ -71,10 +70,10 @@ struct CoverSearchPane: View {
                 DataImage(data: thumbnails[c.id], size: 128)
                     .overlay {
                         if thumbnails[c.id] == nil { ProgressView().controlSize(.small) }
-                        if chosen == c.id { RoundedRectangle(cornerRadius: 6).strokeBorder(theme.accent, lineWidth: 3) }
+                        if chosen == c.id { RoundedRectangle(cornerRadius: 6).strokeBorder(AppColor.accent, lineWidth: 3) }
                     }
                 Text(c.title).font(.caption.weight(.medium)).lineLimit(1)
-                Text(c.detail).font(.caption2).foregroundStyle(.subtext).lineLimit(2)
+                Text(c.detail).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
             }
             .frame(width: 128, alignment: .leading)
             .contentShape(Rectangle())
@@ -140,7 +139,6 @@ struct CoverSearchPane: View {
 struct CDCoverSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.theme) private var theme
     @Bindable var disc: CDDisc
 
     @State private var image: Data?
@@ -188,7 +186,7 @@ struct CDCoverSheet: View {
             DataImage(data: image ?? disc.cover, size: 240)
                 .overlay {
                     if downloading { ProgressView().controlSize(.large) }
-                    if dropTargeted { RoundedRectangle(cornerRadius: 6).strokeBorder(theme.accent, lineWidth: 3) }
+                    if dropTargeted { RoundedRectangle(cornerRadius: 6).strokeBorder(AppColor.accent, lineWidth: 3) }
                 }
                 .dropDestination(for: URL.self) { urls, _ in
                     guard let url = urls.first else { return false }
@@ -201,7 +199,7 @@ struct CDCoverSheet: View {
                 Button("Choose Image…", action: choose)
                 Button("Paste", action: paste).help("Use an image you copied")
             }
-            Text("Or drop an image here, from a file or a web page.").font(.caption).foregroundStyle(.subtext)
+            Text("Or drop an image here, from a file or a web page.").font(.caption).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             if let message { Text(message).font(.caption).foregroundStyle(.red).multilineTextAlignment(.center) }
             Spacer(minLength: 0)

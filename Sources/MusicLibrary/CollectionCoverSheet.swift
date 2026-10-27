@@ -12,7 +12,6 @@ import SwiftUI
 struct CollectionCoverSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.theme) private var theme
     let itemID: String
     let request: CoverSheetRequest
 
@@ -69,7 +68,7 @@ struct CollectionCoverSheet: View {
             DataImage(data: image ?? current, size: 240)
                 .overlay {
                     if downloading { ProgressView().controlSize(.large) }
-                    if dropTargeted { RoundedRectangle(cornerRadius: 6).strokeBorder(theme.accent, lineWidth: 3) }
+                    if dropTargeted { RoundedRectangle(cornerRadius: 6).strokeBorder(AppColor.accent, lineWidth: 3) }
                 }
                 .dropDestination(for: URL.self) { urls, _ in
                     guard let url = urls.first else { return false }
@@ -88,7 +87,7 @@ struct CollectionCoverSheet: View {
                     .buttonStyle(.link)
                     .help("Show the cover of its album in your digital collection instead of its own")
             }
-            Text("Or drop an image file here.").font(.caption).foregroundStyle(.subtext)
+            Text("Or drop an image file here.").font(.caption).foregroundStyle(.secondary)
             if let message { Text(message).font(.caption).foregroundStyle(.red).multilineTextAlignment(.center) }
             Spacer(minLength: 0)
         }
@@ -108,7 +107,7 @@ struct CollectionCoverSheet: View {
             }
             .textFieldStyle(.roundedBorder)
             .onSubmit { Task { await runSearch() } }
-            Text("Covers from the Cover Art Archive, for releases on MusicBrainz").font(.caption).foregroundStyle(.subtext)
+            Text("Covers from the Cover Art Archive, for releases on MusicBrainz").font(.caption).foregroundStyle(.secondary)
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 12, alignment: .top)], spacing: 12) {
                     ForEach(shown) { c in candidateCell(c) }
@@ -119,7 +118,7 @@ struct CollectionCoverSheet: View {
                 if searching {
                     ProgressView("Searching MusicBrainz…")
                 } else if shown.isEmpty, let searchMessage {
-                    Text(searchMessage).foregroundStyle(.subtext).multilineTextAlignment(.center).padding()
+                    Text(searchMessage).foregroundStyle(.secondary).multilineTextAlignment(.center).padding()
                 }
             }
         }
@@ -132,10 +131,10 @@ struct CollectionCoverSheet: View {
                 DataImage(data: thumbnails[c.id], size: 128)
                     .overlay {
                         if thumbnails[c.id] == nil { ProgressView().controlSize(.small) }
-                        if chosen == c.id { RoundedRectangle(cornerRadius: 6).strokeBorder(theme.accent, lineWidth: 3) }
+                        if chosen == c.id { RoundedRectangle(cornerRadius: 6).strokeBorder(AppColor.accent, lineWidth: 3) }
                     }
                 Text(c.title).font(.caption.weight(.medium)).lineLimit(1)
-                Text(c.detail).font(.caption2).foregroundStyle(.subtext).lineLimit(2)
+                Text(c.detail).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
             }
             .frame(width: 128, alignment: .leading)
             .contentShape(Rectangle())
