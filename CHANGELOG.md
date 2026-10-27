@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.27.0
+
 - New: choose the **Radio DJ**'s model. Add a Claude API key, an [OpenRouter](https://openrouter.ai) key, or both, in
   Settings ▸ Radio DJ on the Mac, then **Choose Model…** to pick one of the Claude models (Claude Opus 5.5 stays the
   default) or any OpenRouter model that can use tools, each with its price per million tokens, its context window and
