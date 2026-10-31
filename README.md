@@ -34,8 +34,8 @@ playback, and a Claude-powered radio DJ who tells you the story behind every rec
 ## What it does
 
 - **Catalog what you own.** Add CDs, records and downloads by barcode, give every case a label number (CD #12 and
-  Vinyl #12 are never mixed up), and find any of them with **Find by Label** on the Mac, iPhone, Apple Watch or with
-  Siri. [Physical Collection →](docs/guide/physical-collection.md)
+  Vinyl #12 are never mixed up), find any of them with **Find by Label** on the Mac, iPhone, Apple Watch or with
+  Siri, and send them to your Discogs collection. [Physical Collection →](docs/guide/physical-collection.md)
 - **Build your digital collection.** Import files matched on MusicBrainz, rip CDs to FLAC checked bit for bit against
   AccurateRip, and record your records from the turntable into tracks.
   [Importing →](docs/guide/importing.md) · [Ripping CDs →](docs/guide/ripping-cds.md) ·

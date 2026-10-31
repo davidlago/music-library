@@ -8,12 +8,15 @@ import Foundation
 public enum DiscogsError: Error, LocalizedError, Equatable {
     /// 429: Discogs allows 25 requests a minute without a key.
     case busy
+    /// 401/403 from the collection API: the personal access token was refused.
+    case unauthorized
     case http(Int)
     case badResponse
 
     public var errorDescription: String? {
         switch self {
         case .busy: "Discogs is busy. Try again in a minute."
+        case .unauthorized: "Discogs didn't accept your access token. Check it in Settings ▸ Discogs."
         case .http(let code): "Discogs answered with an error (HTTP \(code))."
         case .badResponse: "Discogs sent something unexpected."
         }

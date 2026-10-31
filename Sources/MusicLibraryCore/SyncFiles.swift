@@ -87,7 +87,7 @@ extension Database {
         try vacuum(into: full.path)
         do {
             let copy = try Database(path: full.path)
-            for table in ["catalog_items", "catalog_info", "catalog_previews"] { try copy.exec("DELETE FROM \(table)") }
+            for table in ["catalog_items", "catalog_info", "catalog_previews", "discogs_sync"] { try copy.exec("DELETE FROM \(table)") }
             try? fm.removeItem(at: target)
             try copy.vacuum(into: target.path)
         }

@@ -239,7 +239,7 @@ import Testing
         // Indexes and triggers that existed are kept as they were.
         for (name, sql) in before.schema { #expect(after.schema[name] == sql, "index \(name)") }
         let created = Set(after.tables.keys).subtracting(before.tables.keys)
-        #expect(created.isSubset(of: ["collection_items", "rip_checks", "track_purchases"]), "created \(created)")
+        #expect(created.isSubset(of: ["collection_items", "discogs_sync", "rip_checks", "track_purchases"]), "created \(created)")
         #expect(after.tables["collection_items"] != nil)
         // Tables made now start empty, apart from the collection.
         for name in created where name != "collection_items" { #expect(after.tables[name]?.rows.isEmpty == true, "\(name)") }

@@ -1,0 +1,7 @@
+{
+  "folders": [
+    {"id": 0, "count": 3, "name": "All", "resource_url": "https://api.discogs.com/users/example_user/collection/folders/0"},
+    {"id": 1, "count": 2, "name": "Uncategorized", "resource_url": "https://api.discogs.com/users/example_user/collection/folders/1"},
+    {"id": 4183920, "count": 1, "name": "Records", "resource_url": "https://api.discogs.com/users/example_user/collection/folders/4183920"}
+  ]
+}

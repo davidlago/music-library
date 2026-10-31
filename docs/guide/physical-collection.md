@@ -129,6 +129,36 @@ CD 12 in Music Library". See [iPhone app](iphone.md#physical) and [Widgets and A
 range in use, the next number, the free numbers in between and any number used twice. Duplicates can come from older
 versions of the app; they stay saveable, but a new duplicate is refused.
 
+## Sync to Discogs
+
+**Sync to Discogs…** (in the **Physical Collection** menu, and at the top of the Shelf once you're connected) adds your
+CDs and records to your collection on [Discogs](https://www.discogs.com). It goes one way: Discogs gets a copy of your
+shelf, and nothing there changes your collection here. Downloads aren't sent.
+
+To connect, generate a personal access token in your Discogs settings (**Developers ▸ Generate new token**) and paste it
+in **Settings ▸ Discogs**. Pick the folder new copies go in there (**Uncategorized** at first).
+
+Each sync first finds every item's Discogs release. It uses the Discogs edition you picked when adding it, or the
+Discogs link on its MusicBrainz release. Otherwise it searches Discogs with the item's barcode, catalog number, country
+and year, filled in from its MusicBrainz release where the item doesn't have them: first by barcode, then among the
+pressings of the album's Discogs master, then by catalog number, then by artist and title. The pressing that agrees on
+the most of those is picked. When only the album could be found, not the pressing, the item is marked **Closest
+edition** in the preview: open it on Discogs to check it's yours, or untick it and pick the edition with **Change
+Edition…**. Each item is looked up once, so the first sync of a big collection takes a while and later ones are quick.
+Then it reads your Discogs collection and shows what it would do:
+
+- **Add to Discogs**, all ticked: items not there yet, items whose copy was removed on Discogs, and items whose edition
+  you changed. Copies already on Discogs are matched to your items instead of being added twice, so the first sync
+  doesn't duplicate a collection you started there.
+- **Remove from Discogs**, none ticked: copies there that aren't in your collection here, copies of items you removed
+  here, and the old edition of an item you changed. Nothing is removed unless you tick it; unticked copies stay.
+- **Not Found on Discogs**: CDs and records with no release found. Pick their edition with **Change Edition…** (choose
+  **Discogs** as the source) or add a barcode, and they're found on the next sync.
+
+**Make Changes** adds and removes what's ticked, one at a time (Discogs allows about a minute's worth of requests at
+once, so a big first sync takes a few minutes). It can be stopped; what's done is kept. Copies of the same edition are
+separate copies on Discogs too.
+
 ## Coming from an earlier version
 
 The first time version 1.21 or later opens your library, every album you'd marked as owned becomes an item, with its

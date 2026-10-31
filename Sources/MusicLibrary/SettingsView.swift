@@ -12,6 +12,7 @@ struct SettingsView: View {
             AppearanceSettings().tabItem { Label("Appearance", systemImage: "circle.lefthalf.filled") }
             LastFMSettings().tabItem { Label("Last.fm", systemImage: "dot.radiowaves.left.and.right") }
             ConcertSettings().tabItem { Label("Concerts", systemImage: "ticket") }
+            DiscogsSettings().tabItem { Label("Discogs", systemImage: "opticaldisc") }
             RadioDJSettings().tabItem { Label("Radio DJ", systemImage: RadioDJIcon.name) }
             LibraryCatalogSettings().tabItem { Label("Local Library", systemImage: "building.columns") }
         }

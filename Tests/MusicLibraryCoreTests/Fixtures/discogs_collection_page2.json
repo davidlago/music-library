@@ -1,0 +1,11 @@
+{
+  "pagination": {"page": 2, "pages": 2, "per_page": 2, "items": 3, "urls": {"first": "https://api.discogs.com/users/example_user/collection/folders/0/releases?page=1&per_page=2"}},
+  "releases": [
+    {"id": 249504, "instance_id": 1450003, "date_added": "2024-04-01T12:00:00-07:00", "rating": 0, "folder_id": 1,
+     "basic_information": {"id": 249504, "title": "Never Gonna Give You Up", "year": 1987,
+       "formats": [{"name": "Vinyl", "qty": "1", "descriptions": ["7\"", "45 RPM", "Single"]}],
+       "labels": [{"name": "RCA", "catno": "PB 41447"}],
+       "artists": [{"name": "Rick Astley", "anv": "", "join": "", "id": 72872}]}},
+    {"id": 0, "instance_id": 9, "folder_id": 1, "basic_information": {}}
+  ]
+}

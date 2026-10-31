@@ -121,6 +121,7 @@ struct MainWindow: View {
             case .link(let id): LinkAlbumPicker(itemID: id)
             case .cover(let id, let request): CollectionCoverSheet(itemID: id, request: request)
             case .changeEdition(let id): ChangeEditionSheet(itemID: id)
+            case .discogsSync: DiscogsSyncSheet()
             }
         }
         .removeFromLibraryConfirmation(model)

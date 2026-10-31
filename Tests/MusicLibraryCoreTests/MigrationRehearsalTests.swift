@@ -111,7 +111,7 @@ struct MigrationRehearsalTests {
         }
         for (name, sql) in before.schema { #expect(after.schema[name] == sql, "index \(name)") }
         let created = Set(after.tables.keys).subtracting(before.tables.keys)
-        #expect(created.isSubset(of: ["collection_items", "rip_checks", "track_purchases"]), "created \(created)")
+        #expect(created.isSubset(of: ["collection_items", "discogs_sync", "rip_checks", "track_purchases"]), "created \(created)")
         for name in created where name != "collection_items" { #expect(after.tables[name]?.rows.isEmpty == true, "\(name)") }
 
         // 2. Every ownership row is an item with the same values, stored with the same bytes.

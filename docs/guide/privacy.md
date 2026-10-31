@@ -7,8 +7,8 @@ has the formal version.
 
 ## On the Mac
 
-Everything is in your library folder and your Mac's preferences. API keys, secrets, your library PIN and your Claude and
-OpenRouter keys are kept in your keychain.
+Everything is in your library folder and your Mac's preferences. API keys, secrets, your library PIN, your Discogs token and
+your Claude and OpenRouter keys are kept in your keychain.
 
 | Service | When | What it receives |
 |---|---|---|
@@ -23,6 +23,7 @@ OpenRouter keys are kept in your keychain.
 | Your library's catalog website | Only once you open Local Library CDs | Searches, and your card number and PIN if you sign in (sent only to that site) |
 | Apple's iTunes Search | When you open a library CD you don't own, or ask for a song preview | The album, artist or song |
 | Discogs | When you search it for an edition you own, and for the track lists of copies found there | What you type (barcode, words or catalog number) and release IDs |
+| Discogs (your account) | Only with your token, when you sync to Discogs | The CDs and records you add or remove there, and barcodes to find their releases |
 | Discogs, eBay, CDandLP, Alibris, Frankfurter | Only when you shop for a CD or record | Its barcode, catalog number or names |
 | Anthropic (Claude API) | Only with your key, while the Radio DJ is on the air | The page's details, your questions, photos you show it (without location or camera details) and the rows of collection searches it runs |
 | OpenRouter (and the model's provider) | Only with your key and an OpenRouter model chosen, while the Radio DJ is on the air | The same as Anthropic above |
