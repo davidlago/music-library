@@ -1,0 +1,84 @@
+{
+ "secondary-types": [],
+ "secondary-type-ids": [],
+ "title": "Céline Dion",
+ "primary-type": "Album",
+ "id": "48d0bd2b-0507-334b-8b67-6ab3897b9a3b",
+ "disambiguation": "",
+ "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+ "first-release-date": "1992-03-30",
+ "relations": [
+  {
+   "attributes": [],
+   "type-id": "a50a1d20-2b20-4d2c-9a29-eb771dd78386",
+   "type": "allmusic",
+   "end": null,
+   "ended": false,
+   "direction": "forward",
+   "attribute-values": {},
+   "target-credit": "",
+   "url": {
+    "id": "a75c70e7-2f81-493c-a715-c1661bfe4633",
+    "resource": "https://www.allmusic.com/album/mw0000071377"
+   },
+   "target-type": "url",
+   "source-credit": "",
+   "attribute-ids": {},
+   "begin": null
+  },
+  {
+   "source-credit": "",
+   "target-type": "url",
+   "begin": null,
+   "attribute-ids": {},
+   "type": "discography entry",
+   "attributes": [],
+   "type-id": "5849de4a-78ae-4876-975d-2181107e70b7",
+   "direction": "forward",
+   "target-credit": "",
+   "attribute-values": {},
+   "url": {
+    "id": "39b8e644-d725-420e-8412-24dd916e5639",
+    "resource": "https://www.last.fm/music/C%C3%A9line+Dion/Celine+Dion"
+   },
+   "end": null,
+   "ended": false
+  },
+  {
+   "begin": null,
+   "attribute-ids": {},
+   "source-credit": "",
+   "target-type": "url",
+   "url": {
+    "id": "d1ba4782-a799-4b0c-9397-e9f0eee1a497",
+    "resource": "https://www.discogs.com/master/90727"
+   },
+   "attribute-values": {},
+   "target-credit": "",
+   "direction": "forward",
+   "ended": false,
+   "end": null,
+   "type": "discogs",
+   "type-id": "99e550f3-5ab4-3110-b5b9-fe01d970b126",
+   "attributes": []
+  },
+  {
+   "attribute-ids": {},
+   "begin": null,
+   "target-type": "url",
+   "source-credit": "",
+   "ended": false,
+   "end": null,
+   "attribute-values": {},
+   "target-credit": "",
+   "direction": "forward",
+   "url": {
+    "resource": "https://www.wikidata.org/wiki/Q859346",
+    "id": "9b4a79dd-e3b8-4517-a115-2b1db5bc0b8d"
+   },
+   "attributes": [],
+   "type-id": "b988d08c-5d86-4a57-9557-c83b399e3580",
+   "type": "wikidata"
+  }
+ ]
+}

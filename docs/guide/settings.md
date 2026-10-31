@@ -41,6 +41,11 @@ profile** (on), what's waiting to be sent, and your recent scrobbles. See [Playb
 Your ZIP or postal code and distance, your Ticketmaster Consumer Key and JamBase API key, and **Show upcoming concerts on
 artist pages** (on). See [Concerts](concerts.md).
 
+## Discogs
+
+Your Discogs personal access token (**Connect**), the account it's connected to, and the folder **Sync to Discogs**
+adds new copies to. See [Physical Collection](physical-collection.md#sync-to-discogs).
+
 ## Radio DJ
 
 Your Claude API and OpenRouter keys (**Check** tests each), the model (**Choose Model…**, with prices), the **DJ's name** and **Your name**, and what the DJ has cost: this month, all

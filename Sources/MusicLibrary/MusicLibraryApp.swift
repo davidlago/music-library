@@ -40,6 +40,8 @@ struct MusicLibraryApp: App {
                     Divider()
                     Button("Find by Label…") { model.findByLabel() }
                         .keyboardShortcut("l", modifiers: .command)
+                    Divider()
+                    Button("Sync to Discogs…") { model.syncToDiscogs() }
                 }
                 .disabled(model.collectionSheet != nil || model.smartPlaylistDraft != nil)
             }

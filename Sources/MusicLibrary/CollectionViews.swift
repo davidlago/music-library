@@ -138,6 +138,7 @@ struct CollectionView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     counts
                     Spacer(minLength: 12)
+                    discogsLink
                     labelCheckLink
                 }
             }
@@ -167,6 +168,19 @@ struct CollectionView: View {
             }
         }
         .font(.callout)
+    }
+
+    /// Sync to Discogs, once an account is connected (the Physical Collection menu has it always).
+    @ViewBuilder
+    private var discogsLink: some View {
+        if model.discogsSync.isConnected, model.collection.items.contains(where: DiscogsReleaseMatcher.isSynced) {
+            Button { model.syncToDiscogs() } label: {
+                Label("Sync to Discogs", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .buttonStyle(.link)
+            .font(.callout)
+            .help("Add your CDs and records to your collection on Discogs")
+        }
     }
 
     /// "3 free · 1 duplicate", opening Label Check.

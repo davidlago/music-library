@@ -1,0 +1,20 @@
+{
+  "pagination": {"page": 1, "pages": 2, "per_page": 2, "items": 3,
+    "urls": {"last": "https://api.discogs.com/users/example_user/collection/folders/0/releases?page=2&per_page=2", "next": "https://api.discogs.com/users/example_user/collection/folders/0/releases?page=2&per_page=2"}},
+  "releases": [
+    {"id": 2772432, "instance_id": 1450001, "date_added": "2024-03-02T09:15:00-08:00", "rating": 0, "folder_id": 4183920,
+     "basic_information": {"id": 2772432, "master_id": 5460, "title": "Kind Of Blue", "year": 1959,
+       "resource_url": "https://api.discogs.com/releases/2772432",
+       "thumb": "https://i.discogs.com/thumb.jpg", "cover_image": "https://i.discogs.com/cover.jpg",
+       "formats": [{"name": "Vinyl", "qty": "1", "descriptions": ["LP", "Album", "Mono"]}],
+       "labels": [{"name": "Columbia", "catno": "CL 1355", "entity_type": "1", "id": 1866}],
+       "artists": [{"name": "Miles Davis", "anv": "", "join": "", "role": "", "tracks": "", "id": 23755}],
+       "genres": ["Jazz"], "styles": ["Modal"]},
+     "notes": [{"field_id": 3, "value": "Bought at the fair"}]},
+    {"id": 8961614, "instance_id": 1450002, "date_added": "2024-03-03T10:00:00-08:00", "rating": 4, "folder_id": 1,
+     "basic_information": {"id": 8961614, "title": "The Wall", "year": 1994,
+       "formats": [{"name": "CD", "qty": "2", "descriptions": ["Album", "Reissue", "Remastered"]}],
+       "labels": [{"name": "EMI", "catno": "none"}, {"name": "Columbia", "catno": "C2K 68519"}],
+       "artists": [{"name": "Pink Floyd", "anv": "", "join": "", "id": 45467}]}}
+  ]
+}

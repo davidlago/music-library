@@ -31,6 +31,8 @@ enum CollectionSheet: Identifiable {
     case cover(itemID: String, request: CoverSheetRequest)
     /// Change Edition… for the item with this id: the edition picker, which replaces only its release details.
     case changeEdition(itemID: String)
+    /// Sync to Discogs.
+    case discogsSync
 
     var id: String {
         switch self {
@@ -41,6 +43,7 @@ enum CollectionSheet: Identifiable {
         case .link(let id): "link-\(id)"
         case .cover(let id, let request): "cover-\(id)-\(request.id)"
         case .changeEdition(let id): "edition-\(id)"
+        case .discogsSync: "discogs"
         }
     }
 }
@@ -296,6 +299,8 @@ final class AppModel {
     @ObservationIgnored let cdShop = CDShopStore()
     /// Wi-Fi sync to the iPhone app.
     @ObservationIgnored let iPhone = SyncStore()
+    /// Sending the physical collection to the user's Discogs collection.
+    @ObservationIgnored let discogsSync = DiscogsSyncStore()
     @ObservationIgnored private var currentPlay: (track: Track, startedAt: Date, tracker: ListenTracker)?
     @ObservationIgnored private var terminationObserver: NSObjectProtocol?
     @ObservationIgnored private(set) var importer: ImportController!
@@ -912,6 +917,9 @@ final class AppModel {
 
     /// Add Library Albums…
     func addLibraryAlbums() { presentCollectionSheet(.addLibraryAlbums) }
+
+    /// Sync to Discogs…
+    func syncToDiscogs() { presentCollectionSheet(.discogsSync) }
 
     /// A sheet is showing in a window (a collection sheet, the smart playlist editor, an export, or a page's own
     /// sheet): the collection's menu commands do nothing then, rather than replace it and lose what's entered.

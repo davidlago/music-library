@@ -7,6 +7,13 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- New: **Sync to Discogs…** (Physical Collection menu, and the top of the Shelf) adds your CDs and records to your
+  collection on [Discogs](https://www.discogs.com) with a personal access token (**Settings ▸ Discogs**). It goes one
+  way and shows what it will do first: additions are ticked, copies only on Discogs are listed for removal but left
+  unticked, and copies already there are matched instead of added twice. Releases come from the edition you picked,
+  the MusicBrainz release's Discogs link, or the barcode.
+  [Guide](https://github.com/davidlago/music-library/blob/main/docs/guide/physical-collection.md#sync-to-discogs)
+
 ## 1.28.0
 
 - New: **Add to Physical Collection** and **Change Edition…** can search [Discogs](https://www.discogs.com) as well as

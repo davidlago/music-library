@@ -1,0 +1,95 @@
+{
+ "cover-art-archive": {
+  "back": false,
+  "front": true,
+  "count": 1,
+  "artwork": true,
+  "darkened": false
+ },
+ "media": [
+  {
+   "position": 1,
+   "track-count": 13,
+   "format": "CD",
+   "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
+   "title": "",
+   "id": "c3720138-931e-350c-a039-2181174fbbed"
+  }
+ ],
+ "title": "Céline Dion",
+ "packaging": null,
+ "packaging-id": null,
+ "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+ "release-events": [
+  {
+   "area": {
+    "name": "Canada",
+    "disambiguation": "",
+    "iso-3166-1-codes": [
+     "CA"
+    ],
+    "type-id": null,
+    "type": null,
+    "sort-name": "Canada",
+    "id": "71bbafaa-e825-3e15-8ca9-017dcad1748b"
+   },
+   "date": "1992"
+  }
+ ],
+ "date": "1992",
+ "status": "Official",
+ "id": "4c169f41-bad0-35f1-8d2a-539197093aa5",
+ "text-representation": {
+  "language": "eng",
+  "script": "Latn"
+ },
+ "label-info": [
+  {
+   "catalog-number": "CK 52473",
+   "label": {
+    "id": "011d1192-6f65-45bd-85c4-0400dd45693e",
+    "sort-name": "Columbia",
+    "type": "Imprint",
+    "disambiguation": "owned by Sony Music Entertainment, worldwide except JP; formerly owned by CBS between 1938–1990 within US/CA/MX",
+    "label-code": 162,
+    "type-id": "b6285b2a-3514-3d43-80df-fcf528824ded",
+    "name": "Columbia"
+   }
+  }
+ ],
+ "country": "CA",
+ "quality": "normal",
+ "relations": [
+  {
+   "end": null,
+   "attributes": [],
+   "target-credit": "",
+   "type": "amazon asin",
+   "begin": null,
+   "ended": false,
+   "source-credit": "",
+   "direction": "forward",
+   "url": {
+    "resource": "https://www.amazon.com/gp/product/B0000028M4",
+    "id": "58a488e6-0f45-4f02-b969-412fef2b8466"
+   },
+   "attribute-values": {},
+   "type-id": "4f2e710d-166c-480c-a293-2e2c8d658d87",
+   "attribute-ids": {},
+   "target-type": "url"
+  }
+ ],
+ "disambiguation": "",
+ "asin": "B0000028M4",
+ "release-group": {
+  "title": "Céline Dion",
+  "id": "48d0bd2b-0507-334b-8b67-6ab3897b9a3b",
+  "disambiguation": "",
+  "first-release-date": "1992-03-30",
+  "secondary-types": [],
+  "primary-type": "Album",
+  "secondary-type-ids": [],
+  "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc"
+ },
+ "barcode": "074645247328"
+}
