@@ -125,6 +125,13 @@ Get the companion Mac app
 Your music comes from Music Library for Mac (free, macOS 14 or later): it catalogs your CDs and records, imports, rips and digitizes your music, then syncs both collections to your iPhone. Download it, and find the full documentation and the source code, at https://davidlago.github.io/music-library/
 ```
 
+**What's New in 1.31.0**:
+
+```
+• A new iPhone tells you it's looking for your library in iCloud, and shows your covers arriving, instead of an empty screen.
+• Music your Mac keeps only in iCloud (offloaded there to save space) comes to your iPhone straight from iCloud, right after a Wi-Fi sync.
+```
+
 **What's New in 1.30.0** (submitted 2026-11-01; the live version was 1.24.0, so it covers the iPhone changes of 1.25–1.30):
 
 ```
