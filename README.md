@@ -48,8 +48,8 @@ playback, and a Claude-powered radio DJ who tells you the story behind every rec
   at, answers questions, checks the web and searches your own collection. Show it a photo of a record or CD (on iPhone,
   straight from the camera) to find out what it is, whether you have it and what to pay.
   [Radio DJ →](docs/guide/radio-dj.md)
-- **Play it properly.** Each song at its own sample rate and bit depth, a real play queue, playlists and smart playlists,
-  and Last.fm scrobbling. [Playback →](docs/guide/playback.md)
+- **Play it properly.** Each song at its own sample rate and bit depth, AirPlay, a real play queue, playlists and smart
+  playlists, and Last.fm scrobbling. [Playback →](docs/guide/playback.md)
 - **Find more music.** Concerts near you by your artists, your public library's CD catalog downloaded and searchable,
   and new and used CDs and records compared across stores. [Concerts →](docs/guide/concerts.md) ·
   [Local Library CDs →](docs/guide/local-library.md) · [Shop →](docs/guide/shop.md)
