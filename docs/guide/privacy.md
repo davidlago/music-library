@@ -1,7 +1,8 @@
 # Privacy
 
 Music Library has no account, no cloud service of its own, no ads, no analytics and no tracking. Your library, your
-listening history and your settings stay on your devices. The app talks to other services only to look things up, and
+listening history and your settings stay on your devices, and in your own iCloud if you turn on
+[iCloud backup](icloud.md). The app talks to other services only to look things up, and
 most of them only once you turn them on. The [privacy policy](https://davidlago.github.io/music-library/privacy.html)
 has the formal version.
 
@@ -27,16 +28,21 @@ your Claude and OpenRouter keys are kept in your keychain.
 | Discogs, eBay, CDandLP, Alibris, Frankfurter | Only when you shop for a CD or record | Its barcode, catalog number or names |
 | Anthropic (Claude API) | Only with your key, while the Radio DJ is on the air | The page's details, your questions, photos you show it (without location or camera details) and the rows of collection searches it runs |
 | OpenRouter (and the model's provider) | Only with your key and an OpenRouter model chosen, while the Radio DJ is on the air | The same as Anthropic above |
+| Your iCloud (Apple) | Only when you turn on iCloud backup | Your library database, covers, artist photos and the music you choose, in Music Library's private folder in your own iCloud; never your keys |
 
 Downloading artist and album info can be turned off in **Settings ▸ General**, and looking up library CDs in **Settings ▸
 Local Library**.
 
 ## On the iPhone and Apple Watch
 
-The iPhone keeps its music and its copy of the library on the phone, out of iCloud backups. It talks to:
+The iPhone keeps its music and its copy of the library on the phone, left out of the iPhone's own backups to iCloud. It
+talks to:
 
 - **Your paired Mac**, over your local network, encrypted with a key the two exchange when pairing. While the Mac app
   runs it listens on the local network for its paired phones (macOS may ask to allow incoming connections).
+- **Your iCloud**, when your Mac backs up there and **Use iCloud** is on: the phone reads the library, covers and the
+  songs you download from your Mac's backup, and writes its plays, likes and Download / Remove requests there for the
+  Mac. It's your own iCloud, stored by Apple; the developer can't see it.
 - **Last.fm**, if you connect it.
 - **Ticketmaster and JamBase**, for concerts on artist pages, only if the Mac has keys for them.
 - **Anthropic** (or **OpenRouter**, with an OpenRouter model), while the Radio DJ is on the air, only if the Mac handed

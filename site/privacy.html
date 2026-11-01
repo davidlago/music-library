@@ -27,13 +27,14 @@
   <main class="doc wrap">
     <p class="kicker">Privacy Policy</p>
     <h1>Your library stays yours.</h1>
-    <p class="doc-meta">For Music Library on Mac, iPhone and Apple Watch (on the App Store as Dave's Music Library). Last updated October 25, 2026.</p>
+    <p class="doc-meta">For Music Library on Mac, iPhone and Apple Watch (on the App Store as Dave's Music Library). Last updated November 1, 2026.</p>
 
     <section>
       <h2>The short version</h2>
       <p>The developer collects nothing. There's no account, no analytics, no advertising, no tracking and no server of
         the app's own. Your music, your listening history, your likes and what you own (your physical collection and
-        downloads, with label numbers, dates and prices) stay on your Mac and your iPhone.
+        downloads, with label numbers, dates and prices) stay on your Mac and your iPhone, and in your own iCloud if you
+        turn on iCloud backup.
         The app contacts other services only to look things up or to do something you turned on, and those are listed
         below.</p>
     </section>
@@ -42,11 +43,16 @@
       <h2>iPhone and Apple Watch</h2>
       <ul>
         <li><strong>Your library.</strong> The music, covers and library database the Mac sends are kept in the app's
-          own folder on the iPhone, left out of iCloud backups. Plays and likes are saved on the iPhone and go
+          own folder on the iPhone, left out of the iPhone's own backups to iCloud. Plays and likes are saved on the iPhone and go
           to your Mac at the next sync.</li>
         <li><strong>Syncing with your Mac.</strong> The iPhone and the Mac find each other on your local network
           (Bonjour) and talk directly, encrypted with a key the two exchange when you pair them. Nothing goes through the
           internet or any server.</li>
+        <li><strong>iCloud (only if your Mac backs up there).</strong> The iPhone reads your library, covers and the
+          songs you download from your Mac's backup in Music Library's private folder in your own iCloud, and writes its
+          plays, likes and download requests there for your Mac. Apple stores it in your iCloud under
+          <a href="https://www.apple.com/legal/privacy/">Apple's privacy policy</a>; the developer can't see it. Keys
+          for Last.fm, concerts and the Radio DJ never go there.</li>
         <li><strong>Last.fm (only if you connect it).</strong> The songs you play (title, artist, album, when you played
           them) are sent to your Last.fm account, using your own API key, which is stored in the iPhone's keychain.
           Last.fm's <a href="https://www.last.fm/legal/privacy">privacy policy</a> applies to what it keeps.</li>
@@ -88,6 +94,10 @@
         the area searched), the stores the Shop compares (Discogs, eBay, CDandLP and Alibris, with the CD or record you're
         looking for), and Anthropic or OpenRouter (the Radio DJ, with your own key: the page you're on, your questions, photos
         you show it and the rows of collection searches it runs). API keys, secrets and your library PIN are kept in your keychain.</p>
+      <p>With iCloud backup turned on, the Mac copies your library database, covers, artist photos and the music you
+        choose to Music Library's private folder in your own iCloud, where Apple stores it under
+        <a href="https://www.apple.com/legal/privacy/">Apple's privacy policy</a> (end-to-end encrypted with Advanced
+        Data Protection). The developer can't see it, and your keys never go there.</p>
     </section>
 
     <section>

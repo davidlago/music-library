@@ -69,7 +69,13 @@ own Anthropic account, App Functionality, not for tracking. The camera needs `NS
 goes to OpenRouter (and the model's provider) instead of Anthropic, with the user's own key. Same privacy label
 categories; the review notes and privacy policy name OpenRouter as a possible recipient.
 
-Nothing else leaves the phone except to the user's own paired Mac (local network) and watch. No tracking, no ads, no
+**Since iCloud backup (the release after 1.29.0):** the phone reads the library, covers and songs from the Mac's backup in
+the app's private iCloud container, and writes its plays, likes and download requests there. That's the user's own
+iCloud, which the developer can't access, so it isn't data the developer collects: the privacy label doesn't change.
+The TestFlight and App Store builds need the iCloud entitlement (`ICLOUD` repository variable for CI, `ICLOUD=1` for
+`scripts/testflight.sh`).
+
+Nothing else leaves the phone except to the user's own paired Mac (local network or the user's own iCloud) and watch. No tracking, no ads, no
 analytics. Export compliance: `ITSAppUsesNonExemptEncryption = NO` (only the encryption built into iOS).
 
 ## Version text
@@ -96,7 +102,7 @@ Your shelf, by its label
 Every CD and record you own comes over from your Mac, ripped or not, in its jewel case or sleeve, with its edition, label number, purchase date and price. Find by Label shows what's at a number and what sits on either side of it, so you can go and grab it from the shelf. On Apple Watch, turn the Digital Crown to a label, even away from your iPhone. Or ask Siri: "Find CD 12 in Music Library".
 
 Every album and artist
-Browse your whole digital collection with the Mac's album and artist pages: descriptions, ratings, credits, the full track list, your copies and your plays. Choose which music to keep on the phone; everything else can still be browsed and downloaded when you want it, and Ready to Download lists the CDs and records you've digitized that aren't on the phone yet.
+Browse your whole digital collection with the Mac's album and artist pages: descriptions, ratings, credits, the full track list, your copies and your plays. Choose which music to keep on the phone; everything else can still be browsed and downloaded when you want it, from your Mac over Wi-Fi or from its backup in your own iCloud when the Mac isn't nearby, and Ready to Download lists the CDs and records you've digitized that aren't on the phone yet.
 
 A radio DJ who knows your records
 With your own Claude API key (set up in the Mac app), tap the radio button on any page and a DJ tells you the story behind what you're looking at: who made it, who played on it and how it connects to everything else you own. Ask anything; the DJ checks the web and searches your own collection to answer, with links to your albums and previews of songs you don't have.
@@ -111,12 +117,22 @@ Widgets and Apple Watch
 Home and lock screen widgets for what's playing (with controls), your listening, your physical collection and next labels, your digital collection and albums to rediscover. On Apple Watch: a remote for your iPhone, your listening, and Find by Label.
 
 Your library stays yours
-No account, no ads, no tracking. Your iPhone and Mac sync directly over your Wi-Fi network, encrypted. Plays and likes go back to your Mac, and you can scrobble to Last.fm. What you own is edited in the Mac app and shown read-only on the phone.
+No account, no ads, no tracking. Your iPhone and Mac sync directly over your Wi-Fi network, encrypted, or through your own iCloud when the Mac backs up there. Plays and likes go back to your Mac, and you can scrobble to Last.fm. What you own is edited in the Mac app and shown read-only on the phone.
 
 No Mac app yet? Tap Explore a Sample Library to try everything with fictional artists, CDs and records.
 
 Get the companion Mac app
 Your music comes from Music Library for Mac (free, macOS 14 or later): it catalogs your CDs and records, imports, rips and digitizes your music, then syncs both collections to your iPhone. Download it, and find the full documentation and the source code, at https://davidlago.github.io/music-library/
+```
+
+**What's New in the iCloud release** (the first version after 1.29.0 built with iCloud):
+
+```
+Your Mac's iCloud backup
+• With iCloud backup turned on in Music Library for Mac, your library, covers and photos stay up to date from your own iCloud, even when the Mac isn't nearby. A new iPhone gets your library without pairing.
+• Download gets songs from the backup when your Mac isn't on the same Wi-Fi, and from the Mac as before when it is.
+• Your plays, likes and downloads reach the Mac through iCloud too.
+• Settings ▸ iCloud shows when the library was last updated, with Check Now.
 ```
 
 **What's New in 1.24.0** (the live version is 1.23.0; 1.23.1 and 1.23.2 only changed the Mac app):
@@ -146,6 +162,8 @@ To review without a Mac: on the first screen, tap "Explore a Sample Library". It
 To sync your own music: install the Mac app, tap Sync at the top of the iPhone's Listen Now tab, then tap "Pair with a Mac", then enter the code it shows in the Mac app (iPhone in the sidebar). Both need to be on the same Wi-Fi network; the app asks for local network access for this. The attached video shows the sample library and the pairing screen.
 
 The screenshots show the developer's own library, synced from the Mac app.
+
+Optional: with iCloud backup turned on in the Mac app (Settings ▸ iCloud), the phone also reads the library and downloads songs from the Mac's backup in the user's own iCloud (the app's private container) when the Mac isn't nearby; Settings ▸ iCloud on the phone shows it. The sample library doesn't use iCloud.
 
 Optional features need the user's own accounts or keys, entered by the user: Last.fm scrobbling (Settings, with a Last.fm API key), concerts on artist pages (Ticketmaster or JamBase keys set on the Mac) and the Radio DJ (the user's own Anthropic Claude API key or OpenRouter key, entered in the Mac app and handed to the phone when they sync; without one, the DJ doesn't appear at all). The DJ runs only when the user taps its button, and sends the page being viewed and the user's questions to Anthropic with the user's own key.
 ```

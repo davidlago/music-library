@@ -46,6 +46,12 @@ artist pages** (on). See [Concerts](concerts.md).
 Your Discogs personal access token (**Connect**), the account it's connected to, and the folder **Sync to Discogs**
 adds new copies to. See [Physical Collection](physical-collection.md#sync-to-discogs).
 
+## iCloud
+
+What to back up to your iCloud (**Off**, **Library and covers**, **Library, covers and chosen music** or
+**Everything**) with the size of each, **Include what's on my iPhone**, the backup's status with **Back Up Now**, and
+**Restore from iCloud…**. Only in versions with iCloud. See [iCloud backup](icloud.md).
+
 ## Radio DJ
 
 Your Claude API and OpenRouter keys (**Check** tests each), the model (**Choose Model…**, with prices), the **DJ's name** and **Your name**, and what the DJ has cost: this month, all

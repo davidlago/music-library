@@ -39,7 +39,8 @@ with this on and the drive holds a complete library: choose it in **Settings ▸
 open it.
 
 For a full backup without the export, quit the app and copy the library folder; see
-[Getting started](getting-started.md#moving-to-another-mac).
+[Getting started](getting-started.md#moving-to-another-mac). For a backup that keeps itself up to date, with earlier
+copies of the database to go back to, see [iCloud backup](icloud.md).
 
 ## Exporting one playlist
 

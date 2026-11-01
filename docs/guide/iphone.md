@@ -3,7 +3,8 @@
 **Dave's Music Library** for iPhone (free on the
 [App Store](https://apps.apple.com/us/app/daves-music-library/id6822005512), iOS 26 or later, with the Apple Watch app)
 shows both your collections and plays the music you choose to keep on the phone, offline. It gets everything from the
-Mac app over your Wi-Fi network, encrypted, with no account or cloud service in between.
+Mac app over your Wi-Fi network, encrypted, with no account or cloud service in between, and, with
+[iCloud backup](icloud.md) turned on on the Mac, from your own iCloud when the Mac isn't nearby.
 
 ![The iPhone app: the Physical tab with Find by Label on CD #14, the records left to digitize, and the item page for Mystery Girl on CD #14](../screenshots/iphone-collection.png)
 
@@ -45,8 +46,9 @@ account, and the Mac's concert settings and Radio DJ key come along too.
   **Digitized CDs**, **Digitized vinyl** or **Everything I own that's digitized** (downloads included). New rips join at
   the next sync, and Remove from iPhone still wins.
 
-With Music Library open on the Mac and both on the same Wi-Fi, the phone syncs right away; otherwise what you asked for
-waits in Sync ("Waiting for the Mac") until the Mac is around. **Sync Now** works from either side while the
+With Music Library open on the Mac and both on the same Wi-Fi, the phone syncs right away. Otherwise, with
+[iCloud backup](icloud.md#on-the-iphone) on, songs that are in your Mac's iCloud backup download from there; the rest
+wait in Sync ("Waiting for the Mac") until the Mac is around. **Sync Now** works from either side while the
 phone's Sync screen is open. Removing deletes the songs from the phone at once. The first sync from a Mac asks before
 deleting anything.
 
@@ -125,6 +127,8 @@ The gear at the top of Listen Now (and of the Collection tab):
 - **Radio DJ**: the DJ's name, yours, and this phone's spending (set up on the Mac; see [Radio DJ](radio-dj.md)).
 - **Last.fm**: connected from the Mac at the first sync, or enter an API key and shared secret and tap **Connect…**. The
   phone scrobbles what it plays itself; scrobbles made offline are sent when it's back online.
+- **iCloud**: **Use iCloud** (on), when the library was last updated from your Mac's iCloud backup, and **Check Now**
+  (see [iCloud backup](icloud.md#on-the-iphone)).
 - **Music Library**: songs on the phone, what you own, **Reload Music Library**, and the sample library.
 
 ## Siri and Shortcuts
