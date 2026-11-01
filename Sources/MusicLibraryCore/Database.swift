@@ -142,6 +142,39 @@ public final class Database: @unchecked Sendable {
         try exec("VACUUM INTO ?", [.text(path)])
     }
 
+    /// Replaces this database's contents with the database at `path` (a backup snapshot), through SQLite's backup API, so
+    /// the open connection and everyone holding it see the restored library. The snapshot is brought up to this
+    /// version's schema, the downloaded library catalog is taken from `catalog` (the snapshot leaves it out), and the
+    /// snapshot's stamp is cleared. The update hook doesn't see any of it: callers schedule a backup themselves.
+    public func restore(from path: String, keepingCatalogFrom catalog: String) throws {
+        lock.lock(); defer { lock.unlock() }
+        var source: OpaquePointer?
+        guard sqlite3_open_v2(path, &source, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let source else {
+            let msg = source.map { String(cString: sqlite3_errmsg($0)) } ?? "unknown error"
+            sqlite3_close(source)
+            throw DatabaseError.open(msg)
+        }
+        defer { sqlite3_close(source) }
+        guard let backup = sqlite3_backup_init(db, "main", source, "main") else { throw error("backup") }
+        let rc = sqlite3_backup_step(backup, -1)
+        sqlite3_backup_finish(backup)
+        guard rc == SQLITE_DONE else { throw error("backup") }
+        try migrate()
+        try exec("ATTACH ? AS kept", [.text(catalog)])
+        defer { try? exec("DETACH kept") }
+        try transaction {
+            for table in ["catalog_items", "catalog_info", "catalog_previews"] {
+                let kept = Set(try query("SELECT name FROM pragma_table_info(?, 'kept')", [.text(table)]) { $0.string(0) ?? "" })
+                let shared = try columns(of: table).filter(kept.contains).sorted()
+                guard !shared.isEmpty else { continue }
+                let list = shared.map { "\"\($0)\"" }.joined(separator: ",")
+                try exec("DELETE FROM main.\(table)")
+                try exec("INSERT INTO main.\(table)(\(list)) SELECT \(list) FROM kept.\(table)")
+            }
+            try clearSnapshotStamp()
+        }
+    }
+
     private func migrate() throws {
         let version = try query("PRAGMA user_version") { $0.int(0) ?? 0 }.first ?? 0
         if version < 1 {

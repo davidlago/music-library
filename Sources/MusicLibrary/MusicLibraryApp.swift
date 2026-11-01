@@ -38,6 +38,11 @@ struct MusicLibraryApp: App {
                     .disabled(model.collectionSheet != nil || model.smartPlaylistDraft != nil)
                 Button("Import…") { model.chooseFilesToImport() }
                     .keyboardShortcut("o", modifiers: .command)
+                if model.cloud.isAvailable {
+                    Divider()
+                    Button("Restore from iCloud…") { model.restoreFromICloud() }
+                        .disabled(model.isShowingSheet)
+                }
             }
             CommandMenu("Physical Collection") {
                 // Also in the File menu, which has its shortcut (one key equivalent per command).

@@ -31,6 +31,11 @@ struct ICloudSettings: View {
             } header: {
                 Text("iCloud Backup")
             }
+            Section("Restore") {
+                Text("Get your library back as it was on a day the backup kept: into a new folder, with the music the backup holds, or just its database into the library that's open.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Restore from iCloud…") { model.restoreFromICloud() }
+            }
             if cloud.scope != .off {
                 Section("Status") {
                     ICloudStatus(cloud: cloud, confirmingReplace: $confirmingReplace)
