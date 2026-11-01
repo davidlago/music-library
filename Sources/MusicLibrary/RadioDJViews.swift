@@ -1177,6 +1177,7 @@ extension AppModel {
         case .digitizeVinyl?: return .page("Digitize Vinyl, where they record their records")
         case .exportList?: return .page("the Export List")
         case .iPhone?: return .page("the iPhone sync page")
+        case .iCloud?: return .page("the music they back up to iCloud")
         case .catalog?: return .page("their public library's CD catalog")
         case .catalogCheckouts?: return .page("their public library checkouts")
         case .catalogList?: return .page("their public library list")

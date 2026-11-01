@@ -196,6 +196,11 @@ struct SidebarView: View {
                 Label("iPhone", systemImage: "iphone")
                     .badge(model.iPhone.selection.included.count)
                     .tag(SidebarItem.iPhone)
+                if model.cloud.isAvailable, model.cloud.scope == .chosen {
+                    Label("iCloud", systemImage: "icloud")
+                        .badge(model.cloud.selection.included.count)
+                        .tag(SidebarItem.iCloud)
+                }
                 Label("Export List", systemImage: "externaldrive")
                     .badge(model.exportList.count)
                     .tag(SidebarItem.exportList)
@@ -304,6 +309,7 @@ struct DetailRouter: View {
         case .digitizeVinyl: VinylDigitizeView()
         case .exportList: ExportListView()
         case .iPhone: IPhoneSyncView()
+        case .iCloud: ICloudBackupView()
         case .catalog: CatalogView()
         case .catalogCheckouts: CatalogCheckoutsView()
         case .catalogList: CatalogListView()

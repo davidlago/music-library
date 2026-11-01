@@ -9,6 +9,8 @@ enum SidebarItem: Hashable {
     /// The Shelf (`.all`), one medium, or To Digitize.
     case collection(CollectionScope)
     case songs, albums, artists, insights, musicDNA, concerts, importQueue, exportList, iPhone, catalog, catalogCheckouts, catalogList, cdShop
+    /// The music chosen for the iCloud backup.
+    case iCloud
     /// Digitize Vinyl: recording a record and cutting it into tracks.
     case digitizeVinyl
     case likedSongs
@@ -360,6 +362,9 @@ final class AppModel {
         }
         iPhone.context = { [unowned self] in self.syncContext }
         cloud.context = { [unowned self] in self.database.map { (self.libraryRoot, $0) } }
+        cloud.tracks = { [unowned self] in self.tracks(for: $0) }
+        cloud.allTracks = { [unowned self] in self.tracks }
+        cloud.iPhoneTracks = { [unowned self] in self.iPhone.phones.isEmpty ? [] : self.iPhoneTracks() }
         cloud.identity = { [unowned self] in
             CloudBackupIdentity(macID: self.iPhone.identity.deviceID, macName: self.iPhone.identity.deviceName, appVersion: AppInfo.version)
         }
@@ -496,6 +501,8 @@ final class AppModel {
             recomputeGroupTotals()
             loadPurchases()
             iPhone.dropMissing()
+            // What the iPhone gets depends on the collection, so not before it's built.
+            if collectionLoaded { cloud.dropMissing() }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1147,6 +1154,7 @@ final class AppModel {
             collectionLoaded = true
             // Skipped while the collection was empty, since what Collection on iPhone adds wasn't known.
             iPhone.dropMissing()
+            cloud.dropMissing()
         }
         // A disc looked up while the collection was loading (or changing) is matched to its items again.
         cd?.collectionChanged()
