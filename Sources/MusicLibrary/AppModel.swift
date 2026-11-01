@@ -116,6 +116,15 @@ final class AppModel {
         }
     }
     @ObservationIgnored private var sidebarChosen = false
+
+    /// The sidebar row already selected was clicked again: back to its main page. Pages opened from it close, and so
+    /// do search results.
+    func sidebarReselected() {
+        guard sidebar != nil else { return }
+        nowPlayingExpanded = false
+        if !navigationPath.isEmpty { navigationPath = NavigationPath() }
+        if !searchText.isEmpty { searchText = "" }
+    }
     var nowPlayingExpanded = false
     /// The Shelf's filter, in the collection query language (`showShelf(query:)` sets it).
     var shelfQuery = ""
@@ -123,6 +132,8 @@ final class AppModel {
     var collectionSheet: CollectionSheet?
     /// Restore from iCloud… is showing.
     var showsCloudRestore = false
+    /// Set Up from iCloud… is showing (an empty library and a backup in iCloud, D21).
+    var showsCloudSetup = false
     /// The item Remove from Collection… asks about (`collectionRemovalConfirmation`).
     var pendingItemRemoval: CollectionItem?
     /// The queue in the window's inspector.
@@ -307,6 +318,8 @@ final class AppModel {
     @ObservationIgnored let discogsSync = DiscogsSyncStore()
     /// The iCloud backup (hidden without an iCloud container).
     @ObservationIgnored let cloud = CloudBackupStore()
+    /// Music offloaded from this Mac to the iCloud backup, and getting it back.
+    @ObservationIgnored let offload = OffloadStore()
     @ObservationIgnored private var currentPlay: (track: Track, startedAt: Date, tracker: ListenTracker)?
     @ObservationIgnored private var terminationObserver: NSObjectProtocol?
     @ObservationIgnored private(set) var importer: ImportController!
@@ -372,6 +385,25 @@ final class AppModel {
         cloud.identity = { [unowned self] in
             CloudBackupIdentity(macID: self.iPhone.identity.deviceID, macName: self.iPhone.identity.deviceName, appVersion: AppInfo.version)
         }
+        SidebarReclick.install { [weak self] in self?.sidebarReselected() }
+        cloud.onPublished = { [unowned self] in self.offload.runAutomatically() }
+        cloud.onMoved = { [unowned self] in self.databaseRestored() }
+        offload.context = { [unowned self] in self.database.map { (self.libraryRoot, $0) } }
+        offload.tracks = { [unowned self] in self.tracks(for: $0) }
+        offload.allTracks = { [unowned self] in self.tracks }
+        offload.lastPlayed = { [unowned self] in self.playTotals.compactMapValues(\.lastPlayed) }
+        offload.playing = { [unowned self] in Set(self.player.currentTrack.map { [$0.id] } ?? []) }
+        offload.queued = { [unowned self] in Set(self.player.queue.entries.map(\.track.id)) }
+        offload.backupStore = { [unowned self] in await self.cloud.backupStore() }
+        offload.backsUpMusic = { [unowned self] in self.cloud.scope.includesMusic }
+        offload.onChanged = { [unowned self] in
+            self.reloadLibrary()
+            self.cloud.filesChanged()
+        }
+        let offload = offload
+        player.isOffloaded = { offload.isOffloaded($0) }
+        player.download = { track in (try? await offload.ensureLocal([track])) != nil }
+        player.prefetch = { offload.prefetch($0) }
         radioDJ.location = { [unowned self] in self.radioDJLocation }
         iPhone.startListening()
         artistInfo.onAutoSyncEnabled = { [unowned self] in self.syncArtistInfo() }
@@ -482,6 +514,7 @@ final class AppModel {
         index = .empty; searchResults = SearchResults(); stats = nil; statsVersion = -1
         listening = nil; listeningRequest = nil; weekListening = nil; weekListeningRequest = nil
         trackPurchases = [:]
+        offload.load(nil, root: url)
         collection = .empty; collectionIndex = .empty; collectionStats = nil; collectionStatsRequest = nil; collectionLoaded = false
         unsettledItems = [:]; searchItems = []; searchLabelHits = []; collectionVersion += 1
         openLibrary()
@@ -504,6 +537,8 @@ final class AppModel {
             trackByID = Dictionary(tracks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             recomputeGroupTotals()
             loadPurchases()
+            offload.load(db, root: libraryRoot)
+            offload.dropMissing()
             iPhone.dropMissing()
             // What the iPhone gets depends on the collection, so not before it's built.
             if collectionLoaded { cloud.dropMissing() }
@@ -781,6 +816,8 @@ final class AppModel {
                       progress: @escaping @Sendable (Int, Int) -> Void) async throws -> AlbumCoverWriter.Result {
         let writer = AlbumCoverWriter(root: libraryRoot, tools: tools)
         let albumTracks = tracks(of: album)
+        // The art goes inside the files, so offloaded ones come back first.
+        if embed { try await offload.ensureLocal(albumTracks) }
         defer {
             coverRevision += 1
             cloud.filesChanged()
@@ -1379,11 +1416,12 @@ final class AppModel {
         let version = libraryVersion
         let all = tracks
         let root = libraryRoot
+        let offloaded = offload.offloaded
         statsTask?.cancel()
         statsTask = Task.detached(priority: .userInitiated) {
             let covers = CoverLookup(root: root)
             let stats = LibraryStats(tracks: all, hasCover: covers.hasCover, fileSize: { t in
-                t.resolvedFileURL(root: root).flatMap(LibraryExporter.size(of:))
+                t.resolvedFileURL(root: root).flatMap(LibraryExporter.size(of:)) ?? offloaded[t.id]?.size
             })
             guard !Task.isCancelled else { return }
             await MainActor.run { [weak self] in
@@ -1837,7 +1875,16 @@ final class AppModel {
                 self?.exportState?.done = done; self?.exportState?.total = total
             }
         }
+        let offload = offload
         exportTask = Task { [weak self] in
+            // Offloaded songs are downloaded to this Mac first (refused when they don't fit).
+            do {
+                try await offload.ensureLocal(tracks)
+            } catch {
+                if self?.exportState?.destination == dest { self?.exportState?.error = error.localizedDescription }
+                self?.exportTask = nil
+                return
+            }
             let job = Task.detached { () -> Result<LibraryExportSummary, Error> in
                 Result {
                     try LibraryExporter().export(tracks: tracks, playlists: playlistFiles, database: backup,

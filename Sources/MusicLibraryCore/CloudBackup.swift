@@ -155,8 +155,10 @@ public struct CloudBackupPlan: Equatable, Sendable {
 
     /// The library files a backup holds, in upload order: every album's `cover.jpg`, the collection items' own covers
     /// (`Database.collectionCoverPaths`), artist photos, then the files of `music` (the tracks the scope backs up).
-    /// Only regular files inside `root` count.
-    public static func files(tracks: [Track], collectionCovers: [String], music: [Track] = [], root: URL) -> [CloudBackupFile] {
+    /// Only regular files inside `root` count, except `offloaded` songs: their files are only in the backup now, so
+    /// they're always wanted as they were backed up, whatever the scope (D18), and never listed for removal.
+    public static func files(tracks: [Track], collectionCovers: [String], music: [Track] = [], offloaded: [OffloadedTrack] = [],
+                             root: URL) -> [CloudBackupFile] {
         var files: [CloudBackupFile] = []
         var seen = Set<String>()
         func add(_ path: String) {
@@ -176,6 +178,9 @@ public struct CloudBackupPlan: Equatable, Sendable {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent(images).path)) ?? []
         for name in names.sorted() where !name.hasPrefix(".") { add((images as NSString).appendingPathComponent(name)) }
         for track in music { add(track.path) }
+        for track in offloaded.sorted(by: { $0.path < $1.path }) where isMusic(track.path) && seen.insert(track.path).inserted {
+            files.append(track.file)
+        }
         return files
     }
 
@@ -235,12 +240,19 @@ public enum CloudBackupError: Error, LocalizedError, Equatable {
     case newerBackup
     /// The library has no identity yet (it's made when the database is opened).
     case noLibraryID
+    /// Another Mac backs this library up now (it was set up from iCloud: D21); this one stops until the user decides.
+    case movedToAnotherMac(macName: String, snapshotAt: Date)
+    /// Replacing another library's backup would delete songs this library has only there (D18).
+    case offloadedMusic(songs: Int)
 
     public var errorDescription: String? {
         switch self {
         case .otherLibrary(let mac, _): return "iCloud holds a backup of another library, from \(mac)."
         case .newerBackup: return "iCloud holds a backup made by a newer version of Music Library. Update the app to back up."
         case .noLibraryID: return "This library can't be backed up yet."
+        case .movedToAnotherMac(let mac, _): return "Your library's backup moved to \(mac)."
+        case .offloadedMusic(let songs):
+            return "\(songs) \(songs == 1 ? "song is" : "songs are") only in iCloud, so the backup there can't be replaced. Download them to this Mac first."
         }
     }
 }
@@ -303,18 +315,26 @@ public enum CloudBackup {
     /// Backs the library up (§5): a new snapshot, then the covers, photos and `music` files that changed (music evicted
     /// from the Mac once uploaded), then `backup.json` once the snapshot is in iCloud, then the removal list, purges
     /// and old snapshots. `music` is what the scope backs up (none for "Library and covers"). `replacingOther`
-    /// replaces a backup of another library, its snapshots included. `deletingRemovedNow` deletes every file the backup
-    /// no longer wants at once instead of after `CloudRemoval.keptFor` (Delete Now, to free iCloud space). Cancelling
-    /// the task stops the music copy (what's left is `remaining`) and leaves the rest of the run as it would be.
+    /// replaces a backup of another library, its snapshots included (refused while songs are offloaded). A backup of
+    /// this library that another Mac now makes (D21) is left to it unless `takingOver`. `deletingRemovedNow` deletes
+    /// every file the backup no longer wants at once instead of after `CloudRemoval.keptFor` (Delete Now, to free iCloud
+    /// space); offloaded songs are always wanted, so neither touches them. Cancelling the task stops the music copy
+    /// (what's left is `remaining`) and leaves the rest of the run as it would be.
     public static func publish(database: Database, root: URL, store: CloudStore, identity: CloudBackupIdentity,
                                scope: CloudBackupScope, music: [Track] = [], scratch: URL, now: Date = Date(),
-                               replacingOther: Bool = false, deletingRemovedNow: Bool = false,
+                               replacingOther: Bool = false, takingOver: Bool = false, deletingRemovedNow: Bool = false,
                                limits: CloudUploadLimits = CloudUploadLimits()) async throws -> CloudBackupResult {
         guard let libraryID = database.libraryID() else { throw CloudBackupError.noLibraryID }
+        let offloaded = try database.offloadedTracks()
         var replacing = false
-        if let existing = try manifest(in: store), existing.libraryID != libraryID {
-            guard replacingOther else { throw CloudBackupError.otherLibrary(macName: existing.macName, snapshotAt: existing.snapshotAt) }
-            replacing = true
+        if let existing = try manifest(in: store) {
+            if existing.libraryID != libraryID {
+                guard replacingOther else { throw CloudBackupError.otherLibrary(macName: existing.macName, snapshotAt: existing.snapshotAt) }
+                guard offloaded.isEmpty else { throw CloudBackupError.offloadedMusic(songs: offloaded.count) }
+                replacing = true
+            } else if !takingOver, !identity.macID.isEmpty, !existing.macID.isEmpty, existing.macID != identity.macID {
+                throw CloudBackupError.movedToAnotherMac(macName: existing.macName, snapshotAt: existing.snapshotAt)
+            }
         }
         let started = ContinuousClock.now
         let snapshotAt = Date(timeIntervalSince1970: now.timeIntervalSince1970.rounded(.down))
@@ -328,7 +348,7 @@ public enum CloudBackup {
 
         let tracks = try database.fetchAllTracks()
         let files = CloudBackupPlan.files(tracks: tracks, collectionCovers: try database.collectionCoverPaths(),
-                                          music: scope.includesMusic ? music : [], root: root)
+                                          music: scope.includesMusic ? music : [], offloaded: Array(offloaded.values), root: root)
         // Unreadable reads as empty, which only delays purging.
         let removals = ((try? store.read(CloudRemoval.path, limit: CloudRemoval.sizeLimit)) ?? nil).map(CloudRemoval.decode) ?? []
         let plan = CloudBackupPlan(files: files, entries: try store.entries(), removals: removals, now: now)
@@ -352,7 +372,9 @@ public enum CloudBackup {
             return result
         }
         var musicBytes: Int64 = 0
-        for track in tracks { musicBytes += track.resolvedFileURL(root: root).flatMap(LibraryExporter.size(of:)) ?? 0 }
+        for track in tracks {
+            musicBytes += track.resolvedFileURL(root: root).flatMap(LibraryExporter.size(of:)) ?? offloaded[track.id]?.size ?? 0
+        }
         let manifest = CloudBackupManifest(libraryID: libraryID, macID: identity.macID, macName: identity.macName,
                                            appVersion: identity.appVersion, scope: scope, current: snapshot,
                                            snapshotAt: snapshotAt, tracks: tracks.count, musicBytes: musicBytes)
@@ -417,10 +439,13 @@ public enum CloudBackup {
     }
 
     /// About how much a backup puts in iCloud: the database (catalog included, so a little more), the covers and
-    /// photos, and `music`'s files.
+    /// photos, the offloaded songs, and `music`'s files.
     public static func estimatedSize(database: Database, root: URL, music: [Track] = []) -> Int64 {
         guard let tracks = try? database.fetchAllTracks() else { return 0 }
-        let files = CloudBackupPlan.files(tracks: tracks, collectionCovers: (try? database.collectionCoverPaths()) ?? [], music: music, root: root)
+        // Offloaded songs are in iCloud whatever the scope.
+        let offloaded = Array(((try? database.offloadedTracks()) ?? [:]).values)
+        let files = CloudBackupPlan.files(tracks: tracks, collectionCovers: (try? database.collectionCoverPaths()) ?? [], music: music,
+                                          offloaded: offloaded, root: root)
         let databaseSize = LibraryExporter.size(of: LibraryLocation.databaseURL(root: root)) ?? 0
         return files.reduce(databaseSize) { $0 + $1.size }
     }

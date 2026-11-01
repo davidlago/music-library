@@ -171,7 +171,7 @@ struct LabelLookupCard: View {
         return HStack(alignment: .top, spacing: 16) {
             Button { open(item) } label: {
                 CopyArt(mark: c.mark(item: item), url: model.coverURL(for: item), width: coverWidth,
-                        revision: model.coverRevision, title: item.album)
+                        revision: model.coverRevision, title: item.album, iCloud: model.offload.placement(c.libraryTracks(item)))
             }
             .buttonStyle(.plain)
             VStack(alignment: .leading, spacing: 5) {

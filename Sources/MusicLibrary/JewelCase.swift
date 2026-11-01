@@ -11,11 +11,14 @@ struct JewelCase<Booklet: View>: View {
     /// What you own: your CD's label on a sticker across the top of the hinge (where it goes on the real case), a
     /// small badge on the booklet while it isn't ripped, or a round badge for a borrowed CD or a download.
     var mark: CopyMark?
+    /// Whether the album's music is only in iCloud: a cloud badge beside the mark's.
+    var iCloud: ICloudMark.Placement
     var booklet: Booklet
 
-    init(width: CGFloat, mark: CopyMark?, @ViewBuilder booklet: () -> Booklet) {
+    init(width: CGFloat, mark: CopyMark?, iCloud: ICloudMark.Placement = .onMac, @ViewBuilder booklet: () -> Booklet) {
         self.width = width
         self.mark = mark
+        self.iCloud = iCloud
         self.booklet = booklet()
     }
 
@@ -63,11 +66,9 @@ struct JewelCase<Booklet: View>: View {
                 LabelSticker(number: sticker.number, series: .cd, width: Self.stickerWidth(width: w))
                     .offset(Self.stickerOffset(width: w))
             }
-            if let mark, let badge = CopyBadge(mark: mark, coverSide: side) {
-                badge
-                    .frame(width: side, height: side, alignment: .bottomTrailing)
-                    .offset(x: w - margin - side, y: margin)
-            }
+            CopyBadges(mark: mark, iCloud: iCloud, coverSide: side)
+                .frame(width: side, height: side, alignment: .bottomTrailing)
+                .offset(x: w - margin - side, y: margin)
         }
         .frame(width: w, height: h)
         .background {

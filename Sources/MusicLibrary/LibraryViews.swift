@@ -17,7 +17,12 @@ struct TrackTable: View {
     var body: some View {
         Table(sorted, selection: $selection, sortOrder: $sortOrder) {
             TableColumn(Text(Image(systemName: "heart")).accessibilityLabel("Liked")) { LikeButton(model: model, track: $0) }.width(22)
-            TableColumn("Title", value: \.title)
+            TableColumn("Title", value: \.title) { [offload = model.offload] track in
+                HStack(spacing: 4) {
+                    Text(track.title)
+                    ICloudMark(placement: offload.placement([track]))
+                }
+            }
             TableColumn("Artist", value: \.artist)
             TableColumn("Album", value: \.album)
             TableColumn("Composer", value: \.composer) { PersonLinks($0.composer) { model.showMusicDNA($0) } }
@@ -39,7 +44,15 @@ struct TrackTable: View {
                 .opacity(0).allowsHitTesting(false)
         }
         .overlay {
-            if tracks.isEmpty {
+            if tracks.isEmpty, emptyState == nil, !model.isSearching, let backup = model.cloud.setupBackup {
+                ContentUnavailableView {
+                    Label("Your Library Is in iCloud", systemImage: "icloud.and.arrow.down")
+                } description: {
+                    Text("\(backup.macName) backed up a library with \(songCount(backup.tracks)). Set this Mac up with it, or drop audio files here to start a new one.")
+                } actions: {
+                    Button("Set Up from iCloud…") { model.showsCloudSetup = true }
+                }
+            } else if tracks.isEmpty {
                 let empty = emptyState ?? (model.isSearching
                     ? ("No Results", "Nothing matches “\(model.searchText)”.")
                     : ("No Songs", "Drop audio files or folders here, or use File ▸ Import…"))
@@ -140,7 +153,8 @@ struct AlbumsView: View {
                         let mark = model.copyMark(for: a)
                         NavigationLink(value: a) {
                             VStack(alignment: .leading, spacing: 4) {
-                                CopyArt(mark: mark, url: model.coverURL(forAlbum: a), width: 150, revision: model.coverRevision)
+                                CopyArt(mark: mark, url: model.coverURL(forAlbum: a), width: 150, revision: model.coverRevision,
+                                        iCloud: model.offload.placement(model.tracks(of: a)))
                                     .overlay(alignment: .topTrailing) { copiesChip(mark) }
                                     .padding(.bottom, 4)
                                 Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.headline).lineLimit(1)
@@ -386,6 +400,13 @@ extension View {
         return " Your \(items.count) copies (\(items.prefix(3).map(name).joined(separator: ", "))\(items.count > 3 ? "…" : "")) stay in \(place)."
     }
 
+    /// Songs offloaded from this Mac have their only copy in iCloud (D18): it's deleted from there 30 days later.
+    static func onlyInICloud(_ count: Int, of total: Int) -> String {
+        guard count > 0 else { return "" }
+        let which = count == total ? (total == 1 ? "This song's only copy is" : "These songs' only copies are") : "\(count) of them have their only copy"
+        return " \(which) in iCloud, offloaded from this Mac: it's deleted from iCloud 30 days after you remove \(count == 1 ? "it" : "them")."
+    }
+
     /// Asks before removing `model.pendingRemoval` from the library. Shown once, by `ContentView`.
     func removeFromLibraryConfirmation(_ model: AppModel) -> some View {
         let request = model.pendingRemoval
@@ -402,10 +423,12 @@ extension View {
             Button("Cancel", role: .cancel) {}
         } message: { request in
             let n = request.tracks.count
+            let inICloud = request.tracks.filter(model.offload.isOffloaded).count
             Text("""
                 \(n == 1 ? "The file is" : "The \(n) files are") moved to the Trash. \
                 \(n == 1 ? "The song is" : "The songs are") removed from all playlists, \
-                with \(n == 1 ? "its" : "their") plays and likes.\(Self.keptCopies(model.copiesLosingMusic(Set(request.tracks.map(\.id)))))
+                with \(n == 1 ? "its" : "their") plays and likes.\(Self.keptCopies(model.copiesLosingMusic(Set(request.tracks.map(\.id)))))\
+                \(Self.onlyInICloud(inICloud, of: n))
                 """)
         }
     }

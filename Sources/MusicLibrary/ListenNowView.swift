@@ -66,7 +66,8 @@ struct ListenNowView: View {
                     ForEach(albums) { a in
                         NavigationLink(value: a) {
                             VStack(alignment: .leading, spacing: 3) {
-                                CopyArt(mark: model.copyMark(for: a), url: model.coverURL(forAlbum: a), width: 140, revision: model.coverRevision)
+                                CopyArt(mark: model.copyMark(for: a), url: model.coverURL(forAlbum: a), width: 140, revision: model.coverRevision,
+                                        iCloud: model.offload.placement(model.tracks(of: a)))
                                     .padding(.bottom, 4)
                                 Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.headline).lineLimit(1)
                                 Text(a.artist.isEmpty ? "Unknown Artist" : a.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
@@ -172,7 +173,8 @@ struct ListenNowView: View {
                     ForEach([around.previous, copy, around.next].compactMap { $0 }) { item in
                         NavigationLink(value: CollectionItemRoute(id: item.id)) {
                             VStack(spacing: 6) {
-                                CopyArt(mark: model.collection.mark(item: item), url: model.coverURL(for: item), width: 92, revision: model.coverRevision)
+                                CopyArt(mark: model.collection.mark(item: item), url: model.coverURL(for: item), width: 92, revision: model.coverRevision,
+                                        iCloud: model.offload.placement(model.collection.libraryTracks(item)))
                                     .overlay {
                                         if item.id == copy.id {
                                             RoundedRectangle(cornerRadius: 6).strokeBorder(AppColor.accent, lineWidth: 2.5).padding(-4)
@@ -207,7 +209,8 @@ private struct ListenNowHero: View {
         let sticker = model.collection.copies(albumKey: key).compactMap(\.sticker).first
         HStack(alignment: .center, spacing: 28) {
             NavigationLink(value: album) {
-                CopyArt(mark: model.copyMark(for: album), url: model.coverURL(forAlbum: album), width: 240, revision: model.coverRevision)
+                CopyArt(mark: model.copyMark(for: album), url: model.coverURL(forAlbum: album), width: 240, revision: model.coverRevision,
+                        iCloud: model.offload.placement(model.tracks(of: album)))
                     .shadow(color: .black.opacity(0.3), radius: 18, y: 10)
             }
             .buttonStyle(.plain)

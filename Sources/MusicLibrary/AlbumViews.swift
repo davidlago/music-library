@@ -161,16 +161,19 @@ struct AlbumDetail: View {
     /// that image.
     private func coverArt(size: CGFloat) -> some View {
         let mark = model.copyMark(for: album)
+        let iCloud = model.offload.placement(tracks)
         return Group {
             switch mark {
             case .cd:
-                JewelCase(width: size, mark: mark) { booklet(side: JewelCase<EmptyView>.bookletSide(width: size)) }
+                JewelCase(width: size, mark: mark, iCloud: iCloud) { booklet(side: JewelCase<EmptyView>.bookletSide(width: size)) }
             case .vinyl:
-                RecordSleeve(width: size, mark: mark, tint: coverTint) { booklet(side: RecordSleeve<EmptyView>.sleeveSide(width: size)) }
+                RecordSleeve(width: size, mark: mark, tint: coverTint, iCloud: iCloud) {
+                    booklet(side: RecordSleeve<EmptyView>.sleeveSide(width: size))
+                }
             default:
                 let side = JewelCase<EmptyView>.height(width: size)
                 booklet(side: side)
-                    .overlay { CoverCopyMark(mark: mark, size: side) }
+                    .overlay { CoverCopyMark(mark: mark, size: side, iCloud: iCloud) }
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .shadow(color: .black.opacity(0.3), radius: 14 * size / 380, y: 14 * size / 380)
                     .frame(width: size, height: side, alignment: .topLeading)
@@ -295,6 +298,7 @@ struct AlbumDetail: View {
 
     @ViewBuilder
     private func sections(_ info: AlbumInfo?) -> some View {
+        AlbumOffloadNote(tracks: tracks)
         if !album.album.isEmpty {
             YourCopiesSection(album: album, plays: tracks.reduce(0) { $0 + (model.playTotals[$1.id]?.plays ?? 0) })
         }
@@ -512,6 +516,7 @@ struct AlbumTrackRow: View {
                 }
             }
             Spacer()
+            ICloudMark(placement: model.offload.placement([track]))
             RipCheckMark(check: model.ripChecks[track.id])
             LikeButton(model: model, track: track, showsUnliked: hovering)
             if let plays = total?.plays, plays > 0 {

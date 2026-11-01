@@ -6,6 +6,8 @@ struct ICloudSettings: View {
     @Environment(AppModel.self) private var model
     @State private var pendingScope: CloudBackupScope?
     @State private var confirmingReplace = false
+    /// A smaller scope (or Off) chosen while songs are offloaded: they're only in iCloud (D18).
+    @State private var offloadedScope: CloudBackupScope?
 
     var body: some View {
         let cloud = model.cloud
@@ -30,6 +32,16 @@ struct ICloudSettings: View {
                 }
             } header: {
                 Text("iCloud Backup")
+            }
+            if cloud.setupBackup != nil {
+                Section("Set Up from iCloud") {
+                    Text("This Mac's library is empty, and iCloud holds the library from \(cloud.setupBackup?.macName ?? "another Mac"). Move it here: the music stays in iCloud and downloads when you play it.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Set Up from iCloud…") { model.showsCloudSetup = true }
+                }
+            }
+            if cloud.scope != .off || !model.offload.offloaded.isEmpty {
+                OffloadSettingsSection()
             }
             Section("Restore") {
                 Text("Get your library back as it was on a day the backup kept: into a new folder, with the music the backup holds, or just its database into the library that's open.")
@@ -63,11 +75,27 @@ struct ICloudSettings: View {
         } message: {
             Text("iCloud holds a backup of another library. Replacing it removes that library's database copies; covers, photos and music it shares with this library are overwritten.")
         }
+        .alert("Some Music Is Only in iCloud", isPresented: Binding(get: { offloadedScope != nil }, set: { if !$0 { offloadedScope = nil } })) {
+            Button("Download It to This Mac First") {
+                model.offload.download([.library])
+                if let scope = offloadedScope { cloud.scope = scope }
+            }
+            Button("Keep It in iCloud") { if let scope = offloadedScope { cloud.scope = scope } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            let offload = model.offload
+            Text("\(songCount(offload.offloaded.count)) (\(Self.bytes(offload.offloadedBytes))) were offloaded from this Mac, so iCloud holds their only copy. Download them to this Mac first (\(Self.bytes(offload.offloadedBytes)) of space), or keep them in iCloud: they stay there and download when you play them, whatever the backup is set to.")
+        }
     }
 
-    /// Asks before the first backup and before backing up more music than now.
+    /// Asks before the first backup and before backing up more music than now; and, while songs are offloaded, before
+    /// backing up less (D18).
     private func choose(_ scope: CloudBackupScope) {
         let cloud = model.cloud
+        if !model.offload.offloaded.isEmpty, scope != cloud.scope, scope == .off || scope == .library || (scope == .chosen && cloud.scope == .everything) {
+            offloadedScope = scope
+            return
+        }
         let grows = scope.includesMusic && (cloud.estimate.map { $0.bytes(scope) > $0.bytes(cloud.scope) } ?? true)
         if scope != .off, cloud.scope == .off || grows {
             pendingScope = scope
@@ -121,8 +149,10 @@ extension CloudBackupScope {
 
 /// The last backup, what's still uploading or waiting to be copied, and problems, with what to do about them.
 struct ICloudStatus: View {
+    @Environment(AppModel.self) private var model
     let cloud: CloudBackupStore
     @Binding var confirmingReplace: Bool
+    @State private var confirmingTakeOver = false
     @State private var confirmingDelete = false
 
     var body: some View {
@@ -175,9 +205,29 @@ struct ICloudStatus: View {
                 Label("iCloud holds a backup of another library, from \(mac) (\(date.formatted(date: .abbreviated, time: .shortened))). Nothing was backed up.",
                       systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                 HStack {
-                    Button("Replace It…") { confirmingReplace = true }
+                    // The songs offloaded from this Mac might be among what replacing it overwrites (D18).
+                    Button("Replace It…") { confirmingReplace = true }.disabled(!model.offload.offloaded.isEmpty)
                     Button("Turn Off Backup") { cloud.scope = .off }
                 }
+                if !model.offload.offloaded.isEmpty {
+                    Text("Songs offloaded from this Mac are only in iCloud, so it can't be replaced. Download them to this Mac first.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        case .movedToAnotherMac(let mac):
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Your library's backup moved to \(mac), which was set up from it. This Mac stopped backing up so the two don't overwrite each other.",
+                      systemImage: "arrow.right.circle.fill").foregroundStyle(.orange)
+                HStack {
+                    Button("Back Up from Here Instead…") { confirmingTakeOver = true }
+                    Button("Stop Backing Up") { cloud.scope = .off }
+                }
+            }
+            .alert("Back Up from This Mac Instead?", isPresented: $confirmingTakeOver) {
+                Button("Back Up from Here") { cloud.takeOver() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This Mac's library becomes the one in iCloud again, and \(mac) stops backing up at its next backup. What was changed on \(mac) since it was set up is no longer in the latest backup, though earlier database copies keep it for a while.")
             }
         case .failed(let message):
             Label(message, systemImage: "xmark.circle.fill").foregroundStyle(.red)

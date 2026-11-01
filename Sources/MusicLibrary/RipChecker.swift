@@ -94,6 +94,8 @@ final class RipChecker {
             defer { albumProgress[key] = nil; albumTasks[key] = nil }
             do {
                 var found = false
+                // The check reads the files, so offloaded ones come back first.
+                try await model.offload.ensureLocal(model.tracks(of: album).filter(RipDiscMatcher.isCDAudio))
                 let byDisc = Dictionary(grouping: model.tracks(of: album).filter(RipDiscMatcher.isCDAudio)) { $0.metadata.discNo ?? 1 }
                 var listed: [String: [Int: [CDTOC]]] = [:]
                 for (discNo, tracks) in byDisc.sorted(by: { $0.key < $1.key }) {

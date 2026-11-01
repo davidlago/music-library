@@ -97,6 +97,23 @@ struct LibraryStatusView: View {
         switch model.state {
         case .loading:
             ProgressView("Loading Your Music…")
+        case .missing where model.cloud.isUsable && (model.cloud.status == .checking || model.cloud.arriving != nil):
+            // A new iPhone gets the library from iCloud without the Mac (D22): say so while the first check runs.
+            ContentUnavailableView {
+                Label("Looking for Your Library in iCloud…", systemImage: "icloud.and.arrow.down")
+            } description: {
+                if let arriving = model.cloud.arriving {
+                    VStack(spacing: 8) {
+                        Text("Your library is on its way from \(model.cloud.macName ?? "your Mac")'s iCloud backup: covers and artist photos first, then the library.")
+                        ProgressView(value: Double(arriving.done), total: Double(max(1, arriving.total)))
+                        Text("\(arriving.done) of \(arriving.total) covers and photos").font(.caption).monospacedDigit()
+                    }
+                } else {
+                    Text("If your Mac backs up to iCloud, your library comes from there, without pairing.")
+                }
+            } actions: {
+                ProgressView()
+            }
         case .missing:
             ContentUnavailableView {
                 Label("No Music Library Yet", systemImage: "music.note.house")

@@ -113,6 +113,7 @@ struct MainWindow: View {
         }
         .sheet(item: $model.smartPlaylistDraft) { SmartPlaylistEditor(draft: $0) }
         .sheet(isPresented: $model.showsCloudRestore) { ICloudRestoreSheet() }
+        .sheet(isPresented: $model.showsCloudSetup) { ICloudSetupSheet() }
         .sheet(item: $model.collectionSheet) { sheet in
             switch sheet {
             case .add(let medium, let prefill): AddToCollectionSheet(medium: medium, prefill: prefill)
@@ -127,6 +128,11 @@ struct MainWindow: View {
         }
         .removeFromLibraryConfirmation(model)
         .collectionRemovalConfirmation(model)
+        .offloadConfirmation(model)
+        // A Mac with an empty library can be set up from a library backed up in iCloud (D21).
+        .task(id: model.libraryVersion) {
+            await model.cloud.lookForSetup(libraryIsEmpty: model.tracks.isEmpty && model.collection.items.isEmpty)
+        }
     }
 }
 
@@ -270,7 +276,18 @@ struct PlaylistRow: View {
                     .onExitCommand { model.renamingPlaylistID = nil }
                     .onAppear { draft = playlist.name; focused = true }
             } else {
-                Label(playlist.name, systemImage: "music.note.list").badge(playlist.trackCount)
+                Label {
+                    HStack(spacing: 4) {
+                        Text(playlist.name)
+                        // A query per playlist, so only while something is offloaded.
+                        if !model.offload.offloaded.isEmpty {
+                            ICloudMark(placement: model.offload.placement(model.playlistTracks(playlist.id)))
+                        }
+                    }
+                } icon: {
+                    Image(systemName: "music.note.list")
+                }
+                .badge(playlist.trackCount)
             }
         }
         .contextMenu {

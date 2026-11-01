@@ -27,6 +27,13 @@ final class Player {
     @ObservationIgnored var onWillPlay: (@MainActor () -> Void)?
     /// Called when playback stops for good: the queue ran out or the player was stopped.
     @ObservationIgnored var onPlaybackEnded: (@MainActor () -> Void)?
+    /// A song offloaded to iCloud (D20) is downloaded before it plays (`download`, false when it can't be), and the next
+    /// one in the queue is fetched ahead while the current one plays (`prefetch`).
+    @ObservationIgnored var isOffloaded: (@MainActor (Track) -> Bool)?
+    @ObservationIgnored var download: (@MainActor (Track) async -> Bool)?
+    @ObservationIgnored var prefetch: (@MainActor (Track) -> Void)?
+    /// The current song is being downloaded from iCloud before it plays.
+    private(set) var isDownloading = false
     /// The queue ran out; pressing play again starts the last track over as a new play.
     @ObservationIgnored private var finishedQueue = false
     /// The current song was restored at launch and isn't loaded yet: playing it loads it from `currentTime`.
@@ -121,6 +128,7 @@ final class Player {
         finishedQueue = false
         restoredPaused = false
         loadGeneration += 1
+        isDownloading = false
         avPlayer.pause()
         avPlayer.replaceCurrentItem(with: nil)
         queue.clear(); isPlaying = false; currentTime = 0; duration = 0; cover = nil; outputState = nil
@@ -131,7 +139,12 @@ final class Player {
     private func loadCurrent(at position: Double = 0) {
         restoredPaused = false
         guard let track = queue.current else { return }
+        isDownloading = false
         guard let url = track.resolvedFileURL(root: root), FileManager.default.fileExists(atPath: url.path) else {
+            if isOffloaded?(track) == true, let download {
+                downloadThenPlay(track, at: position, with: download)
+                return
+            }
             lastError = "File missing: \(track.path)"
             if queue.advance() { loadCurrent() } else { isPlaying = false }
             return
@@ -163,6 +176,39 @@ final class Player {
         }
     }
 
+    /// Downloads an offloaded song, then plays it; one that can't be downloaded (offline, say) is skipped, like a
+    /// missing file.
+    private func downloadThenPlay(_ track: Track, at position: Double, with download: @escaping @MainActor (Track) async -> Bool) {
+        loadGeneration += 1
+        let generation = loadGeneration
+        avPlayer.pause()
+        avPlayer.replaceCurrentItem(with: nil)
+        isPlaying = true
+        isDownloading = true
+        lastError = nil
+        currentTime = position
+        duration = track.duration
+        loadCover(for: track)
+        Task { [weak self] in
+            let ok = await download(track)
+            guard let self, generation == self.loadGeneration else { return }
+            self.isDownloading = false
+            if ok, let url = track.resolvedFileURL(root: self.root), FileManager.default.fileExists(atPath: url.path) {
+                self.loadCurrent(at: position)
+            } else {
+                self.lastError = "Couldn't download “\(track.title)” from iCloud."
+                if self.queue.advance() { self.loadCurrent() } else { self.isPlaying = false }
+            }
+        }
+    }
+
+    /// The song after the current one, fetched ahead when it's offloaded.
+    private func prefetchNext() {
+        guard let prefetch, let index = queue.entries.firstIndex(where: { $0.id == queue.currentEntry?.id }),
+              queue.entries.indices.contains(index + 1) else { return }
+        prefetch(queue.entries[index + 1].track)
+    }
+
     private func start(url: URL, at position: Double) {
         // Without precise timing AVFoundation estimates positions in FLAC files without a seek table, so a seek
         // lands seconds away from where the clock says and the song runs past its length.
@@ -181,6 +227,7 @@ final class Player {
         currentTime = position
         updateNowPlaying()
         if let track = currentTrack { onTrackStart?(track) }
+        prefetchNext()
     }
 
     /// Reloads the current track's cover, after it was replaced.

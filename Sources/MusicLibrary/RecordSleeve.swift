@@ -13,9 +13,12 @@ struct RecordSleeve<Booklet: View>: View {
     var mark: CopyMark?
     /// The disc's centre label; by default a deep red.
     var tint: Color?
+    /// Whether the album's music is only in iCloud: a cloud badge beside the mark's.
+    var iCloud: ICloudMark.Placement
     var booklet: Booklet
 
-    init(width: CGFloat, mark: CopyMark?, tint: Color? = nil, @ViewBuilder booklet: () -> Booklet) {
+    init(width: CGFloat, mark: CopyMark?, tint: Color? = nil, iCloud: ICloudMark.Placement = .onMac, @ViewBuilder booklet: () -> Booklet) {
+        self.iCloud = iCloud
         self.width = width
         self.mark = mark
         self.tint = tint
@@ -43,9 +46,8 @@ struct RecordSleeve<Booklet: View>: View {
                 LabelSticker(number: sticker.number, series: .vinyl, width: JewelCase<EmptyView>.stickerWidth(width: width))
                     .offset(JewelCase<EmptyView>.stickerOffset(width: width))
             }
-            if let mark, let badge = CopyBadge(mark: mark, coverSide: side) {
-                badge.frame(width: side, height: side, alignment: .bottomTrailing)
-            }
+            CopyBadges(mark: mark, iCloud: iCloud, coverSide: side)
+                .frame(width: side, height: side, alignment: .bottomTrailing)
         }
         .frame(width: width, height: h, alignment: .topLeading)
         .background(alignment: .topLeading) {
@@ -111,22 +113,24 @@ struct CopyArt: View {
     var revision = 0
     /// Shown on the placeholder when there's no cover.
     var title = ""
+    /// Whether the music is only in iCloud (offloaded from this Mac): a cloud badge in the corner.
+    var iCloud: ICloudMark.Placement = .onMac
     @State private var tint: Color?
 
     var body: some View {
         switch mark {
         case .cd?:
-            JewelCase(width: width, mark: mark) { cover(side: JewelCase<EmptyView>.bookletSide(width: width)) }
+            JewelCase(width: width, mark: mark, iCloud: iCloud) { cover(side: JewelCase<EmptyView>.bookletSide(width: width)) }
         case .vinyl?:
-            RecordSleeve(width: width, mark: mark, tint: tint) { cover(side: RecordSleeve<EmptyView>.sleeveSide(width: width)) }
+            RecordSleeve(width: width, mark: mark, tint: tint, iCloud: iCloud) { cover(side: RecordSleeve<EmptyView>.sleeveSide(width: width)) }
                 .task(id: "\(url?.path ?? "")|\(revision)") { tint = await CoverTint.color(of: url) }
         default:
             let side = JewelCase<EmptyView>.height(width: width)
             Group {
                 if url == nil, !title.isEmpty {
-                    placeholder(side: side).overlay { if let mark { CoverCopyMark(mark: mark, size: side) } }
+                    placeholder(side: side).overlay { CoverCopyMark(mark: mark, size: side, iCloud: iCloud) }
                 } else {
-                    CoverThumb(url: url, size: side, revision: revision, mark: mark)
+                    CoverThumb(url: url, size: side, revision: revision, mark: mark, iCloud: iCloud)
                 }
             }
             .frame(width: width, height: side)

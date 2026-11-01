@@ -43,6 +43,8 @@ struct CoverThumb: View {
     var mark: CopyMark?
     /// 0 for a booklet in a `JewelCase`.
     var cornerRadius: CGFloat = 6
+    /// Whether the music is only in iCloud: a cloud badge beside the mark's (`CopyBadges`).
+    var iCloud: ICloudMark.Placement = .onMac
     @State private var image: NSImage?
 
     var body: some View {
@@ -53,8 +55,8 @@ struct CoverThumb: View {
                 Rectangle().fill(.quaternary)
                 Image(systemName: "music.note").font(.system(size: size / 3)).foregroundStyle(.secondary)
             }
-            if let mark {
-                CoverCopyMark(mark: mark, size: size)
+            if mark != nil || iCloud != .onMac {
+                CoverCopyMark(mark: mark, size: size, iCloud: iCloud)
             }
         }
         .frame(width: size, height: size)
@@ -174,6 +176,18 @@ struct CopyBadge: View {
         }
     }
 
+    /// Music offloaded to iCloud, as `ICloudMark` shows it on a song.
+    init?(iCloud: ICloudMark.Placement, coverSide: CGFloat) {
+        switch iCloud {
+        case .onMac: return nil
+        case .iCloudOnly: self.init(symbol: "icloud.slash", label: "Not on this Mac: in iCloud only, downloads when you play it", coverSide: coverSide)
+        case .partly:
+            self.init(symbol: "icloud.slash", label: "Some songs not on this Mac: in iCloud only, they download when you play them",
+                      coverSide: coverSide)
+        case .downloading: self.init(symbol: "arrow.down", label: "Downloading from iCloud", coverSide: coverSide)
+        }
+    }
+
     var body: some View {
         let diameter = max(16, min(30, coverSide * 0.13))
         Image(systemName: symbol)
@@ -192,20 +206,37 @@ struct CopyBadge: View {
 /// What you own, on a cover shown without its case: the label pill in the top-left corner and the badge
 /// (`CopyBadge`) in the bottom-right one.
 struct CoverCopyMark: View {
-    let mark: CopyMark
+    let mark: CopyMark?
     /// The cover's side.
     let size: CGFloat
+    var iCloud: ICloudMark.Placement = .onMac
 
     var body: some View {
         ZStack {
-            if let sticker = mark.sticker {
+            if let sticker = mark?.sticker {
                 StickerPill(sticker: sticker, size: max(7, min(13, size * 0.08)), numberOnly: true)
                     .padding(size * 0.03)
                     .frame(width: size, height: size, alignment: .topLeading)
             }
-            if let badge = CopyBadge(mark: mark, coverSide: size) {
-                badge.frame(width: size, height: size, alignment: .bottomTrailing)
-            }
+            CopyBadges(mark: mark, iCloud: iCloud, coverSide: size)
+                .frame(width: size, height: size, alignment: .bottomTrailing)
+        }
+    }
+}
+
+/// The badges in a cover's bottom-right corner: the copy's (`CopyBadge(mark:)`) and, to its left, a struck-through
+/// cloud when the album's music, or some of it, is only in iCloud (offloaded from this Mac), an arrow while it
+/// downloads.
+struct CopyBadges: View {
+    let mark: CopyMark?
+    var iCloud: ICloudMark.Placement = .onMac
+    let coverSide: CGFloat
+
+    var body: some View {
+        // The badges' own padding, overlapped so they sit as close as one badge sits to the edge.
+        HStack(spacing: -max(4, coverSide * 0.035)) {
+            if let badge = CopyBadge(iCloud: iCloud, coverSide: coverSide) { badge }
+            if let mark, let badge = CopyBadge(mark: mark, coverSide: coverSide) { badge }
         }
     }
 }

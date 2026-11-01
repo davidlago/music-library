@@ -6,8 +6,11 @@ profile reached the container on 2026-10-31), **P1 done** (the Mac backs up the 
 (restore to a new folder or the database only, §7), **P4 done** (the phone reads the library from iCloud, §6; checked
 on an iPhone on 2026-11-01), **P6 done** (the phone's plays, likes and requests reach the Mac through iCloud; checked on an iPhone and the Mac), **P5
 done** (Download fetches from iCloud when the Mac isn't reachable; checked on an iPhone), **P7 done** (the guide's iCloud page,
-privacy, README and site, CHANGELOG, App Store copy). Screenshots of the new screens are left for the next round of
-README screenshots. Nothing
+privacy, README and site, CHANGELOG, App Store copy), all released in 1.30.0 (1.30.1: chosen music starts from
+everything, Delete Now). **P8 done except the reading second Mac**, for 1.31.0 (offloading music from the Mac, so
+iCloud holds everything and each device keeps only what it wants, §7b; moving a library to a new Mac and the iPhone's
+first-launch screen; offloading checked on the Mac with a real library). Use My Library on This Mac Too and Make This the Main Mac… (D21's reader) are
+left for a follow-up. Screenshots of the new screens are left for the next round of README screenshots. Nothing
 here bumps
 `Database.schemaVersion` (14) or `SyncProtocol.version` (3): older phones and Macs keep reading every library and
 snapshot this produces.
@@ -29,7 +32,7 @@ Goals:
 Non-goals (for now):
 
 - Editing the collection on the phone. The Mac stays the only writer of the library.
-- More than one Mac writing to the same backup.
+- More than one Mac writing to the same backup. A second Mac can read the library (D21) but never writes it.
 - Streaming songs from iCloud without downloading them.
 - Sharing a library with another Apple Account.
 
@@ -53,6 +56,12 @@ Non-goals (for now):
 | D14 | Trust | Everything read from the container is untrusted, as with sync: paths checked by `SyncPlan.isManaged` and resolved with `LibraryPath.resolve`, snapshots opened with `Database(snapshotAt:)` (read-only, refuses a newer schema), and Inbox files decoded strictly with size limits. | Another version of the app, a corrupted download or a bug on one device must not be able to write outside the library or crash the other. |
 | D15 | Choosing music | The chosen music is a `SyncSelection` of its own (include/exclude rules over `ExportItem`s: albums, artists, playlists, songs; the last rule covering a song decides), kept in the Mac's user defaults (`iCloudBackupSelection`) apart from the iPhone's and the Export List. Artists and playlists resolve when each backup runs, so an artist's new album is backed up without picking it. An option, **Include what's on my iPhone** (off by default, since with Owned Music on iPhone the phone's list can be most of the library; Settings shows what it comes to), adds every paired phone's resolved selection as implicit include rules (`SyncSelection.resolve(_:implicit:)`), so what the phone may download from iCloud (P5) is there; an exclude rule the user added still wins. Every song's database row, play and like is in the snapshot whatever is chosen. | It's the same model the iPhone list already uses and tests, with the same menus. A song taken off the list is a removal like any other (D8), so a mistaken click doesn't delete the backup of an album. |
 | D16 | Where a phone download comes from | Download works as it does today and the phone picks the source: the Mac over Wi-Fi when it's reachable (same network, the app open: the on-demand sync the phone already starts with `requestSync`), otherwise iCloud when the song is backed up there, otherwise it waits (queued, as today) and goes whichever way becomes available first. The phone shows one Download button and one progress, with at most a quiet "from iCloud" note. | It's the experience that already works: iCloud only fills in when the Mac isn't there, so nothing changes for someone at home, and the phone isn't stuck when away. The Mac is preferred because it has every song and the request updates its selection at once. |
+| D17 | Offloading from the Mac (P8) | Only music files are offloaded; the database, covers and artist photos always stay on the Mac (D2). An offloaded song stays in the library (its row, plays, likes, playlists, collection links), but its file is deleted from the library folder once the backup is known to hold the same file: uploaded, with the same size and modification date (as `CloudBackupPlan` compares, D7). It's recorded in a Mac-only table, `offloaded_tracks` (track id, path, size, modified date, offloaded at), created on open without a schema change, like `discogs_sync`: kept in the backup's snapshots (so a restore and another Mac know), emptied in Wi-Fi snapshots for the phone. The unit is the album (all of its songs); a single song can be offloaded from its menu. | The music is nearly all of the space; the database is small and must stay local. Everything needed (verifying an upload, downloading, evicting) already exists from P2–P5. |
+| D18 | iCloud is the only copy of offloaded music | Offloading turns the backup into the only copy, so: (a) offloaded songs are always wanted by the backup whatever the scope (added like D15's implicit rules), never put on `Removed.json`, and never deleted by Delete Now; (b) choosing **Off**, or a smaller scope, while songs are offloaded asks to download them first ("Download 1,204 songs (118 GB) to this Mac first") or keeps them in iCloud as offloaded, never deletes them; (c) **Replace It…** (another library's backup) is refused while this library has offloaded songs, and a restore never deletes them; (d) removing an offloaded song from the library lists its file for removal like any other, 30 days, and the confirmation says it's the only copy; (e) the first offload explains there's no second copy anymore and suggests an occasional export to a drive. | A backup that's also the only copy needs rules that a mirror doesn't. Each rule closes a way the music could disappear by one click. |
+| D19 | Offloading automatically | **Offload music not played in**: Off (the default), 1 month, 3 months, 6 months or 1 year (user defaults `iCloudOffloadAfter`). An album qualifies when every one of its songs is in the backup and its last use is older than that: the newest of its songs' last play (the `plays` table, so plays on the iPhone count once they reach the Mac), the date it was added, and when it was last downloaded back. Never offloaded: albums marked **Keep on This Mac**, the song playing and the queue's songs, and albums still uploading. It runs after a backup, at most once a day. **Offload Now** runs it at once, first showing what it frees ("85 albums, about 120 GB") and asking. | The user's own rule: a time since last played is easy to predict, and Keep on This Mac covers the exceptions. Running after a backup means the files it checks were just compared. |
+| D20 | Getting offloaded music back | Playing an offloaded song downloads it first (the player shows "Downloading from iCloud…"; the next song in the queue is fetched ahead), then it plays from the library folder and counts as downloaded back (D19). **Download to This Mac** on an album, artist, playlist or song brings it back for good. What needs the file downloads it first: retagging and MusicBrainz matching, writing a new cover into the files, AccurateRip checks and Export (with a space check). Wi-Fi sync sends the phone what's on the Mac, and the phone gets offloaded songs it asked for from iCloud: after a Wi-Fi sync it fetches what's still pending from iCloud even with the Mac nearby (a change to D16, no protocol change). | Offloaded music should feel like music that's a few seconds away, not missing. Downloading on demand reuses `CloudStore.copyOut`; no feature has to learn to work without a file. |
+| D21 | A new Mac from iCloud (P8) | A fresh install with no library (no `library.sqlite` in the library folder) that finds a backup offers **Set Up from iCloud**, with two choices. **Move My Library to This Mac:** the database, covers and photos come down (as a restore into the library folder, §7), every song starts offloaded (D17) and downloads when played or with **Download to This Mac** on what you choose, and this Mac becomes the one that backs up: `backup.json` names its `macID`, and the other Mac, seeing another Mac's id on its library's backup at its next publish, stops and asks ("Your library's backup moved to Mac mini": **Back Up from Here Instead…** or **Stop Backing Up**). **Use My Library on This Mac Too:** a second Mac that reads the library like the iPhone does: it comes from iCloud and updates when the backup does (D6, `CloudReceiver`), songs download on demand or by choice and can be offloaded, and plays, likes and requests go back through the Inbox (P6) under this Mac's own device id; it never backs up, and what edits the library (importing, ripping, digitizing, the collection, playlists, tags, covers, Discogs) is off there, with a note that it's done on the main Mac. Its Settings ▸ iCloud offers **Make This the Main Mac…**, which is the move above. | Only one Mac may write the library (non-goal: two writers), so a new Mac is either the new home or a reader. Both reuse what exists: restore, offloaded songs, the phone's reading path and the Inbox. |
+| D22 | A new iPhone from iCloud | Already works since P4: with Use iCloud on (the default) a new iPhone gets the library from the backup when it first opens, without the Mac or pairing, and Download takes songs from iCloud (P5). P8 makes it visible: while the first check runs, the empty first screen says it's looking in iCloud ("Looking for your library in iCloud…"), then shows the library arriving (covers and photos so far), before offering pairing or the sample library. | So a fresh install doesn't look empty for the seconds iCloud takes, or send the user to pair a Mac that isn't needed. |
 
 ## 3. Container layout
 
@@ -228,6 +237,43 @@ to replace that backup, keep it and stop, or turn backup off. It never mixes two
 - The same flow takes a `FolderCloudStore` pointed at a copied backup, for a backup someone copied out of the
   container by hand.
 
+## 7b. Offloading music from the Mac (P8)
+
+So iCloud (with a big enough plan) holds all the music, and the Mac and the iPhone each keep only what they want. The
+iPhone already works this way with **Everything** backed up (P5); P8 gives the Mac the same, under D17–D20.
+
+- **Core:**
+  - `Database`: the `offloaded_tracks` table (D17), read untrusted (paths through `LibraryPath.resolve`, ids
+    checked), with `offloadedTracks()`, `markOffloaded(_:)`, `markDownloaded(_:)` and the last download date per track.
+  - `OffloadPlan` (pure, like `CloudBackupPlan`): from the tracks, plays, added and downloaded dates, the Keep on This
+    Mac rules, the threshold, the queue, the backup's entries and `now`, the albums to offload (only songs whose files
+    the backup holds identically and uploaded) and the bytes that frees.
+  - `CloudBackup.publish` adds offloaded songs to what's wanted whatever the scope (D18a), and
+    `CloudBackup.offload(_:root:store:)` verifies each file against the backup again just before deleting it, then
+    records it; a file that changed since is left alone (the next backup uploads it first).
+  - Downloading back is `CloudStore.copyOut` into the library folder, then `markDownloaded`.
+- **Mac app:**
+  - Settings ▸ iCloud gets **Offload music not played in** (Off, 1 month, 3 months, 6 months, 1 year), what's on this
+    Mac and what's in iCloud only, and **Offload Now** with what it would free and a confirmation. Offloading needs a
+    scope that holds the music (Everything, or chosen music covering it); otherwise the setting says so.
+  - Album, artist, playlist and song menus: **Offload from This Mac**, **Download to This Mac**, **Keep on This Mac**
+    (rules like D15's, user defaults `iCloudKeepOnMac`).
+  - Offloaded songs show a cloud badge in lists and on album pages, and Insights splits the library's size into on
+    this Mac and in iCloud only.
+  - The player downloads before playing and fetches the next song ahead (D20); a song that can't be downloaded
+    (offline) is skipped with a message, like a missing file.
+  - The scope picker, Delete Now, Replace It… and removing songs follow D18.
+- **A new Mac (D21):** the first-run screen (no library yet) checks for a backup and offers **Set Up from iCloud**
+  (Move My Library to This Mac / Use My Library on This Mac Too) next to starting a new library. Moving is a restore of
+  the database, covers and photos into the library folder with every song recorded as offloaded, then this Mac's id in
+  `backup.json`; `CloudBackup.publish` refuses (`CloudBackupError.movedToAnotherMac`) when the library's backup names
+  another Mac's id than the one publishing, and the old Mac asks. A reading Mac (user defaults `iCloudLibraryRole` =
+  `reader`) runs `CloudReceiver` as the phone does, sends its plays and likes with `CloudInbox` under its own device id
+  (the main Mac applies events from any device with this library, and requests only from paired phones, so a reader's
+  Download / Remove only change what's on it), and greys out every command that edits the library.
+- **iPhone:** after a Wi-Fi sync, what's still pending is fetched from iCloud (D20); on a first launch with no library,
+  the empty screen says it's looking in iCloud and shows the library arriving (D22).
+
 ## 8. Signing and build
 
 As built in P0 (one-time portal steps: `docs/distribution.md` ▸ iCloud):
@@ -317,6 +363,15 @@ As built in P0 (one-time portal steps: `docs/distribution.md` ▸ iCloud):
   (ids and covers), plays and likes; database-only restore keeps the copy made before it.
 - Phone side, in Core (`CloudReceiver`): an older snapshot never replaces a newer one, in either order of Wi-Fi and
   iCloud; copies go through partials; bad paths are refused.
+- `OffloadTests` (P8): albums qualify by last play, added and downloaded dates against each threshold; Keep on This
+  Mac, the queue and songs not yet uploaded (or changed since) are never offloaded; a file is deleted only after it's
+  verified against the backup; offloaded songs stay wanted whatever the scope and are never listed for removal or
+  deleted by Delete Now; switching to Off or a smaller scope with offloaded songs refuses to drop them; downloading
+  back restores the file byte for byte and resets the album's last use; a restore keeps offloaded songs; the table is
+  emptied in Wi-Fi snapshots and kept in backup snapshots.
+- `NewMacTests` (P8): moving sets up a library that opens with every song offloaded and its covers, writes this Mac's id,
+  and the old Mac's next publish refuses with `movedToAnotherMac`; a reading Mac takes newer snapshots only, sends
+  batches the main Mac applies (events yes, requests ignored), and never publishes.
 - The existing migration, downgrade and `SyncTests` suites stay as they are. Snapshots without `snapshot_at`
   (written by older Macs) count as older than any stamped one.
 - By hand on two real devices:
@@ -344,6 +399,12 @@ As built in P0 (one-time portal steps: `docs/distribution.md` ▸ iCloud):
    iCloud shows only in iCloud builds, and releases aren't until `MAC_PROVISIONING_PROFILE` is set, so the CHANGELOG
    entry and guide page for the Mac backup go in the release that first sets it, at the latest.
 
+9. **P8, offloading music from the Mac (planned):** D17–D20 and §7b: Offload / Download / Keep on This Mac, the
+   automatic setting with Offload Now, playback that downloads first, and the safety rules; then a new Mac set up from
+   iCloud (D21: move, or a reading second Mac) and the iPhone's first-launch screen (D22). Needs a scope that holds the
+   music (in practice Everything) and an iCloud plan to match. The reading second Mac is the biggest piece (every
+   editing command checks the role) and can ship after the rest.
+
 P1 to P3 are useful on their own as a Mac backup. P4 and P5 need P1 (and P2 for music). P6 can follow P4 or come
 in parallel with P5.
 
@@ -358,5 +419,10 @@ in parallel with P5.
 - **Q3, selection on the phone:** once downloads come from iCloud, should the phone own its "On This iPhone" choice
   outright, with Wi-Fi sync following the phone instead of the Mac's selection? That would be a protocol change
   (version 4), out of scope here.
-- **Q4, several Macs:** a second Mac sees the `libraryID` mismatch and is asked. Is that enough, or should the
-  container hold one folder per library?
+- **Q4, several Macs:** a second Mac with another library sees the `libraryID` mismatch and is asked. Is that enough,
+  or should the container hold one folder per library? (A second Mac with the same library is D21.)
+- **Q5, streaming offloaded songs (P8):** download-then-play adds a few seconds on the first play of a lossless song.
+  Playing while it downloads would hide that, but AVFoundation would read a file iCloud is still writing; left for
+  after P8.
+- **Q6, keeping liked songs on the Mac (P8):** should liked songs be kept on this Mac automatically, like Keep on This
+  Mac? Probably as an option next to the threshold, off by default.

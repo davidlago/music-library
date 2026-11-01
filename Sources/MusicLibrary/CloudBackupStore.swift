@@ -38,6 +38,8 @@ final class CloudBackupStore {
     enum Problem: Equatable {
         case signedOut
         case otherLibrary(macName: String, snapshotAt: Date)
+        /// Another Mac was set up from this library's backup and backs it up now (D21).
+        case movedToAnotherMac(macName: String)
         case failed(String)
     }
 
@@ -108,6 +110,10 @@ final class CloudBackupStore {
     @ObservationIgnored var applyRequests: (_ phoneID: String, _ requests: [SyncRequest], _ sent: Date) -> Bool = { _, _, _ in true }
     /// A phone's plays or likes are in the library now.
     @ObservationIgnored var onPhoneChanges: () -> Void = {}
+    /// A backup finished with the snapshot current (offloading runs then, D19).
+    @ObservationIgnored var onPublished: () -> Void = {}
+    /// The library moved here from iCloud (Set Up from iCloud): everything is read again.
+    @ObservationIgnored var onMoved: () -> Void = {}
     @ObservationIgnored private var readingInbox = false
     @ObservationIgnored var identity: () -> CloudBackupIdentity = { CloudBackupIdentity(macID: "", macName: "Mac", appVersion: AppInfo.version) }
     @ObservationIgnored private var store: FolderCloudStore?
@@ -116,6 +122,7 @@ final class CloudBackupStore {
         didSet { UserDefaults.standard.set(needsPublish, forKey: Keys.pending) }
     }
     @ObservationIgnored private var replacingOther = false
+    @ObservationIgnored private var takingOver = false
     @ObservationIgnored private var deletingRemovedNow = false
     /// The publish running now, cancelled when what's backed up changes (it stops copying music it no longer should).
     @ObservationIgnored private var running: Task<CloudBackupResult, Error>?
@@ -203,6 +210,8 @@ final class CloudBackupStore {
 
     private func tick() {
         readInbox()
+        // Another Mac backs this library up now: nothing more until the user decides.
+        if case .movedToAnotherMac = problem { return }
         guard scope != .off, !isPublishing, let context = context() else { return }
         let id = ObjectIdentifier(context.database)
         if database != id {
@@ -266,12 +275,20 @@ final class CloudBackupStore {
         publish()
     }
 
+    /// Back Up from Here Instead: this Mac takes the library's backup back from the Mac it moved to (asked first).
+    func takeOver() {
+        takingOver = true
+        problem = nil
+        publish()
+    }
+
     private func publish() {
         guard let containerID, scope != .off, !isPublishing, let context = context() else { return }
         isPublishing = true
         problem = nil
         let changes = context.database.changeCount
         let scope = scope, identity = identity(), replacing = replacingOther, music = music(), deleting = deletingRemovedNow
+        let takeOver = takingOver
         let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("MusicLibrary-iCloud", isDirectory: true)
         let known = store
         Task {
@@ -287,20 +304,24 @@ final class CloudBackupStore {
                 let run = Task.detached(priority: .utility) {
                     try await CloudBackup.publish(database: context.database, root: context.root, store: store, identity: identity,
                                                   scope: scope, music: music, scratch: scratch, replacingOther: replacing,
-                                                  deletingRemovedNow: deleting)
+                                                  takingOver: takeOver, deletingRemovedNow: deleting)
                 }
                 running = run
                 defer { running = nil }
                 let result = try await run.value
                 publishedChanges = changes
                 replacingOther = false
+                takingOver = false
                 // Deletion happens once the snapshot is current; otherwise the next run tries again.
                 if result.isCurrent { deletingRemovedNow = false }
                 if result.isCurrent { lastBackup = result.snapshotAt }
                 remaining = result.remaining
                 needsPublish = !result.isCurrent || result.remaining > 0 || result.waiting > 0
+                if result.isCurrent { onPublished() }
             } catch CloudBackupError.otherLibrary(let mac, let date) {
                 problem = .otherLibrary(macName: mac, snapshotAt: date)
+            } catch CloudBackupError.movedToAnotherMac(let mac, _) {
+                problem = .movedToAnotherMac(macName: mac)
             } catch {
                 problem = .failed(error.localizedDescription)
                 needsPublish = true
@@ -339,6 +360,49 @@ final class CloudBackupStore {
         snapshotCount = entries.filter { CloudSnapshots.date(ofPath: $0.path) != nil }.count
         let listed = await Task.detached(priority: .utility) { CloudBackup.awaitingDeletion(in: store) }.value
         awaitingDeletion = Waiting(files: listed.files, bytes: listed.bytes)
+    }
+
+    // MARK: Set Up from iCloud
+
+    /// The backup a Mac with an empty library can be set up from (D21), once looked for.
+    private(set) var setupBackup: CloudBackupManifest?
+    /// Covers and photos brought down so far while moving the library here.
+    private(set) var moving: (done: Int, total: Int)?
+    private(set) var moveError: String?
+
+    /// Looks in iCloud for a library to set this Mac up from, while the open library is empty.
+    func lookForSetup(libraryIsEmpty: Bool) async {
+        guard isAvailable, libraryIsEmpty else { setupBackup = nil; return }
+        guard let store = await backupStore() else { return }
+        setupBackup = await Task.detached(priority: .utility) { CloudSetup.backup(in: store) }.value
+    }
+
+    /// Move My Library to This Mac: the backed-up library becomes this Mac's, every song offloaded, and this Mac backs
+    /// it up from now on (the other Mac is told at its next backup).
+    func moveHere() {
+        guard moving == nil, let context = context() else { return }
+        moving = (0, 0)
+        moveError = nil
+        let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("MusicLibrary-iCloud", isDirectory: true)
+        let report: @Sendable (Int, Int) -> Void = { [weak self] done, total in
+            Task { @MainActor in if self?.moving != nil { self?.moving = (done, total) } }
+        }
+        Task {
+            defer { moving = nil }
+            guard let store = await backupStore() else { moveError = "Sign in to iCloud in System Settings."; return }
+            do {
+                let result = try await Task.detached(priority: .userInitiated) {
+                    try await CloudSetup.moveLibrary(from: store, into: context.database, root: context.root, scratch: scratch, progress: report)
+                }.value
+                setupBackup = nil
+                // The music is only in iCloud now, so it stays wanted whatever was chosen on the other Mac.
+                scope = result.scope == .library ? .library : .everything
+                onMoved()
+                takeOver()
+            } catch {
+                moveError = error.localizedDescription
+            }
+        }
     }
 
     func refreshEstimate() async {

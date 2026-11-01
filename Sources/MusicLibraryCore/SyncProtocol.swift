@@ -204,8 +204,11 @@ public struct SyncPlanSummary: Codable, Equatable, Sendable {
     /// phone checks it against its free space itself: App Store rules keep the free space on the device. Optional:
     /// older Macs don't send it.
     public var needed: Int64?
-    public init(files: Int, bytes: Int64, deletes: Int, needed: Int64? = nil) {
-        self.files = files; self.bytes = bytes; self.deletes = deletes; self.needed = needed
+    /// Songs the phone should have that are only in the Mac's iCloud backup (offloaded from the Mac), by track ID:
+    /// the phone fetches them from iCloud after the sync. Optional: older Macs don't send it, older phones ignore it.
+    public var iCloudOnly: [Int64]?
+    public init(files: Int, bytes: Int64, deletes: Int, needed: Int64? = nil, iCloudOnly: [Int64]? = nil) {
+        self.files = files; self.bytes = bytes; self.deletes = deletes; self.needed = needed; self.iCloudOnly = iCloudOnly
     }
 }
 
@@ -228,6 +231,8 @@ public struct SyncSummary: Codable, Hashable, Sendable {
     public var eventsDropped = 0
     /// Ownership changes from the phone (optional: summaries saved by older versions don't have it).
     public var purchases: Int?
+    /// Songs the Mac's plan said to get from iCloud (`SyncPlanSummary.iCloudOnly`).
+    public var iCloudOnly: [Int64]?
     public init() {}
 }
 

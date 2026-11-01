@@ -293,6 +293,7 @@ public final class Database: @unchecked Sendable {
         // Tables only the Mac uses, added without a schema change (see `createRipChecksTable`).
         try createRipChecksTable()
         try createDiscogsSyncTable()
+        try createOffloadedTracksTable()
         // Added without a schema change too: older phones read the table's other columns by name, so synced copies
         // stay readable there.
         let ownershipColumns = try columns(of: "album_ownership")

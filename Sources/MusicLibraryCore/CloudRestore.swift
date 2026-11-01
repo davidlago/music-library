@@ -125,6 +125,8 @@ public enum CloudRestore {
             // Opened read-write once, which brings an older copy up to date, and made a live database again.
             let db = try Database(path: partial.path)
             try db.clearSnapshotStamp()
+            // Songs the copy says were offloaded have just been copied in.
+            try db.settleOffloaded(root: root)
         }
         for suffix in ["-wal", "-shm"] { try? fm.removeItem(atPath: partial.path + suffix) }
         guard rename(partial.path, target.path) == 0 else { throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: target.path]) }
@@ -133,7 +135,9 @@ public enum CloudRestore {
 
     /// Restores only the database of the library open in `database` (at `root`) to `snapshot`, after saving it as
     /// `library-before-restore-<time>.sqlite` next to it; returns that file. Songs whose files aren't there show as
-    /// missing, as they would otherwise. The downloaded library catalog is kept.
+    /// missing, as they would otherwise, except offloaded ones (D18): a song offloaded now stays offloaded when the
+    /// copy has it at the same path, and one the copy says is offloaded but whose file is here counts as downloaded.
+    /// The downloaded library catalog is kept.
     public static func restoreDatabase(_ snapshot: String, from store: CloudStore, into database: Database, root: URL,
                                        scratch: URL, now: Date = Date()) async throws -> URL {
         let copy = try await fetch(snapshot, from: store, scratch: scratch)
@@ -141,8 +145,14 @@ public enum CloudRestore {
         _ = try Database(snapshotAt: copy.path)
         let stamp = now.formatted(.iso8601).replacingOccurrences(of: ":", with: "-")
         let before = root.appendingPathComponent("library-before-restore-\(stamp).sqlite")
+        let offloaded = try database.offloadedTracks()
         try database.vacuum(into: before.path)
         try database.restore(from: copy.path, keepingCatalogFrom: before.path)
+        try database.settleOffloaded(root: root, now: now)
+        let restored = Dictionary(try database.fetchAllTracks().map { ($0.id, $0.path) }, uniquingKeysWith: { a, _ in a })
+        try database.markOffloaded(offloaded.values.filter { track in
+            restored[track.trackID] == track.path && LibraryPath.resolve(track.path, in: root).flatMap(LibraryExporter.size(of:)) == nil
+        })
         return before
     }
 

@@ -169,7 +169,12 @@ struct NowPlayingBar: View {
         .overlay(Capsule().strokeBorder(.white.opacity(0.12), lineWidth: 0.5))
         .shadow(color: .black.opacity(0.22), radius: 22, y: 10)
         .overlay(alignment: .top) {
-            if let err = player.lastError {
+            if player.isDownloading {
+                Label("Downloading from iCloud…", systemImage: "icloud.and.arrow.down").font(.caption).foregroundStyle(.secondary)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(.regularMaterial, in: Capsule())
+                    .offset(y: -26)
+            } else if let err = player.lastError {
                 Text(err).font(.caption).foregroundStyle(.red)
                     .padding(.horizontal, 10).padding(.vertical, 4)
                     .background(.regularMaterial, in: Capsule())

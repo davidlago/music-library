@@ -82,9 +82,11 @@ public enum SyncPhoneSession {
             try await connection.send(.manifest(SyncManifest(files: files.manifest(), events: events, libraryID: libraryID, requests: requests)))
 
             var state = SyncProgress()
+            var iCloudOnly: [Int64]?
             while true {
                 switch try await connection.receiveMessage() {
                 case .plan(let plan):
+                    iCloudOnly = plan.iCloudOnly.map { Array($0.prefix(1_000_000)) }
                     if let needed = plan.needed, let freeSpace, needed > freeSpace { throw SyncSessionError.notEnoughSpace(needed: needed) }
                     state.totalFiles = plan.files
                     state.totalBytes = plan.bytes
@@ -121,6 +123,7 @@ public enum SyncPhoneSession {
                     summary.likes = sent.likes
                     summary.eventsDropped = sent.eventsDropped
                     summary.purchases = sent.purchases
+                    summary.iCloudOnly = iCloudOnly
                     try await connection.send(.done(summary))
                     await connection.close()
                     return (mac, summary)
@@ -202,8 +205,9 @@ public enum SyncMacSession {
             if let radioDJ, phone.radioDJ == true { try await connection.send(.radioDJ(radioDJ)) }
 
             let selected = await selection(manifest)
+            let offloaded = Dictionary(try database.offloadedTracks().values.map { ($0.path, $0.size) }, uniquingKeysWith: { a, _ in a })
             var plan = SyncPlan(tracks: selected.tracks, library: selected.library, collectionCovers: try database.collectionCoverPaths(),
-                                libraryRoot: libraryRoot, phone: manifest.files)
+                                offloaded: offloaded, libraryRoot: libraryRoot, phone: manifest.files)
             if !plan.deletes.isEmpty, await !approveDeletes(plan.deletes.count) { plan.deletes = [] }
             let onPhone = Dictionary(manifest.files.map { ($0.path, $0.size) }, uniquingKeysWith: { a, _ in a })
             let freed = plan.deletes.reduce(Int64(0)) { $0 + (onPhone[$1] ?? 0) } + plan.sends.reduce(Int64(0)) { $0 + (onPhone[$1.path] ?? 0) }

@@ -61,6 +61,51 @@ own files are never touched.
   sooner, click **Delete Now…** next to it (in **Settings ▸ iCloud** or on the iCloud page). That can't be undone from
   the backup.
 
+## Offload music from the Mac
+
+With **Everything** backed up (or chosen music covering what you'd offload), iCloud can hold your music and the Mac keep
+only what you play. An offloaded song stays in your library, with its plays, likes, playlists and copies in your
+collection; only its file leaves the Mac, and only once the backup holds the same file. Its cover gets a badge in the
+corner, a cloud struck through like the one for music not digitized yet (on albums, and on CDs and records whose music
+it is), songs show the same cloud next to their title, and the album page says which songs are in iCloud only.
+
+- **By hand:** **Offload from This Mac** in the menu of an album, artist, playlist or song. **Download to This Mac**
+  brings it back for good.
+- **Automatically:** **Settings ▸ iCloud ▸ Offload music not played in** (Off, 1 month, 3 months, 6 months or 1 year).
+  After a backup, at most once a day, albums whose songs weren't played, added or downloaded back in that time leave
+  the Mac. **Offload Now…** runs it at once and first shows what it frees. Mark albums, artists, playlists or songs
+  **Keep on This Mac** to keep them here whatever the setting; what's playing or queued always stays.
+- **Playing an offloaded song** downloads it first (the player says **Downloading from iCloud…**), and the next song in
+  the queue is fetched ahead. One that can't be downloaded (offline, say) is skipped. Exporting, writing a new cover
+  into the files and checking a rip download the songs first too.
+- **Insights** splits the size of your music into what's on this Mac and what's in iCloud only.
+
+Once a song is offloaded, **its only copy is in iCloud**, so a few rules keep it safe:
+
+- Offloaded songs stay in the backup whatever it's set to back up; they're never waiting to be deleted, and **Delete
+  Now…** doesn't touch them.
+- Backing up less (or turning backup off) while songs are offloaded asks whether to download them to this Mac first or
+  keep them in iCloud.
+- **Replace It…** (another library's backup) isn't offered while songs are offloaded, and restoring the database keeps
+  them offloaded.
+- Removing an offloaded song from the library deletes its iCloud copy 30 days later, like any song taken out of the
+  backup; the confirmation says it's the only copy.
+- Export your music to a drive now and then (**Export List**) to keep a second copy.
+- Versions before 1.31.0 don't know about offloaded songs: they'd see the files missing and let them go from iCloud 30
+  days later. Before going back to an older version, bring them back with **Settings ▸ iCloud ▸ Download All to This
+  Mac**.
+
+The iPhone gets offloaded songs straight from iCloud: a Wi-Fi sync sends what's on the Mac, and the phone downloads
+the rest of what it should have from iCloud right after.
+
+## A new Mac
+
+On a Mac whose library is empty, the **Songs** page (and **Settings ▸ iCloud**) offers **Set Up from iCloud…** when
+iCloud holds a library. **Move to This Mac** brings down the database, covers and artist photos; every song starts
+offloaded and downloads when you play it (or with **Download to This Mac** on what you choose). The new Mac backs the
+library up from then on. At its next backup, the old Mac says the backup moved and offers **Back Up from Here
+Instead…** or **Stop Backing Up**, so the two never overwrite each other.
+
 ## Restore
 
 **File ▸ Restore from iCloud…** (also in **Settings ▸ iCloud**) lists the database copies, newest first, with how many
@@ -80,7 +125,8 @@ songs, CDs and records, plays and likes each holds. Pick one, then:
 it and every couple of minutes:
 
 - **Your library comes from iCloud.** The database, covers and artist photos stay up to date without the Mac nearby,
-  and an iPhone with no library yet gets one without pairing. A newer copy from a Wi-Fi sync is never replaced by an
+  and an iPhone with no library yet gets one without pairing: its first screen says it's looking in iCloud and shows
+  the covers arriving. A newer copy from a Wi-Fi sync is never replaced by an
   older one from iCloud. Settings shows when the library was last updated from iCloud and which backup it came from,
   with **Check Now**.
 - **Download picks the way.** With your Mac on the same Wi-Fi and Music Library open, Download works as it always has.
