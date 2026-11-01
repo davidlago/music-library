@@ -35,6 +35,9 @@ struct SettingsView: View {
                 if model.radioDJ.isEnabled {
                     RadioDJSettingsSection(dj: model.radioDJ)
                 }
+                if model.cloud.isAvailable {
+                    ICloudSettingsSection(cloud: model.cloud)
+                }
                 NavigationLink {
                     LastFMSettings()
                 } label: {
@@ -51,7 +54,7 @@ struct SettingsView: View {
                     } header: {
                         Text("Music Library")
                     } footer: {
-                        Text("The sample library's artists and albums are fictional. Your own music replaces it after your first sync.")
+                        Text("The sample library's artists and albums are fictional. Your own music replaces it after your first sync, or as soon as it arrives from iCloud.")
                     }
                 } else if let library = model.library {
                     Section("Music Library") {
@@ -189,6 +192,46 @@ struct LastFMSettings: View {
             Label("\(user): connection expired", systemImage: "exclamationmark.circle.fill").foregroundStyle(.orange)
             Button("Reconnect…") { scrobbler.connect() }
             Button("Disconnect", role: .destructive) { scrobbler.disconnect() }
+        }
+    }
+}
+
+/// Use iCloud: the library, covers and artist photos from the Mac's iCloud backup, without the Mac nearby.
+struct ICloudSettingsSection: View {
+    @Bindable var cloud: PhoneCloud
+
+    var body: some View {
+        Section {
+            Toggle("Use iCloud", isOn: $cloud.isEnabled)
+            if cloud.isEnabled {
+                LabeledContent("Updated from iCloud") {
+                    if cloud.status == .checking {
+                        ProgressView()
+                    } else {
+                        Text(cloud.lastUpdate.map { $0.formatted(.relative(presentation: .named)) } ?? "Not yet")
+                    }
+                }
+                switch cloud.status {
+                case .signedOut:
+                    Label("Sign in to iCloud in the Settings app.", systemImage: "icloud.slash").foregroundStyle(.orange)
+                case .otherLibrary:
+                    Label("iCloud holds a backup of another library than the one on this iPhone, so it isn't used.", systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                case .failed(let message):
+                    Label(message, systemImage: "exclamationmark.icloud").foregroundStyle(.orange)
+                case .idle, .checking:
+                    EmptyView()
+                }
+                Button("Check Now") { cloud.check() }.disabled(cloud.status == .checking)
+            }
+        } header: {
+            Text("iCloud")
+        } footer: {
+            if let at = cloud.backupAt, cloud.isEnabled {
+                Text("Latest backup\(cloud.macName.map { " from \($0)" } ?? ""): \(at.formatted(date: .abbreviated, time: .shortened)). Your library, covers and artist photos come from it, so they stay up to date without the Mac nearby.")
+            } else {
+                Text("Your library, covers and artist photos come from your Mac's iCloud backup (Settings ▸ iCloud on the Mac), so they stay up to date without the Mac nearby.")
+            }
         }
     }
 }

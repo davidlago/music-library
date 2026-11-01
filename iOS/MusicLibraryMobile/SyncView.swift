@@ -28,6 +28,19 @@ struct SyncTab: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                if model.cloud.isAvailable, model.cloud.isEnabled, let at = model.cloud.backupAt {
+                    Section {
+                        Label {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(model.cloud.lastUpdate.map { "Updated from iCloud \($0.formatted(.relative(presentation: .named)))" } ?? "Backed up to iCloud")
+                                Text("Your library comes from \(model.cloud.macName ?? "your Mac")'s backup of \(at.formatted(date: .abbreviated, time: .shortened)), even when the Mac isn't nearby.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "icloud")
+                        }
+                    }
+                }
                 if case .pairing(let code) = sync.status {
                     pairing(code)
                 } else if !sync.isPaired {

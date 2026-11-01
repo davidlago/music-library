@@ -21,6 +21,8 @@ struct MusicLibraryMobileApp: App {
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     // While the app is open, it looks for the paired Mac so it can sync what's asked for.
                     model.sync.setActive(phase == .active)
+                    // And checks the Mac's iCloud backup for a newer library.
+                    model.cloud.setActive(phase == .active)
                     switch phase {
                     case .active:
                         applyAppearance(appearance)

@@ -87,19 +87,49 @@ public final class FolderCloudStore: CloudStore {
         let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey,
                                       .ubiquitousItemIsUploadedKey, .ubiquitousItemUploadingErrorKey, .ubiquitousItemDownloadingStatusKey]
         let rootPath = root.standardizedFileURL.path
-        var entries: [CloudEntry] = []
-        guard let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles]) else { return [] }
+        var entries: [String: CloudEntry] = [:]
+        // Hidden files are skipped by hand: an iCloud file not downloaded yet can show as a hidden ".<name>.icloud".
+        guard let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys) else { return [] }
         for case let url as URL in e {
-            guard let values = try? url.resourceValues(forKeys: Set(keys)), values.isRegularFile == true else { continue }
+            let name = url.lastPathComponent
+            guard name.hasPrefix(".") else {
+                guard let values = try? url.resourceValues(forKeys: Set(keys)), values.isRegularFile == true else { continue }
+                let path = url.standardizedFileURL.path
+                guard path.hasPrefix(rootPath + "/") else { continue }
+                let relative = String(path.dropFirst(rootPath.count + 1))
+                entries[relative] = CloudEntry(path: relative, size: Int64(values.fileSize ?? 0), modified: values.contentModificationDate,
+                                               isUploaded: !coordinated || values.ubiquitousItemIsUploaded != false,
+                                               uploadError: values.ubiquitousItemUploadingError?.localizedDescription,
+                                               isLocal: !coordinated || values.ubiquitousItemDownloadingStatus == .current)
+                continue
+            }
+            if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true { e.skipDescendants() }
+            guard coordinated, let placeholder = Self.placeholder(url) else { continue }
+            // The placeholder exists, so its path standardizes like the others'; the name it stands for may not.
             let path = url.standardizedFileURL.path
             guard path.hasPrefix(rootPath + "/") else { continue }
-            entries.append(CloudEntry(path: String(path.dropFirst(rootPath.count + 1)), size: Int64(values.fileSize ?? 0),
-                                      modified: values.contentModificationDate,
-                                      isUploaded: !coordinated || values.ubiquitousItemIsUploaded != false,
-                                      uploadError: values.ubiquitousItemUploadingError?.localizedDescription,
-                                      isLocal: !coordinated || values.ubiquitousItemDownloadingStatus == .current))
+            let folder = (String(path.dropFirst(rootPath.count + 1)) as NSString).deletingLastPathComponent
+            let relative = (folder as NSString).appendingPathComponent(placeholder.url.lastPathComponent)
+            if entries[relative] == nil {
+                entries[relative] = CloudEntry(path: relative, size: placeholder.size, modified: nil, isLocal: false)
+            }
         }
-        return entries.sorted { $0.path < $1.path }
+        return entries.values.sorted { $0.path < $1.path }
+    }
+
+    /// The file a ".<name>.icloud" placeholder stands for, and its size from the placeholder's property list.
+    static func placeholder(_ url: URL) -> (url: URL, size: Int64)? {
+        let name = url.lastPathComponent
+        guard name.hasPrefix("."), name.hasSuffix(".icloud"), name.count > ".x.icloud".count - 1 else { return nil }
+        let real = String(name.dropFirst().dropLast(".icloud".count))
+        guard !real.isEmpty, !real.contains("/") else { return nil }
+        var size: Int64 = 0
+        if let data = try? Data(contentsOf: url), data.count <= 64 * 1024,
+           let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+           let number = plist["NSURLFileSizeKey"] as? NSNumber {
+            size = number.int64Value
+        }
+        return (url.deletingLastPathComponent().appendingPathComponent(real), size)
     }
 
     public func upload(from source: URL, to path: String, modified: Date?) throws {
