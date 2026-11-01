@@ -486,7 +486,7 @@ struct AlbumMenu: View {
         }
         let availability = model.availability(item)
         if availability != .onPhone, !model.isDownloadPending(model.library?.tracks(album: album) ?? []) {
-            Button("Download to iPhone", systemImage: "arrow.down.circle") { model.download(item) }.disabled(!model.sync.isPaired)
+            Button("Download to iPhone", systemImage: "arrow.down.circle") { model.download(item) }.disabled(!model.canDownload)
         }
         if availability != .notOnPhone, !model.isSample {
             Button("Remove from iPhone", systemImage: "trash", role: .destructive) { model.remove(item) }
@@ -590,14 +590,14 @@ struct TrackRows: View {
         }
         .confirmationDialog("“\(missing?.title ?? "")” isn't on this iPhone", isPresented: Binding(get: { missing != nil }, set: { if !$0 { missing = nil } }),
                             titleVisibility: .visible, presenting: missing) { track in
-            if model.sync.isPaired {
+            if model.canDownload {
                 Button("Download Song") { model.download(.track(track.id)) }
                 if let album = model.library?.album(of: track) {
                     Button("Download Album") { model.download(.album(album: album.album, artist: album.artist)) }
                 }
             }
         } message: { _ in
-            Text(model.sync.isPaired ? "Download it from your Mac to play it here." : "Pair with your Mac (Sync, on Listen Now) to download music.")
+            Text(model.canDownload ? "Download it from your Mac or its iCloud backup to play it here." : "Pair with your Mac (Sync, on Listen Now) to download music.")
         }
     }
 }

@@ -1,6 +1,7 @@
 import Foundation
 import MusicLibraryCore
 import Observation
+import UIKit
 
 /// The library from the Mac's iCloud backup (`docs/icloud-plan.md` §6, P4): while the app is open (and every couple of
 /// minutes then), it brings the database, covers and artist photos up to the newest backup with `CloudReceiver`, so
@@ -8,7 +9,9 @@ import Observation
 /// from iCloud never replaces a newer one a Wi-Fi sync brought. Music still comes from the Mac. It also sends the
 /// phone's plays, likes and Download / Remove requests to the Mac through iCloud (P6: `CloudInbox`), a few seconds
 /// after each and at every check, and drops them from the phone once a backup shows the Mac applied them. Hidden in
-/// builds without an iCloud container; Use iCloud (user defaults `useICloud`) is on by default.
+/// builds without an iCloud container; Use iCloud (user defaults `useICloud`) is on by default. And when the Mac isn't
+/// reachable, it fetches the songs asked for (Download) from the backup (P5, D16); a Wi-Fi sync starting stops it,
+/// since the Mac has every song.
 @Observable
 final class PhoneCloud {
     enum Status: Equatable {
@@ -60,6 +63,24 @@ final class PhoneCloud {
     @ObservationIgnored var onApplied: (Set<String>) -> Void = { _ in }
     /// When the phone last sent its changes through iCloud.
     private(set) var lastSent: Date?
+
+    /// Songs asked for that aren't on the phone, and whether the Mac can send them now (nearby, or syncing).
+    @ObservationIgnored var downloads: () -> [Track] = { [] }
+    @ObservationIgnored var macReachable: () -> Bool = { false }
+    struct Progress: Equatable {
+        var done: Int
+        var total: Int
+    }
+    /// Songs being fetched from iCloud.
+    private(set) var fetching: Progress?
+    /// Songs asked for that the backup doesn't hold: they wait for the Mac.
+    private(set) var notInCloud: Set<Int64> = []
+    /// Why the last fetch stopped, such as no room.
+    private(set) var fetchProblem: String?
+    @ObservationIgnored private var fetchTask: Task<Void, Never>?
+
+    /// iCloud can be used on this phone.
+    var isUsable: Bool { isAvailable && isEnabled }
     @ObservationIgnored private var sentKey: String?
     @ObservationIgnored private var sending: Task<Void, Never>?
     @ObservationIgnored private var debounce: Task<Void, Never>?
@@ -98,6 +119,7 @@ final class PhoneCloud {
             defer {
                 running = nil
                 send()
+                fetchDownloads()
             }
             let result = await Self.receive(containerID: containerID, root: root, scratch: scratch, pending: pending)
             switch result {
@@ -118,6 +140,71 @@ final class PhoneCloud {
     }
 
     /// Off the main thread: finding the container can block while iCloud sets it up.
+    // MARK: Downloads
+
+    /// Fetches the songs asked for from iCloud, unless the Mac can send them (D16).
+    func fetchDownloads() {
+        guard let containerID, isEnabled, fetchTask == nil, !macReachable() else { return }
+        let tracks = downloads()
+        guard !tracks.isEmpty else {
+            notInCloud = []
+            fetchProblem = nil
+            return
+        }
+        let root = LibrarySnapshot.findRoot(in: URL.documentsDirectory) ?? LibraryLocation.defaultRoot
+        let free = (try? URL.documentsDirectory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
+            .volumeAvailableCapacityForImportantUsage
+        fetching = Progress(done: 0, total: 0)
+        fetchProblem = nil
+        // A little more time to finish the song being copied if the app goes to the background; iCloud keeps
+        // downloading, and the rest is copied when the app is next active.
+        let background = UIApplication.shared.beginBackgroundTask(withName: "iCloud downloads")
+        fetchTask = Task {
+            defer {
+                fetchTask = nil
+                fetching = nil
+                UIApplication.shared.endBackgroundTask(background)
+            }
+            let result = await Self.fetch(tracks, containerID: containerID, root: root, free: free) { [weak self] done, total in
+                Task { @MainActor in
+                    guard let self, self.fetching != nil else { return }
+                    self.fetching = Progress(done: done, total: total)
+                    // Songs show as on the phone as they arrive, not only at the end.
+                    if done > 0, done % 10 == 0 { self.onLibraryChanged() }
+                }
+            }
+            switch result {
+            case .success(let outcome?):
+                notInCloud = outcome.notInCloud
+                if outcome.files > 0 { onLibraryChanged() }
+            case .success(nil):
+                status = .signedOut
+            case .failure(is CancellationError):
+                onLibraryChanged()
+            case .failure(let error):
+                fetchProblem = error.localizedDescription
+                onLibraryChanged()
+            }
+        }
+    }
+
+    /// A Wi-Fi sync started: the Mac sends the rest.
+    func stopFetching() { fetchTask?.cancel() }
+
+    nonisolated private static func fetch(_ tracks: [Track], containerID: String, root: URL, free: Int64?,
+                                          progress: @escaping @Sendable (Int, Int) -> Void) async -> Result<CloudFetchOutcome?, Error> {
+        await Task.detached(priority: .userInitiated) {
+            guard FileManager.default.ubiquityIdentityToken != nil, let store = CloudContainer.backupStore(identifier: containerID) else {
+                return .success(nil)
+            }
+            do {
+                return .success(try await CloudReceiver.fetch(tracks, from: store, into: root, freeSpace: free, progress: progress))
+            } catch {
+                return .failure(error)
+            }
+        }.value
+    }
+
     // MARK: Sending
 
     /// Plays, likes or requests changed: sent a few seconds later, so a run of them goes as one batch.

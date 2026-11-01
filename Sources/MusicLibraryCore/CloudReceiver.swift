@@ -114,3 +114,67 @@ public enum CloudReceiver {
             || SyncPlan.isCollectionCover(path) || path.hasPrefix(LibraryExporter.artistImageFolder + "/")
     }
 }
+
+/// What fetching songs from iCloud did (P5).
+public struct CloudFetchOutcome: Equatable, Sendable {
+    public var files = 0
+    public var bytes: Int64 = 0
+    /// Songs the backup doesn't hold (not chosen for it, or still uploading): they wait for the Mac.
+    public var notInCloud: Set<Int64> = []
+}
+
+public enum CloudFetchError: Error, LocalizedError, Equatable {
+    case notEnoughSpace(needed: Int64, available: Int64)
+
+    public var errorDescription: String? {
+        switch self {
+        case .notEnoughSpace(let needed, let available):
+            let f = ByteCountFormatter()
+            return "There isn't room on this iPhone: the songs need \(f.string(fromByteCount: needed)), and \(f.string(fromByteCount: available)) is free."
+        }
+    }
+}
+
+extension CloudReceiver {
+    /// Copies the songs the phone asked for from the backup into `root` (`docs/icloud-plan.md` D12, D16): each is
+    /// downloaded, copied in through a partial and a rename, and evicted from the container again, so it's an ordinary
+    /// file the phone plays offline and Remove deletes. Songs already here at the backup's size are skipped; songs the
+    /// backup doesn't hold are reported. Refuses when they don't fit in `freeSpace`. Track paths come from the database
+    /// copy, so they're checked to be plain paths in the managed folders and resolved inside `root`.
+    public static func fetch(_ tracks: [Track], from store: CloudStore, into root: URL, freeSpace: Int64?, concurrency: Int = 2,
+                             progress: @escaping @Sendable (_ done: Int, _ total: Int) -> Void = { _, _ in }) async throws -> CloudFetchOutcome {
+        var inCloud: [String: CloudEntry] = [:]
+        for entry in try store.entries(under: "Music") where SyncPlan.isManaged(entry.path) { inCloud[entry.path] = entry }
+        var outcome = CloudFetchOutcome()
+        var wanted: [(entry: CloudEntry, url: URL)] = []
+        var seen = Set<String>()
+        for track in tracks where seen.insert(track.path).inserted {
+            guard SyncPlan.isManaged(track.path), let url = LibraryPath.resolve(track.path, in: root) else { continue }
+            guard let entry = inCloud[track.path] else { outcome.notInCloud.insert(track.id); continue }
+            if LibraryExporter.size(of: url) == entry.size { continue }
+            wanted.append((entry, url))
+        }
+        let needed = wanted.reduce(0) { $0 + $1.entry.size }
+        if let freeSpace, needed > freeSpace { throw CloudFetchError.notEnoughSpace(needed: needed, available: freeSpace) }
+
+        let total = wanted.count
+        progress(0, total)
+        try await withThrowingTaskGroup(of: Int64.self) { group in
+            var next = wanted.makeIterator()
+            func add() {
+                guard let file = next.next() else { return }
+                group.addTask {
+                    try await store.copyOut(file.entry.path, to: file.url)
+                    return file.entry.size
+                }
+            }
+            for _ in 0..<max(1, concurrency) { add() }
+            while let bytes = try await group.next() {
+                outcome.files += 1; outcome.bytes += bytes
+                progress(outcome.files, total)
+                add()
+            }
+        }
+        return outcome
+    }
+}

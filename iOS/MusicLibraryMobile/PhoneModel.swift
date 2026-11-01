@@ -144,6 +144,12 @@ final class PhoneModel {
             return PhoneCloud.Outgoing(libraryID: id, events: outbox.events, requests: requestQueue.requests)
         }
         cloud.phone = { [weak self] in (self?.sync.deviceID ?? "", self?.sync.deviceName ?? "") }
+        cloud.downloads = { [weak self] in
+            guard let self, let library, !isSample else { return [] }
+            return library.tracks.filter { pendingDownloads.contains($0.id) }
+        }
+        cloud.macReachable = { [weak self] in self?.sync.macPeer != nil || self?.sync.isBusy == true }
+        sync.onSyncStarted = { [weak self] in self?.cloud.stopFetching() }
         cloud.onApplied = { [weak self] ids in
             self?.outbox.remove(ids)
             self?.requestQueue.remove(ids)
@@ -461,13 +467,18 @@ final class PhoneModel {
     /// Asks the Mac for the item's songs; a sync starts as soon as the Mac is around.
     func download(_ item: ExportItem) { download([item]) }
 
-    /// Asks the Mac for all of these at once.
+    /// Asks for all of these at once: from the Mac when it's reachable, else from iCloud when the songs are backed up
+    /// there, else they wait (D16). The request goes to the Mac either way, so its list keeps them.
     func download(_ items: [ExportItem]) {
         guard !isSample, !items.isEmpty else { return }
         for item in items { requestQueue.add(SyncRequest(item: item, include: true)) }
         refreshRequests()
         sync.requestSync()
+        cloud.fetchDownloads()
     }
+
+    /// Music can be downloaded: from a paired Mac, or from iCloud.
+    var canDownload: Bool { sync.isPaired || cloud.isUsable }
 
     /// Deletes the item's songs from the phone now (covers stay, so it can still be browsed) and asks the Mac to
     /// stop syncing them.

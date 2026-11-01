@@ -445,10 +445,12 @@ struct AvailabilityBar: View {
         let sync = model.sync
         return HStack(spacing: 12) {
             Image(systemName: icon(availability, pending)).font(.title3)
+                .symbolEffect(.pulse, isActive: pending && model.cloud.fetching != nil)
                 .foregroundStyle(pending ? Color.accentColor : (availability == .onPhone ? Color.green : Color.secondary))
                 .frame(width: 28)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title(availability, pending)).font(.subheadline.weight(.semibold))
+                Text(pending && model.cloud.fetching != nil ? "Downloading from iCloud" : title(availability, pending))
+                    .font(.subheadline.weight(.semibold))
                 if let detail = detail(availability, pending, sync: sync) {
                     Text(detail).font(.caption).foregroundStyle(.secondary)
                 }
@@ -458,7 +460,7 @@ struct AvailabilityBar: View {
                 Button { model.download(item) } label: { Label("Download", systemImage: "arrow.down") }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
-                    .disabled(!sync.isPaired)
+                    .disabled(!model.canDownload)
             }
             if availability != .notOnPhone && availability != .empty {
                 Menu {
@@ -497,12 +499,21 @@ struct AvailabilityBar: View {
     }
 
     private func detail(_ a: PhoneModel.Availability, _ pending: Bool, sync: PhoneSync) -> String? {
-        if !sync.isPaired { return a == .onPhone ? nil : "Pair with your Mac (Sync, on Listen Now) to download music." }
-        if pending {
-            if case .syncing = sync.status { return "Syncing with \(sync.macName ?? "the Mac")…" }
-            return sync.macPeer == nil ? "Starts when \(sync.macName ?? "your Mac") is on the same Wi-Fi with Music Library open." : "Starting…"
+        let cloud = model.cloud
+        if !model.canDownload { return a == .onPhone ? nil : "Pair with your Mac (Sync, on Listen Now) to download music." }
+        guard pending else { return nil }
+        if case .syncing = sync.status { return "Syncing with \(sync.macName ?? "the Mac")…" }
+        if sync.macPeer != nil { return "Starting…" }
+        let waitForMac = "Starts when \(sync.macName ?? "your Mac") is on the same Wi-Fi with Music Library open."
+        guard cloud.isUsable else { return waitForMac }
+        if let p = cloud.fetching {
+            return p.total == 0 ? "Getting ready…" : "\(p.done) of \(songCount(p.total)) from your Mac's iCloud backup"
         }
-        return nil
+        if let problem = cloud.fetchProblem { return problem }
+        if tracks.contains(where: { cloud.notInCloud.contains($0.id) }) {
+            return sync.isPaired ? "Not in iCloud yet. \(waitForMac)" : "Not in iCloud yet: choose it for the iCloud backup on your Mac."
+        }
+        return "From your Mac's iCloud backup…"
     }
 }
 
@@ -517,7 +528,7 @@ struct SongAvailabilityButtons: View {
             Button("Remove from iPhone", systemImage: "trash", role: .destructive) { model.remove(.track(track.id)) }
         } else if !model.pendingDownloads.contains(track.id) {
             Button("Download to iPhone", systemImage: "arrow.down.circle") { model.download(.track(track.id)) }
-                .disabled(!model.sync.isPaired)
+                .disabled(!model.canDownload)
         }
     }
 }
