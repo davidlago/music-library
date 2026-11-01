@@ -33,6 +33,8 @@ final class SyncStore {
         var lastSummary: SyncSummary?
         /// What the Radio DJ has cost on the phone, as of its last sync.
         var radioDJUsage: RadioDJUsage?
+        /// When the phone last sent its plays, likes or requests through iCloud.
+        var lastCloudBatch: Date?
     }
 
     enum Activity: Equatable {
@@ -226,10 +228,27 @@ final class SyncStore {
                 }
             }
         }
-        for request in manifest.requests.sorted(by: { $0.at < $1.at }) {
+        // Each request once: it may have come through iCloud already.
+        let fresh = (try? context.database.markRequestsApplied(manifest.requests)) ?? manifest.requests
+        for request in fresh.sorted(by: { $0.at < $1.at }) {
             selection.apply(request.item, include: request.include, tracks: ids, implicit: implicit)
         }
         return SyncTracks(tracks: tracks(context, phoneID: phoneID), library: context.library)
+    }
+
+    /// Requests a phone sent through iCloud (P6), applied as at a sync, each once. Only a paired phone's count (the
+    /// list is the Mac's); false while the collection loads, so they wait.
+    func applyCloudRequests(_ requests: [SyncRequest], phoneID: String, sent: Date) -> Bool {
+        guard let index = phones.firstIndex(where: { $0.id == phoneID }) else { return true }
+        guard let context = context(), context.collectionReady else { return false }
+        let implicit = implicitForAll(context)
+        let ids: (ExportItem) -> Set<Int64> = { Set(context.tracks($0).map(\.id)) }
+        let fresh = (try? context.database.markRequestsApplied(requests)) ?? []
+        for request in fresh.sorted(by: { $0.at < $1.at }) {
+            selection.apply(request.item, include: request.include, tracks: ids, implicit: implicit)
+        }
+        if phones[index].lastCloudBatch.map({ $0 < sent }) ?? true { phones[index].lastCloudBatch = sent }
+        return true
     }
 
     // MARK: Pairing

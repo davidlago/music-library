@@ -367,6 +367,8 @@ final class AppModel {
         cloud.tracks = { [unowned self] in self.tracks(for: $0) }
         cloud.allTracks = { [unowned self] in self.tracks }
         cloud.iPhoneTracks = { [unowned self] in self.iPhone.phones.isEmpty ? [] : self.iPhoneTracks() }
+        cloud.applyRequests = { [unowned self] phoneID, requests, sent in self.iPhone.applyCloudRequests(requests, phoneID: phoneID, sent: sent) }
+        cloud.onPhoneChanges = { [unowned self] in self.iPhone.onHistoryChanged() }
         cloud.identity = { [unowned self] in
             CloudBackupIdentity(macID: self.iPhone.identity.deviceID, macName: self.iPhone.identity.deviceName, appVersion: AppInfo.version)
         }

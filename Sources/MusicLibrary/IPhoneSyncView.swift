@@ -115,6 +115,10 @@ struct IPhoneSyncView: View {
                     (Text("Last synced ") + Text(date, style: .relative) + Text(" ago" + (phone.lastSummary.map { ": " + summaryText($0) } ?? "")))
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
+                if let date = phone.lastCloudBatch {
+                    (Text("Plays, likes and requests last sent through iCloud ") + Text(date, style: .relative) + Text(" ago"))
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
                 CollectionOnIPhoneRow(phone: phone, store: store)
             }
             Spacer()

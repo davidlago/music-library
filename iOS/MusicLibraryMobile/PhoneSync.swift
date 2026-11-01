@@ -65,6 +65,9 @@ final class PhoneSync {
     @ObservationIgnored private var busy = false
     /// A sync (or pairing) is running.
     var isBusy: Bool { busy }
+    /// This phone, as the Mac knows it.
+    var deviceID: String { identity.deviceID }
+    var deviceName: String { identity.deviceName }
     @ObservationIgnored private let keychain = KeychainStore.app
     @ObservationIgnored private let identity: SyncIdentity
 
