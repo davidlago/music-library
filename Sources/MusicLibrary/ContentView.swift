@@ -112,6 +112,7 @@ struct MainWindow: View {
             ExportSheet()
         }
         .sheet(item: $model.smartPlaylistDraft) { SmartPlaylistEditor(draft: $0) }
+        .sheet(isPresented: $model.showsCloudRestore) { ICloudRestoreSheet() }
         .sheet(item: $model.collectionSheet) { sheet in
             switch sheet {
             case .add(let medium, let prefill): AddToCollectionSheet(medium: medium, prefill: prefill)

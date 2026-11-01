@@ -255,6 +255,14 @@ final class CloudBackupStore {
         return await Task.detached(priority: .utility) { CloudContainer.backupStore(identifier: containerID) }.value
     }
 
+    /// The backup in iCloud, for a restore; nil when signed out or without iCloud.
+    func backupStore() async -> FolderCloudStore? {
+        guard let containerID else { return nil }
+        let found = await Self.resolve(store, containerID: containerID)
+        if let found { store = found }
+        return found
+    }
+
     /// What's still uploading, the snapshots, and whether signed in to iCloud.
     func refreshStatus() async {
         guard let containerID else { return }

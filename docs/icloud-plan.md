@@ -2,7 +2,8 @@
 
 Status: **P0 done** (signing groundwork, §8; the portal is set up and a local build signed with the Developer ID
 profile reached the container on 2026-10-31), **P1 done** (the Mac backs up the library and covers, §5), **P2 done**
-(chosen music or everything, evicted from the Mac once uploaded, with the removal list and purging), P3–P7 to do. Nothing
+(chosen music or everything, evicted from the Mac once uploaded, with the removal list and purging), **P3 done**
+(restore to a new folder or the database only, §7), P4–P7 to do. Nothing
 here bumps
 `Database.schemaVersion` (14) or `SyncProtocol.version` (3): older phones and Macs keep reading every library and
 snapshot this produces.
@@ -47,6 +48,7 @@ Non-goals (for now):
 | D13 | Phone downloads and the Mac's selection | A download from iCloud still records a `SyncRequest`. The request reaches the Mac through `Inbox/` (§6) or the next Wi-Fi sync, and is cleared as it is today. | Wi-Fi sync makes the phone match the Mac's selection, so a download the Mac never heard about would be deleted on the next sync. |
 | D14 | Trust | Everything read from the container is untrusted, as with sync: paths checked by `SyncPlan.isManaged` and resolved with `LibraryPath.resolve`, snapshots opened with `Database(snapshotAt:)` (read-only, refuses a newer schema), and Inbox files decoded strictly with size limits. | Another version of the app, a corrupted download or a bug on one device must not be able to write outside the library or crash the other. |
 | D15 | Choosing music | The chosen music is a `SyncSelection` of its own (include/exclude rules over `ExportItem`s: albums, artists, playlists, songs; the last rule covering a song decides), kept in the Mac's user defaults (`iCloudBackupSelection`) apart from the iPhone's and the Export List. Artists and playlists resolve when each backup runs, so an artist's new album is backed up without picking it. An option, **Include what's on my iPhone** (off by default, since with Owned Music on iPhone the phone's list can be most of the library; Settings shows what it comes to), adds every paired phone's resolved selection as implicit include rules (`SyncSelection.resolve(_:implicit:)`), so what the phone may download from iCloud (P5) is there; an exclude rule the user added still wins. Every song's database row, play and like is in the snapshot whatever is chosen. | It's the same model the iPhone list already uses and tests, with the same menus. A song taken off the list is a removal like any other (D8), so a mistaken click doesn't delete the backup of an album. |
+| D16 | Where a phone download comes from | Download works as it does today and the phone picks the source: the Mac over Wi-Fi when it's reachable (same network, the app open: the on-demand sync the phone already starts with `requestSync`), otherwise iCloud when the song is backed up there, otherwise it waits (queued, as today) and goes whichever way becomes available first. The phone shows one Download button and one progress, with at most a quiet "from iCloud" note. | It's the experience that already works: iCloud only fills in when the Mac isn't there, so nothing changes for someone at home, and the phone isn't stuck when away. The Mac is preferred because it has every song and the request updates its selection at once. |
 
 ## 3. Container layout
 
@@ -157,11 +159,13 @@ to replace that backup, keep it and stop, or turn backup off. It never mixes two
 
   A phone with no library yet gets one this way, with no Mac and no pairing. The sample library goes away as it does
   when Wi-Fi sync brings one.
-- **Download** (`AvailabilityBar`, Ready to Download, Download All):
-  - When a song's file is in iCloud, the phone downloads it, copies it in and evicts it (D12), and records the
-    `SyncRequest` (D13).
-  - When it isn't in iCloud (the scope is "Library and covers", the song isn't among the chosen music, or it's still
-    uploading), the request waits for the Mac as it does today, and the button says so. The request reaching the Mac
+- **Download** (`AvailabilityBar`, Ready to Download, Download All), with the source picked as in D16:
+  - It records the `SyncRequest` first, as today (D13).
+  - When the Mac is reachable (`PhoneSync.macPeer`), the phone asks it to sync (`requestSync`), exactly as today.
+  - Otherwise, when the song's file is in iCloud, the phone downloads it, copies it in and evicts it (D12). If the Mac
+    turns up mid-download, songs already coming from iCloud finish there and the rest go over Wi-Fi.
+  - Otherwise (the scope is "Library and covers", the song isn't among the chosen music, or it's still uploading), the
+    request waits as it does today and goes by whichever way becomes available first; the button says it's waiting. The request reaching the Mac
     (P6) adds the song to that phone's selection, so with Include what's on my iPhone it goes to iCloud next.
   - The phone refuses a download that doesn't fit, using the sizes from iCloud's metadata, as it refuses a Wi-Fi
     sync.
@@ -184,12 +188,20 @@ to replace that backup, keep it and stop, or turn backup off. It never mixes two
 
 ## 7. Restore (Mac)
 
-- **File ▸ Restore from iCloud…** lists the snapshots (date, tracks, collection items, plays). It offers:
-  - **Restore to a new folder:** choose an empty folder; music, covers and photos are downloaded into the library
-    layout, the snapshot becomes its `library.sqlite`, and the app opens it. A file listed in `Removed.json` can be
-    included ("also bring back what was removed in the last 30 days").
-  - **Restore the database only**, into the open library: the current `library.sqlite` is first copied next to it
-    (`library-before-restore-<date>.sqlite`). Tracks whose files are missing show as missing, as they do now.
+- **File ▸ Restore from iCloud…** (also Settings ▸ iCloud) lists the snapshots (date, tracks, collection items, plays,
+  likes; `CloudRestore.snapshots`, `details`). It offers:
+  - **Restore to a new folder** (`CloudRestore.restore`): choose an empty folder outside the library and the backup;
+    the songs, album covers, collection covers and artist photos the snapshot names that the backup holds are copied
+    into the library layout (downloaded first when they're only in iCloud, and evicted again afterwards), then the
+    snapshot becomes its `library.sqlite` (last, so a folder without one is an unfinished restore; its `snapshot_at`
+    cleared). The restore refuses a folder without room. When it's done the sheet offers to open the restored
+    library. There's no separate "bring back what was removed" option: an older snapshot names the songs it had, and
+    files removed since are still in iCloud for 30 days, so restoring that snapshot gets them back.
+  - **Restore the database only** (`CloudRestore.restoreDatabase`), into the open library: the current database is
+    first saved next to it with `VACUUM INTO` (`library-before-restore-<time>.sqlite`), then `Database.restore` puts
+    the snapshot in place through SQLite's backup API, so the open connection sees it; the downloaded catalog is copied
+    back from the saved file. The app reloads, the player stops, and a backup is scheduled. Tracks whose files are
+    missing show as missing, as they do now.
 - Restore never writes into the open library's `Music/` folder.
 - The same flow takes a `FolderCloudStore` pointed at a copied backup, for a backup someone copied out of the
   container by hand.
@@ -302,7 +314,7 @@ As built in P0 (one-time portal steps: `docs/distribution.md` ▸ iCloud):
    `CloudBackupPlan`, snapshots and `backup.json`, Settings ▸ iCloud, status.
 3. **P2, Mac backup of music (done):** the chosen music (D15: the selection, the iCloud page, Add to iCloud, Include
    what's on my iPhone) and Everything; music files from clones, eviction, `Removed.json`, purge.
-4. **P3, Restore:** to a new folder, and the database only.
+4. **P3, Restore (done):** to a new folder, and the database only.
 5. **P4, phone reads from iCloud:** snapshot and covers, no pairing needed.
 6. **P5, phone downloads from iCloud:** Download, Download All, free-space check, background copy step.
 7. **P6, Inbox:** the phone's events and requests, applied by the Mac.

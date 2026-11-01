@@ -111,6 +111,11 @@ extension Database {
         }
     }
 
+    /// Makes a restored copy a live database again: only copies carry `snapshot_at`.
+    func clearSnapshotStamp() throws {
+        try exec("DELETE FROM library_meta WHERE key=?", [.text(Self.snapshotAtKey)])
+    }
+
     /// When this copy was made (`writeSyncSnapshot`, `writeBackupSnapshot`); nil for the live database and for copies
     /// older Macs made, which count as older than any stamped one.
     public func snapshotDate() -> Date? {

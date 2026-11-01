@@ -134,6 +134,7 @@ private struct OfflineStore: CloudStore {
     func isUploaded(_ path: String) -> Bool { false }
     func evict(_ path: String) throws {}
     func waitUntilUploaded(_ path: String, timeout: Duration) async -> Bool { false }
+    func copyOut(_ path: String, to destination: URL) async throws { try await base.copyOut(path, to: destination) }
 }
 
 /// A plain folder where iCloud uploads music only after being asked about it `delay` times (never, with nil), and
@@ -162,6 +163,7 @@ private final class SlowStore: CloudStore, @unchecked Sendable {
         }
     }
     func evict(_ path: String) throws { lock.withLock { _evicted.append(path) } }
+    func copyOut(_ path: String, to destination: URL) async throws { try await base.copyOut(path, to: destination) }
 }
 
 @Suite struct CloudPublishTests {

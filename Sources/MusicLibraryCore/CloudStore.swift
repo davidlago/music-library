@@ -37,6 +37,9 @@ public protocol CloudStore: Sendable {
     func evict(_ path: String) throws
     /// Waits until iCloud has uploaded the file, up to `timeout`; true when it has.
     func waitUntilUploaded(_ path: String, timeout: Duration) async -> Bool
+    /// Copies the file to `destination` (replacing what's there), downloading it first when it's only in iCloud and
+    /// evicting it again afterwards, so a restore doesn't leave a second copy behind. Made aside and renamed into place.
+    func copyOut(_ path: String, to destination: URL) async throws
 }
 
 extension CloudStore {
@@ -143,6 +146,36 @@ public final class FolderCloudStore: CloudStore {
     public func evict(_ path: String) throws {
         guard coordinated else { return }
         try FileManager.default.evictUbiquitousItem(at: try url(for: path))
+    }
+
+    public func copyOut(_ path: String, to destination: URL) async throws {
+        let fm = FileManager.default
+        var source = try url(for: path)
+        var wasLocal = true
+        if coordinated {
+            source.removeAllCachedResourceValues()
+            if (try? source.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]))?.ubiquitousItemDownloadingStatus != .current {
+                wasLocal = false
+                try fm.startDownloadingUbiquitousItem(at: source)
+                while true {
+                    try Task.checkCancellation()
+                    source.removeAllCachedResourceValues()
+                    let values = try source.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey, .ubiquitousItemDownloadingErrorKey])
+                    if let error = values.ubiquitousItemDownloadingError { throw error }
+                    if values.ubiquitousItemDownloadingStatus == .current { break }
+                    try await Task.sleep(for: .milliseconds(500))
+                }
+            }
+        }
+        try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let aside = try fm.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: destination, create: true)
+        defer { try? fm.removeItem(at: aside) }
+        let partial = aside.appendingPathComponent(destination.lastPathComponent)
+        try coordinate(source, writing: false) { url in try fm.copyItem(at: url, to: partial) }
+        guard rename(partial.path, destination.path) == 0 else {
+            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: destination.path])
+        }
+        if !wasLocal { try? fm.evictUbiquitousItem(at: source) }
     }
 
     /// Makes the file aside (in a replacement folder on the same volume, outside the backup) and renames it into place.

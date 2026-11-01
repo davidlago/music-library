@@ -121,6 +121,8 @@ final class AppModel {
     var shelfQuery = ""
     /// The collection sheet showing, if any (Add to Collection…, Find by Label…, Add Library Albums…).
     var collectionSheet: CollectionSheet?
+    /// Restore from iCloud… is showing.
+    var showsCloudRestore = false
     /// The item Remove from Collection… asks about (`collectionRemovalConfirmation`).
     var pendingItemRemoval: CollectionItem?
     /// The queue in the window's inspector.
@@ -935,6 +937,19 @@ final class AppModel {
 
     /// Sync to Discogs…
     func syncToDiscogs() { presentCollectionSheet(.discogsSync) }
+
+    /// Restore from iCloud… (File menu, Settings ▸ iCloud).
+    func restoreFromICloud() { showsCloudRestore = true }
+
+    /// After the open library's database was restored in place: everything is read again (songs may have other ids,
+    /// so the player stops), and the next backup holds the restored library.
+    func databaseRestored() {
+        player.stop()
+        reloadLibrary()
+        historyVersion += 1
+        coverRevision += 1
+        cloud.filesChanged()
+    }
 
     /// A sheet is showing in a window (a collection sheet, the smart playlist editor, an export, or a page's own
     /// sheet): the collection's menu commands do nothing then, rather than replace it and lose what's entered.
