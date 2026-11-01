@@ -69,7 +69,7 @@ own Anthropic account, App Functionality, not for tracking. The camera needs `NS
 goes to OpenRouter (and the model's provider) instead of Anthropic, with the user's own key. Same privacy label
 categories; the review notes and privacy policy name OpenRouter as a possible recipient.
 
-**Since iCloud backup (the release after 1.29.0):** the phone reads the library, covers and songs from the Mac's backup in
+**Since iCloud backup (1.30.0):** the phone reads the library, covers and songs from the Mac's backup in
 the app's private iCloud container, and writes its plays, likes and download requests there. That's the user's own
 iCloud, which the developer can't access, so it isn't data the developer collects: the privacy label doesn't change.
 The TestFlight and App Store builds need the iCloud entitlement (`ICLOUD` repository variable for CI, `ICLOUD=1` for
@@ -125,7 +125,7 @@ Get the companion Mac app
 Your music comes from Music Library for Mac (free, macOS 14 or later): it catalogs your CDs and records, imports, rips and digitizes your music, then syncs both collections to your iPhone. Download it, and find the full documentation and the source code, at https://davidlago.github.io/music-library/
 ```
 
-**What's New in the iCloud release** (the first version after 1.29.0 built with iCloud):
+**What's New in 1.30.0** (the first version built with iCloud):
 
 ```
 Your Mac's iCloud backup

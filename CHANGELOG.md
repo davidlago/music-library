@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.30.0
+
 - New: **iCloud backup.** **Settings ▸ iCloud** on the Mac backs up your library to your own iCloud: the library
   database (songs, plays, likes, playlists and your physical collection), covers and artist photos, and, if you choose,
   the music too, either **chosen music** (**Add to iCloud** in album, artist, playlist and song menus, listed on the new
