@@ -616,5 +616,6 @@ struct AddToExportListButton: View {
             .disabled(items.allSatisfy(model.isInExportList))
         AddToIPhoneButton(items: items)
         AddToICloudButton(items: items)
+        OffloadButtons(items: items)
     }
 }

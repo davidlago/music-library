@@ -71,6 +71,11 @@ final class PhoneModel {
     private(set) var requests: [SyncRequest] = []
     /// Songs asked for and not here yet.
     private(set) var pendingDownloads: Set<Int64> = []
+    /// Songs the Mac's selection puts on the phone that the Mac has only in iCloud (offloaded there): the last Wi-Fi
+    /// sync didn't send them, so they come from iCloud (D20). Application Support `icloud-only.json`.
+    private var iCloudOnly: Set<Int64> = PhoneModel.loadICloudOnly() {
+        didSet { Self.saveICloudOnly(iCloudOnly) }
+    }
 
     /// The song whose details are shown (Song Info).
     var infoTrack: Track?
@@ -146,10 +151,16 @@ final class PhoneModel {
         cloud.phone = { [weak self] in (self?.sync.deviceID ?? "", self?.sync.deviceName ?? "") }
         cloud.downloads = { [weak self] in
             guard let self, let library, !isSample else { return [] }
-            return library.tracks.filter { pendingDownloads.contains($0.id) }
+            return library.tracks.filter { pendingDownloads.contains($0.id) || (iCloudOnly.contains($0.id) && !library.isPresent($0)) }
         }
         cloud.macReachable = { [weak self] in self?.sync.macPeer != nil || self?.sync.isBusy == true }
         sync.onSyncStarted = { [weak self] in self?.cloud.stopFetching() }
+        sync.onSyncFinished = { [weak self] summary in
+            guard let self else { return }
+            iCloudOnly = Set(summary.iCloudOnly ?? [])
+            // With the Mac nearby too: it couldn't send these.
+            if !iCloudOnly.isEmpty { cloud.fetchDownloads(evenWithMac: true) }
+        }
         cloud.onApplied = { [weak self] ids in
             self?.outbox.remove(ids)
             self?.requestQueue.remove(ids)
@@ -475,6 +486,20 @@ final class PhoneModel {
         refreshRequests()
         sync.requestSync()
         cloud.fetchDownloads()
+    }
+
+    private static var iCloudOnlyURL: URL {
+        URL.applicationSupportDirectory.appendingPathComponent("icloud-only.json")
+    }
+
+    private static func loadICloudOnly() -> Set<Int64> {
+        guard let data = try? Data(contentsOf: iCloudOnlyURL), data.count <= 8 << 20 else { return [] }
+        return Set((try? JSONDecoder().decode([Int64].self, from: data)) ?? [])
+    }
+
+    private static func saveICloudOnly(_ ids: Set<Int64>) {
+        try? FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
+        try? JSONEncoder().encode(ids.sorted()).write(to: iCloudOnlyURL, options: .atomic)
     }
 
     /// Music can be downloaded: from a paired Mac, or from iCloud.

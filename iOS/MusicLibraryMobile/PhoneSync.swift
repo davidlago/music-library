@@ -67,6 +67,8 @@ final class PhoneSync {
     var isBusy: Bool { busy }
     /// A sync is starting (not a pairing).
     @ObservationIgnored var onSyncStarted: () -> Void = {}
+    /// A sync finished; its summary says which songs the Mac has only in iCloud (offloaded there, D20).
+    @ObservationIgnored var onSyncFinished: (SyncSummary) -> Void = { _ in }
     /// This phone, as the Mac knows it.
     var deviceID: String { identity.deviceID }
     var deviceName: String { identity.deviceName }
@@ -256,6 +258,7 @@ final class PhoneSync {
                 } else {
                     onEventsDelivered(Set(events.map(\.id)), Set(requests.map(\.id)))
                     finished(result.summary)
+                    onSyncFinished(result.summary)
                     // Something more was asked for during the sync: another one, once this has wound down.
                     if wantsSync { Task { @MainActor in self.requestSync() } }
                 }

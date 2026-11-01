@@ -458,7 +458,7 @@ struct ArtistDetail: View {
                     NavigationLink(value: a) {
                         VStack(alignment: .leading, spacing: 4) {
                             CoverThumb(url: model.coverURL(forAlbum: a), size: 140, revision: model.coverRevision,
-                                       mark: model.copyMark(for: a))
+                                       mark: model.copyMark(for: a), iCloud: model.offload.placement(model.tracks(of: a)))
                             Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.callout.weight(.medium)).lineLimit(1)
                             Text([a.year.map(String.init), songCount(a.trackCount)].compactMap { $0 }.joined(separator: " · "))
                                 .font(.caption).foregroundStyle(.secondary)
@@ -605,6 +605,7 @@ struct ArtistSongRow: View {
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
+            ICloudMark(placement: model.offload.placement([track]))
             LikeButton(model: model, track: track, showsUnliked: hovering)
             if let plays = total?.plays, plays > 0 {
                 Text("\(plays) play\(plays == 1 ? "" : "s")").font(.caption).foregroundStyle(.secondary).monospacedDigit()

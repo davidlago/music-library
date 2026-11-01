@@ -115,11 +115,12 @@ struct InsightsContent: View {
 }
 
 struct InsightsStack: View {
+    @Environment(AppModel.self) private var model
     let stats: LibraryStats
 
     var body: some View {
             VStack(alignment: .leading, spacing: 18) {
-                HeroTiles(stats: stats)
+                HeroTiles(stats: stats, iCloudOnly: model.offload.offloadedBytes)
                 if !stats.years.isEmpty { TimelineCard(stats: stats) }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 400), spacing: 18, alignment: .top)], alignment: .leading, spacing: 18) {
                     if !stats.genres.isEmpty { GenresCard(stats: stats) }
@@ -375,6 +376,8 @@ struct Chip: View {
 
 struct HeroTiles: View {
     let stats: LibraryStats
+    /// Music offloaded from this Mac, only in iCloud (counted in the total).
+    var iCloudOnly: Int64 = 0
 
     var body: some View {
         let lossless = stats.trackCount == 0 ? 0 : Double(stats.losslessCount) / Double(stats.trackCount)
@@ -383,8 +386,15 @@ struct HeroTiles: View {
             InsightTile(value: stats.albumCount.formatted(), label: stats.albumCount == 1 ? "Album" : "Albums", icon: "square.stack")
             InsightTile(value: stats.artistCount.formatted(), label: stats.artistCount == 1 ? "Artist" : "Artists", icon: "music.mic")
             InsightTile(value: formatLongDuration(stats.totalDuration), label: "Of music", icon: "clock")
-            InsightTile(value: (stats.bytesAreEstimated ? "≈ " : "") + ByteCountFormatter.string(fromByteCount: stats.totalBytes, countStyle: .file),
-                        label: "On disk", icon: "internaldrive")
+            if iCloudOnly > 0 {
+                let onMac = max(0, stats.totalBytes - iCloudOnly)
+                InsightTile(value: (stats.bytesAreEstimated ? "≈ " : "") + ByteCountFormatter.string(fromByteCount: stats.totalBytes, countStyle: .file),
+                            label: "Of music", icon: "internaldrive",
+                            detail: "\(ByteCountFormatter.string(fromByteCount: onMac, countStyle: .file)) on this Mac, \(ByteCountFormatter.string(fromByteCount: iCloudOnly, countStyle: .file)) in iCloud only")
+            } else {
+                InsightTile(value: (stats.bytesAreEstimated ? "≈ " : "") + ByteCountFormatter.string(fromByteCount: stats.totalBytes, countStyle: .file),
+                            label: "On disk", icon: "internaldrive")
+            }
             InsightTile(value: lossless.formatted(.percent.precision(.fractionLength(0))), label: "Lossless", icon: "waveform")
         }
     }

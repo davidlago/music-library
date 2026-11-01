@@ -126,7 +126,7 @@ struct CollectionItemDetail: View {
     /// The case or sleeve, with "Change Cover…" on hover; dropping an image on it opens the cover sheet with it.
     private func coverArt(_ item: CollectionItem, size: CGFloat) -> some View {
         CopyArt(mark: model.collection.mark(item: item), url: model.coverURL(for: item), width: size,
-                revision: model.coverRevision, title: item.album)
+                revision: model.coverRevision, title: item.album, iCloud: model.offload.placement(model.collection.libraryTracks(item)))
             .overlay(alignment: .bottomTrailing) {
                 if hoveringCover, item.isEditable {
                     Button { changeCover(item) } label: { Label("Change Cover…", systemImage: "photo") }
@@ -548,7 +548,7 @@ struct CopyRow: View {
         let state = model.collection.digitalState(item)
         HStack(spacing: 12) {
             CopyArt(mark: model.collection.mark(item: item), url: model.coverURL(for: item), width: 56,
-                    revision: model.coverRevision, title: item.album)
+                    revision: model.coverRevision, title: item.album, iCloud: model.offload.placement(model.collection.libraryTracks(item)))
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     if let s = item.sticker { StickerPill(sticker: s, size: 10) }

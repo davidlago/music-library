@@ -73,6 +73,8 @@ final class PhoneCloud {
     }
     /// Songs being fetched from iCloud.
     private(set) var fetching: Progress?
+    /// Covers and photos arriving from iCloud, while a check brings them (a first one brings them all, D22).
+    private(set) var arriving: Progress?
     /// Songs asked for that the backup doesn't hold: they wait for the Mac.
     private(set) var notInCloud: Set<Int64> = []
     /// Why the last fetch stopped, such as no room.
@@ -121,7 +123,13 @@ final class PhoneCloud {
                 send()
                 fetchDownloads()
             }
-            let result = await Self.receive(containerID: containerID, root: root, scratch: scratch, pending: pending)
+            let result = await Self.receive(containerID: containerID, root: root, scratch: scratch, pending: pending) { [weak self] done, total in
+                Task { @MainActor in
+                    guard let self, self.status == .checking else { return }
+                    self.arriving = done < total ? Progress(done: done, total: total) : nil
+                }
+            }
+            arriving = nil
             switch result {
             case .success(nil):
                 status = .signedOut
@@ -142,9 +150,10 @@ final class PhoneCloud {
     /// Off the main thread: finding the container can block while iCloud sets it up.
     // MARK: Downloads
 
-    /// Fetches the songs asked for from iCloud, unless the Mac can send them (D16).
-    func fetchDownloads() {
-        guard let containerID, isEnabled, fetchTask == nil, !macReachable() else { return }
+    /// Fetches the songs asked for from iCloud, unless the Mac can send them (D16). `evenWithMac` after a Wi-Fi sync,
+    /// for the songs the Mac has only in iCloud (D20).
+    func fetchDownloads(evenWithMac: Bool = false) {
+        guard let containerID, isEnabled, fetchTask == nil, evenWithMac || !macReachable() else { return }
         let tracks = downloads()
         guard !tracks.isEmpty else {
             notInCloud = []
@@ -245,13 +254,14 @@ final class PhoneCloud {
         }.value
     }
 
-    nonisolated private static func receive(containerID: String, root: URL, scratch: URL, pending: Set<String>) async -> Result<CloudReceiveOutcome?, Error> {
+    nonisolated private static func receive(containerID: String, root: URL, scratch: URL, pending: Set<String>,
+                                            progress: @escaping @Sendable (Int, Int) -> Void) async -> Result<CloudReceiveOutcome?, Error> {
         await Task.detached(priority: .utility) {
             guard FileManager.default.ubiquityIdentityToken != nil, let store = CloudContainer.backupStore(identifier: containerID) else {
                 return .success(nil)
             }
             do {
-                return .success(try await CloudReceiver.receive(from: store, into: root, scratch: scratch, pending: pending))
+                return .success(try await CloudReceiver.receive(from: store, into: root, scratch: scratch, pending: pending, progress: progress))
             } catch {
                 return .failure(error)
             }

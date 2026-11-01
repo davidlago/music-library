@@ -14,14 +14,21 @@ public struct SyncPlan: Equatable, Sendable {
     public var deletes: [String] = []
     /// Selected tracks whose files are missing from the Mac's library; they're skipped.
     public var missing = 0
+    /// Selected tracks offloaded from the Mac (only in its iCloud backup) that the phone doesn't have: the phone
+    /// fetches them from iCloud itself (D20). One it has already stays.
+    public var iCloudOnly: [Int64] = []
 
     public var bytes: Int64 { sends.reduce(0) { $0 + $1.size } }
-    public var summary: SyncPlanSummary { SyncPlanSummary(files: sends.count, bytes: bytes, deletes: deletes.count) }
+    public var summary: SyncPlanSummary {
+        SyncPlanSummary(files: sends.count, bytes: bytes, deletes: deletes.count, iCloudOnly: iCloudOnly.isEmpty ? nil : iCloudOnly)
+    }
 
     /// `library` is every track in the library, for the covers; `collectionCovers` the items' own covers
     /// (`Database.collectionCoverPaths`), wanted whatever the selection is. Only those in `CollectionCovers.folder`
-    /// with an allowed name are used.
-    public init(tracks: [Track], library: [Track] = [], collectionCovers: [String] = [], libraryRoot: URL, phone: [SyncFileEntry]) {
+    /// with an allowed name are used. `offloaded` is the songs whose files are only in the Mac's iCloud backup, by
+    /// path, with their size there.
+    public init(tracks: [Track], library: [Track] = [], collectionCovers: [String] = [], offloaded: [String: Int64] = [:],
+                libraryRoot: URL, phone: [SyncFileEntry]) {
         var onPhone: [String: Int64] = [:]
         // The manifest comes from the phone: entries that aren't plain paths inside the managed folders are ignored.
         for entry in phone where SyncPlan.isManaged(entry.path) { onPhone[entry.path] = entry.size }
@@ -44,7 +51,14 @@ public struct SyncPlan: Equatable, Sendable {
         }
         for t in tracks where !wanted.contains(t.path) {
             guard SyncPlan.isManaged(t.path), let size = sourceSize(t.path) else {
-                missing += 1
+                if SyncPlan.isManaged(t.path), let size = offloaded[t.path] {
+                    // Kept where the phone has it; otherwise the phone gets it from iCloud.
+                    wanted.insert(t.path)
+                    if onPhone[t.path] != size { iCloudOnly.append(t.id) }
+                    wantCover(of: t)
+                } else {
+                    missing += 1
+                }
                 continue
             }
             want(t.path, size: size)
@@ -82,14 +96,15 @@ extension Database {
     static let snapshotAtKey = "snapshot_at"
 
     /// A compact copy of the library database for the phone, without the downloaded library catalog (Mac only,
-    /// and often the biggest part) or the Discogs links. `scratch` is a folder for the intermediate copy.
+    /// and often the biggest part), the Discogs links or which songs are offloaded from the Mac. `scratch` is a
+    /// folder for the intermediate copy.
     public func writeSyncSnapshot(to target: URL, scratch: URL, snapshotAt: Date = Date()) throws {
         try writeSnapshot(to: target, scratch: scratch, snapshotAt: snapshotAt,
-                          emptying: ["catalog_items", "catalog_info", "catalog_previews", "discogs_sync"])
+                          emptying: ["catalog_items", "catalog_info", "catalog_previews", "discogs_sync", "offloaded_tracks"])
     }
 
     /// A copy for the iCloud backup: like the phone's, but keeping the Discogs links, since without them the next
-    /// Discogs sync after a restore would add every copy again.
+    /// Discogs sync after a restore would add every copy again, and the offloaded songs (a restore keeps them).
     public func writeBackupSnapshot(to target: URL, scratch: URL, snapshotAt: Date) throws {
         try writeSnapshot(to: target, scratch: scratch, snapshotAt: snapshotAt,
                           emptying: ["catalog_items", "catalog_info", "catalog_previews"])

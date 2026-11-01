@@ -32,9 +32,10 @@ public struct CloudReceiveOutcome: Equatable, Sendable {
 /// the database is opened read-only and checked first (a newer schema is refused), only cover and photo paths are
 /// taken, and each is resolved inside `root`; files are made aside and renamed into place.
 public enum CloudReceiver {
-    /// `pending`: the ids of the phone's plays, likes and requests not yet known to have reached the Mac.
-    public static func receive(from store: CloudStore, into root: URL, scratch: URL, pending: Set<String> = [],
-                               concurrency: Int = 6) async throws -> CloudReceiveOutcome {
+    /// `pending`: the ids of the phone's plays, likes and requests not yet known to have reached the Mac. `progress`
+    /// gets the covers and photos copied so far and how many there are (a first check brings them all).
+    public static func receive(from store: CloudStore, into root: URL, scratch: URL, pending: Set<String> = [], concurrency: Int = 6,
+                               progress: @escaping @Sendable (_ done: Int, _ total: Int) -> Void = { _, _ in }) async throws -> CloudReceiveOutcome {
         let fm = FileManager.default
         try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
@@ -58,6 +59,7 @@ public enum CloudReceiver {
             guard let url = LibraryPath.resolve(entry.path, in: root) else { return false }
             return LibraryExporter.size(of: url) != entry.size
         }
+        if !covers.isEmpty { progress(0, covers.count) }
         try await withThrowingTaskGroup(of: Int64.self) { group in
             var next = covers.makeIterator()
             func add() {
@@ -70,6 +72,7 @@ public enum CloudReceiver {
             for _ in 0..<max(1, concurrency) { add() }
             while let bytes = try await group.next() {
                 outcome.files += 1; outcome.bytes += bytes
+                progress(outcome.files, covers.count)
                 add()
             }
         }

@@ -7,6 +7,24 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.31.0
+
+- New: **offload music from the Mac to iCloud.** With your music backed up to iCloud, **Offload from This Mac** (in the
+  menus of albums, artists, playlists and songs) frees its space on the Mac while it stays in your library, and
+  **Settings ▸ iCloud ▸ Offload music not played in** does it for albums you haven't played in a while (with **Keep on
+  This Mac** for the exceptions and **Offload Now…**). Playing an offloaded song downloads it first; **Download to This
+  Mac** brings it back for good. A struck-through cloud on an album's, CD's or record's cover (and next to a song)
+  shows what's in iCloud only. Offloaded songs stay in the backup whatever it's set to, and the iPhone gets them
+  straight from iCloud. Before going back to an older version, bring them back with **Settings ▸ iCloud ▸ Download
+  All to This Mac**: older versions would let them go from iCloud. [Guide](https://github.com/davidlago/music-library/blob/main/docs/guide/icloud.md#offload-music-from-the-mac)
+- New: **Set Up from iCloud** on a new Mac moves your library there from the iCloud backup, with the music downloading
+  as you play it; the old Mac stops backing up and says so.
+  [Guide](https://github.com/davidlago/music-library/blob/main/docs/guide/icloud.md#a-new-mac)
+- New: a new iPhone says it's looking for your library in iCloud while it arrives, instead of showing an empty screen.
+- Changed: clicking the section already selected in the Mac's sidebar goes back to its main page (the album list from
+  an album, say).
+- Fixed: the Mac window can be dragged from anywhere along its title bar, not only from its top edge.
+
 ## 1.30.1
 
 - Changed: switching the iCloud backup from **Everything** to **Library, covers and chosen music** starts the list with

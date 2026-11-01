@@ -50,7 +50,10 @@ adds new copies to. See [Physical Collection](physical-collection.md#sync-to-dis
 
 What to back up to your iCloud (**Off**, **Library and covers**, **Library, covers and chosen music** or
 **Everything**) with the size of each, **Include what's on my iPhone**, the backup's status with **Back Up Now** (and **Delete Now…** for music waiting to be
-deleted), and **Restore from iCloud…**. Only in versions with iCloud. See [iCloud backup](icloud.md).
+deleted), **Offload music not played in** with **Offload Now…**, what's on this Mac and in iCloud only (with **Download All to
+This Mac**), **Set Up
+from iCloud…** while the library is empty, and **Restore from iCloud…**. Only in versions with iCloud. See [iCloud
+backup](icloud.md).
 
 ## Radio DJ
 

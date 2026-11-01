@@ -124,7 +124,7 @@ import Testing
 }
 
 /// A container where iCloud never finishes uploading.
-private struct OfflineStore: CloudStore {
+struct OfflineStore: CloudStore {
     let base: FolderCloudStore
     func entries() throws -> [CloudEntry] { try base.entries().map { var e = $0; e.isUploaded = false; return e } }
     func upload(from source: URL, to path: String, modified: Date?) throws { try base.upload(from: source, to: path, modified: modified) }

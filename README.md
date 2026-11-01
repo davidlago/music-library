@@ -55,8 +55,8 @@ playback, and a Claude-powered radio DJ who tells you the story behind every rec
   [Local Library CDs →](docs/guide/local-library.md) · [Shop →](docs/guide/shop.md)
 - **Take it with you.** The iPhone app browses both collections and plays what you sync to it, offline and through a USB
   DAC at each song's rate, with widgets and an Apple Watch app. Back up the library and the music you choose to your
-  own iCloud, restore from it, and get it on the iPhone from there when the Mac isn't nearby. Export to a USB player or
-  back up to a drive.
+  own iCloud, restore from it, and get it on the iPhone from there when the Mac isn't nearby; let iCloud hold the albums
+  you don't play, or move the library to a new Mac. Export to a USB player or back up to a drive.
   [iPhone app →](docs/guide/iphone.md) · [Widgets and Apple Watch →](docs/guide/widgets-and-watch.md) ·
   [iCloud backup →](docs/guide/icloud.md) · [Export and backup →](docs/guide/export-and-backup.md)
 

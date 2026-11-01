@@ -463,7 +463,8 @@ struct CollectionCell: View {
     var body: some View {
         let mark = model.collection.mark(item: item)
         VStack(alignment: .leading, spacing: 4) {
-            CopyArt(mark: mark, url: model.coverURL(for: item), width: width, revision: model.coverRevision, title: item.album)
+            CopyArt(mark: mark, url: model.coverURL(for: item), width: width, revision: model.coverRevision, title: item.album,
+                    iCloud: model.offload.placement(model.collection.libraryTracks(item)))
                 .padding(.bottom, 4)
             Text(item.album.isEmpty ? "Unknown Album" : item.album).font(.callout.weight(.medium)).lineLimit(1)
             Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
