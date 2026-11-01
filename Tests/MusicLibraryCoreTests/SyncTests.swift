@@ -233,10 +233,7 @@ struct SyncFixture {
     func listen(key: Data, root: URL, pairing: Bool, grants: GrantBox = GrantBox(), freeSpace: Int64? = nil) async throws -> (NWEndpoint.Port, Task<(SyncHello, SyncSummary), Error>) {
         let sessions = AsyncStream<NWConnection>.makeStream()
         let identity = phone
-        let advertiser = try SyncAdvertiser(deviceID: phone.deviceID, name: "test", key: key, pairing: pairing, advertise: false,
-                                            onState: { _ in }, onConnection: { sessions.continuation.yield($0) })
-        advertiser.start()
-        for _ in 0..<100 where advertiser.port == nil || advertiser.port == .any { try await Task.sleep(for: .milliseconds(20)) }
+        let advertiser = try await TestSupport.listeningAdvertiser(key: key, pairing: pairing) { sessions.continuation.yield($0) }
         let task = Task { () async throws -> (SyncHello, SyncSummary) in
             defer { advertiser.stop() }
             for await connection in sessions.stream {
@@ -505,10 +502,7 @@ extension SyncSessionTests {
         let received = AccountBox()
 
         let sessions = AsyncStream<NWConnection>.makeStream()
-        let advertiser = try SyncAdvertiser(deviceID: "phone-id", name: "test", key: key, pairing: false, advertise: false,
-                                            onConnection: { sessions.continuation.yield($0) })
-        advertiser.start()
-        for _ in 0..<100 where advertiser.port == nil || advertiser.port == .any { try await Task.sleep(for: .milliseconds(20)) }
+        let advertiser = try await TestSupport.listeningAdvertiser(key: key) { sessions.continuation.yield($0) }
         let identity = phone, library = f.db.libraryID()
         let session = Task { () async throws -> SyncSummary in
             defer { advertiser.stop() }

@@ -333,10 +333,7 @@ func textReply(_ text: String, stop: String = "end_turn", model: String = "claud
         let received = Box()
 
         let sessions = AsyncStream<NWConnection>.makeStream()
-        let advertiser = try SyncAdvertiser(deviceID: "phone-id", name: "test", key: key, pairing: false, advertise: false,
-                                            onConnection: { sessions.continuation.yield($0) })
-        advertiser.start()
-        for _ in 0..<100 where advertiser.port == nil || advertiser.port == .any { try await Task.sleep(for: .milliseconds(20)) }
+        let advertiser = try await TestSupport.listeningAdvertiser(key: key) { sessions.continuation.yield($0) }
         let identity = SyncIdentity(deviceID: "phone-id", deviceName: "iPhone", appVersion: "test")
         let usage = spent
         let session = Task { () async throws -> SyncSummary in
