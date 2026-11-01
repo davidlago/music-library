@@ -65,6 +65,8 @@ final class PhoneSync {
     @ObservationIgnored private var busy = false
     /// A sync (or pairing) is running.
     var isBusy: Bool { busy }
+    /// A sync is starting (not a pairing).
+    @ObservationIgnored var onSyncStarted: () -> Void = {}
     /// This phone, as the Mac knows it.
     var deviceID: String { identity.deviceID }
     var deviceName: String { identity.deviceName }
@@ -218,7 +220,10 @@ final class PhoneSync {
     private func run(_ connection: SyncConnection, pairing: Bool) {
         busy = true
         lastError = nil
-        if !pairing { status = .syncing(SyncProgress()) }
+        if !pairing {
+            status = .syncing(SyncProgress())
+            onSyncStarted()
+        }
         UIApplication.shared.isIdleTimerDisabled = true
         // A few more seconds to finish the current file if the app is sent to the background.
         let background = UIApplication.shared.beginBackgroundTask(withName: "Sync")

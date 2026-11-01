@@ -651,8 +651,8 @@ struct ReadyToDownloadPage: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
                 } footer: {
-                    Text(model.sync.isPaired
-                         ? "\(items.count) album\(items.count == 1 ? "" : "s") · \(songCount(songs)) not on this iPhone. They download at the next sync with \(model.sync.macName ?? "your Mac")."
+                    Text(model.sync.isPaired || model.cloud.isUsable
+                         ? "\(items.count) album\(items.count == 1 ? "" : "s") · \(songCount(songs)) not on this iPhone. They download from \(model.sync.macName ?? "your Mac") over Wi-Fi, or from its iCloud backup when it's not nearby."
                          : "\(items.count) album\(items.count == 1 ? "" : "s") · \(songCount(songs)) not on this iPhone. They download at the first sync after you pair with your Mac (Sync, on Listen Now).")
                 }
             }

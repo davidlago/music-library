@@ -4,8 +4,8 @@ Status: **P0 done** (signing groundwork, §8; the portal is set up and a local b
 profile reached the container on 2026-10-31), **P1 done** (the Mac backs up the library and covers, §5), **P2 done**
 (chosen music or everything, evicted from the Mac once uploaded, with the removal list and purging), **P3 done**
 (restore to a new folder or the database only, §7), **P4 done** (the phone reads the library from iCloud, §6; checked
-on an iPhone on 2026-11-01), **P6 done** (the phone's plays, likes and requests reach the Mac through iCloud; checked on an iPhone and the Mac), P5 and
-P7 to do. Nothing
+on an iPhone on 2026-11-01), **P6 done** (the phone's plays, likes and requests reach the Mac through iCloud; checked on an iPhone and the Mac), **P5
+done** (Download fetches from iCloud when the Mac isn't reachable; checked on an iPhone), P7 to do. Nothing
 here bumps
 `Database.schemaVersion` (14) or `SyncProtocol.version` (3): older phones and Macs keep reading every library and
 snapshot this produces.
@@ -180,8 +180,15 @@ to replace that backup, keep it and stop, or turn backup off. It never mixes two
     (P6) adds the song to that phone's selection, so with Include what's on my iPhone it goes to iCloud next.
   - The phone refuses a download that doesn't fit, using the sizes from iCloud's metadata, as it refuses a Wi-Fi
     sync.
-  - Progress shows per album. iCloud keeps downloading while the app is in the background, and the copy step runs
-    when the app is next active (or in a `BGProcessingTask`).
+  - As built (`PhoneCloud.fetchDownloads`, `CloudReceiver.fetch`): it runs right after Download and after each
+    check while the Mac isn't reachable (`PhoneSync.macPeer` nil and no sync running), for every song asked for that
+    isn't on the phone, two at a time; a Wi-Fi sync starting cancels it (`PhoneSync.onSyncStarted`), and the Mac sends
+    the rest. The album's bar says "N of M from your Mac's iCloud backup", "Not in iCloud yet" for songs the backup
+    doesn't hold (they wait for the Mac), or why it stopped (no room). Songs show as on the phone every ten files.
+    iCloud keeps downloading while the app is in the background (a background task gives the current copy time to
+    finish), and the copy step goes on when the app is next active; no `BGProcessingTask`.
+  - Download works without pairing when iCloud is on (`PhoneModel.canDownload`). An unpaired phone's requests aren't
+    applied by the Mac (P6), so they stay queued; that's harmless, since no Wi-Fi sync will remove the songs.
 - **Remove** is unchanged: it deletes the local files at once and records the request.
 - **Inbox:** when the outbox or request queue changes (debounced) and on becoming active, the phone writes a batch
   to `Inbox/<phone id>/<uuid>.json`:
@@ -329,7 +336,7 @@ As built in P0 (one-time portal steps: `docs/distribution.md` ▸ iCloud):
    what's on my iPhone) and Everything; music files from clones, eviction, `Removed.json`, purge.
 4. **P3, Restore (done):** to a new folder, and the database only.
 5. **P4, phone reads from iCloud (done):** snapshot and covers, no pairing needed.
-6. **P5, phone downloads from iCloud:** Download, Download All, free-space check, background copy step.
+6. **P5, phone downloads from iCloud (done):** Download, Download All, free-space check, background copy step.
 7. **P6, Inbox (done, ahead of P5):** the phone's events and requests, applied by the Mac.
 8. **P7, docs and polish:** guide, privacy, README and site, CHANGELOG, App Store copy, screenshots. Settings ▸
    iCloud shows only in iCloud builds, and releases aren't until `MAC_PROVISIONING_PROFILE` is set, so the CHANGELOG

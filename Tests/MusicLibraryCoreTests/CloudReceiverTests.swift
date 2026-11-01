@@ -125,4 +125,38 @@ import Testing
         #expect(try FolderCloudStore(root: dir).entries().isEmpty)
         #expect(FolderCloudStore.placeholder(album.appendingPathComponent(".icloud")) == nil)
     }
+
+    @Test func fetchesTheSongsAskedForFromTheBackup() async throws {
+        let f = try SyncFixture()
+        let store = try FolderCloudStore(root: try TestSupport.tempDir())
+        // Only the first album's songs are in the backup ("chosen music").
+        _ = try await CloudBackup.publish(database: f.db, root: f.root, store: store, identity: identity, scope: .chosen,
+                                          music: Array(f.tracks.prefix(2)), scratch: try TestSupport.tempDir(), now: t0, limits: limits)
+        let root = try phone()
+        _ = try await CloudReceiver.receive(from: store, into: root, scratch: try TestSupport.tempDir())
+        var unsafe = f.tracks[0]
+        unsafe.path = "../../escape.flac"
+
+        let outcome = try await CloudReceiver.fetch(f.tracks + [unsafe], from: store, into: root, freeSpace: 1 << 30)
+        #expect(outcome.files == 2 && outcome.notInCloud == [f.tracks[2].id])
+        #expect(outcome.bytes == f.size(f.tracks[0].path) + f.size(f.tracks[1].path))
+        for track in f.tracks.prefix(2) {
+            #expect(try Data(contentsOf: root.appendingPathComponent(track.path)) == Data(contentsOf: f.root.appendingPathComponent(track.path)))
+        }
+        #expect(!FileManager.default.fileExists(atPath: root.deletingLastPathComponent().appendingPathComponent("escape.flac").path))
+        // Already here: nothing to do.
+        #expect(try await CloudReceiver.fetch(f.tracks, from: store, into: root, freeSpace: 1 << 30).files == 0)
+    }
+
+    @Test func refusesSongsThatDoNotFit() async throws {
+        let f = try SyncFixture()
+        let store = try await backup(f, at: t0)
+        let root = try phone()
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let needed = f.tracks.reduce(0) { $0 + f.size($1.path) }
+        await #expect(throws: CloudFetchError.notEnoughSpace(needed: needed, available: 100)) {
+            try await CloudReceiver.fetch(f.tracks, from: store, into: root, freeSpace: 100)
+        }
+        #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("Music").path))
+    }
 }
