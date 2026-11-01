@@ -69,7 +69,7 @@ private struct OutputLine: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
-            if output.isUSB && volume < 0.99 {
+            if output.isWired && volume < 0.99 {
                 Text("Turn the iPhone's volume all the way up for bit-perfect output.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
