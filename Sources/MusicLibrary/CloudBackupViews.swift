@@ -98,7 +98,7 @@ struct ICloudSettings: View {
         switch scope {
         case .off: return "Nothing goes to iCloud."
         case .library: return library + ". Your music files stay on this Mac."
-        case .chosen: return library + ", plus the music you choose." + removed
+        case .chosen: return library + ", plus the music you choose (switching from Everything starts with all of it)." + removed
         case .everything: return library + ", plus every song's file." + removed
         }
     }
@@ -123,6 +123,7 @@ extension CloudBackupScope {
 struct ICloudStatus: View {
     let cloud: CloudBackupStore
     @Binding var confirmingReplace: Bool
+    @State private var confirmingDelete = false
 
     var body: some View {
         if cloud.isPublishing {
@@ -145,6 +146,23 @@ struct ICloudStatus: View {
         }
         if cloud.snapshotCount > 0 {
             LabeledContent("Database copies", value: "\(cloud.snapshotCount)")
+        }
+        if cloud.awaitingDeletion.files > 0 {
+            LabeledContent {
+                HStack {
+                    Text("\(cloud.awaitingDeletion.files.formatted()) \(cloud.awaitingDeletion.files == 1 ? "file" : "files"), \(ICloudSettings.bytes(cloud.awaitingDeletion.bytes))")
+                    Button("Delete Now…") { confirmingDelete = true }.disabled(cloud.isPublishing)
+                }
+            } label: {
+                Text("Waiting to be deleted")
+                Text("Music no longer backed up stays in iCloud for 30 days, in case you change your mind.")
+            }
+            .alert("Delete It from iCloud Now?", isPresented: $confirmingDelete) {
+                Button("Delete", role: .destructive) { cloud.deleteRemovedNow() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("What the backup no longer holds (\(ICloudSettings.bytes(cloud.awaitingDeletion.bytes))) is deleted from iCloud now instead of after 30 days, freeing that space. It can't be restored from the backup afterwards. Your Mac's own files aren't touched.")
+            }
         }
         if let error = cloud.uploads.error {
             Label(error, systemImage: "exclamationmark.icloud").foregroundStyle(.orange)

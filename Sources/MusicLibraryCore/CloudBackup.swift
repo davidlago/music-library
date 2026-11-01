@@ -303,11 +303,13 @@ public enum CloudBackup {
     /// Backs the library up (§5): a new snapshot, then the covers, photos and `music` files that changed (music evicted
     /// from the Mac once uploaded), then `backup.json` once the snapshot is in iCloud, then the removal list, purges
     /// and old snapshots. `music` is what the scope backs up (none for "Library and covers"). `replacingOther`
-    /// replaces a backup of another library, its snapshots included. Cancelling the task stops the music copy (what's
-    /// left is `remaining`) and leaves the rest of the run as it would be.
+    /// replaces a backup of another library, its snapshots included. `deletingRemovedNow` deletes every file the backup
+    /// no longer wants at once instead of after `CloudRemoval.keptFor` (Delete Now, to free iCloud space). Cancelling
+    /// the task stops the music copy (what's left is `remaining`) and leaves the rest of the run as it would be.
     public static func publish(database: Database, root: URL, store: CloudStore, identity: CloudBackupIdentity,
                                scope: CloudBackupScope, music: [Track] = [], scratch: URL, now: Date = Date(),
-                               replacingOther: Bool = false, limits: CloudUploadLimits = CloudUploadLimits()) async throws -> CloudBackupResult {
+                               replacingOther: Bool = false, deletingRemovedNow: Bool = false,
+                               limits: CloudUploadLimits = CloudUploadLimits()) async throws -> CloudBackupResult {
         guard let libraryID = database.libraryID() else { throw CloudBackupError.noLibraryID }
         var replacing = false
         if let existing = try manifest(in: store), existing.libraryID != libraryID {
@@ -384,14 +386,17 @@ public enum CloudBackup {
         }
         result.waiting = inFlight.count
 
-        // Deleted only after their 30 days; a file whose deletion fails stays listed.
-        var kept = plan.removals
-        for path in plan.purges {
+        // Deleted only after their 30 days (or all of them now); a file whose deletion fails stays listed.
+        var kept = deletingRemovedNow ? [] : plan.removals
+        let purges = deletingRemovedNow ? plan.purges + plan.removals.map(\.path) : plan.purges
+        for path in purges {
             do { try store.remove(path); result.purged += 1 } catch {
-                if let removal = removals.first(where: { $0.path == path }) { kept.append(removal) }
+                if let removal = plan.removals.first(where: { $0.path == path }) ?? removals.first(where: { $0.path == path }) {
+                    kept.append(removal)
+                }
             }
         }
-        result.removed = plan.removals.filter { old in !removals.contains { $0.path == old.path } }.count
+        result.removed = deletingRemovedNow ? 0 : plan.removals.filter { old in !removals.contains { $0.path == old.path } }.count
         if kept != removals { try store.write(try CloudRemoval.encode(kept.sorted { $0.path < $1.path }), to: CloudRemoval.path) }
 
         var snapshots: [Date: String] = [:]
@@ -402,6 +407,13 @@ public enum CloudBackup {
         // Music uploaded earlier (or by an earlier run) that's still on the Mac.
         for entry in entries where entry.isUploaded && entry.isLocal && CloudBackupPlan.isMusic(entry.path) { try? store.evict(entry.path) }
         return result
+    }
+
+    /// What's waiting to be deleted from the backup (`Removed.json`): files and bytes. Zero when there's no list.
+    public static func awaitingDeletion(in store: CloudStore) -> (files: Int, bytes: Int64) {
+        guard let data = (try? store.read(CloudRemoval.path, limit: CloudRemoval.sizeLimit)) ?? nil else { return (0, 0) }
+        let list = CloudRemoval.decode(data)
+        return (list.count, list.reduce(0) { $0 + $1.size })
     }
 
     /// About how much a backup puts in iCloud: the database (catalog included, so a little more), the covers and

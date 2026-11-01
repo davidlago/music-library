@@ -328,6 +328,25 @@ private final class SlowStore: CloudStore, @unchecked Sendable {
         #expect(try store.entries().filter { CloudBackupPlan.isMusic($0.path) }.map(\.path) == [f.tracks[0].path, f.tracks[2].path])
     }
 
+    @Test func deleteNowFreesTheSpaceWithoutWaiting() async throws {
+        let f = try SyncFixture()
+        let store = try FolderCloudStore(root: try TestSupport.tempDir())
+        let now = Date(timeIntervalSince1970: 1_793_456_712)
+        _ = try await CloudBackup.publish(database: f.db, root: f.root, store: store, identity: identity, scope: .everything,
+                                          music: f.tracks, scratch: try TestSupport.tempDir(), now: now, limits: quick)
+        // Down to one album: the other's song waits 30 days...
+        _ = try await CloudBackup.publish(database: f.db, root: f.root, store: store, identity: identity, scope: .chosen,
+                                          music: Array(f.tracks.prefix(2)), scratch: try TestSupport.tempDir(), now: now + 60, limits: quick)
+        #expect(CloudBackup.awaitingDeletion(in: store) == (1, f.size(f.tracks[2].path)))
+        // ...unless deleted now. What's still chosen stays, even when chosen again after it was listed.
+        let deleted = try await CloudBackup.publish(database: f.db, root: f.root, store: store, identity: identity, scope: .chosen,
+                                                    music: Array(f.tracks.prefix(2)), scratch: try TestSupport.tempDir(), now: now + 120,
+                                                    deletingRemovedNow: true, limits: quick)
+        #expect(deleted.purged == 1 && deleted.removed == 0)
+        #expect(try store.entries().filter { CloudBackupPlan.isMusic($0.path) }.map(\.path) == f.tracks.prefix(2).map(\.path))
+        #expect(CloudBackup.awaitingDeletion(in: store) == (0, 0))
+    }
+
     @Test func musicWaitsForICloudAndIsEvictedOnceUploaded() async throws {
         let f = try SyncFixture()
         let store = SlowStore(base: try FolderCloudStore(root: try TestSupport.tempDir()), delay: 3)

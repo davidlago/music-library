@@ -7,6 +7,15 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.30.1
+
+- Changed: switching the iCloud backup from **Everything** to **Library, covers and chosen music** starts the list with
+  your **Entire Digital Collection**, so nothing already in iCloud is let go until you take it out with **Remove from
+  iCloud**.
+- New: **Delete Now…** next to **Waiting to be deleted** (in **Settings ▸ iCloud** and on the iCloud page) deletes the
+  music the backup no longer holds from iCloud right away, instead of after 30 days, to free that space.
+  [Guide](https://github.com/davidlago/music-library/blob/main/docs/guide/icloud.md#whats-kept)
+
 ## 1.30.0
 
 - New: **iCloud backup.** **Settings ▸ iCloud** on the Mac backs up your library to your own iCloud: the library

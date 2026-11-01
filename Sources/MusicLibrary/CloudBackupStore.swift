@@ -57,6 +57,11 @@ final class CloudBackupStore {
             guard scope != oldValue else { return }
             stopCopying()
             problem = nil
+            // From Everything to chosen music with nothing chosen yet: start from everything, so nothing already in
+            // iCloud is let go until the user takes it out.
+            if oldValue == .everything, scope == .chosen, selection.isEmpty {
+                selection = SyncSelection(rules: [SyncSelection.Rule(item: .library, include: true)])
+            }
             if scope != .off { needsPublish = true; lastChange = .distantPast }
         }
     }
@@ -69,6 +74,12 @@ final class CloudBackupStore {
     private(set) var snapshotCount = 0
     /// Files the last publish didn't get to copy into iCloud (a first music backup spans many).
     private(set) var remaining = 0
+    /// What the backup no longer wants, kept in iCloud until 30 days have passed (or Delete Now).
+    struct Waiting: Equatable {
+        var files = 0
+        var bytes: Int64 = 0
+    }
+    private(set) var awaitingDeletion = Waiting()
     private(set) var estimate: Estimate?
     /// The chosen music: albums, artists, playlists and songs, each added or kept out (like the iPhone list).
     private(set) var selection: SyncSelection {
@@ -105,6 +116,7 @@ final class CloudBackupStore {
         didSet { UserDefaults.standard.set(needsPublish, forKey: Keys.pending) }
     }
     @ObservationIgnored private var replacingOther = false
+    @ObservationIgnored private var deletingRemovedNow = false
     /// The publish running now, cancelled when what's backed up changes (it stops copying music it no longer should).
     @ObservationIgnored private var running: Task<CloudBackupResult, Error>?
     /// The database's change count when last seen and when the last publish started, and which database it was.
@@ -210,6 +222,13 @@ final class CloudBackupStore {
 
     func backUpNow() { publish() }
 
+    /// Deletes from iCloud, now, everything the backup no longer wants (asked first), to free iCloud space without
+    /// waiting 30 days. It runs a backup, so what's no longer wanted is worked out from the choice as it is now.
+    func deleteRemovedNow() {
+        deletingRemovedNow = true
+        publish()
+    }
+
     // MARK: Inbox
 
     /// Applies what phones sent through iCloud (P6): plays and likes as a Wi-Fi sync does (each once, only from this
@@ -252,7 +271,7 @@ final class CloudBackupStore {
         isPublishing = true
         problem = nil
         let changes = context.database.changeCount
-        let scope = scope, identity = identity(), replacing = replacingOther, music = music()
+        let scope = scope, identity = identity(), replacing = replacingOther, music = music(), deleting = deletingRemovedNow
         let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("MusicLibrary-iCloud", isDirectory: true)
         let known = store
         Task {
@@ -267,13 +286,16 @@ final class CloudBackupStore {
             do {
                 let run = Task.detached(priority: .utility) {
                     try await CloudBackup.publish(database: context.database, root: context.root, store: store, identity: identity,
-                                                  scope: scope, music: music, scratch: scratch, replacingOther: replacing)
+                                                  scope: scope, music: music, scratch: scratch, replacingOther: replacing,
+                                                  deletingRemovedNow: deleting)
                 }
                 running = run
                 defer { running = nil }
                 let result = try await run.value
                 publishedChanges = changes
                 replacingOther = false
+                // Deletion happens once the snapshot is current; otherwise the next run tries again.
+                if result.isCurrent { deletingRemovedNow = false }
                 if result.isCurrent { lastBackup = result.snapshotAt }
                 remaining = result.remaining
                 needsPublish = !result.isCurrent || result.remaining > 0 || result.waiting > 0
@@ -315,6 +337,8 @@ final class CloudBackupStore {
         uploads = Uploads(files: waiting.count, bytes: waiting.reduce(0) { $0 + $1.size },
                           error: entries.lazy.compactMap(\.uploadError).first)
         snapshotCount = entries.filter { CloudSnapshots.date(ofPath: $0.path) != nil }.count
+        let listed = await Task.detached(priority: .utility) { CloudBackup.awaitingDeletion(in: store) }.value
+        awaitingDeletion = Waiting(files: listed.files, bytes: listed.bytes)
     }
 
     func refreshEstimate() async {
