@@ -7,6 +7,12 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- New: **AirPlay** on the Mac and the iPhone. The AirPlay button (next to the volume in the Mac's player and in Now
+  Playing, and under the controls in the iPhone's Now Playing) sends the music to AirPlay speakers and TVs; on the
+  iPhone you can pick several at once. The Mac sends only Music Library there, so other apps keep the Mac's output. On
+  AirPlay the output's sample rate is left alone, and on the iPhone every song plays without gaps.
+  [Guide](https://github.com/davidlago/music-library/blob/main/docs/guide/playback.md#airplay)
+
 ## 1.31.0
 
 - New: **offload music from the Mac to iCloud.** With your music backed up to iCloud, **Offload from This Mac** (in the

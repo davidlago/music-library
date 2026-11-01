@@ -34,6 +34,9 @@ final class Player {
     @ObservationIgnored var prefetch: (@MainActor (Track) -> Void)?
     /// The current song is being downloaded from iCloud before it plays.
     private(set) var isDownloading = false
+    /// The player's audio goes to an AirPlay device (picked with `AirPlayButton`), not the Mac's output: the
+    /// output device's format is left alone.
+    private(set) var isAirPlaying = false
     /// The queue ran out; pressing play again starts the last track over as a new play.
     @ObservationIgnored private var finishedQueue = false
     /// The current song was restored at launch and isn't loaded yet: playing it loads it from `currentTime`.
@@ -45,6 +48,10 @@ final class Player {
     @ObservationIgnored private let avPlayer = AVPlayer()
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var endObserver: NSObjectProtocol?
+    @ObservationIgnored private var airPlayObservation: NSKeyValueObservation?
+
+    /// The player `AirPlayButton`'s route picker routes.
+    var routedPlayer: AVPlayer { avPlayer }
 
     var currentTrack: Track? { queue.current }
 
@@ -62,7 +69,22 @@ final class Player {
                 if let d = self.avPlayer.currentItem?.duration.seconds, d.isFinite, d > 0 { self.duration = d }
             }
         }
+        airPlayObservation = avPlayer.observe(\.isExternalPlaybackActive, options: [.initial, .new]) { @Sendable [weak self] player, _ in
+            let active = player.isExternalPlaybackActive
+            Task { @MainActor in self?.airPlayChanged(active) }
+        }
         setupRemoteCommands()
+    }
+
+    /// Going to AirPlay puts the Mac's output device back as it was (the music no longer plays there); coming back,
+    /// the next song matches it again.
+    private func airPlayChanged(_ active: Bool) {
+        guard active != isAirPlaying else { return }
+        isAirPlaying = active
+        guard active else { return }
+        outputState = nil
+        let matcher = matcher
+        Task.detached { matcher.restoreAll() }
     }
 
     /// Plays `tracks` from `startAt`, replacing the queue. `source` names the list ("Next from …").
@@ -158,7 +180,7 @@ final class Player {
         currentTime = position
         duration = track.duration
         loadCover(for: track)
-        let matchRate = matchOutputRate
+        let matchRate = matchOutputRate && !isAirPlaying
         let matchBits = matchOutputBitDepth
         let matcher = matcher
         Task { [weak self] in

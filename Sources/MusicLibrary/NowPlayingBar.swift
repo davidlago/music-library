@@ -1,3 +1,4 @@
+import AVKit
 import MusicLibraryCore
 import SwiftUI
 
@@ -10,7 +11,9 @@ struct FormatCaption: View {
         if let format = player.currentTrack?.audioFormat {
             HStack(spacing: 0) {
                 Text(format.summary).foregroundStyle(.secondary)
-                if let out = player.outputState {
+                if player.isAirPlaying {
+                    Text(" → AirPlay").foregroundStyle(.secondary)
+                } else if let out = player.outputState {
                     Text(" → \(out.summary)")
                         .foregroundStyle(out.matched ? Color.secondary : Color.orange)
                         .help(out.matched ? "" : "Output device doesn't support \(AudioFormat.kHzString(out.sourceRate)) kHz; using \(AudioFormat.kHzString(out.sampleRate)) kHz")
@@ -79,6 +82,31 @@ struct VolumeControl: View {
             Slider(value: Binding(get: { Double(player.volume) }, set: { player.volume = Float($0) }), in: 0...1)
                 .frame(width: width)
         }
+    }
+}
+
+/// Picks where the player plays: this Mac or AirPlay speakers and TVs. It routes only this app's player, so the
+/// Mac's own output (and other apps) stay where they are.
+struct AirPlayButton: NSViewRepresentable {
+    let player: Player
+
+    func makeNSView(context: Context) -> AVRoutePickerView {
+        let view = AVRoutePickerView()
+        view.player = player.routedPlayer
+        view.isRoutePickerButtonBordered = false
+        view.setRoutePickerButtonColor(.secondaryLabelColor, for: .normal)
+        view.setRoutePickerButtonColor(.labelColor, for: .normalHighlighted)
+        view.setRoutePickerButtonColor(.controlAccentColor, for: .active)
+        view.setRoutePickerButtonColor(.controlAccentColor, for: .activeHighlighted)
+        view.toolTip = "AirPlay"
+        view.setAccessibilityLabel("AirPlay")
+        return view
+    }
+
+    func updateNSView(_ view: AVRoutePickerView, context: Context) {}
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: AVRoutePickerView, context: Context) -> CGSize? {
+        CGSize(width: 24, height: 24)
     }
 }
 
@@ -161,6 +189,7 @@ struct NowPlayingBar: View {
             TransportControls()
             ScrubberView()
             VolumeControl()
+            AirPlayButton(player: player)
             QueueButton()
         }
         .padding(.leading, 9).padding(.trailing, 20).padding(.vertical, 9)

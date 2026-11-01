@@ -5,21 +5,36 @@ import UIKit
 
 private struct ImageBox: @unchecked Sendable { let image: UIImage }
 
-/// Where audio is going: the route's first output and the rate the hardware runs at.
+/// Where audio is going: the route's output (every AirPlay speaker playing, by name) and the rate the hardware runs at.
 struct AudioOutput: Equatable, Sendable {
     var name: String
     var isUSB: Bool
+    /// AirPlay speakers or TVs: they run at their own rate, so the song's isn't asked for.
+    var isAirPlay: Bool
     var sampleRate: Double
 
+    /// "USB Audio · 96 kHz", "Living Room · AirPlay".
+    var summary: String { isAirPlay ? "\(name) · AirPlay" : "\(name) · \(AudioFormat.kHzString(sampleRate)) kHz" }
+
     nonisolated static func current(_ session: AVAudioSession) -> AudioOutput? {
-        guard let port = session.currentRoute.outputs.first else { return nil }
-        return AudioOutput(name: port.portName, isUSB: port.portType == .usbAudio, sampleRate: session.sampleRate)
+        let outputs = session.currentRoute.outputs
+        guard let port = outputs.first else { return nil }
+        if outputs.contains(where: { $0.portType == .airPlay }) {
+            let names = outputs.filter { $0.portType == .airPlay }.map(\.portName)
+            return AudioOutput(name: names.formatted(.list(type: .and)), isUSB: false, isAirPlay: true, sampleRate: session.sampleRate)
+        }
+        return AudioOutput(name: port.portName, isUSB: port.portType == .usbAudio, isAirPlay: false, sampleRate: session.sampleRate)
+    }
+
+    nonisolated static var isAirPlay: Bool {
+        AVAudioSession.sharedInstance().currentRoute.outputs.contains { $0.portType == .airPlay }
     }
 }
 
 /// Plays the queue in the background, with lock screen and Control Center controls. Modeled on the Mac app's
 /// `Player`: before each song the output is switched to the song's sample rate (so a USB DAC plays it at its own
-/// rate), and the next song is preloaded for a gapless transition when it has the same rate.
+/// rate), and the next song is preloaded for a gapless transition when it has the same rate. On AirPlay the rate is
+/// left alone and every next song is preloaded.
 @Observable
 final class PhonePlayer {
     private enum Keys {
@@ -223,7 +238,7 @@ final class PhonePlayer {
         currentTime = position
         duration = track.duration
         loadCover(for: track)
-        let rate = matchSampleRate ? track.audioFormat?.sampleRate : nil
+        let rate = matchSampleRate && !AudioOutput.isAirPlay ? track.audioFormat?.sampleRate : nil
         let reactivate = rate != nil && rate != requestedRate
         if let rate { requestedRate = rate }
         outputSettling = reactivate
@@ -277,7 +292,7 @@ final class PhonePlayer {
         preloaded = nil
         guard let currentItem, let current = currentTrack, let index = queue.index, index + 1 < queue.entries.count else { return }
         let next = queue.entries[index + 1]
-        guard !matchSampleRate || next.track.audioFormat?.sampleRate == current.audioFormat?.sampleRate,
+        guard !matchSampleRate || AudioOutput.isAirPlay || next.track.audioFormat?.sampleRate == current.audioFormat?.sampleRate,
               let url = fileURL(next.track) else { return }
         let item = Self.item(url)
         guard avPlayer.canInsert(item, after: currentItem) else { return }
@@ -341,10 +356,11 @@ final class PhonePlayer {
     /// Activates the playback session, at `rate` when given. With `reactivate` (the rate differs from the last
     /// song's) the session is deactivated first, so the new preferred rate applies on every route; nothing is
     /// playing at that point. The session's `sampleRate` isn't read here: it lags behind the hardware.
+    /// Long-form audio (music) is what AirPlay 2 plays buffered, on several speakers at once.
     nonisolated private static func configureSession(rate: Int?, reactivate: Bool) -> String? {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playback, mode: .default)
+            try session.setCategory(.playback, mode: .default, policy: .longFormAudio)
             if let rate, rate > 0 {
                 try session.setPreferredSampleRate(Double(rate))
                 if reactivate { try? session.setActive(false) }
@@ -422,19 +438,24 @@ final class PhonePlayer {
     }
 
     private func routeChanged(_ reason: AVAudioSession.RouteChangeReason?) {
+        let wasAirPlay = output?.isAirPlay == true
         output = AudioOutput.current(AVAudioSession.sharedInstance())
-        switch reason {
-        case .oldDeviceUnavailable:
-            // Unplugging the DAC (or headphones) pauses instead of switching to the speaker.
+        let airPlay = output?.isAirPlay == true
+        if reason == .oldDeviceUnavailable && !airPlay {
+            // Unplugging the DAC (or headphones), or losing the AirPlay speaker, pauses instead of switching to the speaker.
             pause()
-        case .newDeviceAvailable:
+            return
+        }
+        let restartsAtRate = isPlaying && matchSampleRate && currentTrack?.audioFormat?.sampleRate != nil
+        if airPlay != wasAirPlay {
+            // AirPlay ignores the song's rate: the next song can be preloaded now whatever its rate, and back on the
+            // iPhone's own output (or a DAC) the song restarts at its rate, as when a DAC is plugged in.
+            requestedRate = nil
+            if wasAirPlay && restartsAtRate { loadCurrent(at: currentTime) } else { prepareNext() }
+        } else if reason == .newDeviceAvailable && !airPlay && restartsAtRate {
             // A DAC plugged in mid-song starts at its own default rate: restart the song at the song's rate.
-            if isPlaying, matchSampleRate, currentTrack?.audioFormat?.sampleRate != nil {
-                requestedRate = nil
-                loadCurrent(at: currentTime)
-            }
-        default:
-            break
+            requestedRate = nil
+            loadCurrent(at: currentTime)
         }
     }
 

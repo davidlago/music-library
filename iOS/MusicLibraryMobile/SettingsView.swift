@@ -25,12 +25,12 @@ struct SettingsView: View {
                 Section {
                     Toggle("Match the DAC's sample rate", isOn: $player.matchSampleRate)
                     if let output = player.output {
-                        LabeledContent("Output", value: "\(output.name) · \(AudioFormat.kHzString(output.sampleRate)) kHz")
+                        LabeledContent("Output", value: output.summary)
                     }
                 } header: {
                     Text("Playback")
                 } footer: {
-                    Text("Before each song, the output switches to the song's sample rate, so a USB DAC plays it at its own rate. Songs at the same rate play without gaps. For bit-perfect output, keep the iPhone's volume at maximum and use the DAC's or amplifier's volume.")
+                    Text("Before each song, the output switches to the song's sample rate, so a USB DAC plays it at its own rate. Songs at the same rate play without gaps. For bit-perfect output, keep the iPhone's volume at maximum and use the DAC's or amplifier's volume. AirPlay speakers play at their own rate, so on AirPlay every song plays without gaps.")
                 }
                 if model.radioDJ.isEnabled {
                     RadioDJSettingsSection(dj: model.radioDJ)
