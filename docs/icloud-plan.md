@@ -3,7 +3,8 @@
 Status: **P0 done** (signing groundwork, §8; the portal is set up and a local build signed with the Developer ID
 profile reached the container on 2026-10-31), **P1 done** (the Mac backs up the library and covers, §5), **P2 done**
 (chosen music or everything, evicted from the Mac once uploaded, with the removal list and purging), **P3 done**
-(restore to a new folder or the database only, §7), P4–P7 to do. Nothing
+(restore to a new folder or the database only, §7), **P4 done** (the phone reads the library from iCloud, §6; checked
+on an iPhone on 2026-11-01), P5–P7 to do. Nothing
 here bumps
 `Database.schemaVersion` (14) or `SyncProtocol.version` (3): older phones and Macs keep reading every library and
 snapshot this produces.
@@ -149,8 +150,11 @@ to replace that backup, keep it and stop, or turn backup off. It never mixes two
 
 ## 6. iPhone: reading and downloading (`PhoneCloud`, iOS app)
 
-- **Finding the library:** while the app is active, an `NSMetadataQuery` watches `backup.json`. When it names a
-  snapshot newer than the phone's (D6), the phone:
+- **Finding the library** (`PhoneCloud`, `CloudReceiver`): when the app becomes active and every two minutes while it
+  is (polling `backup.json`, which is tiny, instead of an `NSMetadataQuery`), and not while a Wi-Fi sync runs. iOS
+  shows a file it hasn't downloaded as a hidden `.<name>.icloud` placeholder, which `FolderCloudStore.entries` reads
+  as the file (size from its property list). When `backup.json` names a snapshot newer than the phone's (D6), the
+  phone:
   1. downloads it;
   2. checks it with `Database(snapshotAt:)`;
   3. copies it to `Documents/Music Library/library.sqlite` through a partial and a rename;
@@ -158,7 +162,9 @@ to replace that backup, keep it and stop, or turn backup off. It never mixes two
   5. reloads.
 
   A phone with no library yet gets one this way, with no Mac and no pairing. The sample library goes away as it does
-  when Wi-Fi sync brings one.
+  when Wi-Fi sync brings one. A phone holding another library (its `library_id` differs) is left alone. Covers come
+  first and the database last, and the phone's copy is read again just before it's replaced, so a Wi-Fi sync landing
+  meanwhile is never undone.
 - **Download** (`AvailabilityBar`, Ready to Download, Download All), with the source picked as in D16:
   - It records the `SyncRequest` first, as today (D13).
   - When the Mac is reachable (`PhoneSync.macPeer`), the phone asks it to sync (`requestSync`), exactly as today.
@@ -315,7 +321,7 @@ As built in P0 (one-time portal steps: `docs/distribution.md` ▸ iCloud):
 3. **P2, Mac backup of music (done):** the chosen music (D15: the selection, the iCloud page, Add to iCloud, Include
    what's on my iPhone) and Everything; music files from clones, eviction, `Removed.json`, purge.
 4. **P3, Restore (done):** to a new folder, and the database only.
-5. **P4, phone reads from iCloud:** snapshot and covers, no pairing needed.
+5. **P4, phone reads from iCloud (done):** snapshot and covers, no pairing needed.
 6. **P5, phone downloads from iCloud:** Download, Download All, free-space check, background copy step.
 7. **P6, Inbox:** the phone's events and requests, applied by the Mac.
 8. **P7, docs and polish:** guide, privacy, README and site, CHANGELOG, App Store copy, screenshots. Settings ▸

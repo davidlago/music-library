@@ -63,6 +63,8 @@ final class PhoneSync {
     /// A sync is wanted (music asked for or removed) and starts when the Mac is found.
     @ObservationIgnored private var wantsSync = false
     @ObservationIgnored private var busy = false
+    /// A sync (or pairing) is running.
+    var isBusy: Bool { busy }
     @ObservationIgnored private let keychain = KeychainStore.app
     @ObservationIgnored private let identity: SyncIdentity
 

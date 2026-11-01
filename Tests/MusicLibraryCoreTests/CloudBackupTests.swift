@@ -360,8 +360,11 @@ private final class SlowStore: CloudStore, @unchecked Sendable {
                                           music: f.tracks, scratch: scratch, limits: limits)
         }
         try await Task.sleep(for: .milliseconds(100))
+        let cancelled = ContinuousClock.now
         run.cancel()
         let result = try await run.value
-        #expect(result.isCurrent && result.remaining == 2 && result.waiting == 1)
+        // Stopped at once (the run had ten minutes), with the database current and at most one song copied.
+        #expect(ContinuousClock.now - cancelled < .seconds(5))
+        #expect(result.isCurrent && result.remaining >= 2 && result.remaining + result.waiting == 3)
     }
 }

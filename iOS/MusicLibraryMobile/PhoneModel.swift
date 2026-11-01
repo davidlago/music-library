@@ -40,6 +40,8 @@ final class PhoneModel {
     /// Shared with the Mac app: the same scrobble rules, queue (kept while offline) and account handling.
     let scrobbler = Scrobbler(openURL: { UIApplication.shared.open($0) })
     let sync = PhoneSync()
+    /// The library from the Mac's iCloud backup, when the app has an iCloud container.
+    let cloud = PhoneCloud()
     let concerts = PhoneConcerts()
     /// The Radio DJ, on once the Mac has handed over a Claude API key.
     let radioDJ = PhoneRadioDJ()
@@ -134,6 +136,8 @@ final class PhoneModel {
         self.glance = glance
         watch = WatchLink(store: glance.store)
         sync.onLibraryChanged = { [weak self] in self?.reload() }
+        cloud.onLibraryChanged = { [weak self] in self?.reload() }
+        cloud.isSyncing = { [weak self] in self?.sync.isBusy ?? false }
         sync.pendingEvents = { [weak self] in
             // The sample library's changes never go to the Mac; the Mac's wait until your own library is back.
             guard let self, !isSample else { return ([], [], nil) }
