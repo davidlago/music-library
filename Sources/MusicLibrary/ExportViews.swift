@@ -615,5 +615,6 @@ struct AddToExportListButton: View {
         Button("Add to Export List", systemImage: "externaldrive.badge.plus") { model.addToExportList(items) }
             .disabled(items.allSatisfy(model.isInExportList))
         AddToIPhoneButton(items: items)
+        AddToICloudButton(items: items)
     }
 }

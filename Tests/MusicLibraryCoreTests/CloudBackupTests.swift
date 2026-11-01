@@ -79,9 +79,8 @@ import Testing
 @Suite struct CloudBackupPlanTests {
     @Test func uploadsWhatChangedBySizeOrDate() throws {
         let f = try SyncFixture()
-        let files = CloudBackupPlan.files(tracks: f.tracks, collectionCovers: [], root: f.root, scope: .library)
+        let files = CloudBackupPlan.files(tracks: f.tracks, collectionCovers: [], root: f.root)
         #expect(files.map(\.path) == ["Music/Artist/First (2000)/cover.jpg", "Music/Artist/Second (2000)/cover.jpg", "Artist Images/artist.jpg"])
-        #expect(CloudBackupPlan.files(tracks: f.tracks, collectionCovers: [], root: f.root, scope: .off).isEmpty)
 
         let first = CloudBackupPlan(files: files, entries: [])
         #expect(first.uploads == files)
@@ -94,7 +93,7 @@ import Testing
         try f.write("Music/Artist/First (2000)/cover.jpg", bytes: 55)
         let photo = f.root.appendingPathComponent("Artist Images/artist.jpg")
         try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(3600)], ofItemAtPath: photo.path)
-        let again = CloudBackupPlan(files: CloudBackupPlan.files(tracks: f.tracks, collectionCovers: [], root: f.root, scope: .library),
+        let again = CloudBackupPlan(files: CloudBackupPlan.files(tracks: f.tracks, collectionCovers: [], root: f.root),
                                     entries: try store.entries())
         #expect(again.uploads.map(\.path) == ["Music/Artist/First (2000)/cover.jpg", "Artist Images/artist.jpg"])
     }
@@ -108,7 +107,7 @@ import Testing
         try f.write("Music/Collection Covers/0f8fad5b-d9cb-469f-a165-70867728950e-0000abcd.jpg", bytes: 40)
         let covers = ["Music/Collection Covers/0f8fad5b-d9cb-469f-a165-70867728950e-0000abcd.jpg", "../secret.jpg", "/etc/hosts",
                       "Notes/x.jpg", "Music/Collection Covers/missing-0000abcd.jpg"]
-        let files = CloudBackupPlan.files(tracks: f.tracks, collectionCovers: covers, root: f.root, scope: .library)
+        let files = CloudBackupPlan.files(tracks: f.tracks, collectionCovers: covers, root: f.root)
         #expect(files.map(\.path) == ["Music/Artist/First (2000)/cover.jpg", "Music/Artist/Second (2000)/cover.jpg",
                                       covers[0], "Artist Images/artist.jpg"])
 
@@ -132,7 +131,37 @@ private struct OfflineStore: CloudStore {
     func write(_ data: Data, to path: String) throws { try base.write(data, to: path) }
     func read(_ path: String, limit: Int) throws -> Data? { try base.read(path, limit: limit) }
     func remove(_ path: String) throws { try base.remove(path) }
+    func isUploaded(_ path: String) -> Bool { false }
+    func evict(_ path: String) throws {}
     func waitUntilUploaded(_ path: String, timeout: Duration) async -> Bool { false }
+}
+
+/// A plain folder where iCloud uploads music only after being asked about it `delay` times (never, with nil), and
+/// evictions are recorded.
+private final class SlowStore: CloudStore, @unchecked Sendable {
+    let base: FolderCloudStore
+    let delay: Int?
+    private let lock = NSLock()
+    private var asked: [String: Int] = [:]
+    private var _evicted: [String] = []
+    var evicted: [String] { lock.withLock { _evicted } }
+
+    init(base: FolderCloudStore, delay: Int?) { self.base = base; self.delay = delay }
+    func entries() throws -> [CloudEntry] {
+        try base.entries().map { var e = $0; if CloudBackupPlan.isMusic(e.path) { e.isUploaded = delay != nil }; return e }
+    }
+    func upload(from source: URL, to path: String, modified: Date?) throws { try base.upload(from: source, to: path, modified: modified) }
+    func write(_ data: Data, to path: String) throws { try base.write(data, to: path) }
+    func read(_ path: String, limit: Int) throws -> Data? { try base.read(path, limit: limit) }
+    func remove(_ path: String) throws { try base.remove(path) }
+    func isUploaded(_ path: String) -> Bool {
+        guard CloudBackupPlan.isMusic(path) else { return true }
+        return lock.withLock {
+            asked[path, default: 0] += 1
+            return delay.map { asked[path]! > $0 } ?? false
+        }
+    }
+    func evict(_ path: String) throws { lock.withLock { _evicted.append(path) } }
 }
 
 @Suite struct CloudPublishTests {
@@ -216,5 +245,121 @@ private struct OfflineStore: CloudStore {
         let result = try await CloudBackup.publish(database: f.db, root: f.root, store: store, identity: identity, scope: .library,
                                                    scratch: try TestSupport.tempDir())
         #expect(try CloudBackup.manifest(in: store)?.current == result.snapshot)
+    }
+}
+
+@Suite struct CloudMusicBackupTests {
+    let identity = CloudBackupIdentity(macID: "mac-1", macName: "Studio Mac", appVersion: "1.30.0")
+    let quick = CloudUploadLimits(inFlightBytes: 1, runTime: .seconds(60), snapshotTimeout: .seconds(1), poll: .milliseconds(1))
+
+    @Test func musicComesAfterCoversAndPhotos() throws {
+        let f = try SyncFixture()
+        let files = CloudBackupPlan.files(tracks: f.tracks, collectionCovers: [], music: [f.tracks[2], f.tracks[0]], root: f.root)
+        #expect(files.map(\.path) == ["Music/Artist/First (2000)/cover.jpg", "Music/Artist/Second (2000)/cover.jpg", "Artist Images/artist.jpg",
+                                      f.tracks[2].path, f.tracks[0].path])
+        #expect(files.filter { CloudBackupPlan.isMusic($0.path) }.count == 2)
+        #expect(!CloudBackupPlan.isMusic("Music/Artist/First (2000)/cover.jpg") && !CloudBackupPlan.isMusic("Snapshots/x.flac"))
+    }
+
+    @Test func unwantedFilesAreListedThenPurgedAfter30Days() {
+        let now = Date(timeIntervalSince1970: 1_793_456_712)
+        let day: TimeInterval = 86400
+        let keep = CloudBackupFile(path: "Music/A/B (1)/cover.jpg", size: 5, modified: now)
+        let entries = [CloudEntry(path: keep.path, size: 5, modified: now),
+                       CloudEntry(path: "Music/A/B (1)/01 - New.flac", size: 10, modified: now),      // newly unwanted
+                       CloudEntry(path: "Music/A/B (1)/02 - Old.flac", size: 20, modified: now),      // listed 31 days ago
+                       CloudEntry(path: "Music/A/B (1)/03 - Back.flac", size: 30, modified: now),     // listed, wanted again
+                       CloudEntry(path: "Snapshots/2026-10-31T14-25-12Z.sqlite", size: 1, modified: now)]
+        let listed = [CloudRemoval(path: "Music/A/B (1)/02 - Old.flac", size: 20, removedAt: now - 31 * day),
+                      CloudRemoval(path: "Music/A/B (1)/03 - Back.flac", size: 30, removedAt: now - 2 * day),
+                      CloudRemoval(path: "Music/A/B (1)/04 - Gone.flac", size: 40, removedAt: now - 2 * day),   // no longer in iCloud
+                      CloudRemoval(path: "../../etc/passwd", size: 1, removedAt: now - 99 * day)]
+        let back = CloudBackupFile(path: "Music/A/B (1)/03 - Back.flac", size: 30, modified: now)
+        let plan = CloudBackupPlan(files: [keep, back], entries: entries, removals: listed, now: now)
+        #expect(plan.uploads.isEmpty)
+        #expect(plan.removals == [CloudRemoval(path: "Music/A/B (1)/01 - New.flac", size: 10, removedAt: now)])
+        #expect(plan.purges == ["Music/A/B (1)/02 - Old.flac"])
+
+        // A month later, the new one goes too.
+        let later = CloudBackupPlan(files: [keep, back], entries: entries.filter { !$0.path.contains("02 -") }, removals: plan.removals,
+                                    now: now + 30 * day)
+        #expect(later.purges == ["Music/A/B (1)/01 - New.flac"] && later.removals.isEmpty)
+    }
+
+    @Test func theRemovalListIsReadWithCare() throws {
+        #expect(CloudRemoval.decode(Data("garbage".utf8)).isEmpty)
+        #expect(CloudRemoval.decode(Data(repeating: 0x20, count: CloudRemoval.sizeLimit + 1)).isEmpty)
+        let now = Date(timeIntervalSince1970: 1_793_456_712)
+        let list = [CloudRemoval(path: "Music/A/x.flac", size: 1, removedAt: now), CloudRemoval(path: "/etc/hosts", size: 1, removedAt: now),
+                    CloudRemoval(path: "Notes/x.flac", size: 1, removedAt: now)]
+        #expect(CloudRemoval.decode(try CloudRemoval.encode(list)) == [list[0]])
+    }
+
+    @Test func switchingScopesListsThenPurgesMusic() async throws {
+        let f = try SyncFixture()
+        let store = try FolderCloudStore(root: try TestSupport.tempDir())
+        let now = Date(timeIntervalSince1970: 1_793_456_712)
+        let all = try await CloudBackup.publish(database: f.db, root: f.root, store: store, identity: identity, scope: .everything,
+                                                music: f.tracks, scratch: try TestSupport.tempDir(), now: now, limits: quick)
+        #expect(all.files == 6 && all.remaining == 0)
+        #expect(try store.entries().filter { CloudBackupPlan.isMusic($0.path) }.count == 3)
+        #expect(try CloudBackup.manifest(in: store)?.scope == "everything")
+
+        // Only one album chosen: the others' songs are listed, not deleted.
+        let chosen = try await CloudBackup.publish(database: f.db, root: f.root, store: store, identity: identity, scope: .chosen,
+                                                   music: [f.tracks[2]], scratch: try TestSupport.tempDir(), now: now + 60, limits: quick)
+        #expect(chosen.files == 0 && chosen.removed == 2 && chosen.purged == 0)
+        let listed = CloudRemoval.decode(try #require(try store.read(CloudRemoval.path, limit: 1 << 20)))
+        #expect(Set(listed.map(\.path)) == Set(f.tracks.prefix(2).map(\.path)))
+        #expect(try store.entries().filter { CloudBackupPlan.isMusic($0.path) }.count == 3)
+
+        // Picked again before the month is up: off the list.
+        let back = try await CloudBackup.publish(database: f.db, root: f.root, store: store, identity: identity, scope: .chosen,
+                                                 music: [f.tracks[0], f.tracks[2]], scratch: try TestSupport.tempDir(), now: now + 120, limits: quick)
+        #expect(back.files == 0)
+        #expect(CloudRemoval.decode(try store.read(CloudRemoval.path, limit: 1 << 20) ?? Data()).map(\.path) == [f.tracks[1].path])
+
+        // 31 days on, what's still unwanted is deleted, and "Library and covers" lists the rest.
+        let month = try await CloudBackup.publish(database: f.db, root: f.root, store: store, identity: identity, scope: .library,
+                                                  music: f.tracks, scratch: try TestSupport.tempDir(), now: now + 31 * 86400, limits: quick)
+        #expect(month.purged == 1 && month.removed == 2)
+        #expect(try store.entries().filter { CloudBackupPlan.isMusic($0.path) }.map(\.path) == [f.tracks[0].path, f.tracks[2].path])
+    }
+
+    @Test func musicWaitsForICloudAndIsEvictedOnceUploaded() async throws {
+        let f = try SyncFixture()
+        let store = SlowStore(base: try FolderCloudStore(root: try TestSupport.tempDir()), delay: 3)
+        let result = try await CloudBackup.publish(database: f.db, root: f.root, store: store, identity: identity, scope: .everything,
+                                                   music: f.tracks, scratch: try TestSupport.tempDir(), limits: quick)
+        #expect(result.isCurrent && result.remaining == 0 && result.waiting == 0 && result.files == 6)
+        #expect(Set(store.evicted) == Set(f.tracks.map(\.path)))
+        #expect(store.evicted.allSatisfy(CloudBackupPlan.isMusic))
+    }
+
+    @Test func aRunStopsCopyingWhenICloudFallsBehind() async throws {
+        let f = try SyncFixture()
+        let store = SlowStore(base: try FolderCloudStore(root: try TestSupport.tempDir()), delay: nil)
+        let limits = CloudUploadLimits(inFlightBytes: 1, runTime: .milliseconds(200), snapshotTimeout: .seconds(1), poll: .milliseconds(5))
+        let result = try await CloudBackup.publish(database: f.db, root: f.root, store: store, identity: identity, scope: .everything,
+                                                   music: f.tracks, scratch: try TestSupport.tempDir(), limits: limits)
+        // The database backup is current; one song is waiting for iCloud and the other two wait for the next run.
+        #expect(result.isCurrent && result.remaining == 2 && result.waiting == 1)
+        #expect(try CloudBackup.manifest(in: store.base)?.current == result.snapshot)
+        #expect(store.evicted.isEmpty)
+    }
+
+    @Test func cancellingStopsTheMusicCopy() async throws {
+        let f = try SyncFixture()
+        let store = SlowStore(base: try FolderCloudStore(root: try TestSupport.tempDir()), delay: nil)
+        let limits = CloudUploadLimits(inFlightBytes: 1, runTime: .seconds(600), snapshotTimeout: .seconds(1), poll: .milliseconds(5))
+        let identity = identity, scratch = try TestSupport.tempDir()
+        let run = Task {
+            try await CloudBackup.publish(database: f.db, root: f.root, store: store, identity: identity, scope: .everything,
+                                          music: f.tracks, scratch: scratch, limits: limits)
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        run.cancel()
+        let result = try await run.value
+        #expect(result.isCurrent && result.remaining == 2 && result.waiting == 1)
     }
 }

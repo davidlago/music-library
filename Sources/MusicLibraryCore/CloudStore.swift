@@ -9,9 +9,12 @@ public struct CloudEntry: Equatable, Sendable {
     public var isUploaded: Bool
     /// Why iCloud couldn't upload it, such as iCloud being full.
     public var uploadError: String?
+    /// Its data is on this device, not only in iCloud; always true in a plain folder.
+    public var isLocal: Bool
 
-    public init(path: String, size: Int64, modified: Date?, isUploaded: Bool = true, uploadError: String? = nil) {
+    public init(path: String, size: Int64, modified: Date?, isUploaded: Bool = true, uploadError: String? = nil, isLocal: Bool = true) {
         self.path = path; self.size = size; self.modified = modified; self.isUploaded = isUploaded; self.uploadError = uploadError
+        self.isLocal = isLocal
     }
 }
 
@@ -28,8 +31,23 @@ public protocol CloudStore: Sendable {
     /// A small file's contents (at most `limit` bytes), or nil when there's none.
     func read(_ path: String, limit: Int) throws -> Data?
     func remove(_ path: String) throws
+    /// Whether iCloud has uploaded the file (always, in a plain folder).
+    func isUploaded(_ path: String) -> Bool
+    /// Removes this device's copy of an uploaded file, keeping it in iCloud (nothing, in a plain folder).
+    func evict(_ path: String) throws
     /// Waits until iCloud has uploaded the file, up to `timeout`; true when it has.
     func waitUntilUploaded(_ path: String, timeout: Duration) async -> Bool
+}
+
+extension CloudStore {
+    public func waitUntilUploaded(_ path: String, timeout: Duration) async -> Bool {
+        let deadline = ContinuousClock.now + timeout
+        while !isUploaded(path) {
+            guard ContinuousClock.now < deadline else { return false }
+            try? await Task.sleep(for: .seconds(2))
+        }
+        return true
+    }
 }
 
 public enum CloudStoreError: Error, LocalizedError, Equatable {
@@ -64,7 +82,7 @@ public final class FolderCloudStore: CloudStore {
 
     public func entries() throws -> [CloudEntry] {
         let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey,
-                                      .ubiquitousItemIsUploadedKey, .ubiquitousItemUploadingErrorKey]
+                                      .ubiquitousItemIsUploadedKey, .ubiquitousItemUploadingErrorKey, .ubiquitousItemDownloadingStatusKey]
         let rootPath = root.standardizedFileURL.path
         var entries: [CloudEntry] = []
         guard let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles]) else { return [] }
@@ -75,7 +93,8 @@ public final class FolderCloudStore: CloudStore {
             entries.append(CloudEntry(path: String(path.dropFirst(rootPath.count + 1)), size: Int64(values.fileSize ?? 0),
                                       modified: values.contentModificationDate,
                                       isUploaded: !coordinated || values.ubiquitousItemIsUploaded != false,
-                                      uploadError: values.ubiquitousItemUploadingError?.localizedDescription))
+                                      uploadError: values.ubiquitousItemUploadingError?.localizedDescription,
+                                      isLocal: !coordinated || values.ubiquitousItemDownloadingStatus == .current))
         }
         return entries.sorted { $0.path < $1.path }
     }
@@ -114,16 +133,16 @@ public final class FolderCloudStore: CloudStore {
         }
     }
 
-    public func waitUntilUploaded(_ path: String, timeout: Duration) async -> Bool {
+    public func isUploaded(_ path: String) -> Bool {
         guard coordinated else { return true }
         guard var target = try? url(for: path) else { return false }
-        let deadline = ContinuousClock.now + timeout
-        while true {
-            target.removeAllCachedResourceValues()
-            if (try? target.resourceValues(forKeys: [.ubiquitousItemIsUploadedKey]))?.ubiquitousItemIsUploaded == true { return true }
-            guard ContinuousClock.now < deadline else { return false }
-            try? await Task.sleep(for: .seconds(2))
-        }
+        target.removeAllCachedResourceValues()
+        return (try? target.resourceValues(forKeys: [.ubiquitousItemIsUploadedKey]))?.ubiquitousItemIsUploaded == true
+    }
+
+    public func evict(_ path: String) throws {
+        guard coordinated else { return }
+        try FileManager.default.evictUbiquitousItem(at: try url(for: path))
     }
 
     /// Makes the file aside (in a replacement folder on the same volume, outside the backup) and renames it into place.

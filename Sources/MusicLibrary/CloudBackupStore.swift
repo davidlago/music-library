@@ -1,9 +1,10 @@
 import Foundation
 import MusicLibraryCore
 
-/// The iCloud backup (`docs/icloud-plan.md` §5): what to back up (user defaults `iCloudBackupScope`), when (two
-/// minutes after the library last changed, at most every 15 minutes, again after a publish that didn't finish, and
-/// Back Up Now), and its status. Hidden in builds without an iCloud container (`isAvailable`).
+/// The iCloud backup (`docs/icloud-plan.md` §5): what to back up (user defaults `iCloudBackupScope`; with "chosen
+/// music", the list in `iCloudBackupSelection` and `iCloudBackupIncludesIPhone`, D15), when (two minutes after the
+/// library last changed, at most every 15 minutes, again after a publish that didn't finish, and Back Up Now), and its
+/// status. Hidden in builds without an iCloud container (`isAvailable`).
 @MainActor @Observable
 final class CloudBackupStore {
     private enum Keys {
@@ -11,6 +12,27 @@ final class CloudBackupStore {
         static let lastBackup = "iCloudLastBackup"
         /// The last publish failed or didn't finish, so one runs soon after launch.
         static let pending = "iCloudBackupPending"
+        static let selection = "iCloudBackupSelection"
+        static let includesIPhone = "iCloudBackupIncludesIPhone"
+    }
+
+    /// About how much each scope puts in iCloud.
+    struct Estimate: Equatable {
+        var library: Int64
+        var chosenMusic: Int64
+        var allMusic: Int64
+        /// What the iPhone list puts on the paired phones, whether or not it's included.
+        var iPhoneSongs: Int
+        var iPhoneMusic: Int64
+
+        func bytes(_ scope: CloudBackupScope) -> Int64 {
+            switch scope {
+            case .off: 0
+            case .library: library
+            case .chosen: library + chosenMusic
+            case .everything: library + allMusic
+            }
+        }
     }
 
     enum Problem: Equatable {
@@ -33,6 +55,7 @@ final class CloudBackupStore {
         didSet {
             UserDefaults.standard.set(scope.rawValue, forKey: Keys.scope)
             guard scope != oldValue else { return }
+            stopCopying()
             problem = nil
             if scope != .off { needsPublish = true; lastChange = .distantPast }
         }
@@ -44,11 +67,31 @@ final class CloudBackupStore {
     private(set) var problem: Problem?
     private(set) var uploads = Uploads()
     private(set) var snapshotCount = 0
-    /// About how much "Library and covers" takes in iCloud.
-    private(set) var estimate: Int64?
+    /// Files the last publish didn't get to copy into iCloud (a first music backup spans many).
+    private(set) var remaining = 0
+    private(set) var estimate: Estimate?
+    /// The chosen music: albums, artists, playlists and songs, each added or kept out (like the iPhone list).
+    private(set) var selection: SyncSelection {
+        didSet {
+            UserDefaults.standard.set(try? JSONEncoder().encode(selection), forKey: Keys.selection)
+            if scope == .chosen { stopCopying(); filesChanged() }
+        }
+    }
+    /// With "chosen music", also what's picked for the paired iPhones, so the phone can download it from iCloud.
+    var includesIPhone: Bool {
+        didSet {
+            UserDefaults.standard.set(includesIPhone, forKey: Keys.includesIPhone)
+            if scope == .chosen { stopCopying(); filesChanged() }
+        }
+    }
 
     /// The open library; nil while none is.
     @ObservationIgnored var context: () -> (root: URL, database: Database)? = { nil }
+    /// An item's songs as they are now, every song in the library, and what the iPhone list puts on the paired phones
+    /// (none without one).
+    @ObservationIgnored var tracks: (ExportItem) -> [Track] = { _ in [] }
+    @ObservationIgnored var allTracks: () -> [Track] = { [] }
+    @ObservationIgnored var iPhoneTracks: () -> [Track] = { [] }
     @ObservationIgnored var identity: () -> CloudBackupIdentity = { CloudBackupIdentity(macID: "", macName: "Mac", appVersion: AppInfo.version) }
     @ObservationIgnored private var store: FolderCloudStore?
     @ObservationIgnored private var timer: Task<Void, Never>?
@@ -56,6 +99,8 @@ final class CloudBackupStore {
         didSet { UserDefaults.standard.set(needsPublish, forKey: Keys.pending) }
     }
     @ObservationIgnored private var replacingOther = false
+    /// The publish running now, cancelled when what's backed up changes (it stops copying music it no longer should).
+    @ObservationIgnored private var running: Task<CloudBackupResult, Error>?
     /// The database's change count when last seen and when the last publish started, and which database it was.
     @ObservationIgnored private var seenChanges = 0
     @ObservationIgnored private var publishedChanges = 0
@@ -71,6 +116,54 @@ final class CloudBackupStore {
         scope = defaults.string(forKey: Keys.scope).flatMap(CloudBackupScope.init(rawValue:)) ?? .off
         lastBackup = defaults.object(forKey: Keys.lastBackup) as? Date
         needsPublish = defaults.bool(forKey: Keys.pending)
+        selection = defaults.data(forKey: Keys.selection).flatMap { try? JSONDecoder().decode(SyncSelection.self, from: $0) } ?? SyncSelection()
+        // Off unless asked for: "chosen music" means what you chose, and the iPhone's list can be most of the library.
+        includesIPhone = defaults.bool(forKey: Keys.includesIPhone)
+    }
+
+    // MARK: Chosen music
+
+    /// Stops the music a running publish is copying; the next one (soon, since something changed) backs up the new
+    /// choice and lists what's no longer wanted for removal.
+    private func stopCopying() { running?.cancel() }
+
+    /// The iPhone's songs, as rules before the list's own, so a song kept out of iCloud stays out.
+    private var implicit: [ExportItem] { includesIPhone ? iPhoneTracks().map { .track($0.id) } : [] }
+
+    /// The songs "chosen music" backs up, each once.
+    func chosenTracks() -> [Track] { selection.resolve(tracks, implicit: implicit) }
+
+    /// The songs the scope backs up.
+    func music() -> [Track] {
+        switch scope {
+        case .off, .library: []
+        case .chosen: chosenTracks()
+        case .everything: allTracks()
+        }
+    }
+
+    func add(_ items: [ExportItem]) {
+        let implicit = implicit
+        for item in items { selection.apply(item, include: true, tracks: { Set(self.tracks($0).map(\.id)) }, implicit: implicit) }
+    }
+
+    /// Keeps the items' songs out of iCloud, even where an artist, playlist or the iPhone puts them in.
+    func keepOut(_ items: [ExportItem]) {
+        let implicit = implicit
+        for item in items { selection.apply(item, include: false, tracks: { Set(self.tracks($0).map(\.id)) }, implicit: implicit) }
+    }
+
+    /// Deletes rules from the list (a kept-out one deleted puts its songs back).
+    func remove(_ rules: Set<SyncSelection.Rule>) { selection.rules.removeAll { rules.contains($0) } }
+
+    func contains(_ item: ExportItem) -> Bool { selection.contains(item, tracks: tracks, implicit: implicit) }
+
+    /// Drops albums, artists and songs that left the library. Only with a library loaded.
+    func dropMissing() {
+        guard !allTracks().isEmpty else { return }
+        var pruned = selection
+        pruned.dropMissing(tracks: { Set(self.tracks($0).map(\.id)) }, implicit: implicit)
+        if pruned != selection { selection = pruned }
     }
 
     /// Starts watching the library for changes (every 30 s; the database counts its own).
@@ -121,7 +214,7 @@ final class CloudBackupStore {
         isPublishing = true
         problem = nil
         let changes = context.database.changeCount
-        let scope = scope, identity = identity(), replacing = replacingOther
+        let scope = scope, identity = identity(), replacing = replacingOther, music = music()
         let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("MusicLibrary-iCloud", isDirectory: true)
         let known = store
         Task {
@@ -134,14 +227,18 @@ final class CloudBackupStore {
             }
             self.store = store
             do {
-                let result = try await Task.detached(priority: .utility) {
+                let run = Task.detached(priority: .utility) {
                     try await CloudBackup.publish(database: context.database, root: context.root, store: store, identity: identity,
-                                                  scope: scope, scratch: scratch, replacingOther: replacing)
-                }.value
+                                                  scope: scope, music: music, scratch: scratch, replacingOther: replacing)
+                }
+                running = run
+                defer { running = nil }
+                let result = try await run.value
                 publishedChanges = changes
                 replacingOther = false
                 if result.isCurrent { lastBackup = result.snapshotAt }
-                needsPublish = !result.isCurrent
+                remaining = result.remaining
+                needsPublish = !result.isCurrent || result.remaining > 0 || result.waiting > 0
             } catch CloudBackupError.otherLibrary(let mac, let date) {
                 problem = .otherLibrary(macName: mac, snapshotAt: date)
             } catch {
@@ -176,11 +273,13 @@ final class CloudBackupStore {
 
     func refreshEstimate() async {
         guard let context = context() else { return }
+        let chosen = chosenTracks(), all = allTracks(), phone = iPhoneTracks()
         estimate = await Task.detached(priority: .utility) {
-            CloudBackup.estimatedSize(database: context.database, root: context.root, scope: .library)
+            func size(_ tracks: [Track]) -> Int64 {
+                tracks.reduce(0) { $0 + ($1.resolvedFileURL(root: context.root).flatMap(LibraryExporter.size(of:)) ?? 0) }
+            }
+            return Estimate(library: CloudBackup.estimatedSize(database: context.database, root: context.root),
+                            chosenMusic: size(chosen), allMusic: size(all), iPhoneSongs: phone.count, iPhoneMusic: size(phone))
         }.value
     }
-
-    /// The backup's folder in the container, for Show in Finder.
-    var folder: URL? { store?.root }
 }
