@@ -1,7 +1,7 @@
 # iCloud backup and iPhone downloads: plan
 
-Status: **P0 done** (signing groundwork, §8; nothing uses iCloud yet; the portal is set up and a local build signed
-with the Developer ID profile reached the container on 2026-10-31), P1–P7 to do. Nothing here bumps
+Status: **P0 done** (signing groundwork, §8; the portal is set up and a local build signed with the Developer ID
+profile reached the container on 2026-10-31), **P1 done** (the Mac backs up the library and covers, §5), P2–P7 to do. Nothing here bumps
 `Database.schemaVersion` (14) or `SyncProtocol.version` (3): older phones and Macs keep reading every library and
 snapshot this produces.
 
@@ -39,11 +39,12 @@ Non-goals (for now):
 | D7 | Detecting changed files | Size **and** modification date. The copy in iCloud gets the source's modification date. | `SyncPlan` compares sizes only. A retag that fits in the tags' padding keeps the size, and a backup must not miss it. |
 | D8 | Deletions | A file removed from the library moves to `Removed.json` with its date and is deleted from iCloud **30 days** later. Restore can bring it back until then. | Without a delay, a mirror deletes your backup when you make a mistake. |
 | D9 | Database history | Keep the last 10 snapshots, one a day for 14 days and one a week for 8 weeks. | Snapshots are tens of MB, so the history is cheap and covers slow-burning mistakes. |
-| D10 | Scope | A setting with three choices: **Off**, **Library and covers** (database, covers, artist photos: small), **Everything** (plus music files). It's off by default. Turning it on shows an estimate of the size. | A lossless library can need a 2 TB iCloud plan, but the database and covers alone are a real backup of the collection. |
+| D10 | Scope | A setting with four choices: **Off**, **Library and covers** (database, covers, artist photos: small), **Library, covers and chosen music** (plus the music files of what you pick, D15), **Everything** (plus every music file). It's off by default. Turning it on, and changing what's chosen, shows an estimate of the size. | A lossless library can need a 2 TB iCloud plan, but the database and covers alone are a real backup of the collection, and the albums you care most about (or want on the phone without the Mac) are usually a fraction of it. |
 | D11 | Mac disk use | Upload each file from an APFS clone (`clonefile`, then `FileManager.setUbiquitous(_:itemAt:destinationURL:)`), then evict the container's copy (`evictUbiquitousItem`) once `ubiquitousItemIsUploaded` is true. | The music doesn't take twice the space on the Mac. |
 | D12 | Phone storage | Downloaded files are **copied** into `Documents/Music Library` (through a hidden partial and a rename, as `SyncReceiver` does), then the container's copy is evicted. | `presentIDs`, playback, offline listening and Remove work as they do now. iOS may remove files in the container whenever it's low on space, which would make songs vanish. |
 | D13 | Phone downloads and the Mac's selection | A download from iCloud still records a `SyncRequest`. The request reaches the Mac through `Inbox/` (§6) or the next Wi-Fi sync, and is cleared as it is today. | Wi-Fi sync makes the phone match the Mac's selection, so a download the Mac never heard about would be deleted on the next sync. |
 | D14 | Trust | Everything read from the container is untrusted, as with sync: paths checked by `SyncPlan.isManaged` and resolved with `LibraryPath.resolve`, snapshots opened with `Database(snapshotAt:)` (read-only, refuses a newer schema), and Inbox files decoded strictly with size limits. | Another version of the app, a corrupted download or a bug on one device must not be able to write outside the library or crash the other. |
+| D15 | Choosing music | The chosen music is a `SyncSelection` of its own (include/exclude rules over `ExportItem`s: albums, artists, playlists, songs; the last rule covering a song decides), kept in the Mac's user defaults (`iCloudBackupSelection`) apart from the iPhone's and the Export List. Artists and playlists resolve when each backup runs, so an artist's new album is backed up without picking it. An option, **Include what's on my iPhone** (on by default), adds every paired phone's resolved selection as implicit include rules (`SyncSelection.resolve(_:implicit:)`), so what the phone may download from iCloud (P5) is there; an exclude rule the user added still wins. Every song's database row, play and like is in the snapshot whatever is chosen. | It's the same model the iPhone list already uses and tests, with the same menus. A song taken off the list is a removal like any other (D8), so a mistaken click doesn't delete the backup of an album. |
 
 ## 3. Container layout
 
@@ -51,7 +52,7 @@ Non-goals (for now):
 <container>/Music Library/
   backup.json                          what's here (below); replaced atomically
   Snapshots/2026-10-31T14-05-12Z.sqlite
-  Music/<Artist>/<Album> (<Year>)/…     only with "Everything", plus every cover.jpg
+  Music/<Artist>/<Album> (<Year>)/…     the chosen music (or all of it), plus every cover.jpg
   Music/Collection Covers/…
   Artist Images/…
   Removed.json                         [{path, size, removedAt}], purged after 30 days
@@ -67,7 +68,7 @@ Non-goals (for now):
   "macID": "…", "macName": "Dave's MacBook Pro",
   "appVersion": "1.30.0",
   "schemaVersion": 14,
-  "scope": "everything",       // or "library"
+  "scope": "chosen",           // "library", "chosen" or "everything"
   "current": "Snapshots/2026-10-31T14-05-12Z.sqlite",
   "snapshotAt": "2026-10-31T14:05:12Z",
   "tracks": 12873, "musicBytes": 412345678901
@@ -87,15 +88,17 @@ to replace that backup, keep it and stop, or turn backup off. It never mixes two
   - The implementations are `ICloudStore` (Mac and iPhone: `NSMetadataQuery` on `NSMetadataQueryUbiquitousDataScope`,
     `NSFileCoordinator`, `setUbiquitous`, `startDownloadingUbiquitousItem`, `evictUbiquitousItem`) and
     `FolderCloudStore` (a plain folder, for tests and for restoring from a copied backup).
-- `CloudBackupPlan` (pure, like `SyncPlan`): from the library's tracks, collection covers, artist photos, the scope,
-  the store's entries, `Removed.json` and `now`, it works out:
+- `CloudBackupPlan` (pure, like `SyncPlan`): from the library's tracks, collection covers, artist photos, the scope
+  (with "chosen music", the selection's tracks, resolved by the caller as `SyncPlan`'s are), the store's entries,
+  `Removed.json` and `now`, it works out:
   - uploads, in order: database snapshot first, then covers, artist photos and music;
   - files that move to `Removed.json`;
   - files to purge (removed more than 30 days ago);
   - untrusted entries to ignore, meaning paths that aren't managed.
 
-  Files in the container that the library doesn't have and `Removed.json` doesn't list (left by a crash, or from
-  "Everything" after switching to "Library and covers") are added to `Removed.json` rather than deleted at once.
+  Files in the container that the library doesn't have, or that the scope no longer wants, and that `Removed.json`
+  doesn't list (left by a crash, an album taken off the chosen music, or switching to a smaller scope) are added to
+  `Removed.json` rather than deleted at once. A file that's wanted again is taken off the list.
 - `CloudSnapshots`: names, retention (D9), and `Database.writeBackupSnapshot(to:scratch:snapshotAt:)` next to
   `writeSyncSnapshot` (both gain the `snapshot_at` stamp, D6).
 - `CloudInbox`: the batch format (§6), with encoding, and decoding with limits.
@@ -120,7 +123,15 @@ to replace that backup, keep it and stop, or turn backup off. It never mixes two
   `Database.applySyncEvents` (which already applies each event once and checks the library ID), and its requests
   are applied to that phone's selection. Requests count only for a paired phone; events count from any phone that
   has this library. Then the batch file is deleted and a publish is scheduled.
-- Nothing is uploaded until the collection is built, for the same reason as `SyncContext.collectionReady`.
+- **Which changes count:** `Database.changeCount`, every row written through the app's connection except the
+  downloaded library catalog's (a cache the backup leaves out), checked every 30 seconds, plus files written without
+  a database change (an album's new cover). Nothing waits for the collection to be built: unlike Wi-Fi sync's
+  selection, a backup doesn't depend on it.
+- **Upload state:** the Mac lists the container's folder with iCloud's resource values (`ubiquitousItemIsUploaded`,
+  `ubiquitousItemUploadingError`). Since macOS 14, a file Optimize Mac Storage evicted keeps its name, size and date
+  there, so no `NSMetadataQuery` is needed on the Mac. When iCloud hasn't uploaded the snapshot five minutes after it
+  was written, `backup.json` stays on the previous one and the publish counts as unfinished, to be tried again.
+- In P1, files that leave the library stay in iCloud: `Removed.json` and purging come with P2.
 
 ## 6. iPhone: reading and downloading (`PhoneCloud`, iOS app)
 
@@ -137,8 +148,9 @@ to replace that backup, keep it and stop, or turn backup off. It never mixes two
 - **Download** (`AvailabilityBar`, Ready to Download, Download All):
   - When a song's file is in iCloud, the phone downloads it, copies it in and evicts it (D12), and records the
     `SyncRequest` (D13).
-  - When it isn't in iCloud (the scope is "Library and covers", or it's still uploading), the request waits for the
-    Mac as it does today, and the button says so.
+  - When it isn't in iCloud (the scope is "Library and covers", the song isn't among the chosen music, or it's still
+    uploading), the request waits for the Mac as it does today, and the button says so. The request reaching the Mac
+    (P6) adds the song to that phone's selection, so with Include what's on my iPhone it goes to iCloud next.
   - The phone refuses a download that doesn't fit, using the sizes from iCloud's metadata, as it refuses a Wi-Fi
     sync.
   - Progress shows per album. iCloud keeps downloading while the app is in the background, and the copy step runs
@@ -211,10 +223,15 @@ As built in P0 (one-time portal steps: `docs/distribution.md` ▸ iCloud):
 
 - **Settings ▸ iCloud:**
   - the scope (D10), with the estimated size;
+  - with "chosen music": Include what's on my iPhone, and a link to the iCloud page;
   - status: last backup, what's left to upload, errors;
   - Back Up Now;
   - Restore…;
   - Snapshots, a list with Reveal and Restore.
+- **iCloud page** (sidebar, Devices section, shown while the scope is "chosen music"): the chosen albums, artists,
+  playlists and songs, like the iPhone page, with each one's size and whether it's uploaded, the total, and what the
+  iPhone option adds. Albums, artists, playlists and songs get **Add to iCloud** / **Remove from iCloud** in their
+  context menus, next to Add to iPhone (`AddToExportListButton`).
 - The iPhone page shows each phone's last Inbox batch next to its last Wi-Fi sync.
 - The first time the scope is turned on, a sheet explains what goes to iCloud, the size, and that the Mac's music
   stays where it is.
@@ -235,6 +252,8 @@ As built in P0 (one-time portal steps: `docs/distribution.md` ▸ iCloud):
   - a removed track goes to `Removed.json`, a purge after 30 days, and a track that comes back is taken off the
     list;
   - "Library and covers" leaves out music;
+  - "chosen music" uploads the selection's songs (an artist's new album included) and the phones' with Include what's
+    on my iPhone, an exclude rule wins over a phone's, and a song taken off the list goes to `Removed.json`;
   - untrusted paths (`..`, absolute paths, symlinks, outside the managed folders) are ignored.
 - `CloudSnapshotTests`:
   - `snapshot_at` stamped in the copy and not in the live database;
@@ -266,14 +285,17 @@ As built in P0 (one-time portal steps: `docs/distribution.md` ▸ iCloud):
 1. **P0, signing groundwork (done):** profile builds, entitlements, `build-app.sh` and CI, the iPhone entitlements
    split, the defaults import, `CloudContainer`. The feature is still hidden. Still to check once the portal is set
    up: that a signed build reaches the container on both devices (`docs/distribution.md` ▸ iCloud).
-2. **P1, Mac backup of the library and covers:** the snapshot stamp (Wi-Fi snapshots too), `CloudStore`,
+2. **P1, Mac backup of the library and covers (done):** the snapshot stamp (Wi-Fi snapshots too), `CloudStore`,
    `CloudBackupPlan`, snapshots and `backup.json`, Settings ▸ iCloud, status.
-3. **P2, Mac backup of everything:** music files from clones, eviction, `Removed.json`, purge.
+3. **P2, Mac backup of music:** the chosen music (D15: the selection, the iCloud page, Add to iCloud, Include
+   what's on my iPhone) and Everything; music files from clones, eviction, `Removed.json`, purge.
 4. **P3, Restore:** to a new folder, and the database only.
 5. **P4, phone reads from iCloud:** snapshot and covers, no pairing needed.
 6. **P5, phone downloads from iCloud:** Download, Download All, free-space check, background copy step.
 7. **P6, Inbox:** the phone's events and requests, applied by the Mac.
-8. **P7, docs and polish:** guide, privacy, README and site, CHANGELOG, App Store copy, screenshots.
+8. **P7, docs and polish:** guide, privacy, README and site, CHANGELOG, App Store copy, screenshots. Settings ▸
+   iCloud shows only in iCloud builds, and releases aren't until `MAC_PROVISIONING_PROFILE` is set, so the CHANGELOG
+   entry and guide page for the Mac backup go in the release that first sets it, at the latest.
 
 P1 to P3 are useful on their own as a Mac backup. P4 and P5 need P1 (and P2 for music). P6 can follow P4 or come
 in parallel with P5.

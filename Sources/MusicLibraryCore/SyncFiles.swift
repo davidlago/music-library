@@ -77,20 +77,45 @@ public struct SyncPlan: Equatable, Sendable {
 }
 
 extension Database {
+    /// The `library_meta` key of the copies made for the phone and iCloud (never set in the live database): when the
+    /// copy was made, ISO 8601 by the Mac's clock, so a phone that gets copies both ways keeps the newest.
+    static let snapshotAtKey = "snapshot_at"
+
     /// A compact copy of the library database for the phone, without the downloaded library catalog (Mac only,
-    /// and often the biggest part). `scratch` is a folder for the intermediate copy.
-    public func writeSyncSnapshot(to target: URL, scratch: URL) throws {
+    /// and often the biggest part) or the Discogs links. `scratch` is a folder for the intermediate copy.
+    public func writeSyncSnapshot(to target: URL, scratch: URL, snapshotAt: Date = Date()) throws {
+        try writeSnapshot(to: target, scratch: scratch, snapshotAt: snapshotAt,
+                          emptying: ["catalog_items", "catalog_info", "catalog_previews", "discogs_sync"])
+    }
+
+    /// A copy for the iCloud backup: like the phone's, but keeping the Discogs links, since without them the next
+    /// Discogs sync after a restore would add every copy again.
+    public func writeBackupSnapshot(to target: URL, scratch: URL, snapshotAt: Date) throws {
+        try writeSnapshot(to: target, scratch: scratch, snapshotAt: snapshotAt,
+                          emptying: ["catalog_items", "catalog_info", "catalog_previews"])
+    }
+
+    private func writeSnapshot(to target: URL, scratch: URL, snapshotAt: Date, emptying tables: [String]) throws {
         let fm = FileManager.default
         try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
-        let full = scratch.appendingPathComponent("sync-full-\(UUID().uuidString).sqlite")
+        let full = scratch.appendingPathComponent("snapshot-full-\(UUID().uuidString).sqlite")
         defer { for suffix in ["", "-wal", "-shm"] { try? fm.removeItem(atPath: full.path + suffix) } }
         try vacuum(into: full.path)
         do {
             let copy = try Database(path: full.path)
-            for table in ["catalog_items", "catalog_info", "catalog_previews", "discogs_sync"] { try copy.exec("DELETE FROM \(table)") }
+            for table in tables { try copy.exec("DELETE FROM \(table)") }
+            try copy.exec("INSERT OR REPLACE INTO library_meta(key,value) VALUES(?,?)",
+                          [.text(Self.snapshotAtKey), .text(snapshotAt.formatted(.iso8601))])
             try? fm.removeItem(at: target)
             try copy.vacuum(into: target.path)
         }
+    }
+
+    /// When this copy was made (`writeSyncSnapshot`, `writeBackupSnapshot`); nil for the live database and for copies
+    /// older Macs made, which count as older than any stamped one.
+    public func snapshotDate() -> Date? {
+        let rows = (try? query("SELECT value FROM library_meta WHERE key=?", [.text(Self.snapshotAtKey)]) { $0.string(0) }) ?? []
+        return rows.first.flatMap { $0 }.flatMap { try? Date($0, strategy: .iso8601) }
     }
 }
 
