@@ -282,10 +282,10 @@ public struct CloudUploadLimits: Sendable {
 
 public enum CloudBackup {
     /// The files a backup can hold: the library's managed folders (`Music`, `Artist Images`), the snapshots,
-    /// `backup.json` and `Removed.json`.
+    /// `backup.json`, `Removed.json` and the phones' inbox batches.
     public static func isBackupPath(_ path: String) -> Bool {
         path == CloudBackupManifest.path || path == CloudRemoval.path || CloudSnapshots.date(ofPath: path) != nil
-            || SyncPlan.isManaged(path)
+            || SyncPlan.isManaged(path) || CloudInbox.parse(path) != nil
     }
 
     /// The backup's `backup.json`, or nil when there's none or it can't be read (it's then replaced).

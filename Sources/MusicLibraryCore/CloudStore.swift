@@ -23,6 +23,8 @@ public struct CloudEntry: Equatable, Sendable {
 public protocol CloudStore: Sendable {
     /// Every file, leaving out hidden ones.
     func entries() throws -> [CloudEntry]
+    /// The files in one folder of the backup and the folders inside it (paths still relative to the backup).
+    func entries(under folder: String) throws -> [CloudEntry]
     /// Copies `source` (an APFS clone where it can) to `path`, replacing what's there, with `modified` as its
     /// modification date. The copy is made aside and renamed into place, so readers never see half a file.
     func upload(from source: URL, to path: String, modified: Date?) throws
@@ -43,6 +45,10 @@ public protocol CloudStore: Sendable {
 }
 
 extension CloudStore {
+    public func entries(under folder: String) throws -> [CloudEntry] {
+        try entries().filter { $0.path.hasPrefix(folder + "/") }
+    }
+
     public func waitUntilUploaded(_ path: String, timeout: Duration) async -> Bool {
         let deadline = ContinuousClock.now + timeout
         while !isUploaded(path) {
@@ -83,13 +89,20 @@ public final class FolderCloudStore: CloudStore {
         return url
     }
 
-    public func entries() throws -> [CloudEntry] {
+    public func entries() throws -> [CloudEntry] { try list(root) }
+
+    public func entries(under folder: String) throws -> [CloudEntry] {
+        guard let dir = LibraryPath.resolve(folder, in: root), FileManager.default.fileExists(atPath: dir.path) else { return [] }
+        return try list(dir)
+    }
+
+    private func list(_ dir: URL) throws -> [CloudEntry] {
         let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey,
                                       .ubiquitousItemIsUploadedKey, .ubiquitousItemUploadingErrorKey, .ubiquitousItemDownloadingStatusKey]
         let rootPath = root.standardizedFileURL.path
         var entries: [String: CloudEntry] = [:]
         // Hidden files are skipped by hand: an iCloud file not downloaded yet can show as a hidden ".<name>.icloud".
-        guard let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys) else { return [] }
+        guard let e = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: keys) else { return [] }
         for case let url as URL in e {
             let name = url.lastPathComponent
             guard name.hasPrefix(".") else {

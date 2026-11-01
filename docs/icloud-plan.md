@@ -4,7 +4,8 @@ Status: **P0 done** (signing groundwork, §8; the portal is set up and a local b
 profile reached the container on 2026-10-31), **P1 done** (the Mac backs up the library and covers, §5), **P2 done**
 (chosen music or everything, evicted from the Mac once uploaded, with the removal list and purging), **P3 done**
 (restore to a new folder or the database only, §7), **P4 done** (the phone reads the library from iCloud, §6; checked
-on an iPhone on 2026-11-01), P5–P7 to do. Nothing
+on an iPhone on 2026-11-01), **P6 done** (the phone's plays, likes and requests reach the Mac through iCloud; checked on an iPhone and the Mac), P5 and
+P7 to do. Nothing
 here bumps
 `Database.schemaVersion` (14) or `SyncProtocol.version` (3): older phones and Macs keep reading every library and
 snapshot this produces.
@@ -124,10 +125,14 @@ to replace that backup, keep it and stop, or turn backup off. It never mixes two
   - "iCloud is full" comes from `NSUbiquitousFileErrorDomain` / `ubiquitousItemUploadingError`.
   - "Signed out of iCloud" means `ubiquityIdentityToken` is nil.
   - "Another library is backed up here" is the `libraryID` mismatch.
-- **Inbox:** the same query watches `Inbox/`. Each new batch is decoded, its events go through
-  `Database.applySyncEvents` (which already applies each event once and checks the library ID), and its requests
-  are applied to that phone's selection. Requests count only for a paired phone; events count from any phone that
-  has this library. Then the batch file is deleted and a publish is scheduled.
+- **Inbox (P6):** every 30 seconds while the backup is on (also during a publish), the Mac lists `Inbox/`
+  (`CloudInbox.pending`; batches downloaded first, unreadable ones deleted). Each batch's events go through
+  `Database.applySyncEvents` (each once, by id, and only from this library), and its requests are applied to the
+  iPhone list (`SyncStore.applyCloudRequests`) once each: `Database.markRequestsApplied` keeps their ids in
+  `sync_events` too, and the Wi-Fi path checks the same table, so a request arriving both ways is applied once.
+  Requests count only for a paired phone and this library; while the collection is loading the batch waits. Then
+  the batch file is deleted; the database changed, so a publish follows. The iPhone page shows when each phone last
+  sent a batch (`PairedPhone.lastCloudBatch`).
 - **Which changes count:** `Database.changeCount`, every row written through the app's connection except the
   downloaded library catalog's (a cache the backup leaves out), checked every 30 seconds, plus files written without
   a database change (an album's new cover). Nothing waits for the collection to be built: unlike Wi-Fi sync's
@@ -186,9 +191,11 @@ to replace that backup, keep it and stop, or turn backup off. It never mixes two
    "events": [SyncEvent…], "requests": [SyncRequest…]}
   ```
 
-  Batches are never edited after they're written: a new batch carries what's new. An event leaves the outbox when a
-  snapshot's `sync_events` holds its ID, or when a Wi-Fi sync finishes as today. Requests are cleared as today, once
-  a snapshot's selection covers them. The sample library never writes a batch.
+  A batch carries everything still pending, so the phone writes a new one (a few seconds after a like, play or
+  request, and after each check) and removes its earlier ones (`CloudInbox.send`); one with nothing pending only
+  removes them. Dates are encoded as Wi-Fi sync encodes them, to the fraction of a second. Events and requests leave
+  the phone when a snapshot from iCloud shows their ids in `sync_events` (`CloudReceiver`'s `applied`), or when a
+  Wi-Fi sync finishes, as today. The sample library never writes a batch.
 - The phone's **Settings** get iCloud: Use iCloud (on when the container is reachable), the last update from iCloud,
   and downloads in progress. The Sync sheet shows the same line, so it's clear the Mac isn't needed.
 
@@ -323,7 +330,7 @@ As built in P0 (one-time portal steps: `docs/distribution.md` ▸ iCloud):
 4. **P3, Restore (done):** to a new folder, and the database only.
 5. **P4, phone reads from iCloud (done):** snapshot and covers, no pairing needed.
 6. **P5, phone downloads from iCloud:** Download, Download All, free-space check, background copy step.
-7. **P6, Inbox:** the phone's events and requests, applied by the Mac.
+7. **P6, Inbox (done, ahead of P5):** the phone's events and requests, applied by the Mac.
 8. **P7, docs and polish:** guide, privacy, README and site, CHANGELOG, App Store copy, screenshots. Settings ▸
    iCloud shows only in iCloud builds, and releases aren't until `MAC_PROVISIONING_PROFILE` is set, so the CHANGELOG
    entry and guide page for the Mac backup go in the release that first sets it, at the latest.

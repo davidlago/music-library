@@ -138,6 +138,17 @@ final class PhoneModel {
         sync.onLibraryChanged = { [weak self] in self?.reload() }
         cloud.onLibraryChanged = { [weak self] in self?.reload() }
         cloud.isSyncing = { [weak self] in self?.sync.isBusy ?? false }
+        cloud.outgoing = { [weak self] in
+            // The sample library's changes never go to the Mac.
+            guard let self, !isSample, let id = library?.libraryID else { return nil }
+            return PhoneCloud.Outgoing(libraryID: id, events: outbox.events, requests: requestQueue.requests)
+        }
+        cloud.phone = { [weak self] in (self?.sync.deviceID ?? "", self?.sync.deviceName ?? "") }
+        cloud.onApplied = { [weak self] ids in
+            self?.outbox.remove(ids)
+            self?.requestQueue.remove(ids)
+            self?.refreshOverlays()
+        }
         sync.pendingEvents = { [weak self] in
             // The sample library's changes never go to the Mac; the Mac's wait until your own library is back.
             guard let self, !isSample else { return ([], [], nil) }
@@ -374,6 +385,7 @@ final class PhoneModel {
     func toggleLike(_ track: Track) {
         activeOutbox.append(SyncEvent(track: track, at: Date(), kind: .like(!isLiked(track))))
         likedDates = SyncOutbox.liked(base: library?.likedDates ?? [:], events: activeOutbox.events)
+        cloud.changesPending()
         glance.setNeedsUpdate()
     }
 
@@ -476,6 +488,7 @@ final class PhoneModel {
 
     private func refreshRequests() {
         requests = isSample ? [] : requestQueue.requests
+        cloud.changesPending()
         guard let library else { pendingDownloads = []; return }
         var pending = Set<Int64>()
         for r in requests {
@@ -611,6 +624,7 @@ final class PhoneModel {
         currentPlay = nil
         activeOutbox.append(event)
         refreshPlays(activeOutbox.events)
+        cloud.changesPending()
     }
 
     private var currentPlayEvent: SyncEvent? {

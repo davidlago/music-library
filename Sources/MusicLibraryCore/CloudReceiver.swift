@@ -20,6 +20,8 @@ public struct CloudReceiveOutcome: Equatable, Sendable {
     /// Covers and artist photos copied in.
     public var files = 0
     public var bytes: Int64 = 0
+    /// Of the phone's pending changes, the ones the new database shows the Mac applied (only when it replaced it).
+    public var applied: Set<String> = []
 }
 
 /// The phone's side of the backup (`docs/icloud-plan.md` §6, P4): brings the library at `root` up to the newest copy
@@ -30,7 +32,9 @@ public struct CloudReceiveOutcome: Equatable, Sendable {
 /// the database is opened read-only and checked first (a newer schema is refused), only cover and photo paths are
 /// taken, and each is resolved inside `root`; files are made aside and renamed into place.
 public enum CloudReceiver {
-    public static func receive(from store: CloudStore, into root: URL, scratch: URL, concurrency: Int = 6) async throws -> CloudReceiveOutcome {
+    /// `pending`: the ids of the phone's plays, likes and requests not yet known to have reached the Mac.
+    public static func receive(from store: CloudStore, into root: URL, scratch: URL, pending: Set<String> = [],
+                               concurrency: Int = 6) async throws -> CloudReceiveOutcome {
         let fm = FileManager.default
         try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
@@ -89,6 +93,7 @@ public enum CloudReceiver {
         }
         guard rename(partial.path, target.path) == 0 else { throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: target.path]) }
         outcome.database = .replaced
+        if !pending.isEmpty { outcome.applied = (try? Database(snapshotAt: target.path))?.appliedSyncIDs(among: pending) ?? [] }
         return outcome
     }
 

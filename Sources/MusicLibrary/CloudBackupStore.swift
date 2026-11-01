@@ -92,6 +92,12 @@ final class CloudBackupStore {
     @ObservationIgnored var tracks: (ExportItem) -> [Track] = { _ in [] }
     @ObservationIgnored var allTracks: () -> [Track] = { [] }
     @ObservationIgnored var iPhoneTracks: () -> [Track] = { [] }
+    /// Applies Download / Remove requests a phone sent through iCloud; false when the iPhone list can't take them yet
+    /// (the collection is still loading), so the batch waits.
+    @ObservationIgnored var applyRequests: (_ phoneID: String, _ requests: [SyncRequest], _ sent: Date) -> Bool = { _, _, _ in true }
+    /// A phone's plays or likes are in the library now.
+    @ObservationIgnored var onPhoneChanges: () -> Void = {}
+    @ObservationIgnored private var readingInbox = false
     @ObservationIgnored var identity: () -> CloudBackupIdentity = { CloudBackupIdentity(macID: "", macName: "Mac", appVersion: AppInfo.version) }
     @ObservationIgnored private var store: FolderCloudStore?
     @ObservationIgnored private var timer: Task<Void, Never>?
@@ -184,6 +190,7 @@ final class CloudBackupStore {
     }
 
     private func tick() {
+        readInbox()
         guard scope != .off, !isPublishing, let context = context() else { return }
         let id = ObjectIdentifier(context.database)
         if database != id {
@@ -202,6 +209,37 @@ final class CloudBackupStore {
     }
 
     func backUpNow() { publish() }
+
+    // MARK: Inbox
+
+    /// Applies what phones sent through iCloud (P6): plays and likes as a Wi-Fi sync does (each once, only from this
+    /// library), and Download / Remove requests from paired phones; then deletes each batch. Also while publishing.
+    private func readInbox() {
+        guard scope != .off, !readingInbox, let context = context() else { return }
+        readingInbox = true
+        let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("MusicLibrary-Inbox", isDirectory: true)
+        Task {
+            defer { readingInbox = false }
+            guard let store = await backupStore(),
+                  let batches = try? await Task.detached(priority: .utility, operation: { try await CloudInbox.pending(in: store, scratch: scratch) }).value,
+                  !batches.isEmpty else { return }
+            var changed = false
+            for (path, batch) in batches {
+                if let batch {
+                    if let result = try? context.database.applySyncEvents(batch.events, libraryID: batch.libraryID),
+                       result.plays + result.likes + result.purchases > 0 {
+                        changed = true
+                    }
+                    if !batch.requests.isEmpty, batch.libraryID == context.database.libraryID(),
+                       !applyRequests(batch.phoneID, batch.requests, batch.writtenAt) {
+                        continue
+                    }
+                }
+                try? store.remove(path)
+            }
+            if changed { onPhoneChanges() }
+        }
+    }
 
     /// Replaces another library's backup with this one (asked first).
     func replaceOtherBackup() {
