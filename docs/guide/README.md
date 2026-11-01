@@ -41,6 +41,8 @@ pages explain every feature, how it works and how to set it up. For a quick look
 ## Take it with you
 
 - [Export and backup](export-and-backup.md): copy music to a USB player or drive, and back up the whole library.
+- [iCloud backup](icloud.md): back up the library and the music you choose to your own iCloud, restore from it, and get
+  it on the iPhone without the Mac nearby.
 - [iPhone app](iphone.md): pair, sync over Wi-Fi, play offline through a DAC, and browse both collections.
 - [Widgets and Apple Watch](widgets-and-watch.md): your collection and listening at a glance, and a remote on your
   wrist.

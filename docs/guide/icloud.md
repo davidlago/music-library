@@ -1,0 +1,102 @@
+# iCloud backup
+
+Music Library can back up your library to your own iCloud: the library database, the covers and artist photos, and, if
+you choose, your music. Your iPhone can then get the library and your music from there, so it stays up to date and can
+download songs when your Mac isn't nearby.
+
+You need Music Library for Mac and the iPhone app from the releases that include iCloud, both signed in to the same
+Apple Account in iCloud, and room on your iCloud plan for what you back up. Builds you make yourself need iCloud set up
+for signing; see [Building from source](building-from-source.md).
+
+## Turn it on
+
+In the Mac app, open **Settings ▸ iCloud** and choose what to back up:
+
+| Choice | What goes to iCloud |
+|---|---|
+| **Off** | Nothing (the default). |
+| **Library and covers** | The library database (your songs' details, plays, likes, playlists and your physical collection), album and collection covers, and artist photos. Usually tens of MB. |
+| **Library, covers and chosen music** | The same, plus the music you choose. |
+| **Everything** | The same, plus every song's file. Check that your iCloud plan has room. |
+
+The tab shows the size each choice comes to, and the app asks before backing up for the first time or backing up more
+music than before.
+
+## Choose the music
+
+With **Library, covers and chosen music**, use **Add to iCloud** in the menu of any album, artist, playlist or song (it
+sits next to **Add to iPhone**). Once something is in, the menu offers **Remove from iCloud**. An artist or playlist
+keeps up to date: an album you add later by that artist is backed up too.
+
+The **iCloud** page, under **Devices** in the sidebar, lists what you chose and what you kept out, how many songs and how
+much space they come to, and the backup's status, with **Back Up Now**.
+
+**Include what's on my iPhone** (off by default) also backs up the music picked for your paired iPhones, so the phone
+can download it from iCloud when the Mac isn't around. Settings shows what that list comes to first: with **Owned Music
+on iPhone** turned on it can be most of your library.
+
+## When it backs up
+
+The backup runs by itself two minutes after your library changes, at most every 15 minutes, and whenever you click
+**Back Up Now** (in **Settings ▸ iCloud** and on the iCloud page). The status shows the last backup, what's still
+uploading, and any problem, such as iCloud being full or being signed out.
+
+A first backup of a lot of music takes a while. It goes on in the background, half an hour at a time, and the status
+shows how many files are still to go. Your music doesn't take twice the space on the Mac: each song is copied without
+using extra space on the same disk, and the copy waiting for iCloud is cleared as soon as it's uploaded. Your library's
+own files are never touched.
+
+## What's kept
+
+- **The database** is kept in several copies: the last 10, one a day for two weeks and one a week for two months. Each is
+  a few MB, so the history costs little.
+- **Music, covers and photos** are kept once each and replaced when they change. There's no history of the music
+  itself.
+- **Music you take out of the backup** (or remove from the library) stays in iCloud for 30 days, then it's deleted.
+  Choosing it again before then keeps it.
+
+## Restore
+
+**File ▸ Restore from iCloud…** (also in **Settings ▸ iCloud**) lists the database copies, newest first, with how many
+songs, CDs and records, plays and likes each holds. Pick one, then:
+
+- **Restore to New Folder…** puts the library as it was then into an empty folder you choose: the database, and the
+  songs, covers and photos it names that the backup holds (songs that weren't backed up show as missing). Your current
+  library isn't touched. When it's done, **Open Restored Library** switches to it.
+- **Restore Database Only…** puts that copy's database in place of the open library's, keeping your music files. The
+  database from before is kept in the library folder as `library-before-restore-…sqlite`, so you can go back.
+
+**Use a Backup Folder…** restores from a copy of the backup made by hand, for example on another disk.
+
+## On the iPhone
+
+**Settings ▸ iCloud ▸ Use iCloud** is on by default. While the app is open, it checks your Mac's backup when you open
+it and every couple of minutes:
+
+- **Your library comes from iCloud.** The database, covers and artist photos stay up to date without the Mac nearby,
+  and an iPhone with no library yet gets one without pairing. A newer copy from a Wi-Fi sync is never replaced by an
+  older one from iCloud. Settings shows when the library was last updated from iCloud and which backup it came from,
+  with **Check Now**.
+- **Download picks the way.** With your Mac on the same Wi-Fi and Music Library open, Download works as it always has.
+  Otherwise the songs come from your Mac's iCloud backup, if they're in it ("Downloading from iCloud"). Songs that
+  aren't say **Not in iCloud yet** and download from the Mac when it's around. Downloaded songs play offline, and each
+  takes its space on the phone once.
+- **Your plays, likes and requests go back.** A few seconds after you like a song, play one or tap Download or Remove,
+  the phone sends it to your Mac through iCloud. The Mac picks it up within a minute while Music Library is open, and
+  its **iPhone** page shows when each phone last sent something this way.
+
+The keys and settings your Mac hands over (the Radio DJ's key, Last.fm and concerts) still come over a Wi-Fi sync only;
+they never go to iCloud.
+
+## Where the backup is
+
+The backup lives in Music Library's own private folder in your iCloud. It doesn't show in iCloud Drive (in Finder, the
+Files app or on iCloud.com), so nothing in it can be moved or deleted by hand. You can see the space it takes in
+**System Settings ▸ your name ▸ iCloud** on the Mac (or **Settings ▸ your name ▸ iCloud** on the iPhone). Turning the
+backup off stops it; deleting Music Library's data there removes it.
+
+One iCloud holds one library's backup. If another Mac (or another library folder) tries to back up there, its settings
+say so and offer **Replace It…** or **Turn Off Backup**.
+
+The backup is yours: it's stored by Apple in your iCloud, and the developer can't see it. With Advanced Data Protection
+turned on in your iCloud settings, it's end-to-end encrypted. See [Privacy](privacy.md).

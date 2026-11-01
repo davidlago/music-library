@@ -58,6 +58,18 @@ lookups run at one per second.
 Apps installed with a free Apple ID stop opening after 7 days. See
 [Building from source](building-from-source.md#every-7-days-free-apple-id).
 
+## iCloud backup says something's wrong
+
+- **Sign in to iCloud**: the Mac (or iPhone) isn't signed in to iCloud, or iCloud Drive is off for it. Turn it on in
+  System Settings (or Settings) ▸ your name ▸ iCloud.
+- **iCloud is full**: the backup waits until there's room. Choose less music, or more iCloud storage.
+- **Another library is backed up here**: a different Mac or library folder already uses this iCloud. **Replace It…**
+  backs up this library instead; **Turn Off Backup** leaves the other one alone.
+- **The iPhone says iCloud holds another library**: the phone has a library other than the one your Mac backs up (one
+  copied over by hand, say). It keeps its own and doesn't use iCloud.
+- **Not in iCloud yet** on the iPhone: those songs aren't in the backup. Add them with **Add to iCloud** on the Mac, or
+  they download from the Mac at the next Wi-Fi sync.
+
 ## Getting help
 
 Search or open an issue on [GitHub](https://github.com/davidlago/music-library/issues), or see the

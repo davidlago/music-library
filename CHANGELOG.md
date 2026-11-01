@@ -7,6 +7,26 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- New: **iCloud backup.** **Settings ▸ iCloud** on the Mac backs up your library to your own iCloud: the library
+  database (songs, plays, likes, playlists and your physical collection), covers and artist photos, and, if you choose,
+  the music too, either **chosen music** (**Add to iCloud** in album, artist, playlist and song menus, listed on the new
+  **iCloud** page under Devices) or **Everything**. It runs by itself after changes and on **Back Up Now**, keeps earlier
+  copies of the database (the last 10, one a day for two weeks, one a week for two months), keeps music you take out for
+  30 days, and doesn't take extra space on the Mac.
+  [Guide](https://github.com/davidlago/music-library/blob/main/docs/guide/icloud.md)
+- New: **File ▸ Restore from iCloud…** restores the library as it was on any of those days into a new folder, with the
+  music the backup holds, or just its database into the open library (keeping the one from before).
+  [Guide](https://github.com/davidlago/music-library/blob/main/docs/guide/icloud.md#restore)
+- New: on the iPhone, **Settings ▸ iCloud ▸ Use iCloud** keeps the library, covers and photos up to date from your Mac's
+  iCloud backup without the Mac nearby (a phone with no library gets one without pairing), and **Download** gets songs
+  from the backup when the Mac isn't on the same Wi-Fi. Your plays, likes and Download / Remove requests reach the Mac
+  through iCloud too, within a minute while Music Library is open.
+  [Guide](https://github.com/davidlago/music-library/blob/main/docs/guide/icloud.md#on-the-iphone)
+- Changed: the Mac app has a new bundle identifier (`io.github.davidlago.MusicLibrary`), which iCloud needs. Your library
+  and settings carry over by themselves the first time it opens, but macOS asks once more to allow keychain access,
+  local network access and (for Digitize Vinyl) the microphone, and you'll need to sign in to your public library's
+  catalog again.
+
 ## 1.29.0
 
 - New: **Sync to Discogs…** (Physical Collection menu, and the top of the Shelf) adds your CDs and records to your

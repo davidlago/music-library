@@ -64,6 +64,13 @@ Apps installed with a free Apple ID stop opening after 7 days. Connect the phone
 new build installs over the old one and keeps your music, library, Last.fm account and queue. Don't delete the app from
 the home screen, which deletes its music too. A paid Apple Developer Program membership makes installs last a year.
 
+### iCloud
+
+Builds you make yourself leave out [iCloud backup](icloud.md): iCloud needs a registered App ID with an iCloud container,
+which a free Apple ID can't have. With a paid membership, register one (`docs/distribution.md` ▸ iCloud has the steps),
+then build the Mac app with `PROVISIONING_PROFILE=…` and `SIGN_IDENTITY=…`, and the iPhone app with
+`APP_ENTITLEMENTS = MusicLibraryMobile.entitlements` in `iOS/Local.xcconfig`.
+
 ## Releases
 
 Releases are built by GitHub Actions: pushing a tag like `v1.2.3` runs the tests, builds a universal app, signs it with a

@@ -54,9 +54,11 @@ playback, and a Claude-powered radio DJ who tells you the story behind every rec
   and new and used CDs and records compared across stores. [Concerts →](docs/guide/concerts.md) ·
   [Local Library CDs →](docs/guide/local-library.md) · [Shop →](docs/guide/shop.md)
 - **Take it with you.** The iPhone app browses both collections and plays what you sync to it, offline and through a USB
-  DAC at each song's rate, with widgets and an Apple Watch app. Export to a USB player or back up to a drive.
+  DAC at each song's rate, with widgets and an Apple Watch app. Back up the library and the music you choose to your
+  own iCloud, restore from it, and get it on the iPhone from there when the Mac isn't nearby. Export to a USB player or
+  back up to a drive.
   [iPhone app →](docs/guide/iphone.md) · [Widgets and Apple Watch →](docs/guide/widgets-and-watch.md) ·
-  [Export and backup →](docs/guide/export-and-backup.md)
+  [iCloud backup →](docs/guide/icloud.md) · [Export and backup →](docs/guide/export-and-backup.md)
 
 ## A closer look
 
@@ -95,7 +97,7 @@ every feature: [Getting started](docs/guide/getting-started.md), [Physical Colle
 [Search](docs/guide/search.md), [Insights](docs/guide/insights.md), [Music DNA](docs/guide/music-dna.md),
 [Radio DJ](docs/guide/radio-dj.md), [Concerts](docs/guide/concerts.md), [Playback](docs/guide/playback.md),
 [Local Library CDs](docs/guide/local-library.md), [Shop](docs/guide/shop.md),
-[Export and backup](docs/guide/export-and-backup.md), [iPhone app](docs/guide/iphone.md),
+[Export and backup](docs/guide/export-and-backup.md), [iCloud backup](docs/guide/icloud.md), [iPhone app](docs/guide/iphone.md),
 [Widgets and Apple Watch](docs/guide/widgets-and-watch.md), [Settings](docs/guide/settings.md),
 [Privacy](docs/guide/privacy.md), [Troubleshooting](docs/guide/troubleshooting.md) and
 [Building from source](docs/guide/building-from-source.md). What changed in each version is in the
@@ -103,8 +105,8 @@ every feature: [Getting started](docs/guide/getting-started.md), [Physical Colle
 
 ## Privacy
 
-No account, no cloud service, no ads, no tracking. Your library and listening history stay on your Mac and iPhone, which
-sync directly over your Wi-Fi, encrypted. The app talks to MusicBrainz, Wikipedia and the other services only to look
+No account, no cloud service of its own, no ads, no tracking. Your library and listening history stay on your Mac and
+iPhone, which sync directly over your Wi-Fi, encrypted, and in your own iCloud if you turn on iCloud backup. The app talks to MusicBrainz, Wikipedia and the other services only to look
 things up, and to Last.fm, Ticketmaster, JamBase, Claude or OpenRouter only with your own keys. Details in
 [Privacy](docs/guide/privacy.md).
 

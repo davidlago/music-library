@@ -5,7 +5,9 @@ profile reached the container on 2026-10-31), **P1 done** (the Mac backs up the 
 (chosen music or everything, evicted from the Mac once uploaded, with the removal list and purging), **P3 done**
 (restore to a new folder or the database only, §7), **P4 done** (the phone reads the library from iCloud, §6; checked
 on an iPhone on 2026-11-01), **P6 done** (the phone's plays, likes and requests reach the Mac through iCloud; checked on an iPhone and the Mac), **P5
-done** (Download fetches from iCloud when the Mac isn't reachable; checked on an iPhone), P7 to do. Nothing
+done** (Download fetches from iCloud when the Mac isn't reachable; checked on an iPhone), **P7 done** (the guide's iCloud page,
+privacy, README and site, CHANGELOG, App Store copy). Screenshots of the new screens are left for the next round of
+README screenshots. Nothing
 here bumps
 `Database.schemaVersion` (14) or `SyncProtocol.version` (3): older phones and Macs keep reading every library and
 snapshot this produces.
@@ -338,7 +340,7 @@ As built in P0 (one-time portal steps: `docs/distribution.md` ▸ iCloud):
 5. **P4, phone reads from iCloud (done):** snapshot and covers, no pairing needed.
 6. **P5, phone downloads from iCloud (done):** Download, Download All, free-space check, background copy step.
 7. **P6, Inbox (done, ahead of P5):** the phone's events and requests, applied by the Mac.
-8. **P7, docs and polish:** guide, privacy, README and site, CHANGELOG, App Store copy, screenshots. Settings ▸
+8. **P7, docs and polish (done):** guide, privacy, README and site, CHANGELOG, App Store copy, screenshots. Settings ▸
    iCloud shows only in iCloud builds, and releases aren't until `MAC_PROVISIONING_PROFILE` is set, so the CHANGELOG
    entry and guide page for the Mac backup go in the release that first sets it, at the latest.
 
