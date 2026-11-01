@@ -301,6 +301,8 @@ final class AppModel {
     @ObservationIgnored let iPhone = SyncStore()
     /// Sending the physical collection to the user's Discogs collection.
     @ObservationIgnored let discogsSync = DiscogsSyncStore()
+    /// The iCloud backup (hidden without an iCloud container).
+    @ObservationIgnored let cloud = CloudBackupStore()
     @ObservationIgnored private var currentPlay: (track: Track, startedAt: Date, tracker: ListenTracker)?
     @ObservationIgnored private var terminationObserver: NSObjectProtocol?
     @ObservationIgnored private(set) var importer: ImportController!
@@ -357,6 +359,10 @@ final class AppModel {
             self.historyVersion += 1
         }
         iPhone.context = { [unowned self] in self.syncContext }
+        cloud.context = { [unowned self] in self.database.map { (self.libraryRoot, $0) } }
+        cloud.identity = { [unowned self] in
+            CloudBackupIdentity(macID: self.iPhone.identity.deviceID, macName: self.iPhone.identity.deviceName, appVersion: AppInfo.version)
+        }
         radioDJ.location = { [unowned self] in self.radioDJLocation }
         iPhone.startListening()
         artistInfo.onAutoSyncEnabled = { [unowned self] in self.syncArtistInfo() }
@@ -384,6 +390,7 @@ final class AppModel {
         if !catalog.downloadDates.isEmpty { catalog.downloadCatalogs() }
         installSpaceBarMonitor()
         cd.start()
+        cloud.start()
     }
 
     // MARK: Appearance
@@ -765,6 +772,7 @@ final class AppModel {
         let albumTracks = tracks(of: album)
         defer {
             coverRevision += 1
+            cloud.filesChanged()
             player.reloadCover()
             reloadLibrary()
         }

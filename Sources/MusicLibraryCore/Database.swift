@@ -42,6 +42,7 @@ public final class Database: @unchecked Sendable {
     private var db: OpaquePointer?
     private let lock = NSRecursiveLock()
     private var transactionDepth = 0
+    private var changes = 0
     static let schemaVersion = 14
 
     public init(path: String) throws {
@@ -53,6 +54,11 @@ public final class Database: @unchecked Sendable {
         try exec("PRAGMA foreign_keys=ON")
         if path != ":memory:" { try exec("PRAGMA journal_mode=WAL") }
         try migrate()
+        // Counts what a backup would hold: every table's rows but the downloaded library catalog's (a cache).
+        sqlite3_update_hook(db, { context, _, _, table, _ in
+            guard let context, let table, strncmp(table, "catalog_", 8) != 0 else { return }
+            Unmanaged<Database>.fromOpaque(context).takeUnretainedValue().changes &+= 1
+        }, Unmanaged.passUnretained(self).toOpaque())
     }
 
     /// Opens a library snapshot (the `library.sqlite` an export or a sync writes) without changing it: no
@@ -69,6 +75,13 @@ public final class Database: @unchecked Sendable {
     }
 
     deinit { sqlite3_close(db) }
+
+    /// Rows changed through this connection since it was opened, outside the downloaded library catalog, so a backup
+    /// can tell whether there's anything new to publish.
+    public var changeCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return changes
+    }
 
     // MARK: Low level
 

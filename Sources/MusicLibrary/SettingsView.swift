@@ -13,6 +13,9 @@ struct SettingsView: View {
             LastFMSettings().tabItem { Label("Last.fm", systemImage: "dot.radiowaves.left.and.right") }
             ConcertSettings().tabItem { Label("Concerts", systemImage: "ticket") }
             DiscogsSettings().tabItem { Label("Discogs", systemImage: "opticaldisc") }
+            if model.cloud.isAvailable {
+                ICloudSettings().tabItem { Label("iCloud", systemImage: "icloud") }
+            }
             RadioDJSettings().tabItem { Label("Radio DJ", systemImage: RadioDJIcon.name) }
             LibraryCatalogSettings().tabItem { Label("Local Library", systemImage: "building.columns") }
         }
