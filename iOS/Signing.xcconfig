@@ -12,5 +12,13 @@ APP_BUNDLE_ID = io.github.davidlago.MusicLibraryMobile
 // The iPhone app and its widgets share this container (the watch app and its complications have their own).
 APP_GROUP_IDENTIFIER = group.$(APP_BUNDLE_ID)
 
+// iCloud (docs/icloud-plan.md): the container the Mac app shares. It needs iCloud on the App ID with this container
+// assigned (docs/distribution.md), which a Personal Team can't have, so the app is signed without it unless
+// Local.xcconfig (or scripts/testflight.sh with ICLOUD=1) switches to the iCloud entitlements:
+//
+//     APP_ENTITLEMENTS = MusicLibraryMobile.entitlements
+ICLOUD_CONTAINER = iCloud.io.github.davidlago.MusicLibrary
+APP_ENTITLEMENTS = AppGroup.entitlements
+
 #include "Version.xcconfig"
 #include? "Local.xcconfig"
