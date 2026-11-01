@@ -1,3 +1,4 @@
+import AVKit
 import MusicLibraryCore
 import SwiftUI
 
@@ -35,8 +36,22 @@ struct MiniPlayer: View {
     }
 }
 
-/// Where the song is going and at what rate: "→ USB Audio · 96 kHz", with a warning when the hardware didn't
-/// follow the song's rate and a hint when the system volume scales down what a USB DAC receives.
+/// Picks where the music plays: the iPhone, headphones, or AirPlay speakers and TVs (several at once).
+struct AirPlayButton: UIViewRepresentable {
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let view = AVRoutePickerView()
+        view.tintColor = .secondaryLabel
+        view.activeTintColor = .tintColor
+        view.prioritizesVideoDevices = false
+        view.accessibilityLabel = "AirPlay"
+        return view
+    }
+
+    func updateUIView(_ view: AVRoutePickerView, context: Context) {}
+}
+
+/// Where the song is going and at what rate: "→ USB Audio · 96 kHz" (or "→ Living Room · AirPlay"), with a warning
+/// when the hardware didn't follow the song's rate and a hint when the system volume scales down what a USB DAC receives.
 private struct OutputLine: View {
     let track: Track
     let output: AudioOutput
@@ -46,15 +61,15 @@ private struct OutputLine: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            Text("→ \(output.name) · \(AudioFormat.kHzString(output.sampleRate)) kHz")
+            Text("→ \(output.summary)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if !settling, let rate = track.audioFormat?.sampleRate, abs(output.sampleRate - Double(rate)) > 0.5 {
+            if !settling, !output.isAirPlay, let rate = track.audioFormat?.sampleRate, abs(output.sampleRate - Double(rate)) > 0.5 {
                 Label("Resampled from \(AudioFormat.kHzString(Double(rate))) kHz", systemImage: "exclamationmark.triangle")
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
-            if output.isUSB && volume < 0.99 {
+            if output.isWired && volume < 0.99 {
                 Text("Turn the iPhone's volume all the way up for bit-perfect output.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -161,6 +176,8 @@ struct NowPlayingView: View {
         }
         .font(.title)
         .buttonStyle(.plain)
+
+        AirPlayButton().frame(width: 44, height: 44)
 
         if let error = player.lastError {
             Text(error).font(.caption).foregroundStyle(.red)

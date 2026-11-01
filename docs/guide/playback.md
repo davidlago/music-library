@@ -16,12 +16,19 @@ resampled awkwardly. **Match output bit depth** also sets the device's bit depth
   turn the setting off.
 - Devices with a fixed rate (Bluetooth, AirPlay) aren't affected.
 
-Playback uses the output chosen in System Settings ▸ Sound.
+Playback uses the output chosen in System Settings ▸ Sound, unless you pick an AirPlay device in the app.
+
+## AirPlay
+
+The AirPlay button, next to the volume in the player and in Now Playing, lists the AirPlay speakers and TVs on your
+network: pick one to play there, or the Mac to come back. Only Music Library's music goes to it; other apps keep
+playing through the Mac's output. While it plays on AirPlay the player shows "→ AirPlay" after the song's format, and
+the Mac's output device is put back to its own format (AirPlay devices run at their own rate).
 
 ## The player and Now Playing
 
 The player floats at the bottom of the window, over the pages: the song, a heart for Liked Songs, previous / play-pause /
-next, the scrubber, volume, and the queue button. Pages leave room under their last row, so nothing stays hidden behind
+next, the scrubber, volume, [AirPlay](#airplay), and the queue button. Pages leave room under their last row, so nothing stays hidden behind
 it. **Space** plays and pauses (except while typing).
 
 Click the cover to expand **Now Playing**: a large cover, the song's details and credits (click a name for

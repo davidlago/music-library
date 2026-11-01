@@ -5,21 +5,39 @@ import UIKit
 
 private struct ImageBox: @unchecked Sendable { let image: UIImage }
 
-/// Where audio is going: the route's first output and the rate the hardware runs at.
+/// Where audio is going: the route's output (every AirPlay speaker playing, by name) and the rate the hardware runs at.
 struct AudioOutput: Equatable, Sendable {
     var name: String
-    var isUSB: Bool
+    /// A USB DAC, or wired headphones (on iPhones without a headphone jack, a USB-C or Lightning DAC too): the
+    /// system volume scales down the samples it receives.
+    var isWired: Bool
+    /// AirPlay speakers or TVs: they run at their own rate, so the song's isn't asked for.
+    var isAirPlay: Bool
     var sampleRate: Double
 
+    /// "USB Audio · 96 kHz", "Living Room · AirPlay".
+    var summary: String { isAirPlay ? "\(name) · AirPlay" : "\(name) · \(AudioFormat.kHzString(sampleRate)) kHz" }
+
     nonisolated static func current(_ session: AVAudioSession) -> AudioOutput? {
-        guard let port = session.currentRoute.outputs.first else { return nil }
-        return AudioOutput(name: port.portName, isUSB: port.portType == .usbAudio, sampleRate: session.sampleRate)
+        let outputs = session.currentRoute.outputs
+        guard let port = outputs.first else { return nil }
+        if outputs.contains(where: { $0.portType == .airPlay }) {
+            let names = outputs.filter { $0.portType == .airPlay }.map(\.portName)
+            return AudioOutput(name: names.formatted(.list(type: .and)), isWired: false, isAirPlay: true, sampleRate: session.sampleRate)
+        }
+        let wired = port.portType == .usbAudio || port.portType == .headphones
+        return AudioOutput(name: port.portName, isWired: wired, isAirPlay: false, sampleRate: session.sampleRate)
+    }
+
+    nonisolated static var isAirPlay: Bool {
+        AVAudioSession.sharedInstance().currentRoute.outputs.contains { $0.portType == .airPlay }
     }
 }
 
 /// Plays the queue in the background, with lock screen and Control Center controls. Modeled on the Mac app's
 /// `Player`: before each song the output is switched to the song's sample rate (so a USB DAC plays it at its own
-/// rate), and the next song is preloaded for a gapless transition when it has the same rate.
+/// rate), and the next song is preloaded for a gapless transition when it has the same rate. On AirPlay the rate is
+/// left alone and every next song is preloaded.
 @Observable
 final class PhonePlayer {
     private enum Keys {
@@ -58,6 +76,8 @@ final class PhonePlayer {
     @ObservationIgnored private let avPlayer = AVQueuePlayer()
     /// The item playing the queue's current song, and the next song's item when it's preloaded.
     @ObservationIgnored private var currentItem: AVPlayerItem?
+    /// The current item was opened with precise timing (`item(_:precise:)`), so a seek lands where it says.
+    @ObservationIgnored private var currentIsPrecise = false
     @ObservationIgnored private var preloaded: (item: AVPlayerItem, entry: PlayQueue.Entry.ID)?
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
@@ -168,9 +188,11 @@ final class PhonePlayer {
     }
 
     func seek(to seconds: Double) {
-        // Seek the song's own item once it's ready: a seek sent to the queue player can land in the preloaded next
-        // song when this one ends first (scrubbing to the very end).
-        if !restoredPaused {
+        if !restoredPaused, seconds > 0, currentItem != nil, !currentIsPrecise, let track = currentTrack, let url = fileURL(track) {
+            reopenPrecisely(url, at: seconds)
+        } else if !restoredPaused {
+            // Seek the song's own item once it's ready: a seek sent to the queue player can land in the preloaded next
+            // song when this one ends first (scrubbing to the very end).
             let time = CMTime(seconds: seconds, preferredTimescale: 600)
             if let item = currentItem, item.status == .readyToPlay {
                 item.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero, completionHandler: nil)
@@ -223,7 +245,7 @@ final class PhonePlayer {
         currentTime = position
         duration = track.duration
         loadCover(for: track)
-        let rate = matchSampleRate ? track.audioFormat?.sampleRate : nil
+        let rate = matchSampleRate && !AudioOutput.isAirPlay ? track.audioFormat?.sampleRate : nil
         let reactivate = rate != nil && rate != requestedRate
         if let rate { requestedRate = rate }
         outputSettling = reactivate
@@ -251,8 +273,9 @@ final class PhonePlayer {
     }
 
     private func start(url: URL, track: Track, at position: Double) {
-        let item = Self.item(url)
+        let item = Self.item(url, precise: position > 0)
         currentItem = item
+        currentIsPrecise = position > 0
         avPlayer.insert(item, after: nil)
         // The new item is the only one queued, so the player's seek (applied once it's ready) can only land in it.
         if position > 0 { avPlayer.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) }
@@ -267,7 +290,21 @@ final class PhonePlayer {
         avPlayer.pause()
         avPlayer.removeAllItems()
         currentItem = nil
+        currentIsPrecise = false
         preloaded = nil
+    }
+
+    /// Opens the current song again with precise timing at `position`, for a seek in an item opened without it: the
+    /// same song goes on (no new play, no output change), after the moment it takes to read the file through.
+    private func reopenPrecisely(_ url: URL, at position: Double) {
+        stopItems()
+        let item = Self.item(url, precise: true)
+        currentItem = item
+        currentIsPrecise = true
+        avPlayer.insert(item, after: nil)
+        avPlayer.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        if isPlaying { avPlayer.play() }
+        prepareNext()
     }
 
     /// Preloads the next song behind the current one for a gapless transition, when it plays at the same rate
@@ -277,18 +314,22 @@ final class PhonePlayer {
         preloaded = nil
         guard let currentItem, let current = currentTrack, let index = queue.index, index + 1 < queue.entries.count else { return }
         let next = queue.entries[index + 1]
-        guard !matchSampleRate || next.track.audioFormat?.sampleRate == current.audioFormat?.sampleRate,
+        guard !matchSampleRate || AudioOutput.isAirPlay || next.track.audioFormat?.sampleRate == current.audioFormat?.sampleRate,
               let url = fileURL(next.track) else { return }
-        let item = Self.item(url)
+        let item = Self.item(url, precise: true)
         guard avPlayer.canInsert(item, after: currentItem) else { return }
         avPlayer.insert(item, after: currentItem)
         preloaded = (item, next.id)
     }
 
     /// Without precise timing AVFoundation estimates positions in FLAC files without a seek table, so a seek
-    /// lands seconds away from where the clock says and the song runs past its length.
-    private static func item(_ url: URL) -> AVPlayerItem {
-        AVPlayerItem(asset: AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true]))
+    /// lands seconds away from where the clock says and the song runs past its length. With it, though, iOS reads
+    /// the whole file before the item is ready (about 8 s for a 26-minute 24/192 FLAC, 0.3 s for a CD song), so a
+    /// song started from the beginning opens without it (playing on from the start is exact) and is reopened with it
+    /// on its first seek (`reopenPrecisely`); songs started mid-way, and the next song, preloaded while this one
+    /// plays, open with it.
+    private static func item(_ url: URL, precise: Bool) -> AVPlayerItem {
+        AVPlayerItem(asset: AVURLAsset(url: url, options: precise ? [AVURLAssetPreferPreciseDurationAndTimingKey: true] : [:]))
     }
 
     private func fileURL(_ track: Track) -> URL? {
@@ -302,6 +343,7 @@ final class PhonePlayer {
             // AVQueuePlayer has moved on to the preloaded song already.
             _ = queue.advance()
             self.currentItem = preloaded.item
+            self.currentIsPrecise = true
             self.preloaded = nil
             guard let track = currentTrack else { return }
             currentTime = 0
@@ -324,12 +366,14 @@ final class PhonePlayer {
 
     private func timeChanged(_ time: CMTime) {
         // Right after a gapless transition the player can report the next item's time before `itemEnded` runs.
-        guard let item = avPlayer.currentItem, item === currentItem, let track = currentTrack else { return }
+        // A song reopened for a seek reports 0 until it's ready, not the position it's going to.
+        guard let item = avPlayer.currentItem, item === currentItem, item.status == .readyToPlay, let track = currentTrack else { return }
         if time.seconds.isFinite {
             currentTime = time.seconds
             onProgress?(track, time.seconds, isPlaying)
         }
-        if item.duration.seconds.isFinite, item.duration.seconds > 0 { duration = item.duration.seconds }
+        // Without precise timing the item's duration is an estimate; the track's own is exact.
+        if currentIsPrecise, item.duration.seconds.isFinite, item.duration.seconds > 0 { duration = item.duration.seconds }
     }
 
     private func loadCover(for track: Track) {
@@ -341,10 +385,11 @@ final class PhonePlayer {
     /// Activates the playback session, at `rate` when given. With `reactivate` (the rate differs from the last
     /// song's) the session is deactivated first, so the new preferred rate applies on every route; nothing is
     /// playing at that point. The session's `sampleRate` isn't read here: it lags behind the hardware.
+    /// Long-form audio (music) is what AirPlay 2 plays buffered, on several speakers at once.
     nonisolated private static func configureSession(rate: Int?, reactivate: Bool) -> String? {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playback, mode: .default)
+            try session.setCategory(.playback, mode: .default, policy: .longFormAudio)
             if let rate, rate > 0 {
                 try session.setPreferredSampleRate(Double(rate))
                 if reactivate { try? session.setActive(false) }
@@ -422,19 +467,24 @@ final class PhonePlayer {
     }
 
     private func routeChanged(_ reason: AVAudioSession.RouteChangeReason?) {
+        let wasAirPlay = output?.isAirPlay == true
         output = AudioOutput.current(AVAudioSession.sharedInstance())
-        switch reason {
-        case .oldDeviceUnavailable:
-            // Unplugging the DAC (or headphones) pauses instead of switching to the speaker.
+        let airPlay = output?.isAirPlay == true
+        if reason == .oldDeviceUnavailable && !airPlay {
+            // Unplugging the DAC (or headphones), or losing the AirPlay speaker, pauses instead of switching to the speaker.
             pause()
-        case .newDeviceAvailable:
+            return
+        }
+        let restartsAtRate = isPlaying && matchSampleRate && currentTrack?.audioFormat?.sampleRate != nil
+        if airPlay != wasAirPlay {
+            // AirPlay ignores the song's rate: the next song can be preloaded now whatever its rate, and back on the
+            // iPhone's own output (or a DAC) the song restarts at its rate, as when a DAC is plugged in.
+            requestedRate = nil
+            if wasAirPlay && restartsAtRate { loadCurrent(at: currentTime) } else { prepareNext() }
+        } else if reason == .newDeviceAvailable && !airPlay && restartsAtRate {
             // A DAC plugged in mid-song starts at its own default rate: restart the song at the song's rate.
-            if isPlaying, matchSampleRate, currentTrack?.audioFormat?.sampleRate != nil {
-                requestedRate = nil
-                loadCurrent(at: currentTime)
-            }
-        default:
-            break
+            requestedRate = nil
+            loadCurrent(at: currentTime)
         }
     }
 

@@ -40,7 +40,7 @@ struct NowPlayingView: View {
                 ScrubberView().frame(maxWidth: 720)
                 ZStack {
                     TransportControls(large: true)
-                    HStack { Spacer(); VolumeControl() }
+                    HStack(spacing: 12) { Spacer(); VolumeControl(); AirPlayButton(player: player) }
                 }
                 .frame(maxWidth: 720)
                 if let err = player.lastError { Text(err).font(.caption).foregroundStyle(.red) }

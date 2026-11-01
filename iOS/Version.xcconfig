@@ -1,4 +1,4 @@
 // The version of the iPhone app, its widgets and the Apple Watch app (they must match). Keep MARKETING_VERSION at the
 // Mac app's release version. scripts/testflight.sh sets a new CURRENT_PROJECT_VERSION for every upload.
-MARKETING_VERSION = 1.31.0
+MARKETING_VERSION = 1.32.0
 CURRENT_PROJECT_VERSION = 1

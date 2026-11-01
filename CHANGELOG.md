@@ -7,6 +7,19 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.32.0
+
+- New: **AirPlay** on the Mac and the iPhone. The AirPlay button (next to the volume in the Mac's player and in Now
+  Playing, and under the controls in the iPhone's Now Playing) sends the music to AirPlay speakers and TVs; on the
+  iPhone you can pick several at once. The Mac sends only Music Library there, so other apps keep the Mac's output. On
+  AirPlay the output's sample rate is left alone, and on the iPhone every song plays without gaps.
+  [Guide](https://github.com/davidlago/music-library/blob/main/docs/guide/playback.md#airplay)
+- Fixed: on the iPhone, songs start right away instead of after a pause that grew with the file's size (about 8
+  seconds for a 26-minute 24/192 FLAC, a second or two for most hi-res songs). The first time you skip around in a song
+  started that way, it takes that moment instead.
+- Fixed: the iPhone's reminder to turn its volume all the way up for bit-perfect output now also shows for USB-C DACs
+  that iOS lists as headphones, like the HiBy FC4.
+
 ## 1.31.0
 
 - New: **offload music from the Mac to iCloud.** With your music backed up to iCloud, **Offload from This Mac** (in the

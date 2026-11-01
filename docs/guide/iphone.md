@@ -116,6 +116,9 @@ phone looks for the Mac's syncs only while Sync is open.
   and warns when it was resampled. For bit-perfect output keep the iPhone's volume at maximum and use the DAC's or
   amplifier's.
 - Plugging in a DAC mid-song restarts the song at its rate; unplugging pauses instead of switching to the speaker.
+- **AirPlay**: the AirPlay button under the controls in Now Playing plays on AirPlay speakers and TVs, several at once
+  (or pick them in Control Center). Now Playing shows where it's playing ("→ Living Room · AirPlay"). AirPlay runs at
+  its own rate, so the phone doesn't switch it and every song plays without gaps; losing the speaker pauses.
 - Liked Songs, scrobbling and the Radio DJ work as on the Mac.
 
 ## Settings
