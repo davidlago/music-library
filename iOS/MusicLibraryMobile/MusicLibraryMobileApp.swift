@@ -8,6 +8,10 @@ struct MusicLibraryMobileApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppearanceMode.defaultsKey) private var appearance = AppearanceMode.system
 
+    init() {
+        CloudContainer.logAvailability()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

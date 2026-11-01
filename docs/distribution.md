@@ -75,6 +75,50 @@ A tagged build fails rather than publishing an unsigned release when a secret is
 Users of an earlier, ad-hoc-signed release are asked once to allow keychain access after updating (**Always Allow**);
 later Developer ID releases keep that access.
 
+### 5. iCloud (optional)
+
+iCloud backup and iPhone downloads (`docs/icloud-plan.md`) need the app's iCloud container in both apps' entitlements,
+and on the Mac that means a registered App ID and an embedded provisioning profile. Without these the apps build and
+run as before, with no iCloud and nothing of it showing. In the
+[developer portal](https://developer.apple.com/account/resources) ▸ **Certificates, Identifiers & Profiles**:
+
+1. **Identifiers ▸ +** ▸ **iCloud Containers**: `iCloud.io.github.davidlago.MusicLibrary`.
+2. **Identifiers ▸ +** ▸ **App IDs** ▸ **App**, platform macOS, explicit bundle ID `io.github.davidlago.MusicLibrary`.
+   Tick **iCloud** (with CloudKit support), then **Configure** and assign the container.
+3. Open the iPhone app's App ID (`io.github.davidlago.MusicLibraryMobile`), tick **iCloud** and assign the same
+   container. This invalidates its App Store profiles; CI's are made again on the next run.
+4. **Profiles ▸ +** ▸ **Developer ID** (under Distribution), the macOS App ID and the Developer ID certificate.
+   Download it.
+
+Build and check on your Mac:
+
+```bash
+SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" PROVISIONING_PROFILE=~/Downloads/MusicLibrary.provisionprofile scripts/build-app.sh
+```
+
+The build checks that the profile allows the container and iCloud Documents, takes the bundle ID from it and embeds it.
+At launch, the app logs whether it reached the container. (The log's subsystem is `local.musiclibrary` and its
+category is `iCloud`.)
+
+```bash
+/usr/bin/log stream --predicate 'subsystem == "local.musiclibrary" AND category == "iCloud"'
+```
+
+Such a build has its own bundle ID, and so its own user defaults: at its first launch it copies the settings of
+`local.musiclibrary` (the library folder, paired phones, the Export List…), once. `local.musiclibrary`'s settings are
+left alone, so an older release still finds them. macOS also asks again to allow keychain access, the local network
+and the microphone, because those permissions belong to the bundle ID.
+
+For releases, store the profile as a secret. A tagged build with it is built for iCloud; without it, as before.
+
+```bash
+base64 -i ~/Downloads/MusicLibrary.provisionprofile | gh secret set MAC_PROVISIONING_PROFILE
+```
+
+On the iPhone, set `APP_ENTITLEMENTS = MusicLibraryMobile.entitlements` in `iOS/Local.xcconfig` (see
+`iOS/Signing.xcconfig`) to build with iCloud. For TestFlight from CI, set the repository variable `ICLOUD` to `1`
+(`gh variable set ICLOUD --body 1`); `scripts/testflight.sh` takes `ICLOUD=1` too.
+
 ## iPhone app: TestFlight
 
 The iPhone app, its widgets and the Apple Watch app upload together. `iOS/Local.xcconfig` holds your team

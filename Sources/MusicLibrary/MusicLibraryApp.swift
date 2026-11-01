@@ -14,7 +14,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct MusicLibraryApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @State private var model = AppModel()
+    @State private var model: AppModel
+
+    init() {
+        // Before anything reads a setting: a build signed for iCloud has its own bundle ID, and starts with the
+        // settings of the local.musiclibrary build it replaces.
+        DefaultsImport.runIfAsked()
+        _model = State(initialValue: AppModel())
+        CloudContainer.logAvailability()
+    }
 
     var body: some Scene {
         WindowGroup("Music Library") {

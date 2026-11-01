@@ -11,6 +11,12 @@
 #                   (Developer ID, or an Apple Development one from Xcode) keeps access across builds.
 #   BUNDLE_TOOLS=0  leave out ffmpeg, ffprobe and fpcalc (default: build them with scripts/build-tools.sh and put them
 #                   in Contents/Helpers, so the app needs nothing from Homebrew)
+#   PROVISIONING_PROFILE=path/to/MusicLibrary.provisionprofile
+#                   a Developer ID profile with iCloud (docs/distribution.md), embedded in the app; it's then signed with
+#                   the iCloud entitlements for ICLOUD_CONTAINER (default iCloud.io.github.davidlago.MusicLibrary) and
+#                   takes its bundle ID from the profile. Needs SIGN_IDENTITY. Such a build has its own user defaults, so
+#                   it imports local.musiclibrary's once at launch (DefaultsImport). Without a profile the app is
+#                   local.musiclibrary, has no iCloud and shows none (docs/icloud-plan.md).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -23,6 +29,53 @@ BUILD="${BUILD:-1}"
 if [[ -z "${SDKROOT:-}" ]]; then
     sdk="$(ls -d /Library/Developer/CommandLineTools/SDKs/MacOSX26*.sdk 2>/dev/null | sort -V | tail -1 || true)"
     if [[ -n "$sdk" && ! -d /Applications/Xcode.app ]]; then export SDKROOT="$sdk"; fi
+fi
+
+# iCloud needs an explicit App ID, an embedded profile that allows the container and entitlements matching it.
+DEFAULT_BUNDLE_ID=local.musiclibrary
+BUNDLE_ID="$DEFAULT_BUNDLE_ID"
+ENTITLEMENTS=Resources/MusicLibrary.entitlements
+EXTRA_INFO=""
+if [[ -n "${PROVISIONING_PROFILE:-}" ]]; then
+    fail() { echo "error: $1" >&2; exit 1; }
+    [[ "${SIGN_IDENTITY:--}" != "-" ]] || fail "PROVISIONING_PROFILE needs SIGN_IDENTITY (an ad-hoc signature can't use a profile)"
+    SIGNING=build/signing
+    rm -rf "$SIGNING" && mkdir -p "$SIGNING"
+    security cms -D -i "$PROVISIONING_PROFILE" > "$SIGNING/profile.plist" 2> /dev/null \
+        || fail "can't read the provisioning profile $PROVISIONING_PROFILE"
+    allowed() { /usr/libexec/PlistBuddy -c "Print :Entitlements:$1" "$SIGNING/profile.plist" 2> /dev/null || true; }
+    APP_IDENTIFIER="$(allowed com.apple.application-identifier)"
+    TEAM_ID="$(allowed com.apple.developer.team-identifier)"
+    [[ -n "$TEAM_ID" && "$APP_IDENTIFIER" == "$TEAM_ID".* ]] || fail "the profile has no application identifier for its team"
+    BUNDLE_ID="${APP_IDENTIFIER#"$TEAM_ID".}"
+    [[ "$BUNDLE_ID" =~ ^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ ]] || fail "the profile is for \"$BUNDLE_ID\"; iCloud needs an explicit App ID"
+    ICLOUD_CONTAINER="${ICLOUD_CONTAINER:-iCloud.io.github.davidlago.MusicLibrary}"
+    for key in com.apple.developer.icloud-container-identifiers com.apple.developer.ubiquity-container-identifiers; do
+        allowed "$key" | sed 's/^ *//' | grep -qxF -e "$ICLOUD_CONTAINER" -e '*' \
+            || fail "the profile doesn't allow $ICLOUD_CONTAINER ($key); add the container to the App ID and make the profile again"
+    done
+    allowed com.apple.developer.icloud-services | sed 's/^ *//' | grep -qxF -e CloudDocuments -e '*' \
+        || fail "the profile doesn't allow iCloud Documents (com.apple.developer.icloud-services)"
+
+    ENTITLEMENTS="$SIGNING/MusicLibrary.entitlements"
+    cp Resources/MusicLibrary.entitlements "$ENTITLEMENTS"
+    entitle() { /usr/libexec/PlistBuddy -c "$1" "$ENTITLEMENTS" > /dev/null; }
+    entitle "Add :com.apple.application-identifier string $APP_IDENTIFIER"
+    entitle "Add :com.apple.developer.team-identifier string $TEAM_ID"
+    for key in com.apple.developer.icloud-container-identifiers com.apple.developer.ubiquity-container-identifiers; do
+        entitle "Add :$key array"
+        entitle "Add :$key:0 string $ICLOUD_CONTAINER"
+    done
+    entitle "Add :com.apple.developer.icloud-services array"
+    entitle "Add :com.apple.developer.icloud-services:0 string CloudDocuments"
+    # Developer ID builds use the production iCloud environment; only name it when the profile does.
+    if [[ -n "$(allowed com.apple.developer.icloud-container-environment)" ]]; then
+        entitle "Add :com.apple.developer.icloud-container-environment string Production"
+    fi
+    EXTRA_INFO="    <key>MusicLibraryICloudContainer</key><string>$ICLOUD_CONTAINER</string>"
+    if [[ "$BUNDLE_ID" != "$DEFAULT_BUNDLE_ID" ]]; then
+        EXTRA_INFO+=$'\n'"    <key>MusicLibraryImportsDefaultsFrom</key><string>$DEFAULT_BUNDLE_ID</string>"
+    fi
 fi
 
 ARCH_FLAGS=()
@@ -59,7 +112,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleExecutable</key><string>MusicLibrary</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleIconName</key><string>AppIcon</string>
-    <key>CFBundleIdentifier</key><string>local.musiclibrary</string>
+    <key>CFBundleIdentifier</key><string>${BUNDLE_ID}</string>
     <key>CFBundleName</key><string>MusicLibrary</string>
     <key>CFBundleDisplayName</key><string>Music Library</string>
     <key>CFBundlePackageType</key><string>APPL</string>
@@ -73,6 +126,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>NSBonjourServices</key><array><string>_musiclib-sync._tcp</string><string>_musiclib-mac._tcp</string></array>
     <key>NSHumanReadableCopyright</key><string>© 2026 Dave Lago. MIT License.</string>
     <key>NSPrincipalClass</key><string>NSApplication</string>
+${EXTRA_INFO}
 </dict>
 </plist>
 PLIST
@@ -87,7 +141,8 @@ if [[ -d "$APP/Contents/Helpers" ]]; then
         codesign "${SIGN_FLAGS[@]}" --identifier "local.musiclibrary.$(basename "$tool")" "$tool"
     done
 fi
-# The hardened runtime blocks recording without this (Digitize Vinyl).
-codesign "${SIGN_FLAGS[@]}" --entitlements Resources/MusicLibrary.entitlements "$APP"
+if [[ -n "${PROVISIONING_PROFILE:-}" ]]; then cp "$PROVISIONING_PROFILE" "$APP/Contents/embedded.provisionprofile"; fi
+# The hardened runtime blocks recording without the audio input entitlement (Digitize Vinyl).
+codesign "${SIGN_FLAGS[@]}" --entitlements "$ENTITLEMENTS" "$APP"
 codesign --verify --strict --deep "$APP"
-echo "Built $APP ($VERSION, $(lipo -archs "$APP/Contents/MacOS/MusicLibrary"), signed: $IDENTITY)"
+echo "Built $APP ($BUNDLE_ID $VERSION, $(lipo -archs "$APP/Contents/MacOS/MusicLibrary"), signed: $IDENTITY${EXTRA_INFO:+, iCloud: ${ICLOUD_CONTAINER:-}})"

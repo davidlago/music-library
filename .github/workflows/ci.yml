@@ -82,6 +82,18 @@ jobs:
           identity="$(scripts/import-certificate.sh "Developer ID Application")"
           echo "SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
 
+      # Optional: with a Developer ID profile that has iCloud the release is built for iCloud (its own bundle ID);
+      # without one, exactly as before (docs/distribution.md).
+      - name: Install the Mac provisioning profile
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          PROFILE: ${{ secrets.MAC_PROVISIONING_PROFILE }}
+        run: |
+          if [ -n "$PROFILE" ]; then
+            printf '%s' "$PROFILE" | base64 --decode > "$RUNNER_TEMP/MusicLibrary.provisionprofile"
+            echo "PROVISIONING_PROFILE=$RUNNER_TEMP/MusicLibrary.provisionprofile" >> "$GITHUB_ENV"
+          fi
+
       - name: Build app (Apple Silicon + Intel)
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -136,7 +148,8 @@ jobs:
         run: xcodebuild -scheme MusicLibraryCore -destination 'generic/platform=iOS Simulator' build
 
       - name: Build the iPhone app
-        run: xcodebuild -project iOS/MusicLibraryMobile.xcodeproj -scheme MusicLibraryMobile -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+        # With the iCloud entitlements, so the file and its build settings are checked too.
+        run: xcodebuild -project iOS/MusicLibraryMobile.xcodeproj -scheme MusicLibraryMobile -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO APP_ENTITLEMENTS=MusicLibraryMobile.entitlements build
 
   testflight:
     name: Upload the iPhone app to TestFlight
@@ -170,6 +183,8 @@ jobs:
           ASC_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
           ASC_ISSUER: ${{ secrets.NOTARY_API_ISSUER_ID }}
           UPLOAD: ${{ (startsWith(github.ref, 'refs/tags/v') || inputs.testflight == 'upload') && '1' || '0' }}
+          # The repository variable ICLOUD=1 once the App ID has iCloud (docs/distribution.md).
+          ICLOUD: ${{ vars.ICLOUD == '1' && '1' || '0' }}
         run: |
           export ASC_KEY="$RUNNER_TEMP/AuthKey.p8"
           printf '%s\n' "$API_KEY" > "$ASC_KEY"

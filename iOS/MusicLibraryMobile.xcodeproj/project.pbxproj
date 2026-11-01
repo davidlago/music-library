@@ -449,7 +449,7 @@
 			baseConfigurationReference = 4D11A0000000000000000004 /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = AppGroup.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "$(APP_ENTITLEMENTS)";
 				CODE_SIGN_STYLE = Automatic;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -480,7 +480,7 @@
 			baseConfigurationReference = 4D11A0000000000000000004 /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = AppGroup.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "$(APP_ENTITLEMENTS)";
 				CODE_SIGN_STYLE = Automatic;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;

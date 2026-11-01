@@ -14,6 +14,8 @@
 #                        sign manually with the Apple Distribution certificate in the keychain and App Store profiles
 #                        made for it with the API key (scripts/provisioning-profiles.swift); for CI, where there's no
 #                        development certificate and an App Manager API key can't use cloud signing
+#   ICLOUD=1             sign the app with iCloud (MusicLibraryMobile.entitlements, see iOS/Signing.xcconfig), once its
+#                        App ID has iCloud with the container (docs/distribution.md)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -24,6 +26,7 @@ EXPORT=build/testflight
 
 SETTINGS=(CURRENT_PROJECT_VERSION="$BUILD")
 if [[ -n "${VERSION:-}" ]]; then SETTINGS+=(MARKETING_VERSION="$VERSION"); fi
+if [[ "${ICLOUD:-0}" == "1" ]]; then SETTINGS+=(APP_ENTITLEMENTS=MusicLibraryMobile.entitlements); fi
 if [[ -n "${DEVELOPMENT_TEAM:-}" ]]; then
     SETTINGS+=(DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM")
 elif ! grep -qs '^[[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=' iOS/Local.xcconfig; then
