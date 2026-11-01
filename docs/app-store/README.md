@@ -84,7 +84,7 @@ analytics. Export compliance: `ITSAppUsesNonExemptEncryption = NO` (only the enc
 version):
 
 ```
-New: a radio DJ who tells you the story behind your records. Find any CD or record by its label, and play your music offline, synced from Music Library for Mac.
+New: back up to your own iCloud and get your music on iPhone even when your Mac isn't nearby. Find any CD or record by its label, and play your music offline.
 ```
 
 **Keywords** (at most 100 characters):
@@ -125,7 +125,7 @@ Get the companion Mac app
 Your music comes from Music Library for Mac (free, macOS 14 or later): it catalogs your CDs and records, imports, rips and digitizes your music, then syncs both collections to your iPhone. Download it, and find the full documentation and the source code, at https://davidlago.github.io/music-library/
 ```
 
-**What's New in 1.30.0** (the first version built with iCloud):
+**What's New in 1.30.0** (submitted 2026-11-01; the live version was 1.24.0, so it covers the iPhone changes of 1.25–1.30):
 
 ```
 Your Mac's iCloud backup
@@ -133,6 +133,15 @@ Your Mac's iCloud backup
 • Download gets songs from the backup when your Mac isn't on the same Wi-Fi, and from the Mac as before when it is.
 • Your plays, likes and downloads reach the Mac through iCloud too.
 • Settings ▸ iCloud shows when the library was last updated, with Check Now.
+
+A new home
+• Four tabs: Listen Now (the album playing or played last, what you've been playing, its neighbors on the shelf, your week and what's up next), Collection (your CDs and records, then your digital collection), Explore (Artists, Music DNA and Insights) and Search. Sync and Settings are at the top of Listen Now.
+• One look in Light and Dark, following your iPhone, or always Light or Dark in Settings.
+
+Radio DJ
+• Show it a photo: tap the camera in the DJ's sheet (touch and hold for your photo library), and it tells you what the record or CD is, which edition, whether you already own it and what a fair price is. Photos are sent without their location.
+• Choose the DJ's model on your Mac, from Claude models or models on OpenRouter; your choice comes over at the next sync.
+• Going on the air is free: the DJ says hello for your time of day and offers a few questions to start with.
 ```
 
 **What's New in 1.24.0** (the live version is 1.23.0; 1.23.1 and 1.23.2 only changed the Mac app):

@@ -1,4 +1,5 @@
 import Foundation
+import Network
 @testable import MusicLibraryCore
 
 enum TestSupport {
@@ -42,6 +43,31 @@ enum TestSupport {
         let url = dir.appendingPathComponent("\(name).jpg")
         try await ffmpeg(["-f", "lavfi", "-i", "color=c=\(color):s=64x64", "-frames:v", "1", url.path])
         return try Data(contentsOf: url)
+    }
+
+    /// A phone listener on a local port, started and accepting connections: its port is known as soon as it's bound,
+    /// which can be a moment before it accepts, and connecting then is refused.
+    static func listeningAdvertiser(key: Data, pairing: Bool = false,
+                                    onConnection: @escaping @Sendable (NWConnection) -> Void) async throws -> SyncAdvertiser {
+        let states = AsyncStream<NWListener.State>.makeStream()
+        let advertiser = try SyncAdvertiser(deviceID: "phone-id", name: "test", key: key, pairing: pairing, advertise: false,
+                                            onState: { states.continuation.yield($0) }, onConnection: onConnection)
+        advertiser.start()
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                for await state in states.stream {
+                    if case .ready = state { return }
+                    if case .failed(let error) = state { throw error }
+                }
+            }
+            group.addTask {
+                try await Task.sleep(for: .seconds(15))
+                throw SyncError.connection("The test listener didn't start.")
+            }
+            try await group.next()
+            group.cancelAll()
+        }
+        return advertiser
     }
 
     static func makeLibrary() throws -> (root: URL, db: Database, service: ImportService) {

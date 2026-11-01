@@ -28,6 +28,10 @@ With **Library, covers and chosen music**, use **Add to iCloud** in the menu of 
 sits next to **Add to iPhone**). Once something is in, the menu offers **Remove from iCloud**. An artist or playlist
 keeps up to date: an album you add later by that artist is backed up too.
 
+Switching from **Everything** to chosen music starts the list with your **Entire Digital Collection**, so nothing
+already in iCloud is let go: take out what you don't want with **Remove from iCloud**, or delete that rule on the iCloud
+page and add albums one by one.
+
 The **iCloud** page, under **Devices** in the sidebar, lists what you chose and what you kept out, how many songs and how
 much space they come to, and the backup's status, with **Back Up Now**.
 
@@ -53,7 +57,9 @@ own files are never touched.
 - **Music, covers and photos** are kept once each and replaced when they change. There's no history of the music
   itself.
 - **Music you take out of the backup** (or remove from the library) stays in iCloud for 30 days, then it's deleted.
-  Choosing it again before then keeps it.
+  Choosing it again before then keeps it. The status shows what's **Waiting to be deleted**; to free that iCloud space
+  sooner, click **Delete Now…** next to it (in **Settings ▸ iCloud** or on the iCloud page). That can't be undone from
+  the backup.
 
 ## Restore
 
