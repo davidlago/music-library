@@ -19,6 +19,8 @@
 	<string>$(APP_GROUP_IDENTIFIER)</string>
 	<key>MusicLibraryICloudContainer</key>
 	<string>$(ICLOUD_CONTAINER)</string>
+	<key>MusicLibraryICloudSigned</key>
+	<string>$(APP_ICLOUD_SIGNED)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take a photo of a record or CD to show the Radio DJ, who tells you what it is, whether you have it and what it's worth.</string>
 	<key>NSBonjourServices</key>

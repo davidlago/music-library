@@ -252,7 +252,38 @@ public final class FolderCloudStore: CloudStore {
     }
 }
 
+/// Why the backup in iCloud can't be opened (`CloudContainer.openBackup`).
+public enum CloudAccessError: Error, LocalizedError, Equatable {
+    /// No iCloud account on this device (or iCloud Drive is off altogether).
+    case signedOut
+    /// Signed in, but iOS doesn't give the app its container: iCloud Drive is off for the app, or the build wasn't
+    /// signed for iCloud (`CloudContainer.isSigned` tells which).
+    case noContainer
+    /// The backup's folder couldn't be made in the container.
+    case folder(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .signedOut: return "Not signed in to iCloud."
+        case .noContainer: return "iCloud isn't available to Music Library."
+        case .folder(let message): return "The backup's folder in iCloud can't be opened: \(message)"
+        }
+    }
+}
+
 extension CloudContainer {
+    /// The backup in the container, or why it can't be opened. Blocks while iCloud sets the container up, so never
+    /// call it on the main thread.
+    public static func openBackup(identifier: String) -> Result<FolderCloudStore, CloudAccessError> {
+        guard FileManager.default.ubiquityIdentityToken != nil else { return .failure(.signedOut) }
+        guard let container = FileManager.default.url(forUbiquityContainerIdentifier: identifier) else { return .failure(.noContainer) }
+        do {
+            return .success(try FolderCloudStore(root: container.appendingPathComponent("Music Library", isDirectory: true), coordinated: true))
+        } catch {
+            return .failure(.folder(error.localizedDescription))
+        }
+    }
+
     /// The backup in the container (`Music Library`), or nil without iCloud. Blocks while iCloud sets the container
     /// up, so never call it on the main thread.
     public static func backupStore(identifier: String) -> FolderCloudStore? {

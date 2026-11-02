@@ -7,6 +7,10 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- Fixed: when the iPhone couldn't use iCloud, it always said to sign in, even when it was signed in. It now says what's
+  wrong: not signed in, iCloud Drive turned off for the app (with where to turn it on), or a build of the app made
+  without iCloud. While it can't reach iCloud, plays and likes stay on the phone until it can.
+
 ## 1.32.0
 
 - New: **AirPlay** on the Mac and the iPhone. The AirPlay button (next to the volume in the Mac's player and in Now

@@ -8,6 +8,22 @@ import Testing
         #expect(CloudContainer.identifier(from: "iCloud.com.example-team.app2") != nil)
     }
 
+    /// The iPhone app's Info.plist says whether the build was signed for iCloud ("YES", or empty without it); the Mac's
+    /// doesn't say.
+    @Test func readsWhetherTheBuildWasSignedForICloud() throws {
+        func bundle(_ info: [String: Any]) throws -> Bundle {
+            let dir = try TestSupport.tempDir().appendingPathComponent("Test.bundle/Contents", isDirectory: true)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            var plist = info
+            plist["CFBundleIdentifier"] = "test.\(UUID().uuidString)"
+            try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0).write(to: dir.appendingPathComponent("Info.plist"))
+            return try #require(Bundle(url: dir.deletingLastPathComponent()))
+        }
+        #expect(CloudContainer.isSigned(in: try bundle([CloudContainer.signedKey: "YES"])) == true)
+        #expect(CloudContainer.isSigned(in: try bundle([CloudContainer.signedKey: ""])) == false)
+        #expect(CloudContainer.isSigned(in: try bundle([:])) == nil)
+    }
+
     @Test func refusesEverythingElse() {
         for value: Any? in [nil, 42, "", "iCloud.", "iCloud.single", "io.github.davidlago.MusicLibrary",
                             "icloud.io.github.x", "iCloud.$(APP_BUNDLE_ID)", "$(ICLOUD_CONTAINER)", "iCloud.a..b",

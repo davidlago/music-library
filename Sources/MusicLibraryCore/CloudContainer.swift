@@ -28,6 +28,16 @@ public enum CloudContainer {
         }
     }
 
+    public static let signedKey = "MusicLibraryICloudSigned"
+
+    /// Whether the build says it was signed with the iCloud entitlements (the iPhone app's Info.plist does, from its
+    /// build settings): false for a build without them, nil when the bundle doesn't say (the Mac's, which has no
+    /// container key without iCloud anyway). iOS can't read an app's own entitlements, hence the key.
+    public static func isSigned(in bundle: Bundle = .main) -> Bool? {
+        guard let value = bundle.object(forInfoDictionaryKey: signedKey) as? String else { return nil }
+        return value == "YES"
+    }
+
     /// The container's folder, or nil when the app isn't entitled to it or isn't signed in to iCloud. It can block
     /// while iCloud sets the container up, so never call it on the main thread.
     public static func url(identifier: String) -> URL? {
