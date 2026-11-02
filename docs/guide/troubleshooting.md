@@ -65,6 +65,10 @@ Apps installed with a free Apple ID stop opening after 7 days. See
 - **iCloud is full**: the backup waits until there's room. Choose less music, or more iCloud storage.
 - **Another library is backed up here**: a different Mac or library folder already uses this iCloud. **Replace It…**
   backs up this library instead; **Turn Off Backup** leaves the other one alone.
+- **The iPhone asks you to turn on iCloud Drive for the app**: in the Settings app, tap your name, then **iCloud**,
+  then **Drive**, and turn on **Dave's Music Library**.
+- **The iPhone says this build wasn't made with iCloud**: it's a version you built yourself without iCloud (see
+  [Building from source](building-from-source.md#icloud)). The App Store and TestFlight versions use iCloud.
 - **The iPhone says iCloud holds another library**: the phone has a library other than the one your Mac backs up (one
   copied over by hand, say). It keeps its own and doesn't use iCloud.
 - **Not in iCloud yet** on the iPhone: those songs aren't in the backup. Add them with **Add to iCloud** on the Mac, or

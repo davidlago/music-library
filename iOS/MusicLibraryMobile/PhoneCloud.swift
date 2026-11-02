@@ -17,7 +17,12 @@ final class PhoneCloud {
     enum Status: Equatable {
         case idle
         case checking
+        /// No iCloud account on the phone.
         case signedOut
+        /// Signed in, but iCloud Drive is off for the app.
+        case driveOff
+        /// This build of the app wasn't signed for iCloud (a local build without the iCloud entitlements).
+        case notSigned
         /// The phone holds another library than the one backed up.
         case otherLibrary
         case failed(String)
@@ -110,8 +115,22 @@ final class PhoneCloud {
         }
     }
 
+    /// Why iCloud can't be reached, as the status shown in Settings.
+    private func unreachable(_ error: CloudAccessError) -> Status {
+        switch error {
+        case .signedOut: .signedOut
+        case .noContainer: CloudContainer.isSigned() == false ? .notSigned : .driveOff
+        case .folder(let message): .failed(error.errorDescription ?? message)
+        }
+    }
+
     func check() {
         guard let containerID, isEnabled, running == nil, !isSyncing() else { return }
+        // Nothing to try: say so rather than ask the user to sign in.
+        if CloudContainer.isSigned() == false {
+            status = .notSigned
+            return
+        }
         status = .checking
         let root = LibrarySnapshot.findRoot(in: URL.documentsDirectory) ?? LibraryLocation.defaultRoot
         let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("iCloud", isDirectory: true)
@@ -131,9 +150,7 @@ final class PhoneCloud {
             }
             arriving = nil
             switch result {
-            case .success(nil):
-                status = .signedOut
-            case .success(let outcome?):
+            case .success(let outcome):
                 status = outcome.database == .otherLibrary ? .otherLibrary : .idle
                 if let at = outcome.backupAt { backupAt = at; macName = outcome.macName }
                 if outcome.database == .replaced {
@@ -141,6 +158,8 @@ final class PhoneCloud {
                     if !outcome.applied.isEmpty { onApplied(outcome.applied) }
                     onLibraryChanged()
                 }
+            case .failure(let error as CloudAccessError):
+                status = unreachable(error)
             case .failure(let error):
                 status = .failed(error.localizedDescription)
             }
@@ -183,11 +202,11 @@ final class PhoneCloud {
                 }
             }
             switch result {
-            case .success(let outcome?):
+            case .success(let outcome):
                 notInCloud = outcome.notInCloud
                 if outcome.files > 0 { onLibraryChanged() }
-            case .success(nil):
-                status = .signedOut
+            case .failure(let error as CloudAccessError):
+                status = unreachable(error)
             case .failure(is CancellationError):
                 onLibraryChanged()
             case .failure(let error):
@@ -201,10 +220,12 @@ final class PhoneCloud {
     func stopFetching() { fetchTask?.cancel() }
 
     nonisolated private static func fetch(_ tracks: [Track], containerID: String, root: URL, free: Int64?,
-                                          progress: @escaping @Sendable (Int, Int) -> Void) async -> Result<CloudFetchOutcome?, Error> {
+                                          progress: @escaping @Sendable (Int, Int) -> Void) async -> Result<CloudFetchOutcome, Error> {
         await Task.detached(priority: .userInitiated) {
-            guard FileManager.default.ubiquityIdentityToken != nil, let store = CloudContainer.backupStore(identifier: containerID) else {
-                return .success(nil)
+            let store: FolderCloudStore
+            switch CloudContainer.openBackup(identifier: containerID) {
+            case .success(let opened): store = opened
+            case .failure(let error): return .failure(error)
             }
             do {
                 return .success(try await CloudReceiver.fetch(tracks, from: store, into: root, freeSpace: free, progress: progress))
@@ -239,26 +260,34 @@ final class PhoneCloud {
         guard key != sentKey else { return }
         sending = Task {
             defer { sending = nil }
-            let sent = await Self.send(batch, phoneID: phone.id, containerID: containerID)
-            if sent {
+            switch await Self.send(batch, phoneID: phone.id, containerID: containerID) {
+            case .success:
                 sentKey = key
                 if batch != nil { lastSent = Date() }
+            case .failure(let error as CloudAccessError):
+                status = unreachable(error)
+            case .failure:
+                break  // Tried again at the next change or check.
             }
         }
     }
 
-    nonisolated private static func send(_ batch: CloudInboxBatch?, phoneID: String, containerID: String) async -> Bool {
+    nonisolated private static func send(_ batch: CloudInboxBatch?, phoneID: String, containerID: String) async -> Result<Void, Error> {
         await Task.detached(priority: .utility) {
-            guard FileManager.default.ubiquityIdentityToken != nil, let store = CloudContainer.backupStore(identifier: containerID) else { return false }
-            return (try? CloudInbox.send(batch, phoneID: phoneID, to: store)) != nil
+            switch CloudContainer.openBackup(identifier: containerID) {
+            case .success(let store): Result { try CloudInbox.send(batch, phoneID: phoneID, to: store) }
+            case .failure(let error): .failure(error)
+            }
         }.value
     }
 
     nonisolated private static func receive(containerID: String, root: URL, scratch: URL, pending: Set<String>,
-                                            progress: @escaping @Sendable (Int, Int) -> Void) async -> Result<CloudReceiveOutcome?, Error> {
+                                            progress: @escaping @Sendable (Int, Int) -> Void) async -> Result<CloudReceiveOutcome, Error> {
         await Task.detached(priority: .utility) {
-            guard FileManager.default.ubiquityIdentityToken != nil, let store = CloudContainer.backupStore(identifier: containerID) else {
-                return .success(nil)
+            let store: FolderCloudStore
+            switch CloudContainer.openBackup(identifier: containerID) {
+            case .success(let opened): store = opened
+            case .failure(let error): return .failure(error)
             }
             do {
                 return .success(try await CloudReceiver.receive(from: store, into: root, scratch: scratch, pending: pending, progress: progress))

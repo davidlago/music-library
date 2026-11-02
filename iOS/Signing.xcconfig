@@ -19,6 +19,10 @@ APP_GROUP_IDENTIFIER = group.$(APP_BUNDLE_ID)
 //     APP_ENTITLEMENTS = MusicLibraryMobile.entitlements
 ICLOUD_CONTAINER = iCloud.io.github.davidlago.MusicLibrary
 APP_ENTITLEMENTS = AppGroup.entitlements
+// Whether this build is signed with the iCloud entitlements (Info.plist MusicLibraryICloudSigned), so the app can tell
+// a build without iCloud from iCloud Drive being off: YES only with MusicLibraryMobile.entitlements.
+APP_ICLOUD_SIGNED_MusicLibraryMobile = YES
+APP_ICLOUD_SIGNED = $(APP_ICLOUD_SIGNED_$(APP_ENTITLEMENTS:base))
 
 #include "Version.xcconfig"
 #include? "Local.xcconfig"

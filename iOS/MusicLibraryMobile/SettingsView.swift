@@ -214,6 +214,12 @@ struct ICloudSettingsSection: View {
                 switch cloud.status {
                 case .signedOut:
                     Label("Sign in to iCloud in the Settings app.", systemImage: "icloud.slash").foregroundStyle(.orange)
+                case .driveOff:
+                    Label("Turn on iCloud Drive for Dave's Music Library: in the Settings app, tap your name, then iCloud, then Drive.",
+                          systemImage: "icloud.slash").foregroundStyle(.orange)
+                case .notSigned:
+                    Label("This build of the app wasn't made with iCloud, so it can't use your backup. The App Store and TestFlight versions can.",
+                          systemImage: "icloud.slash").foregroundStyle(.orange)
                 case .otherLibrary:
                     Label("iCloud holds a backup of another library than the one on this iPhone, so it isn't used.", systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
