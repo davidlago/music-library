@@ -125,14 +125,28 @@ Get the companion Mac app
 Your music comes from Music Library for Mac (free, macOS 14 or later): it catalogs your CDs and records, imports, rips and digitizes your music, then syncs both collections to your iPhone. Download it, and find the full documentation and the source code, at https://davidlago.github.io/music-library/
 ```
 
-**What's New in 1.31.0**:
+**What's New in 1.31.0** (submitted 2026-11-01 in place of 1.30.0, which was taken out of review; the live version
+is 1.24.0, so it covers the iPhone changes of 1.25–1.31):
 
 ```
-• A new iPhone tells you it's looking for your library in iCloud, and shows your covers arriving, instead of an empty screen.
+Your Mac's iCloud backup
+• With iCloud backup turned on in Music Library for Mac, your library, covers and photos stay up to date from your own iCloud, even when the Mac isn't nearby. A new iPhone gets your library without pairing, and shows it arriving instead of an empty screen.
+• Download gets songs from the backup when your Mac isn't on the same Wi-Fi, and from the Mac as before when it is.
 • Music your Mac keeps only in iCloud (offloaded there to save space) comes to your iPhone straight from iCloud, right after a Wi-Fi sync.
+• Your plays, likes and downloads reach the Mac through iCloud too.
+• Settings ▸ iCloud shows when the library was last updated, with Check Now.
+
+A new home
+• Four tabs: Listen Now (the album playing or played last, what you've been playing, its neighbors on the shelf, your week and what's up next), Collection (your CDs and records, then your digital collection), Explore (Artists, Music DNA and Insights) and Search. Sync and Settings are at the top of Listen Now.
+• One look in Light and Dark, following your iPhone, or always Light or Dark in Settings.
+
+Radio DJ
+• Show it a photo: tap the camera in the DJ's sheet (touch and hold for your photo library), and it tells you what the record or CD is, which edition, whether you already own it and what a fair price is. Photos are sent without their location.
+• Choose the DJ's model on your Mac, from Claude models or models on OpenRouter; your choice comes over at the next sync.
+• Going on the air is free: the DJ says hello for your time of day and offers a few questions to start with.
 ```
 
-**What's New in 1.30.0** (submitted 2026-11-01; the live version was 1.24.0, so it covers the iPhone changes of 1.25–1.30):
+**What's New in 1.30.0** (submitted 2026-11-01, then replaced by 1.31.0 before review; the live version was 1.24.0, so it covers the iPhone changes of 1.25–1.30):
 
 ```
 Your Mac's iCloud backup
