@@ -26,6 +26,17 @@ private func discrete(_ rates: Double...) -> [ClosedRange<Double>] { rates.map {
         #expect(OutputFormatChooser.chooseSampleRate(source: 352800, available: discrete(44100, 88200, 96000, 176400)) == 176400)
     }
 
+    @Test func neverDropsBelowCDRateForAnEvenRatio() {
+        // Bluetooth earbuds: 16 kHz is the mono call profile, 44.1 kHz is the music one.
+        let earbuds = discrete(16000, 44100)
+        #expect(OutputFormatChooser.chooseSampleRate(source: 44100, available: earbuds) == 44100)
+        #expect(OutputFormatChooser.chooseSampleRate(source: 48000, available: earbuds) == 44100)
+        #expect(OutputFormatChooser.chooseSampleRate(source: 96000, available: earbuds) == 44100)
+        #expect(OutputFormatChooser.chooseSampleRate(source: 192000, available: earbuds) == 44100)
+        // With nothing better, the highest rate still plays.
+        #expect(OutputFormatChooser.chooseSampleRate(source: 48000, available: discrete(16000, 24000)) == 24000)
+    }
+
     @Test func upsamplesLowRates() {
         #expect(OutputFormatChooser.chooseSampleRate(source: 22050, available: discrete(44100, 48000)) == 44100)
     }

@@ -60,6 +60,9 @@ public struct PhysicalFormatOption: Hashable, Sendable {
 
 public enum OutputFormatChooser {
     static let tolerance = 0.5
+    /// An even ratio isn't worth going lower than CD rate for: it loses the song's top end, and on Bluetooth earbuds
+    /// 16 kHz (a third of 48 kHz) is the mono call profile.
+    static let lowestEvenDivisor = 44100.0
 
     static func contains(_ r: ClosedRange<Double>, _ x: Double) -> Bool {
         x >= r.lowerBound - tolerance && x <= r.upperBound + tolerance
@@ -89,7 +92,7 @@ public enum OutputFormatChooser {
             }
         }
         if let m = multiples.min() { return m }
-        if let d = divisors.max() { return d }
+        if let d = divisors.filter({ $0 >= lowestEvenDivisor }).max() { return d }
         let above = available.compactMap { $0.lowerBound > source ? $0.lowerBound : nil }
         if let a = above.min() { return a }
         return available.map(\.upperBound).max()
