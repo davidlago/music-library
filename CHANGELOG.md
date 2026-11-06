@@ -7,6 +7,10 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.32.1
+
+- Fixed: on the Mac, 48, 96 and 192 kHz songs put Bluetooth earbuds into their 16 kHz mono call mode. They now play at
+  the earbuds' music rate (44.1 kHz on most).
 - Fixed: when the iPhone couldn't use iCloud, it always said to sign in, even when it was signed in. It now says what's
   wrong: not signed in, iCloud Drive turned off for the app (with where to turn it on), or a build of the app made
   without iCloud. While it can't reach iCloud, plays and likes stay on the phone until it can.

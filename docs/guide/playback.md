@@ -7,8 +7,8 @@ your Mac uses, with a real play queue.
 
 With **Match output device sample rate to the song** on (Settings ▸ Playback, on by default), the app sets your output
 device to each song's own sample rate before it plays: a 44.1 kHz CD rip plays at 44.1, a 24/96 file at 96. When a
-device can't do a song's rate, it uses the closest rate that divides evenly (a multiple, then a divisor), so nothing is
-resampled awkwardly. **Match output bit depth** also sets the device's bit depth to the song's.
+device can't do a song's rate, it uses the closest rate that divides evenly (a multiple, then a divisor no lower than CD
+rate), so nothing is resampled awkwardly. **Match output bit depth** also sets the device's bit depth to the song's.
 
 - The player bar shows what's happening: "FLAC · 24-bit / 96 kHz → DAC 96 kHz / 24-bit". The output part turns orange
   when the device couldn't match the song ("Output device doesn't support 192 kHz; using 96 kHz").
