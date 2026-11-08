@@ -16,8 +16,10 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   choose it.
 - Picking an edition from Discogs (Add to Collection, Change Edition…) shows its runouts, barcodes and pressing plant,
   so you can tell which pressing you have; **Use Runouts** copies them into your copy.
-- What a copy is worth now comes from Discogs: its own pressing (or the album's most common one), at Discogs' suggested
-  price for its grade, or Very Good to Near Mint when it isn't graded. eBay's sales show alongside.
+- What a copy is worth now comes from Discogs alone: its own pressing (or the album's most common one), at Discogs'
+  suggested price for its grade, or Very Good to Near Mint when it isn't graded; without suggested prices, the low to
+  high of what that pressing has sold for on Discogs (valued at the median), else its cheapest copy for sale. eBay is
+  no longer used for it, and copies priced from eBay are priced again.
 - The Shop's price at the top is now Discogs' suggested price (Very Good to Near Mint) for the album's most common
   pressing, plus what US sellers typically charge to ship it (on the Mac, from the Discogs listings the Shop reads),
   rather than eBay's sales.

@@ -163,14 +163,14 @@ final class PhoneMarket {
 
     // MARK: Values
 
-    /// Prices a copy with the whole guide when it isn't priced or was priced over a day ago (or `force`).
+    /// Prices a copy with Discogs' whole guide (plus what its pressing sold for there; no eBay) when it isn't priced or was priced over a day ago (or `force`).
     func price(_ item: CollectionItem, force: Bool = false) {
         guard CollectionValue.canValue(item), !pricing.contains(item.id), let guides = guides() else { return }
         if !force, let v = values[item.id], v.matches(item), Date().timeIntervalSince(v.at) < 24 * 3600 { return }
         pricing.insert(item.id)
         let request = CollectionValue.request(for: item)
         Task {
-            let guide = await guides.fullGuide(for: request)
+            let guide = await guides.withSales(await guides.guide(for: request))
             pricing.remove(item.id)
             itemGuides[item.id] = guide
             localValues[item.id] = CollectionValue(itemID: item.id, guide: guide, grade: item.mediaGrade)

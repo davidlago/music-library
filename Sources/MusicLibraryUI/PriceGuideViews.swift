@@ -128,6 +128,10 @@ private struct EditionRow: View {
                     }
                 }
             }
+            if let sales = edition.sales {
+                Text("Sold on Discogs: \(PriceGuide.text(sales.low)) low · \(PriceGuide.text(sales.median)) median · \(PriceGuide.text(sales.high)) high")
+                    .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
+            }
             if let have = edition.have, let want = edition.want {
                 Text("\(have.formatted()) have · \(want.formatted()) want").font(.caption2).foregroundStyle(.secondary)
             }

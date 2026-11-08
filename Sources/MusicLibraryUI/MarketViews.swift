@@ -7,8 +7,8 @@ import SwiftUI
 
 // MARK: A copy's value
 
-/// "What It's Worth" on an item's page: the latest value of this copy's edition, against what you paid, with the
-/// full price guide underneath once it has been read this session.
+/// "What It's Worth" on an item's page: the latest value of this copy's edition on Discogs, against what you paid, with
+/// Discogs' price guide underneath once it has been read this session.
 public struct CollectionValueSection: View {
     let value: CollectionValue?
     let guide: PriceGuide?
@@ -50,24 +50,24 @@ public struct CollectionValueSection: View {
                         if let delta = gain(value) { gainLabel(delta) }
                     }
                     if let source = value.source { Text("From \(source)").font(.caption).foregroundStyle(.secondary) }
+                    if let sales = salesText(value) {
+                        Text(sales).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    }
                     if let note = gradeNote(value) {
                         Label(note, systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
                     }
-                    if let sold = guide?.ebaySold?.used ?? guide?.ebaySold?.new, sold.count >= 3 {
-                        Text("eBay sales, any condition: \(PriceGuide.text(sold.typicalLow))–\(PriceGuide.text(sold.typicalHigh)) (\(sold.count) sold)")
-                            .font(.caption).foregroundStyle(.secondary).monospacedDigit()
-                    }
                     figures(value)
                 } else if let value, !value.found {
-                    Text("Nothing on Discogs or eBay matched this edition when it was priced.")
+                    Text("Nothing on Discogs matched this edition when it was priced.")
                         .font(.callout).foregroundStyle(.secondary)
                 } else if let value {
-                    Text("No price for this edition yet: nothing sold or listed.").font(.callout).foregroundStyle(.secondary)
+                    Text("No price on Discogs for this edition yet: it hasn't sold there, and none is for sale.")
+                        .font(.callout).foregroundStyle(.secondary)
                     figures(value)
                 } else if pricing {
-                    Text("Checking Discogs and eBay for this edition…").font(.callout).foregroundStyle(.secondary)
+                    Text("Checking Discogs for this edition…").font(.callout).foregroundStyle(.secondary)
                 } else {
-                    Text("See what this edition sells for on Discogs and eBay.").font(.callout).foregroundStyle(.secondary)
+                    Text("See what this edition sells for on Discogs.").font(.callout).foregroundStyle(.secondary)
                 }
                 if let value {
                     Text("Priced \(value.at.formatted(.relative(presentation: .named)))")
@@ -85,6 +85,13 @@ public struct CollectionValueSection: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .card()
         }
+    }
+
+    /// "Median $10 · last sold Sep 23, 2026", for a value from the pressing's Discogs sales.
+    private func salesText(_ value: CollectionValue) -> String? {
+        guard let median = value.median else { return nil }
+        let last = value.lastSold.map { " · last sold \($0.formatted(date: .abbreviated, time: .omitted))" } ?? ""
+        return "Median \(PriceGuide.text(median))\(last)"
     }
 
     /// Why a copy's value isn't for its grade: it has none, or Discogs gave no price for it.

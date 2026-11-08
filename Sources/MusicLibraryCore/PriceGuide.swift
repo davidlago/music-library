@@ -111,6 +111,8 @@ public struct DiscogsPricedEdition: Hashable, Sendable, Identifiable {
     public var ratingCount: Int?
     /// Best condition first; empty without a token (or seller settings).
     public var suggestions: [DiscogsConditionPrice] = []
+    /// What it has sold for on Discogs (read from its release page for a copy's value only; nil: not read, or never sold).
+    public var sales: DiscogsSalesHistory?
 
     public var id: Int { releaseID }
     public var webURL: URL? { DiscogsLink.releaseURL(releaseID) }
@@ -201,6 +203,9 @@ public struct PriceGuide: Hashable, Sendable, Identifiable {
         public var low: Money
         public var high: Money
         public var source: String
+        /// From a pressing's Discogs sales: their median (the estimate) and the last sale's date.
+        public var median: Money?
+        public var lastSold: Date?
 
         public var text: String { low == high ? PriceGuide.text(low) : "\(PriceGuide.text(low))–\(PriceGuide.text(high))" }
     }
@@ -249,13 +254,14 @@ public struct PriceGuide: Hashable, Sendable, Identifiable {
         return fairPrice
     }
 
-    /// What a copy you own is worth, looked up on Discogs as the Shop does: the copy's own pressing when the guide
-    /// identified it, else the album's most common one; Discogs' suggestion for the copy's media grade when it's
-    /// graded and Discogs has one, else its Very Good to Near Mint suggestions, else the cheapest copy of that pressing
-    /// for sale; `fairPrice` only when Discogs has no price at all. No shipping: it's what the copy is worth.
+    /// What a copy you own is worth, from Discogs alone (never eBay): the copy's own pressing when the guide
+    /// identified it, else the album's most common one (`valuedEdition`); Discogs' suggestion for the copy's media
+    /// grade when it's graded and Discogs has one, else its Very Good to Near Mint suggestions, else the low to high of
+    /// what that pressing has sold for on Discogs (its median the estimate), else the cheapest copy of it for sale;
+    /// nil when Discogs has no price for it. No shipping: it's what the copy is worth.
     public func copyEstimate(grade: CollectionGrade?) -> FairPrice? {
         let own = editions.first { $0.roles.contains(.identified) }
-        guard let edition = own ?? mostCommon else { return fairPrice }
+        guard let edition = valuedEdition else { return nil }
         let pressing = own != nil ? "this pressing" : "the most common pressing"
         if let grade, grade.isMediaGrade,
            let suggestion = edition.suggestions.first(where: { $0.condition.caseInsensitiveCompare(grade.discogsName) == .orderedSame }) {
@@ -265,10 +271,19 @@ public struct PriceGuide: Hashable, Sendable, Identifiable {
         if let range = edition.fairRange {
             return FairPrice(low: range.low, high: range.high, source: "Discogs' suggestion for \(pressing), VG to NM")
         }
+        if let sales = edition.sales {
+            return FairPrice(low: sales.low, high: sales.high, source: "Discogs sales of \(pressing), any condition",
+                             median: sales.median, lastSold: sales.lastSold)
+        }
         if let lowest = edition.lowest {
             return FairPrice(low: lowest, high: lowest, source: "the cheapest copy of \(pressing) on Discogs")
         }
-        return fairPrice
+        return nil
+    }
+
+    /// The pressing a copy's value comes from: the one identified, else the album's most common.
+    public var valuedEdition: DiscogsPricedEdition? {
+        editions.first { $0.roles.contains(.identified) } ?? mostCommon
     }
 
     /// The album's most common pressing: the most collected edition, else the one to lead with.
@@ -320,6 +335,10 @@ public struct PriceGuide: Hashable, Sendable, Identifiable {
                 if let rating = e.rating, let count = e.ratingCount, count > 0 { line += String(format: "; rated %.2f/5 (%d)", rating, count) }
                 if !e.suggestions.isEmpty {
                     line += ". Suggested: " + e.suggestions.map { "\($0.short) \(Self.text($0.price))" }.joined(separator: ", ")
+                }
+                if let s = e.sales {
+                    line += ". Sold on Discogs: low \(Self.text(s.low)), median \(Self.text(s.median)), high \(Self.text(s.high))"
+                    if let last = s.lastSold { line += ", last \(last.formatted(.iso8601.year().month().day()))" }
                 }
                 lines.append(line + ".")
             }
@@ -581,13 +600,17 @@ public actor PriceGuides {
     private var loading: Task<[DiscogsInstance], Error>?
     private let now: @Sendable () -> Date
     private let ebay: EbayReader?
+    private let discogsPages: DiscogsPageReader?
     public nonisolated var readsEbay: Bool { ebay != nil }
 
     /// `token`/`username`: the user's account (checked with `DiscogsToken.cleaned`/`DiscogsIdentity.isValidUsername`);
     /// without them the public figures only, at Discogs' lower anonymous rate.
+    /// `discogsPages` reads release pages for what a pressing has sold for (`withSales`; nil: not at all).
     public init(token: String?, username: String?, currency: String, ebay: EbayReader? = nil,
+                discogsPages: DiscogsPageReader? = nil,
                 transport: DiscogsCollectionClient.Transport? = nil, now: @escaping @Sendable () -> Date = Date.init) {
         self.ebay = ebay
+        self.discogsPages = discogsPages
         let token = token.flatMap(DiscogsToken.cleaned)
         let username = username.flatMap { DiscogsIdentity.isValidUsername($0) ? $0 : nil }
         client = DiscogsCollectionClient(token: token, transport: transport, window: token == nil ? 20 : 50)
@@ -650,6 +673,21 @@ public actor PriceGuides {
         let sold = await ebay.signedIn() ? await read(sold: true) : (nil, nil)
         let forSale = readsForSale ?? ebay.readsForSale ? await read(sold: false) : (nil, nil)
         return (sold.0, forSale.0, [sold.1, forSale.1].compactMap { $0 })
+    }
+
+    /// The guide with what the pressing a copy is valued by (`PriceGuide.valuedEdition`) has sold for on Discogs, when
+    /// Discogs' suggestions don't already price it (one page read). What failed goes in its notes.
+    public func withSales(_ guide: PriceGuide) async -> PriceGuide {
+        guard let discogsPages, let edition = guide.valuedEdition, edition.fairRange == nil, edition.sales == nil,
+              let index = guide.editions.firstIndex(where: { $0.releaseID == edition.releaseID }),
+              let url = DiscogsSalesHistory.url(releaseID: edition.releaseID) else { return guide }
+        var guide = guide
+        do {
+            guide.editions[index].sales = DiscogsSalesHistory.parse(try await discogsPages.sales(url), releaseID: edition.releaseID)
+        } catch {
+            guide.notes.append("Couldn't read what this pressing sold for on Discogs (\(error.localizedDescription)).")
+        }
+        return guide
     }
 
     /// A quick guide to one edition, for valuing many copies in a row: with its Discogs release known, only that

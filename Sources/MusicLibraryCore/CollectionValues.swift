@@ -9,7 +9,7 @@ import Foundation
 public struct CollectionValue: Codable, Hashable, Sendable {
     public var itemID: String
     public var at: Date
-    /// Discogs or eBay had it.
+    /// Discogs had it (before 1.35: Discogs or eBay).
     public var found: Bool
     public var low: Money?
     public var high: Money?
@@ -25,9 +25,13 @@ public struct CollectionValue: Codable, Hashable, Sendable {
     public var grade: String?
     /// How it was worked out (`CollectionValue.method`); nil: before 1.35, when eBay's sales led.
     public var method: Int?
+    /// When it's from the pressing's Discogs sales (`low`–`high`): their median, the estimate, and the last sale.
+    public var median: Money?
+    public var lastSold: Date?
 
-    /// 2: Discogs first, for the copy's grade (`PriceGuide.copyEstimate`).
-    public static let method = 2
+    /// 3: Discogs alone, for the copy's grade, with the pressing's Discogs sales before its cheapest copy for sale
+    /// (`PriceGuide.copyEstimate`). 2 fell back to eBay when Discogs had no price.
+    public static let method = 3
 
     public init(itemID: String, at: Date, found: Bool, low: Money? = nil, high: Money? = nil, source: String? = nil,
                 lowest: Money? = nil, forSale: Int? = nil, have: Int? = nil, want: Int? = nil, releaseID: Int? = nil) {
@@ -39,10 +43,12 @@ public struct CollectionValue: Codable, Hashable, Sendable {
     public init(itemID: String, guide: PriceGuide, grade: CollectionGrade? = nil, at: Date = Date()) {
         self.itemID = itemID
         self.at = at
-        found = guide.hasPrices
+        found = guide.found
         self.grade = grade?.rawValue
         method = Self.method
-        if let fair = guide.copyEstimate(grade: grade) { low = fair.low; high = fair.high; source = fair.source }
+        if let fair = guide.copyEstimate(grade: grade) {
+            low = fair.low; high = fair.high; source = fair.source; median = fair.median; lastSold = fair.lastSold
+        }
         let edition = guide.editions.first { $0.roles.contains(.identified) } ?? guide.headline
         lowest = edition?.lowest
         forSale = edition?.forSale
@@ -51,9 +57,10 @@ public struct CollectionValue: Codable, Hashable, Sendable {
         releaseID = edition?.releaseID
     }
 
-    /// What it's worth: the middle of the fair price.
+    /// What it's worth: the median of its Discogs sales, else the middle of the range.
     public var estimate: Money? {
         guard let low else { return nil }
+        if let median, median.currency == low.currency { return median }
         guard let high, high.currency == low.currency else { return low }
         return Money((low.amount + high.amount) / 2, low.currency)
     }
@@ -71,6 +78,8 @@ public struct CollectionValue: Codable, Hashable, Sendable {
         v.low = low.flatMap(WantedAlbum.validMoney)
         v.high = high.flatMap(WantedAlbum.validMoney)
         v.lowest = lowest.flatMap(WantedAlbum.validMoney)
+        v.median = median.flatMap(WantedAlbum.validMoney)
+        v.lastSold = lastSold.flatMap { $0.timeIntervalSince1970.isFinite ? $0 : nil }
         v.source = source.map { String($0.prefix(200)) }
         v.forSale = forSale.map { max(0, $0) }
         v.have = have.map { max(0, $0) }

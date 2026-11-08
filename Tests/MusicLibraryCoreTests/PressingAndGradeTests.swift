@@ -169,10 +169,66 @@ import Testing
         var noToken = guide
         noToken.editions = noToken.editions.map { var e = $0; e.suggestions = []; return e }
         #expect(noToken.copyEstimate(grade: .veryGoodPlus)?.low == Money(30, "USD"))
-        // No Discogs at all: the fair price as before.
+        // With what the pressing sold for on Discogs, its low to high, before the cheapest copy for sale.
+        var sold = noToken
+        sold.editions[0].sales = DiscogsSalesHistory(releaseID: 1, low: Money(6, "USD"), median: Money(10, "USD"), high: Money(35, "USD"))
+        let sales = try #require(sold.copyEstimate(grade: .veryGoodPlus))
+        #expect(sales.low == Money(6, "USD") && sales.high == Money(35, "USD") && sales.median == Money(10, "USD"))
+        #expect(sales.source == "Discogs sales of this pressing, any condition")
+        // Its value's estimate is the median, not the middle of the range.
+        #expect(CollectionValue(itemID: "v1", guide: sold, grade: .veryGoodPlus).estimate == Money(10, "USD"))
+        // Never eBay: with no Discogs price, no value, though eBay's sales would lead the fair price.
         var ebayOnly = guide
         ebayOnly.editions = []
-        #expect(ebayOnly.copyEstimate(grade: .nearMint) == ebayOnly.fairPrice)
+        #expect(ebayOnly.fairPrice?.source.contains("eBay") == true)
+        #expect(ebayOnly.copyEstimate(grade: .nearMint) == nil)
+        var nothingListed = noToken
+        nothingListed.editions = nothingListed.editions.map { var e = $0; e.lowest = nil; return e }
+        #expect(nothingListed.copyEstimate(grade: nil) == nil)
+        let unpriced = CollectionValue(itemID: "v1", guide: nothingListed)
+        #expect(unpriced.found && unpriced.low == nil)
+        ebayOnly.masterID = nil
+        #expect(!CollectionValue(itemID: "v1", guide: ebayOnly).found)
+    }
+
+    @Test func discogsSalesReadFromTheReleasePage() throws {
+        func sales(_ id: Int) throws -> DiscogsSalesHistory? {
+            DiscogsSalesHistory.parse(String(decoding: try TestSupport.fixture("discogs_sales_\(id)"), as: UTF8.self), releaseID: id)
+        }
+        // The Köln Concert, US Pitman pressing: none for sale, Low $6.00, Median $10.00, High $34.99 on the page.
+        let koln = try #require(try sales(29241412))
+        #expect(koln.low == Money(6, "USD") && koln.median == Money(10, "USD") && koln.high == Money(Decimal(string: "34.99")!, "USD"))
+        #expect(koln.lastSold == ISO8601DateFormatter().date(from: "2026-09-23T00:27:23Z"))
+        let chronicle = try #require(try sales(2775493))
+        #expect(chronicle.low == Money(1, "USD") && chronicle.median == Money(Decimal(string: "2.9")!, "USD") && chronicle.high == Money(10, "USD"))
+        // Another release's page, a page without its data, nonsense.
+        let text = String(decoding: try TestSupport.fixture("discogs_sales_29241412"), as: UTF8.self)
+        #expect(DiscogsSalesHistory.parse(text, releaseID: 2775493) == nil)
+        #expect(DiscogsSalesHistory.parse("", releaseID: 1) == nil)
+        #expect(DiscogsSalesHistory.parse(#"{"releases":[{"discogsId":1,"statistics":null}]}"#, releaseID: 1) == nil)
+        let upsideDown = #"{"releases":[{"discogsId":1,"statistics":{"min":{"amount":9,"currency":"USD"},"median":{"amount":5,"currency":"USD"},"max":{"amount":10,"currency":"USD"}}}]}"#
+        #expect(DiscogsSalesHistory.parse(upsideDown, releaseID: 1) == nil)
+        #expect(DiscogsSalesHistory.url(releaseID: 29241412)?.absoluteString == "https://www.discogs.com/release/29241412")
+    }
+
+    @Test func salesAreReadOnlyWhenDiscogsSuggestsNoPrice() async throws {
+        let page = String(decoding: try TestSupport.fixture("discogs_sales_29241412"), as: UTF8.self)
+        let reads = PageReads()
+        let guides = PriceGuides(token: nil, username: nil, currency: "USD",
+                                 discogsPages: DiscogsPageReader(sales: { url in
+                                     await reads.add(url)
+                                     return page
+                                 }))
+        var g = PriceGuide(request: PriceGuideRequest(artist: "Keith Jarrett", album: "The Köln Concert"))
+        g.editions = [DiscogsPricedEdition(releaseID: 29241412, title: "The Köln Concert", country: "US", label: "ECM Records",
+                                           catalogNumber: "ECM 1064/65", format: "LP", roles: [.identified], forSale: 0)]
+        let read = await guides.withSales(g)
+        #expect(read.editions[0].sales?.median == Money(10, "USD"))
+        #expect(await reads.urls == [URL(string: "https://www.discogs.com/release/29241412")!])
+        // Discogs' suggestions already price it: no page read.
+        g.editions[0].suggestions = [DiscogsConditionPrice(condition: "Very Good Plus (VG+)", price: Money(20, "USD"))]
+        _ = await guides.withSales(g)
+        #expect(await reads.urls.count == 1)
     }
 
     @Test func valueRemembersItsGradeAndMethod() {
@@ -182,7 +238,10 @@ import Testing
         #expect(value.estimate == Money(40, "USD") && value.matches(item))
         item.mediaGrade = .veryGood
         #expect(!value.matches(item))
-        // A value from before 1.35 is priced again.
+        // A value from before 1.35, or from 1.35's builds that fell back to eBay, is priced again.
+        var eBayFallback = value
+        eBayFallback.method = 2
+        #expect(!eBayFallback.matches(item))
         let old = CollectionValue(itemID: "v1", at: Date(), found: true, low: Money(100, "USD"), high: Money(120, "USD"))
         item.mediaGrade = nil
         #expect(!old.matches(item))
@@ -315,4 +374,9 @@ import Testing
         #expect(noFields.gradeUpdates.isEmpty && noFields.gradesWithoutField == 1)
         #expect(DiscogsSyncPlan.make(items: [linked], releases: releases, links: links, remote: remote).gradeUpdates.isEmpty)
     }
+}
+
+private actor PageReads {
+    var urls: [URL] = []
+    func add(_ url: URL) { urls.append(url) }
 }

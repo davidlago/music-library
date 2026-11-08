@@ -3,9 +3,10 @@ import MusicLibraryCore
 import Observation
 
 /// What the CDs and records are worth (`CollectionValues.swift`): each copy's latest value, kept in the library
-/// database (so the phone shows them too). An item's page prices its copy with the whole guide (Discogs and eBay);
-/// Update Values prices every copy not priced in the last month with Discogs alone, one at a time (its edition only
-/// when the item, or Sync to Discogs, knows its release: two requests), in the background, with a Stop.
+/// database (so the phone shows them too). Values come from Discogs alone: an item's page prices its copy with
+/// Discogs' whole guide, Update Values prices every copy not priced in the last month one at a time (its edition only
+/// when the item, or Sync to Discogs, knows its release: two requests), in the background, with a Stop; both read
+/// what the pressing sold for from its Discogs page when Discogs suggests no price (`PriceGuides.withSales`).
 @MainActor @Observable
 final class CollectionValueStore {
     private(set) var values: [String: CollectionValue] = [:]
@@ -38,7 +39,7 @@ final class CollectionValueStore {
         ((try? database()?.discogsSyncRows()) ?? [:]).compactMapValues { $0.releaseID ?? $0.instanceReleaseID }
     }
 
-    /// Prices one copy with the whole guide, when it isn't priced or was priced more than a day ago (or `force`).
+    /// Prices one copy with Discogs' whole guide, when it isn't priced or was priced more than a day ago (or `force`).
     func price(_ item: CollectionItem, force: Bool = false) {
         guard CollectionValue.canValue(item), !pricing.contains(item.id), let guides = priceGuides() else { return }
         if !force, let v = values[item.id], v.matches(item), Date().timeIntervalSince(v.at) < Self.pageAge { return }
@@ -50,7 +51,7 @@ final class CollectionValueStore {
         pricing.insert(item.id)
         let request = CollectionValue.request(for: item, discogsMatch: discogsMatches()[item.id])
         Task {
-            let guide = await guides.fullGuide(for: request, readsForSale: true)
+            let guide = await guides.withSales(await guides.guide(for: request))
             pricing.remove(item.id)
             fullGuides[item.id] = guide
             save([CollectionValue(itemID: item.id, guide: guide, grade: item.mediaGrade)])
@@ -74,7 +75,7 @@ final class CollectionValueStore {
             for (i, item) in items.enumerated() {
                 if Task.isCancelled { break }
                 pricing.insert(item.id)
-                let guide = await guides.editionGuide(for: CollectionValue.request(for: item, discogsMatch: matches[item.id]))
+                let guide = await guides.withSales(await guides.editionGuide(for: CollectionValue.request(for: item, discogsMatch: matches[item.id])))
                 pricing.remove(item.id)
                 if Task.isCancelled { break }
                 // Discogs busy: stop rather than record nothing for the rest.

@@ -138,18 +138,21 @@ Search for them with `grade:` (`grade:vg+`, `grade:>=vg+`, `grade:<vg`, `grade:n
 
 ### What it's worth
 
-A CD's or record's page shows what your copy is worth on Discogs: Discogs' suggested price for its pressing in its grade
-(the record's or disc's), or for a Very Good to Near Mint copy when it isn't graded; without suggested prices, the
-cheapest copy of that pressing for sale. The pressing is your copy's own Discogs release (yours, or the one
+A CD's or record's page shows what your copy is worth on Discogs (eBay isn't used for it): Discogs' suggested price
+for its pressing in its grade (the record's or disc's), or for a Very Good to Near Mint copy when it isn't graded.
+Without suggested prices, the range of what that pressing has sold for on Discogs, low to high, with the median (what
+the copy counts as worth) and the date of the last sale, as the Statistics on its Discogs page show them; if it has
+never sold there, the cheapest copy of it for sale. The pressing is your copy's own Discogs release (yours, or the one
 [Sync to Discogs](#sync-to-discogs) matched, else found by its barcode, catalog number, country and year), else the
 album's most common pressing. Discogs gives suggested prices only with a Discogs token (Settings ▸ Discogs on the Mac).
-Below it: what eBay buyers paid recently (any condition), how that compares with what you paid, the cheapest copy for
-sale on Discogs, how many people have and want it, and the whole price guide. It's checked again when you open the
-page and the price is more than a day old, when you change the copy's grade, or with **Refresh**.
+Below it: how that compares with what you paid, the cheapest copy for sale on Discogs, how many people have and want
+it, and Discogs' price guide for the album. It's checked again when you open the page and the price is more than a day
+old, when you change the copy's grade, or with **Refresh**.
 
 The values add up in the **Owned** pane of [Insights](insights.md#owned): **Collection Value**. On the Mac, **Update
-Values** there prices every CD and record not priced in the last month, using Discogs alone (two requests per copy when
-its Discogs release is known), at the pace Discogs allows, in the background. Values sync to the iPhone.
+Values** there prices every CD and record not priced in the last month the same way (two requests per copy when its
+Discogs release is known, plus its Discogs page when there are no suggested prices), at the pace Discogs allows, in the
+background. Values sync to the iPhone.
 
 ## Find by Label
 
