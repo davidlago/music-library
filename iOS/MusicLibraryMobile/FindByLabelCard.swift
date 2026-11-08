@@ -137,7 +137,7 @@ struct FindByLabelCard: View {
                 Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                 let meta = [item.year.map(String.init), item.formatDetail].compactMap { $0 }
                 if !meta.isEmpty { Text(meta.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
-                DigitalStatusLabel(item: item, state: state, collection: c).font(.caption)
+                DigitalStatusLabel(state: state, medium: item.medium, collection: c).font(.caption)
             }
             Spacer(minLength: 4)
             InsightChevron()

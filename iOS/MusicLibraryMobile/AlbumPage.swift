@@ -501,7 +501,7 @@ struct CopyRow: View {
                 if !bought.isEmpty {
                     Text(bought.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 }
-                DigitalStatusLabel(item: item, state: state, collection: model.collection)
+                DigitalStatusLabel(state: state, medium: item.medium, collection: model.collection)
                     .font(.caption)
             }
             Spacer(minLength: 6)
