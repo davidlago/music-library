@@ -23,6 +23,10 @@ struct CollectionInsightsPane: View {
                 InsightTileGrid { CollectionTiles(stats: stats) }
                 CollectionShelvesCard(stats: stats, collection: model.collection)
                 CollectionMediaCard(stats: stats)
+                CollectionValueCard(stats: model.market.valueStats) { item in
+                    CoverImage(url: model.library?.coverURL(item: item), size: 36, title: nil)
+                }
+                BuyListCard(shown: model.market.shown) { openRoute(BuyListRoute.list) }
                 if !stats.timeline.isEmpty { CollectionSpendingCard(stats: stats) }
                 CollectionListsCard(stats: stats) { item in
                     CoverImage(url: model.library?.coverURL(item: item), size: 40, title: nil)

@@ -17,12 +17,18 @@ public struct CloudInboxBatch: Codable, Equatable, Sendable {
     public var writtenAt: Date
     public var events: [SyncEvent]
     public var requests: [SyncRequest]
+    /// Buy List changes (optional: older Macs ignore it, so the format stays 1).
+    public var wanted: [WantedAlbum]?
+    /// The Shop's Recent Finds (optional, like `wanted`).
+    public var shopFinds: [ShopFind]?
 
     public init(libraryID: String, phoneID: String, phoneName: String, writtenAt: Date = Date(),
-                events: [SyncEvent], requests: [SyncRequest]) {
+                events: [SyncEvent], requests: [SyncRequest], wanted: [WantedAlbum]? = nil, shopFinds: [ShopFind]? = nil) {
         format = Self.currentFormat
         self.libraryID = libraryID; self.phoneID = phoneID; self.phoneName = phoneName; self.writtenAt = writtenAt
         self.events = events; self.requests = requests
+        self.wanted = wanted?.isEmpty == true ? nil : wanted
+        self.shopFinds = shopFinds?.isEmpty == true ? nil : shopFinds
     }
 
     public static func decode(_ data: Data) -> CloudInboxBatch? {

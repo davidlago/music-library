@@ -45,6 +45,10 @@ final class PhoneSync {
     /// The plays, likes and ownership changes to send, the downloads and removals asked for, and the library they
     /// were recorded against.
     @ObservationIgnored var pendingEvents: () -> ([SyncEvent], [SyncRequest], String?) = { ([], [], nil) }
+    /// Buy List changes for the Mac (they leave the outbox once a copy shows them applied).
+    @ObservationIgnored var pendingWanted: () -> [WantedAlbum] = { [] }
+    /// The Shop's Recent Finds for the Mac.
+    @ObservationIgnored var pendingFinds: () -> [ShopFind] = { [] }
     /// Called with the events and requests a finished sync handled (the Mac applied, already had, or dropped them).
     @ObservationIgnored var onEventsDelivered: (Set<String>, Set<String>) -> Void = { _, _ in }
     /// Keeps the Mac's concert settings.
@@ -233,6 +237,8 @@ final class PhoneSync {
         let free = (try? URL.documentsDirectory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
             .volumeAvailableCapacityForImportantUsage
         let (events, requests, libraryID) = pairing ? ([], [], nil) : pendingEvents()
+        let wanted = pairing ? [] : pendingWanted()
+        let finds = pairing ? [] : pendingFinds()
         let lastFMConnected = isLastFMConnected()
         let djUsage = radioDJUsage()
         Task {
@@ -244,7 +250,7 @@ final class PhoneSync {
             do {
                 let result = try await SyncPhoneSession.run(
                     connection, identity: identity, root: root, freeSpace: free, pairing: pairing,
-                    events: events, requests: requests, libraryID: libraryID, lastFMConnected: lastFMConnected,
+                    events: events, requests: requests, wanted: wanted, shopFinds: finds, libraryID: libraryID, lastFMConnected: lastFMConnected,
                     radioDJUsage: djUsage,
                     storeGrant: { grant in try await self.store(grant) },
                     adoptLastFM: { account in await self.adopt(account) },

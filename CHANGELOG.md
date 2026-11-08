@@ -7,6 +7,27 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.34.0
+
+- New: a **Buy List** for the albums you're looking for, on the Mac (Acquire ▸ Buy List) and the iPhone (Collection tab
+  and Shop tab). Add an album from the Shop after looking it up or scanning its barcode, from a Local Library CD, or by
+  name; each one keeps what it goes for (the cheapest copy on Discogs or eBay, the fair price, and how that moved since
+  the last check), with the most you'd pay so you can see what's a deal. **Refresh Prices** checks them all again. The
+  list syncs between the Mac and the iPhone, changes on either side included.
+  [Buy List](https://github.com/davidlago/music-library/blob/main/docs/guide/shop.md#buy-list)
+- New: what your CDs and records are worth. An item's page shows **What It's Worth**: its edition's fair price on
+  Discogs and eBay against what you paid, the cheapest copy for sale, and the full price guide. The **Owned** pane of
+  Insights adds **Collection Value** (the total, what it's gained over what you paid, the most valuable copies and the
+  biggest gains; **Update Values** on the Mac prices every copy) and your Buy List.
+  [What it's worth](https://github.com/davidlago/music-library/blob/main/docs/guide/physical-collection.md#what-its-worth)
+- New: the Shop shows the album's **track list** from Apple Music, on the Mac and the iPhone: click or tap a song for
+  its 30-second preview (or **Play Previews** for all of them in a row), and **Open in Apple Music** opens the album in
+  the Music app, ready to play with your subscription. [Track list](https://github.com/davidlago/music-library/blob/main/docs/guide/shop.md#track-list-and-apple-music)
+- New: **Recent Finds** sync between the Mac and the iPhone (Wi-Fi sync and iCloud), and the Mac's Shop shows them
+  too. The finds already on your iPhone go to the Mac at the next sync. [Recent Finds](https://github.com/davidlago/music-library/blob/main/docs/guide/shop.md#recent-finds)
+- Removed: the local library list (**List for Music Library**, and its page in the sidebar). Local Library CDs now have
+  **Add to Buy List** instead, and `is:onlist` finds the CDs on your Buy List.
+
 ## 1.33.0
 
 - New: the Shop has a price guide, on the Mac and the iPhone: a fair price to lead with, Discogs' figures for the edition,

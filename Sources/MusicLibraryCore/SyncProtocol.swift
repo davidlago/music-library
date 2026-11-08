@@ -191,8 +191,15 @@ public struct SyncManifest: Codable, Equatable, Sendable {
     public var libraryID: String?
     /// Downloads and removals asked for on the phone, oldest first.
     public var requests: [SyncRequest]
-    public init(files: [SyncFileEntry], events: [SyncEvent] = [], libraryID: String? = nil, requests: [SyncRequest] = []) {
+    /// Buy List changes made on the phone (`WantedOutbox`). Optional: older Macs ignore it, older phones don't send it.
+    public var wanted: [WantedAlbum]?
+    /// The Shop's Recent Finds made or removed on the phone (optional, like `wanted`).
+    public var shopFinds: [ShopFind]?
+    public init(files: [SyncFileEntry], events: [SyncEvent] = [], libraryID: String? = nil, requests: [SyncRequest] = [],
+                wanted: [WantedAlbum]? = nil, shopFinds: [ShopFind]? = nil) {
         self.files = files; self.events = events; self.libraryID = libraryID; self.requests = requests
+        self.wanted = wanted?.isEmpty == true ? nil : wanted
+        self.shopFinds = shopFinds?.isEmpty == true ? nil : shopFinds
     }
 }
 

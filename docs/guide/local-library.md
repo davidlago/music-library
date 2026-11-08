@@ -16,9 +16,8 @@ Open **Settings ▸ Local Library**:
 - **Website**: your catalog's address (`https://natick.minlib.net` by default).
 - **My local library**: your branch, selected when browsing, listed first in availability and offered for "Available
   now at".
-- **Account** (optional): your library card number or username and PIN or password, to see your checkouts and to add
-  CDs to one of your library lists (**List for Music Library**). The password is kept in your keychain and sent only to
-  the catalog's website.
+- **Account** (optional): your library card number or username and PIN or password, to see your checkouts. The
+  password is kept in your keychain and sent only to the catalog's website.
 - **Downloaded catalogs**: the libraries whose CDs are downloaded. Your library is added the first time you open Local
   Library CDs; **Add a Library…** adds more.
 - **Album details**: **Look up track lists, covers and info on MusicBrainz as CDs load** (on by default).
@@ -46,7 +45,7 @@ match, recently added, artist, title, newest or oldest release, or rating, and s
 | `is:owned`, `-is:owned` | Already in your digital collection, or not |
 | `own:any`, `own:vinyl`, `own:none` | Owned by you (on CD, vinyl or as a download), or not |
 | `is:available`, `is:out` | On the shelf at your library right now, or not |
-| `is:onlist` | On the library list you chose in Settings |
+| `is:onlist` | On your [Buy List](shop.md#buy-list) |
 | `library:acton`, `rating:>=4` | Owned by a library; MusicBrainz community rating |
 
 `is:owned` is about your digital collection, `own:` about what you own: a CD you own but haven't ripped is
@@ -64,9 +63,10 @@ download.
   **I Own This…** to add it to your Physical Collection.
 - **Where to Find It**: every library that owns it, with the call number and how many copies are in.
 - **Play Previews**: 30-second previews of its songs from Apple Music, one at a time or all in a row, with no account.
-- **Open in Catalog**, and **Add to** your library list (named after it) when you've chosen one in Settings.
+- **Open in Catalog**, and **Add to Buy List** to look for a copy of your own (it's priced right away; see
+  [Buy List](shop.md#buy-list)). CDs on your Buy List have an orange bag on their cover, and **On Buy List** in the
+  filters shows only those.
 
 ## Your account
 
-With an account in Settings, **My Checkouts** lists what you have checked out (and which CDs you haven't ripped yet),
-and your list (named in the sidebar) shows the CDs you saved for your next visit.
+With an account in Settings, **My Checkouts** lists what you have checked out (and which CDs you haven't ripped yet).

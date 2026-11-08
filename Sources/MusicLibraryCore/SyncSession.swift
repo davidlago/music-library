@@ -55,7 +55,8 @@ public enum SyncPhoneSession {
     /// `radioDJUsage`). `freeSpace` is checked here against what the Mac's plan needs and never sent. Returns the Mac's hello
     /// and what was applied.
     public static func run(_ connection: SyncConnection, identity: SyncIdentity, root: URL, freeSpace: Int64?, pairing: Bool,
-                           events: [SyncEvent] = [], requests: [SyncRequest] = [], libraryID: String? = nil, lastFMConnected: Bool = true,
+                           events: [SyncEvent] = [], requests: [SyncRequest] = [], wanted: [WantedAlbum] = [], shopFinds: [ShopFind] = [],
+                           libraryID: String? = nil, lastFMConnected: Bool = true,
                            radioDJUsage: RadioDJUsage? = nil,
                            storeGrant: @Sendable (SyncGrant) async throws -> Void,
                            adoptLastFM: @Sendable (SyncLastFM) async -> Void = { _ in },
@@ -79,7 +80,8 @@ public enum SyncPhoneSession {
             }
             let files = try SyncReceiver(root: root)
             receiver = files
-            try await connection.send(.manifest(SyncManifest(files: files.manifest(), events: events, libraryID: libraryID, requests: requests)))
+            try await connection.send(.manifest(SyncManifest(files: files.manifest(), events: events, libraryID: libraryID, requests: requests,
+                                                                   wanted: wanted, shopFinds: shopFinds)))
 
             var state = SyncProgress()
             var iCloudOnly: [Int64]?
@@ -200,6 +202,9 @@ public enum SyncMacSession {
             guard phone.schemaVersion >= Database.schemaVersion else { throw SyncSessionError.phoneAppTooOld }
             guard case .manifest(let manifest) = try await connection.receiveMessage() else { throw SyncError.unexpected("no file list from the iPhone") }
             let applied = try database.applySyncEvents(manifest.events, libraryID: manifest.libraryID)
+            // Before the snapshot is written, so the phone gets its Buy List changes back merged.
+            try database.applyWanted(manifest.wanted ?? [], libraryID: manifest.libraryID)
+            try database.applyShopFinds(manifest.shopFinds ?? [], libraryID: manifest.libraryID)
             if let lastFM, phone.lastFMConnected == false { try await connection.send(.lastFM(lastFM)) }
             if let concerts { try await connection.send(.concerts(concerts)) }
             if let radioDJ, phone.radioDJ == true { try await connection.send(.radioDJ(radioDJ)) }

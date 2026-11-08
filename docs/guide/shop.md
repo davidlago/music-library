@@ -67,6 +67,26 @@ each album's page:
 
 Prices are before shipping. They're in your currency where Discogs has it (eBay's are in dollars).
 
+## Track list and Apple Music
+
+Under the price guide (the Mac) or on the album's page (the iPhone), **Tracks** lists the album's songs as Apple Music
+has them, found by the barcode when there is one, else by artist and title:
+
+- Click (or tap) a song for its 30-second preview; the next song's follows. **Play Previews** plays them all in a row.
+  Your own music pauses while a preview plays, and previews never go into your queue, history or Last.fm.
+- **Open in Apple Music** opens the album in the Music app, where Apple Music subscribers can play it right away. Right-
+  click (or press and hold) a song for **Open Song in Apple Music**.
+
+Apple's catalog doesn't have every release (and may list a different edition's songs); when it can't find the album,
+the page says so.
+
+## Recent Finds
+
+Every album priced in the Shop, on the Mac or the iPhone, is kept in **Recent Finds** (the last 100, newest first): on
+the Mac in the Shop before you search, on the iPhone under the search. Click or tap one to open it again; delete it to
+remove it (on both devices). They're kept in the library, so they sync between the Mac and the iPhone (Wi-Fi sync and
+iCloud) and are in your iCloud backup. The photo you showed the DJ stays on the iPhone.
+
 ### Discogs account
 
 Connect Discogs on the Mac in **Settings ▸ Discogs** (the same personal access token [Sync to
@@ -90,7 +110,35 @@ The **Shop** tab:
   digital library; tap one to open it), the [price guide](#price-guide), and **Find a Copy**: each store's own search
   for it (Discogs, eBay, CDandLP, Alibris, Amazon, Walmart, Half Price Books, Barnes & Noble). Switch the format at the
   top to see the other format's editions and prices.
-- **Recent Finds**: the albums you looked up, with the fair price, newest first (swipe to delete).
+- **Add to Buy List** on an album's page keeps it on your [Buy List](#buy-list), with its prices.
+- **Tracks** with Apple Music previews, and **Open in Apple Music** (see [Track list and Apple Music](#track-list-and-apple-music)).
+- **Recent Finds**: the albums you looked up here or on the Mac, with the fair price, newest first (swipe to delete).
+  See [Recent Finds](#recent-finds).
+
+## Buy List
+
+The albums you're looking for, with what each goes for now. It's on the Mac (**Acquire ▸ Buy List**) and the iPhone (the
+**Collection** tab, and the top of the **Shop** tab), and it's the same list on both: what you add or change on one shows
+on the other after the next sync (Wi-Fi or iCloud).
+
+- **Add an album**: **Add to Buy List** on an album you priced in the Shop (on the iPhone, after looking it up or scanning
+  its barcode), on a [Local Library CD](local-library.md), or **+** to add one by name. With a barcode or catalog number
+  it's that edition; otherwise the cheapest copy of any edition in the format (CD, Vinyl or Any Format).
+- **What it goes for**: the big price is the cheapest copy for sale now (on Discogs, or eBay's typical asking price for
+  a used copy), with an arrow when it moved since the check before; under it, the **fair** price from recent eBay sales
+  or Discogs' suggestions by condition. Open an album for its price history, the figures from each store, notes and
+  the full price guide with each store's search.
+- **The most you'd pay**: set it (**Edit**) and the album is marked **At or under your max** when something's asking
+  that or less; deals go to the top of the list, and **Deals** on the Mac shows only those.
+- **Refresh Prices** checks every album not checked in the last six hours, one at a time, as the Shop would (Discogs,
+  and eBay's listings and recent sales); **Refresh** on one checks just it. Looking an album up in the Shop updates its
+  price too.
+- **I Got It…** (Mac) adds it to your Physical Collection; the list then says **You own it now**, and you can remove it.
+- With the Radio DJ on, **Ask (your DJ's name)** about an album on the list (Mac), and the DJ can see the list when you're
+  on its page.
+
+The top of the list says how many albums you're after, about what they'd cost at fair prices and how many are deals
+now; the **Owned** pane of [Insights](insights.md#owned) has the same as a card.
 
 ## Your crate-digging friend
 

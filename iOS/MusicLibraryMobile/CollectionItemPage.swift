@@ -44,6 +44,11 @@ private struct CollectionItemContent: View {
             VStack(alignment: .leading, spacing: 24) {
                 hero
                 digitalCopy(state)
+                if CollectionValue.canValue(item) {
+                    let market = model.market
+                    CollectionValueSection(value: market.values[item.id], guide: market.itemGuides[item.id], paid: item.price,
+                                           pricing: market.pricing.contains(item.id)) { market.price(item, force: true) }
+                }
                 yourCopy(state)
                 AlbumTrackList(album: model.album(for: item), tracks: tracks, info: info, source: title)
                 release
@@ -67,6 +72,8 @@ private struct CollectionItemContent: View {
             .padding(.bottom, 32)
         }
         .background { PageBackdrop(url: library.coverURL(item: item)) }
+        // What it's worth, read again when it's more than a day old.
+        .task(id: item.id) { model.market.price(item) }
         .navigationTitle(item.sticker?.text ?? title)
         .navigationBarTitleDisplayMode(.inline)
         .radioDJ { [model, item] in model.radioDJSubject(item: item) }

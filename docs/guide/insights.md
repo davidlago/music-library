@@ -21,6 +21,11 @@ Your CDs, records and downloads.
 - Lists: Recently Added, To Digitize, Priciest, Best Value (most plays for the money) and Still in the Wrapper (never
   played).
 - **Artists** (by money spent or by items) and **Genres**, **Release Eras** or **Record Labels**.
+- **Collection Value**: what your CDs and records are worth now (see
+  [What it's worth](physical-collection.md#what-its-worth)), what that is against what you paid for them, by medium,
+  and the **Most Valuable** copies and **Biggest Gains**. **Update Values** (Mac) prices the copies not priced yet.
+- **Buy List**: how many albums you're after, about what they'd cost and how many are deals now. See
+  [Buy List](shop.md#buy-list).
 
 The iPhone shows the same cards, one under the other.
 

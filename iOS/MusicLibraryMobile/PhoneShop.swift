@@ -9,51 +9,59 @@ import SwiftUI
 /// on, show the DJ a photo instead and it works out which record it is, prices it and says whether it's worth taking
 /// home (`session`, the DJ in store mode). The Discogs account comes from the Mac at each sync (token in the
 /// keychain, username in user defaults); eBay's sold listings need the opt-in eBay sign-in (`ebay`, Settings ▸ Shop).
-/// Albums looked up are kept as recent finds (Application Support `shop-finds.json`, the last 60).
+/// Albums looked up are kept as Recent Finds (`ShopFinds.swift`): synced with the Mac like the Buy List, the DJ's
+/// photos kept on the phone (`shop-find-photos.json`).
 @Observable
 final class PhoneShop {
-    /// One album looked up in the Shop.
-    struct Find: Codable, Hashable, Identifiable {
-        var id = UUID()
+    /// A find as versions before 1.34 kept them on the phone (`shop-finds.json`), read once and moved into the synced list.
+    private struct LegacyFind: Codable {
         var date = Date()
         var album: String
         var artist: String
         var format: String
         var masterID: Int?
         var releaseID: Int?
-        /// "$18–$32".
         var fairPrice: String?
-        /// The photo shown to the DJ, small (nil: looked up by name).
         var photo: Data?
         var thumbnail: URL?
-
-        var request: PriceGuideRequest {
-            PriceGuideRequest(artist: artist, album: album, format: PriceGuideRequest.Format(rawValue: format) ?? .any,
-                              releaseID: releaseID, masterID: masterID)
-        }
     }
 
     let ebay = EbaySession()
+    /// Albums found on Apple Music for the Shop's track lists, by artist, title and barcode (nil: not there).
+    @ObservationIgnored var appleAlbums: [String: AppleAlbum?] = [:]
     @ObservationIgnored let loader = CDShopPageLoader()
     private(set) var discogsUsername: String?
     private(set) var hasDiscogsToken: Bool
-    private(set) var finds: [Find] = []
+    /// Recent Finds, newest first: the copy's (`LibrarySnapshot.shopFinds`) with this phone's since merged in.
+    private(set) var finds: [ShopFind] = []
+    /// The photos shown to the DJ, by find (small JPEGs; they stay on this phone).
+    private(set) var photos: [String: Data] = [:]
+    @ObservationIgnored let findsOutbox = ShopFindOutbox(url: URL.applicationSupportDirectory.appendingPathComponent("shop-finds-outbox.json"))
+    @ObservationIgnored let sampleFindsOutbox = ShopFindOutbox(url: URL.applicationSupportDirectory.appendingPathComponent("sample-shop-finds.json"))
+    @ObservationIgnored private var baseFinds: [ShopFind] = []
+    @ObservationIgnored private var isSample = false
+    /// Something for the Mac changed (sent through iCloud a few seconds later).
+    @ObservationIgnored var onChange: () -> Void = {}
+    /// Each guide read (the Buy List keeps it as the album's latest price when it's on the list).
+    @ObservationIgnored var onGuide: (PriceGuide) -> Void = { _ in }
     /// The DJ out crate digging with you (nil: not on).
     private(set) var session: RadioDJSession?
 
     @ObservationIgnored private var cached: (key: String, guides: PriceGuides)?
-    @ObservationIgnored private let findsURL = URL.applicationSupportDirectory.appendingPathComponent("shop-finds.json")
+    @ObservationIgnored private let legacyFindsURL = URL.applicationSupportDirectory.appendingPathComponent("shop-finds.json")
+    @ObservationIgnored private let photosURL = URL.applicationSupportDirectory.appendingPathComponent("shop-find-photos.json")
     private static let usernameKey = "discogsUsername"
-    static let maxFinds = 60
 
     init() {
         let username = UserDefaults.standard.string(forKey: Self.usernameKey).flatMap { DiscogsIdentity.isValidUsername($0) ? $0 : nil }
         discogsUsername = username
         // The keychain is read only once Discogs was connected.
         hasDiscogsToken = username != nil && KeychainStore.app.string(for: DiscogsToken.keychainAccount).flatMap(DiscogsToken.cleaned) != nil
-        if let data = try? Data(contentsOf: findsURL), let saved = try? JSONDecoder().decode([Find].self, from: data) {
-            finds = Array(saved.prefix(Self.maxFinds))
+        if let data = try? Data(contentsOf: photosURL), let saved = try? JSONDecoder().decode([String: Data].self, from: data) {
+            photos = saved
         }
+        migrateLegacyFinds()
+        rebuildFinds()
     }
 
     var hasDiscogs: Bool { hasDiscogsToken && discogsUsername != nil }
@@ -106,33 +114,66 @@ final class PhoneShop {
 
     // MARK: Finds
 
+    /// The finds the Mac hasn't got yet (none from the sample library).
+    var pendingFinds: [ShopFind] { isSample ? [] : findsOutbox.changes }
+
+    private var activeFindsOutbox: ShopFindOutbox { isSample ? sampleFindsOutbox : findsOutbox }
+
+    /// A new copy: its finds, and the outbox without what the copy has.
+    func update(library: LibrarySnapshot?, isSample: Bool) {
+        self.isSample = isSample
+        baseFinds = library?.shopFinds ?? []
+        if !isSample { findsOutbox.remove(SyncedRecords.applied(findsOutbox.changes, in: baseFinds)) }
+        rebuildFinds()
+    }
+
+    func forgetSample() { sampleFindsOutbox.removeAll() }
+
+    private func rebuildFinds() {
+        finds = ShopFind.shown(SyncedRecords.overlay(baseFinds, activeFindsOutbox.changes))
+    }
+
     func record(_ guide: PriceGuide, photo: RadioDJPhoto? = nil) {
-        guard guide.hasPrices else { return }
-        let album = guide.title.isEmpty ? guide.request.album : guide.title
-        let artist = guide.artist.isEmpty ? guide.request.artist : guide.artist
-        var find = Find(album: album, artist: artist, format: guide.request.format.rawValue, masterID: guide.masterID,
-                        releaseID: guide.editions.first { $0.roles.contains(.identified) }?.releaseID,
-                        fairPrice: guide.fairPrice?.text, photo: photo?.thumbnail, thumbnail: guide.thumbnail)
-        // The same album again moves up (keeping a photo it had).
-        if let old = finds.firstIndex(where: { $0.album == find.album && $0.artist == find.artist && $0.format == find.format }) {
-            if find.photo == nil { find.photo = finds[old].photo }
-            finds.remove(at: old)
+        guard let find = ShopFind(guide: guide) else { return }
+        onGuide(guide)
+        activeFindsOutbox.put(find)
+        if let thumb = photo?.thumbnail {
+            photos[find.id] = thumb
+            savePhotos()
         }
-        finds.insert(find, at: 0)
-        finds = Array(finds.prefix(Self.maxFinds))
-        save()
+        rebuildFinds()
+        if !isSample { onChange() }
     }
 
-    func remove(_ ids: Set<UUID>) {
-        finds.removeAll { ids.contains($0.id) }
-        save()
+    func remove(_ ids: Set<String>) {
+        for find in finds where ids.contains(find.id) { activeFindsOutbox.put(find.removing()) }
+        photos = photos.filter { !ids.contains($0.key) }
+        savePhotos()
+        rebuildFinds()
+        if !isSample { onChange() }
     }
 
-    private func save() {
-        let finds = finds, url = findsURL
+    /// Finds kept on the phone by versions before 1.34 join the synced list (so the Mac gets them), once.
+    private func migrateLegacyFinds() {
+        guard let data = try? Data(contentsOf: legacyFindsURL) else { return }
+        if let old = try? JSONDecoder().decode([LegacyFind].self, from: data) {
+            for f in old {
+                var find = ShopFind(album: f.album, artist: f.artist, format: PriceGuideRequest.Format(rawValue: f.format) ?? .any,
+                                    masterID: f.masterID, releaseID: f.releaseID, fairPrice: f.fairPrice, thumbnail: f.thumbnail, at: f.date)
+                find = find.sanitized() ?? find
+                findsOutbox.put(find)
+                if let photo = f.photo { photos[find.id] = photo }
+            }
+            savePhotos()
+        }
+        try? FileManager.default.removeItem(at: legacyFindsURL)
+    }
+
+    private func savePhotos() {
+        let photos = photos, url = photosURL
         Task.detached(priority: .utility) {
             try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? JSONEncoder().encode(finds).write(to: url, options: .atomic)
+            try? JSONEncoder().encode(photos).write(to: url, options: .atomic)
         }
     }
 }

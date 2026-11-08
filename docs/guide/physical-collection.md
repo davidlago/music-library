@@ -104,11 +104,25 @@ Click any CD or record to open its page.
 - **Tracks**: the release's track list, a record's with its sides; songs not in your digital collection are dimmed.
 - **Your Copy**: medium, label number, date bought, price paid, notes, edition and cover, all edited in place. A new
   cover can go to the digital album too.
+- **What It's Worth**: see [below](#what-its-worth).
 - **Your Other Copies**, and the album's description, reviews and links.
 - The **…** menu has **Change Cover…**, **Link Digital Copy…**, the queue and export items, **Digitize This Record…**,
   **Shop for This CD** (or **Shop for This Record**) and **Remove from Physical Collection…**.
 
 An album page lists **Your Copies** (CDs, records and downloads), with what the album has cost you per play.
+
+### What it's worth
+
+A CD's or record's page shows what its edition sells for, from the Shop's [price guide](shop.md#price-guide): the fair
+price (recent eBay sales, else Discogs' suggested prices for a playable copy, else eBay's asking prices or the cheapest
+Discogs copy), how that compares with what you paid, the cheapest copy for sale on Discogs, how many people have and
+want it, and the whole price guide underneath. The edition is found by its Discogs release (yours, or the one
+[Sync to Discogs](#sync-to-discogs) matched), else by its barcode, catalog number, country and year. It's checked again
+when you open the page and the price is more than a day old, or with **Refresh**.
+
+The values add up in the **Owned** pane of [Insights](insights.md#owned): **Collection Value**. On the Mac, **Update
+Values** there prices every CD and record not priced in the last month, using Discogs alone (two requests per copy when
+its Discogs release is known), at the pace Discogs allows, in the background. Values sync to the iPhone.
 
 ## Find by Label
 

@@ -258,6 +258,12 @@ final class CloudBackupStore {
                        result.plays + result.likes + result.purchases > 0 {
                         changed = true
                     }
+                    if let wanted = batch.wanted, (try? context.database.applyWanted(wanted, libraryID: batch.libraryID)) ?? 0 > 0 {
+                        changed = true
+                    }
+                    if let finds = batch.shopFinds, (try? context.database.applyShopFinds(finds, libraryID: batch.libraryID)) ?? 0 > 0 {
+                        changed = true
+                    }
                     if !batch.requests.isEmpty, batch.libraryID == context.database.libraryID(),
                        !applyRequests(batch.phoneID, batch.requests, batch.writtenAt) {
                         continue

@@ -307,6 +307,10 @@ public final class Database: @unchecked Sendable {
         }
         // The collection, also without a schema change; `album_ownership` becomes its projection for older readers.
         try createCollectionTable()
+        // The Buy List and what copies are worth, also without a schema change (phones on older versions skip them).
+        try createWantedTable()
+        try createCollectionValuesTable()
+        try createShopFindsTable()
         try reconcileLegacyOwnership()
         try markLegacyWriters()
         try exec("PRAGMA user_version=\(Self.schemaVersion)")

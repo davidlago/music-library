@@ -60,6 +60,8 @@ final class PhoneCloud {
         var libraryID: String
         var events: [SyncEvent]
         var requests: [SyncRequest]
+        var wanted: [WantedAlbum] = []
+        var shopFinds: [ShopFind] = []
     }
     @ObservationIgnored var outgoing: () -> Outgoing? = { nil }
     /// This phone's sync id and name.
@@ -254,9 +256,13 @@ final class PhoneCloud {
         guard let containerID, isEnabled, sending == nil, let out = outgoing() else { return }
         let phone = phone()
         guard !phone.id.isEmpty else { return }
-        let batch = out.events.isEmpty && out.requests.isEmpty ? nil
-            : CloudInboxBatch(libraryID: out.libraryID, phoneID: phone.id, phoneName: phone.name, events: out.events, requests: out.requests)
-        let key = batch.map { $0.ids.sorted().joined(separator: ",") } ?? ""
+        let batch = out.events.isEmpty && out.requests.isEmpty && out.wanted.isEmpty && out.shopFinds.isEmpty ? nil
+            : CloudInboxBatch(libraryID: out.libraryID, phoneID: phone.id, phoneName: phone.name, events: out.events, requests: out.requests,
+                              wanted: out.wanted, shopFinds: out.shopFinds)
+        // Buy List changes by album and version (a price check changes an album without a new id).
+        let wantedKey = out.wanted.map { "\($0.id)@\($0.updatedAt.timeIntervalSince1970)/\($0.checks.first?.at.timeIntervalSince1970 ?? 0)" }
+        let findsKey = out.shopFinds.map { "\($0.id)@\($0.updatedAt.timeIntervalSince1970)" }
+        let key = batch.map { ($0.ids.sorted() + wantedKey.sorted() + findsKey.sorted()).joined(separator: ",") } ?? ""
         guard key != sentKey else { return }
         sending = Task {
             defer { sending = nil }

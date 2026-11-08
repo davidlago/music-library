@@ -140,9 +140,10 @@ struct DownloadedSearchBar: View {
                     ForEach(LibraryCatalogStore.OwnershipFilter.allCases) { Text($0.label).tag($0) }
                 }
                 .labelsHidden().fixedSize()
-                if catalog.isSignedIn, !catalog.listId.isEmpty {
-                    Toggle(isOn: $catalog.localOnList) { Label("On \(catalog.listTitle)", systemImage: "bookmark") }
+                if !model.buyList.shown.isEmpty {
+                    Toggle(isOn: $catalog.localOnList) { Label("On Buy List", systemImage: "bag") }
                         .toggleStyle(.button)
+                        .help("Only CDs on your Buy List")
                 }
                 Picker("Sort by", selection: $catalog.localSort) {
                     ForEach(CatalogLocalSort.allCases) { Text($0.label).tag($0) }

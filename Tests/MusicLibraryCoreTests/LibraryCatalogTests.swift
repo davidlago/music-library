@@ -137,60 +137,6 @@ import Testing
         #expect(throws: CatalogError.notSignedIn) { try CatalogParser.parseCheckouts(Data(#"{"success":false,"message":"You must be logged in"}"#.utf8)) }
     }
 
-    // MARK: Lists
-
-    @Test func userLists() throws {
-        let body = """
-        <form><input type="hidden" name="sourceId" id="sourceId" value="lists"><div class="form-group">
-        <label for="addToList-list">Choose a List</label>
-        <select name="list" id="addToList-list" class="form-control"><option value="101">Music to borrow</option><option value="102">Books &amp; more</option></select>
-        </div><textarea id="addToList-notes" name="notes"></textarea></form>
-        """
-        let data = try JSONSerialization.data(withJSONObject: ["title": "Add To List", "modalBody": body, "modalButtons": ""])
-        #expect(try CatalogParser.parseUserLists(data) == [CatalogUserList(id: "101", title: "Music to borrow"), CatalogUserList(id: "102", title: "Books & more")])
-        #expect(CatalogPaths.addToList(listId: "101", workId: "abc-eng") == "/MyAccount/AJAX?method=saveToList&notes=&listId=101&source=GroupedWork&sourceId=abc-eng")
-        #expect(CatalogPaths.removeFromList(listId: "101", entryId: "9") == "/MyAccount/MyList/101?delete=9")
-        #expect(try CatalogParser.parseSaveToList(Data(#"{"success":true,"message":"This title was saved to your list successfully."}"#.utf8)) == "This title was saved to your list successfully.")
-        #expect(throws: CatalogError.self) { try CatalogParser.parseSaveToList(Data(#"{"success":false,"message":"Unable to find that list"}"#.utf8)) }
-    }
-
-    @Test func listPage() throws {
-        // The shape of a list page (values made up): entries link to records; the work ID is in "Add to List".
-        func entry(_ n: Int, entry: Int, work: String, title: String, author: String, status: String) -> String {
-            """
-            <div class="result"><div id="listEntry\(entry)" class="resultsList listEntry"><div class="row">
-            <div class="selectTitle col-xs-12 col-sm-1"><input type="checkbox" id="selected\(entry)" class="titleSelect"></div>
-            <div class="col-xs-3"><a href="/Record/.b\(n)00?searchId=5&amp;recordIndex=\(n)&amp;page="><img src="/bookcover.php?id=\(work)&amp;size=small" class="listResultImage"></a></div>
-            <div class="col-xs-6"><div class="row"><div class="col-xs-12"><span class="result-index">\(n))</span> <a href="/Record/.b\(n)00?searchId=5" class="result-title notranslate">\(title)</a></div></div>
-            <div class="row"><div class="result-label col-xs-3">Author</div><div class="result-value col-xs-9 notranslate"><a href="/Author/Home?author=x">\(author)</a></div></div>
-            <div class="row"><div class="col-xs-12 formatDisplayVertical"><div class="related-manifestations"><div class="row related-manifestation grouped "><div class="col-xs-12"><div class="row">
-            <div class="col-tn-4 manifestation-format"><a class="btn btn-xs btn-primary" href="/Record/.b\(n)00">Music CD</a><br><a href="#" onclick="return AspenDiscovery.ResultsList.showRelatedManifestations('\(work)','Music_CD', '77\(n)');"><span>Show Edition</span></a></div>
-            <div class="col-tn-8"><div class="related-manifestation-shelf-status \(status) label">Status</div></div>
-            </div></div></div></div></div></div>
-            <div class="result-tools-horizontal"><a href="/Record/.b\(n)00?searchId=5" class="btn btn-sm btn-tools">More Info</a>
-            <button onclick="return AspenDiscovery.Account.showSaveToListForm(this, 'GroupedWork', '\(work)');" class="btn btn-sm btn-tools">Add to List</button></div>
-            </div>
-            <div class="col-xs-2"><a href="#" onclick="return AspenDiscovery.Account.getEditListForm(\(entry),101,1)" class="btn btn-sm">Edit</a>
-            <a href="#" onclick="AspenDiscovery.confirm('Delete Title ', 'Are you sure?', 'Yes', 'No', true, 'AspenDiscovery.Lists.deleteEntryFromList(101, \(entry))');" class="btn btn-sm btn-danger">Delete</a></div>
-            </div></div></div>
-            """
-        }
-        let html = """
-        <html><body><div class="resultHead">Showing 1 - 2 of 2 (2 total entries)</div><div id="UserList">
-        \(entry(1, entry: 9001, work: "d0797869-8043-715e-f883-2100b5c2cd80-eng", title: "Hamilton: original Broadway cast recording", author: "Miranda, Lin-Manuel, 1980-", status: "status-on-shelf"))
-        \(entry(2, entry: 9002, work: "101115d3-1111-c274-3bd5-fe16b40c1524-eng", title: "The dark side of the moon", author: "Pink Floyd (Musical group)", status: "status-checked-out"))
-        </div></body></html>
-        """
-        let page = try CatalogParser.parseList(html)
-        #expect(page.total == 2 && page.entries.count == 2)
-        let first = page.entries[0]
-        #expect(first.entryId == "9001" && first.item.id == "d0797869-8043-715e-f883-2100b5c2cd80-eng")
-        #expect(first.item.displayTitle == "Hamilton: Original Broadway Cast Recording" && first.item.artist == "Lin-Manuel Miranda")
-        #expect(first.item.availability == .here && first.item.variationId == "771" && first.item.recordId == ".b100")
-        #expect(page.entries[1].item.artist == "Pink Floyd" && page.entries[1].item.availability == .unavailable)
-        #expect(try CatalogParser.parseList("<html><body>This list is empty.</body></html>").entries.isEmpty)
-    }
-
     // MARK: Text
 
     @Test func names() {

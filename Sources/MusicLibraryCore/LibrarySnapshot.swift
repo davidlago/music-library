@@ -50,6 +50,12 @@ public struct LibrarySnapshot: Sendable {
     public let artistPhotos: [String: ArtistPhotoChoice]
     /// Who played, wrote and produced with whom (Music DNA).
     public let collaborations: CollaborationGraph
+    /// The Buy List as the Mac last saw it, removed albums too (`BuyList.overlay` adds the phone's changes).
+    public let wanted: [WantedAlbum]
+    /// What copies were worth when the Mac last priced them, by item id.
+    public let collectionValues: [String: CollectionValue]
+    /// The Shop's Recent Finds as the Mac last saw them, removed ones too.
+    public let shopFinds: [ShopFind]
     private let albumTracks: [String: [Track]]
     private let trackByID: [Int64: Track]
 
@@ -138,6 +144,9 @@ public struct LibrarySnapshot: Sendable {
         self.collaborations = CollaborationGraph(tracks: all, physical: CollaborationGraph.physicalSongs(collection: collection, albumInfos: albumInfos))
         self.albumTracks = albumTracks
         self.trackByID = byID
+        self.wanted = (try? db.wantedAlbums()) ?? []
+        self.collectionValues = (try? db.collectionValues()) ?? [:]
+        self.shopFinds = (try? db.shopFinds()) ?? []
     }
 
     public func track(id: Int64) -> Track? { trackByID[id] }

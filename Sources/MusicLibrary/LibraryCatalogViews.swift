@@ -289,12 +289,12 @@ struct CatalogCard: View {
                         .shadow(radius: 2).padding(6)
                         .help("In your digital collection")
                 }
-                if catalog.isOnList(item) {
-                    Image(systemName: "bookmark.fill")
+                if catalog.wantedEntry(item) != nil {
+                    Image(systemName: "bag.fill")
                         .font(.title3).foregroundStyle(.orange)
                         .shadow(radius: 2).padding(.horizontal, 8)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .help("On your list “\(catalog.listTitle)”")
+                        .help("On your Buy List")
                 }
             }
             Text(item.displayTitle).font(.headline).lineLimit(2)
@@ -1072,141 +1072,25 @@ struct CheckoutCover: View {
     }
 }
 
-// MARK: List
+// MARK: Buy List
 
-/// "Add to <list>" / "Remove from <list>", for the list chosen in Settings.
+/// "Add to Buy List" / "On Buy List" for a catalog CD: the album on CD, priced right away.
 struct CatalogListButton: View {
     @Environment(AppModel.self) private var model
     let item: CatalogItem
 
     var body: some View {
         let catalog = model.catalog
-        if catalog.isSignedIn, !catalog.listId.isEmpty {
-            let busy = catalog.listBusy.contains(item.id)
-            if let entry = catalog.listEntry(for: item) {
-                Button { catalog.removeFromList(item) } label: { Label("Remove from \(catalog.listTitle)", systemImage: "bookmark.slash") }
-                    .disabled(busy || entry.entryId.isEmpty)
-                    .help("Remove this CD from your list on the local library's website")
-            } else {
-                Button { catalog.addToList(item) } label: { Label("Add to \(catalog.listTitle)", systemImage: "bookmark") }
-                    .disabled(busy)
-                    .help("Add this CD to your list on the local library's website, so you know what to look for")
-            }
+        if let entry = catalog.wantedEntry(item) {
+            Button { model.showBuyList(entry.id) } label: { Label("On Buy List", systemImage: "bag.fill") }
+                .help("Show it on your Buy List, with what it goes for")
+        } else {
+            Button {
+                let name = catalog.albumName(item)
+                model.buyList.add(artist: name.artist, album: name.album, format: .cd, barcode: catalog.details[item.id]?.barcode ?? "")
+            } label: { Label("Add to Buy List", systemImage: "bag.badge.plus") }
+                .help("Put this album on your Buy List, to find a copy of your own and watch what it goes for")
         }
-    }
-}
-
-/// The list chosen in Settings: what's on it, where it's on the shelf, and removing titles.
-struct CatalogListView: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        let catalog = model.catalog
-        let entries = catalog.listEntries
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    if let url = catalog.webURL(catalog.listId.isEmpty ? "/MyAccount/Lists" : CatalogPaths.list(catalog.listId)) {
-                        Link("Open on the Local Library's Website", destination: url).font(.callout)
-                    }
-                    Spacer()
-                    if catalog.listLoading { ProgressView().controlSize(.small) }
-                    LookupStatus()
-                }
-                if let error = catalog.listError { CatalogErrorBanner(message: error) { catalog.loadList() } }
-                if !entries.isEmpty {
-                    let here = entries.filter { $0.item.availability == .here }.count
-                    let site = catalog.siteLibrary ?? "your local library"
-                    Text("\(here) of \(entries.count) on the shelf at \(site) right now.").font(.callout).foregroundStyle(.secondary)
-                    VStack(spacing: 0) {
-                        ForEach(entries) { row($0) }
-                    }
-                    .padding(.vertical, 6)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(AppColor.card.opacity(0.72)))
-                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(AppColor.separator.opacity(0.5), lineWidth: 0.5))
-                }
-            }
-            .padding(20)
-        }
-        .overlay { emptyState(entries) }
-        .navigationTitle(catalog.listTitle)
-        .navigationSubtitle(catalog.listLoaded ? (entries.count == 1 ? "1 title" : "\(entries.count) titles") : "")
-        .toolbar {
-            ToolbarItem {
-                Button { catalog.loadList() } label: { Label("Reload", systemImage: "arrow.clockwise") }
-                    .disabled(!catalog.isSignedIn || catalog.listId.isEmpty || catalog.listLoading)
-            }
-        }
-        .onAppear {
-            if catalog.isSignedIn {
-                if catalog.userLists.isEmpty { catalog.loadUserLists() } else if !catalog.listLoaded { catalog.loadList() }
-            } else {
-                catalog.start()
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func emptyState(_ entries: [CatalogListEntry]) -> some View {
-        let catalog = model.catalog
-        if !catalog.isSignedIn {
-            if catalog.account == .signingIn {
-                ProgressView("Signing in…")
-            } else {
-                ContentUnavailableView {
-                    Label("Not Signed In", systemImage: "person.crop.circle.badge.questionmark")
-                } description: {
-                    Text("Sign in to your local library account in Settings, then pick the list to use.")
-                } actions: {
-                    SettingsLink { Text("Open Settings…") }
-                }
-            }
-        } else if catalog.listId.isEmpty {
-            ContentUnavailableView {
-                Label("No List Chosen", systemImage: "bookmark")
-            } description: {
-                Text("Pick one of your local library lists in Settings ▸ Local Library. CDs you add while browsing go there.")
-            } actions: {
-                SettingsLink { Text("Open Settings…") }
-            }
-        } else if catalog.listLoaded, entries.isEmpty {
-            ContentUnavailableView("Nothing on This List Yet", systemImage: "bookmark",
-                                   description: Text("Add CDs from Local Library CDs with the bookmark button or by right-clicking them."))
-        }
-    }
-
-    private func row(_ entry: CatalogListEntry) -> some View {
-        let catalog = model.catalog
-        let item = entry.item
-        let owned = catalog.ownedAlbum(item)
-        return HStack(spacing: 12) {
-            NavigationLink(value: item) {
-                HStack(spacing: 12) {
-                    ListCover(item: item)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(item.displayTitle).fontWeight(.medium).lineLimit(1)
-                        Text(item.artist.isEmpty ? (catalog.details[item.id]?.mbArtist ?? "Various Artists") : item.artist)
-                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    }
-                    Spacer()
-                    if let call = item.callNumber, item.availability == .here {
-                        Text(call).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
-                    }
-                    CatalogStatusBadge(availability: item.availability, text: item.statusText, library: catalog.siteLibrary)
-                    if owned != nil {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(AppColor.accent).help("In your digital collection")
-                    }
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            Button { catalog.removeFromList(item) } label: { Image(systemName: "trash") }
-                .buttonStyle(.borderless)
-                .disabled(catalog.listBusy.contains(item.id) || entry.entryId.isEmpty)
-                .help("Remove from \(catalog.listTitle)")
-        }
-        .padding(.horizontal, 14).padding(.vertical, 7)
-        .contextMenu { CatalogItemMenu(item: item) }
     }
 }
 
