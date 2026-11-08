@@ -324,7 +324,7 @@ struct CollectionRow: View {
                 HStack(spacing: 6) {
                     if let sticker = item.sticker { StickerPill(sticker: sticker, size: 10) }
                     else { Text(item.origin == .songs ? "Songs" : item.medium.name).font(.caption2.weight(.semibold)).foregroundStyle(.secondary) }
-                    DigitalStatusLabel(item: item, state: state, collection: model.collection, compact: true)
+                    DigitalStatusLabel(state: state, medium: item.medium, collection: model.collection, compact: true)
                         .font(.caption2).lineLimit(1)
                 }
             }
@@ -353,57 +353,6 @@ struct CollectionStatusMark: View {
             Image(systemName: item.medium == .vinyl ? "record.circle" : item.medium == .cd ? "opticaldisc" : "shippingbox")
                 .font(.caption).foregroundStyle(.secondary)
                 .accessibilityLabel("No digital copy")
-        }
-    }
-}
-
-/// Where an item's digital copy stands, with its icon: nothing for a full digital copy (unless asked), "Not ripped",
-/// "8 of 12", "From your CD #142", "Missing".
-struct DigitalStatusLabel: View {
-    let item: CollectionItem
-    let state: DigitalState
-    let collection: MusicCollection
-    /// Leaves out a full digital copy (the usual case) to keep cells short.
-    var compact = false
-
-    var body: some View {
-        if let status = describe() {
-            Label {
-                Text(status.text)
-            } icon: {
-                Image(systemName: status.icon)
-            }
-            .labelStyle(StatusLabelStyle())
-            .foregroundStyle(.secondary)
-        }
-    }
-
-    private func describe() -> (text: String, icon: String)? {
-        switch state {
-        case .digitized:
-            if compact { return nil }
-            return (item.medium == .download ? "In your digital collection" : item.medium == .cd ? "Ripped" : "Digitized", "checkmark.circle")
-        case .partial(let have, let total):
-            return ("\(have) of \(total)", "circle.lefthalf.filled")
-        case .otherCopy(_, let from):
-            if let from = from.flatMap(collection.item(id:)) {
-                return ("From your " + (from.sticker?.text ?? from.medium.name.lowercased()), "arrow.triangle.2.circlepath")
-            }
-            return (compact ? "From elsewhere" : "Same album, from elsewhere", "arrow.triangle.2.circlepath")
-        case .none:
-            guard item.medium.isPhysical else { return ("No files", "questionmark.circle") }
-            return (item.medium == .cd ? "Not ripped" : "Not digitized", "waveform.slash")
-        case .missing:
-            return ("Missing", "exclamationmark.circle")
-        }
-    }
-
-    private struct StatusLabelStyle: LabelStyle {
-        func makeBody(configuration: Configuration) -> some View {
-            HStack(spacing: 3) {
-                configuration.icon
-                configuration.title
-            }
         }
     }
 }
