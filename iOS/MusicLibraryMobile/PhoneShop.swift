@@ -71,7 +71,8 @@ final class PhoneShop {
         let token = hasDiscogs ? KeychainStore.app.string(for: DiscogsToken.keychainAccount) : nil
         let key = "\(token ?? "")|\(discogsUsername ?? "")"
         if let cached, cached.key == key { return cached.guides }
-        let made = PriceGuides(token: token, username: discogsUsername, currency: currencyCode, ebay: loader.ebayReader(ebay))
+        let made = PriceGuides(token: token, username: discogsUsername, currency: currencyCode, ebay: loader.ebayReader(ebay),
+                               discogsPages: loader.discogsReader())
         Task { await made.prefetchCollection() }
         cached = (key, made)
         return made

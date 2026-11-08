@@ -34,9 +34,10 @@ public final class CDShopPageLoader: NSObject, WKNavigationDelegate {
 
     public override init() { super.init() }
 
-    /// Elements that show a page has its listings, or says it has none.
-    private static func readySelector(_ shop: CDShop) -> String? {
+    /// Elements that show a page has its listings, or says it has none (a Discogs release page: its embedded data).
+    private static func readySelector(_ shop: CDShop, _ url: URL) -> String? {
         switch shop {
+        case .discogs where url.path.hasPrefix("/release/"): "#dsdata"
         case .discogs: "article.msr-listing-card, [class*='empty-state'], [class*='no-results'], [class*='NoResults']"
         default: nil
         }
@@ -113,7 +114,7 @@ public final class CDShopPageLoader: NSObject, WKNavigationDelegate {
                 return try await load(url, shop: shop, attempt: attempt + 1)
             } else if let host = v.url, !shop.owns(host) {
                 throw CDShopError.unexpectedPage
-            } else if let selector = Self.readySelector(shop) {
+            } else if let selector = Self.readySelector(shop, url) {
                 let found = (try? await v.callAsyncJavaScript("return document.querySelector(s) !== null",
                                                               arguments: ["s": selector], contentWorld: .page)) as? Bool ?? false
                 let length = (try? await v.evaluateJavaScript("document.body ? document.body.innerHTML.length : 0")) as? Int ?? 0
@@ -166,6 +167,14 @@ public final class CDShopPageLoader: NSObject, WKNavigationDelegate {
 }
 
 extension CDShopPageLoader {
+    /// Discogs' release pages for what a pressing sold for (`DiscogsSalesHistory`).
+    public func discogsReader() -> DiscogsPageReader {
+        DiscogsPageReader(sales: { [weak self] url in
+            guard let self else { throw CancellationError() }
+            return try await self.run(DiscogsSalesHistory.script, on: url, shop: .discogs)
+        })
+    }
+
     /// eBay for the price guide: pages read here, sign-in state from `session`.
     public func ebayReader(_ session: EbaySession, readsForSale: Bool = true) -> EbayReader {
         EbayReader(page: { [weak self] url in

@@ -26,7 +26,8 @@ your Claude and OpenRouter keys are kept in your keychain.
 | Discogs | When you search it for an edition you own, and for the track lists of copies found there | What you type (barcode, words or catalog number) and release IDs |
 | Discogs (your account) | Only with your token, when you sync to Discogs | The CDs and records you add or remove there, and barcodes to find their releases |
 | Discogs, eBay, CDandLP, Alibris, Frankfurter | Only when you shop for a CD or record | Its barcode, catalog number or names |
-| Discogs, eBay | When you refresh your Buy List's prices, open a CD's or record's page (its value, at most daily) or choose Update Values | The album's names, barcode, catalog number or Discogs IDs |
+| Discogs, eBay | When you refresh your Buy List's prices | The album's names, barcode, catalog number or Discogs IDs |
+| Discogs | When you open a CD's or record's page (its value, at most daily) or choose Update Values | The album's names, barcode, catalog number or Discogs IDs; the pressing's Discogs page is opened for what it sold for |
 | Discogs (your account), eBay (signed in) | Only for the Shop's price guide, if you connected Discogs or signed in to eBay | The album's names and Discogs IDs; Discogs reads your collection to see which versions you own. eBay gets its own cookies from the sign-in you made on its page (the app never sees your password) |
 | Anthropic (Claude API) | Only with your key, while the Radio DJ is on the air | The page's details, your questions, photos you show it (without location or camera details) and the rows of collection searches it runs |
 | OpenRouter (and the model's provider) | Only with your key and an OpenRouter model chosen, while the Radio DJ is on the air | The same as Anthropic above |
@@ -51,7 +52,7 @@ talks to:
   over a key. Photos you take or pick for the DJ go only there, without their location; the app asks for the camera the first time you take one.
 - **Apple's iTunes Search**, for previews of songs the DJ mentions and of an album's songs in the Shop.
 - **Discogs and eBay**, only when you look something up in the Shop, refresh your Buy List's prices or open a CD's or
-  record's page (for what it's worth, at most once a day): the album's names or the barcode you typed or scanned. With the Discogs token your Mac hands over (in the keychain), Discogs also reads your Discogs collection;
+  record's page (for what it's worth, at most once a day, from Discogs only): the album's names or the barcode you typed or scanned. With the Discogs token your Mac hands over (in the keychain), Discogs also reads your Discogs collection;
   signed in to eBay (optional), eBay gets its own cookies, never your password through the app. Recent finds stay on
   the phone. The camera is used for barcodes only while the scanner is open; barcode images aren't kept or sent.
 

@@ -454,7 +454,7 @@ final class CDShopStore {
         if let guides, guides.key == key { return guides.guides }
         let made = PriceGuides(token: account.token, username: account.username,
                                currency: Locale.current.currency?.identifier ?? "USD",
-                               ebay: loader.ebayReader(ebay, readsForSale: false))
+                               ebay: loader.ebayReader(ebay, readsForSale: false), discogsPages: loader.discogsReader())
         Task { await made.prefetchCollection() }
         guides = (key, made)
         return made
