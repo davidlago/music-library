@@ -113,6 +113,9 @@ Gapless playback when songs share a sample rate, and with a USB DAC the output s
 Insights and Music DNA
 See what you own (how much is digitized, your free label numbers, what you've spent and the cost per play), what your music files are made of, and a listening report for the last week, month, year or all time: top artists, albums and songs, what was new to you, your listening clock and forgotten favorites. Music DNA maps who played, wrote and produced with whom.
 
+Take it record shopping
+The Shop tab is made for record stores and fairs: scan a CD's or record's barcode (or type its name) and see what it's worth on Discogs and eBay, whether you already own it and where to buy it. With the Radio DJ set up, snap the record you're holding instead: your crate-digging friend, a bargain-hunting audiophile collector, works out which pressing it is, checks your collection and tells you whether it's worth taking home at that price.
+
 Widgets and Apple Watch
 Home and lock screen widgets for what's playing (with controls), your listening, your physical collection and next labels, your digital collection and albums to rediscover. On Apple Watch: a remote for your iPhone, your listening, and Find by Label.
 
@@ -123,6 +126,20 @@ No Mac app yet? Tap Explore a Sample Library to try everything with fictional ar
 
 Get the companion Mac app
 Your music comes from Music Library for Mac (free, macOS 14 or later): it catalogs your CDs and records, imports, rips and digitizes your music, then syncs both collections to your iPhone. Download it, and find the full documentation and the source code, at https://davidlago.github.io/music-library/
+```
+
+**What's New in 1.33.0** (draft: covers the iPhone changes of 1.33.0; if the live version is older than 1.32.0, add
+1.32's AirPlay and the clearer iCloud messages from the changelog):
+
+```
+Take your iPhone record shopping
+• A new Shop tab for record stores and fairs: scan a CD's or record's barcode, or type its name, and see a price guide from Discogs and eBay, whether you already own it (on your shelf or in your digital collection) and where to buy it. Albums you look up are kept as Recent Finds.
+• Connect Discogs on your Mac and sync to add Discogs' suggested prices by condition and the versions already in your Discogs collection. Sign in to eBay in Settings ▸ Shop (optional, on eBay's own page) to add what copies recently sold for.
+• With the Radio DJ set up, tap Show a Record and snap what you're holding: your crate-digging friend, a bargain-hunting audiophile collector, works out which pressing it is (or shows you the likely albums to pick, or asks for a photo of the back), prices it, checks your collection and tells you whether it's worth taking home.
+
+Everywhere
+• Insights, Music DNA and the DJ's conversation now look the same as on the Mac: the Listening banner names your top artist, the Owned pane groups artists, genres, eras and labels under pickers, and artist pages are tinted by the artist's photo.
+• Record sleeves get the Mac's cardboard finish, and a download album with only some songs bought says so.
 ```
 
 **What's New in 1.31.0** (submitted 2026-11-01 in place of 1.30.0, which was taken out of review; the live version
@@ -196,6 +213,8 @@ The screenshots show the developer's own library, synced from the Mac app.
 Optional: with iCloud backup turned on in the Mac app (Settings ▸ iCloud), the phone also reads the library and downloads songs from the Mac's backup in the user's own iCloud (the app's private container) when the Mac isn't nearby; Settings ▸ iCloud on the phone shows it. The sample library doesn't use iCloud.
 
 Optional features need the user's own accounts or keys, entered by the user: Last.fm scrobbling (Settings, with a Last.fm API key), concerts on artist pages (Ticketmaster or JamBase keys set on the Mac) and the Radio DJ (the user's own Anthropic Claude API key or OpenRouter key, entered in the Mac app and handed to the phone when they sync; without one, the DJ doesn't appear at all). The DJ runs only when the user taps its button, and sends the page being viewed and the user's questions to Anthropic with the user's own key.
+
+The Shop tab works without any account: it searches Discogs' public database for what the user types or scans, and reads eBay's public listings for the album. The barcode scanner uses the camera on the device only; nothing it sees is kept or sent except the barcode's digits. Optionally the user can sign in to eBay on eBay's own sign-in page shown in the app (the app never sees the password, only eBay's cookies) to see recent sold prices, and a Discogs token set up in the Mac app adds Discogs' suggested prices. With the Radio DJ set up, the Shop's "Show a Record" sends the photo the user takes to Anthropic (or OpenRouter) with the user's own key, like the DJ's photos.
 ```
 
 **Attachment:** the demo video (`build/app-store/review-demo.mp4`).

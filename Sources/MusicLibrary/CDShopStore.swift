@@ -1,10 +1,12 @@
 import Foundation
 import MusicLibraryCore
+import MusicLibraryUI
 
 /// The Shop: find the exact CD or record on MusicBrainz, then gather copies for sale from marketplaces that ship to
-/// the US (`CDShop.searched`), plus links to search a few more. Nothing is signed in to. Results are kept in
-/// memory for half an hour per CD or record; exchange rates (to compare prices in other currencies) once a day.
-/// The Radio DJ can open it on an album too (`find(_:)`).
+/// the US (`CDShop.searched`), plus links to search a few more, and the price guide (`PriceGuide`: Discogs' figures
+/// and, once the user has signed in to eBay in Settings ▸ Shop, recent eBay sales). Nothing else is signed in to.
+/// Results are kept in memory for half an hour per CD or record; exchange rates (to compare prices in other
+/// currencies) once a day. The Radio DJ can open it on an album too (`find(_:)`), and price albums (`priceGuides`).
 @MainActor @Observable
 final class CDShopStore {
     enum SearchState: Equatable {
@@ -47,7 +49,17 @@ final class CDShopStore {
     private(set) var shopStates: [CDShop: ShopState] = [:]
     private(set) var offers: [CDOffer] = []
     private(set) var discogsStats: DiscogsMarketStats?
+    /// The price guide for the target (nil while it's read).
+    private(set) var priceGuide: PriceGuide?
+    private(set) var isPricing = false
     private(set) var rates = ExchangeRates()
+    /// The eBay sign-in for sold prices (opt-in, Settings ▸ Shop).
+    let ebay = EbaySession()
+    /// The Discogs account's token and username, for suggested prices and what's in the user's Discogs collection.
+    @ObservationIgnored var discogsAccount: () -> (token: String?, username: String?) = { (nil, nil) }
+    @ObservationIgnored private var guides: (key: String, guides: PriceGuides)?
+    @ObservationIgnored private var guideCache: [CDShoppingTarget: (guide: PriceGuide, at: Date)] = [:]
+    @ObservationIgnored private var guideTask: Task<Void, Never>?
 
     var condition: ConditionFilter = .any
     var hiddenShops: Set<CDShop> = []
@@ -212,6 +224,7 @@ final class CDShopStore {
         offers = []
         raw = []
         discogsStats = nil
+        priceGuide = nil
         resolveError = nil
         shopStates = Dictionary(uniqueKeysWithValues: CDShop.searched.map { ($0, .waiting) })
         shopTask?.cancel()
@@ -220,6 +233,8 @@ final class CDShopStore {
 
     func unlock() {
         shopTask?.cancel()
+        guideTask?.cancel()
+        isPricing = false
         runID = UUID()
         target = nil
     }
@@ -254,6 +269,7 @@ final class CDShopStore {
         isResolving = false
         guard !Task.isCancelled else { return }
         self.target = target
+        loadPriceGuide(for: target, force: force)
         raw = []
         offers = []
         shopStates = Dictionary(uniqueKeysWithValues: CDShop.searched.map { ($0, .waiting) })
@@ -334,6 +350,46 @@ final class CDShopStore {
             return "\(offer.shop.name): \(offer.title), \(offer.conditionText.isEmpty ? offer.condition.rawValue : offer.conditionText), \(price) (with shipping when the store lists it)"
         }
         return .page("the Shop, \(target.format == .cd ? "CDs" : "records") of *\(target.album)* by \(target.artist)", details: details)
+    }
+
+    // MARK: Price guide
+
+    /// The price guides, for the Shop and the Radio DJ (rebuilt when the Discogs account changes). On the Mac the
+    /// Shop reads eBay's listings itself, so the guide adds only recent sales, and only once signed in to eBay.
+    func priceGuides() -> PriceGuides {
+        let account = discogsAccount()
+        let key = "\(account.token ?? "")|\(account.username ?? "")"
+        if let guides, guides.key == key { return guides.guides }
+        let made = PriceGuides(token: account.token, username: account.username,
+                               currency: Locale.current.currency?.identifier ?? "USD",
+                               ebay: loader.ebayReader(ebay, readsForSale: false))
+        Task { await made.prefetchCollection() }
+        guides = (key, made)
+        return made
+    }
+
+    private func loadPriceGuide(for target: CDShoppingTarget, force: Bool) {
+        if !force, let hit = guideCache[target], Date().timeIntervalSince(hit.at) < Self.cacheAge {
+            priceGuide = hit.guide
+            return
+        }
+        let e = target.edition
+        let request = PriceGuideRequest(
+            artist: target.artist, album: target.album, format: PriceGuideRequest.Format(target.format),
+            barcode: target.barcode ?? "", catalogNumber: e.map { $0.catalogNumber.components(separatedBy: "; ").first ?? "" } ?? "",
+            label: e?.label ?? "", country: e?.country ?? "", year: e.flatMap { Int($0.date.prefix(4)) },
+            releaseID: e == nil ? nil : target.links.discogsRelease, masterID: target.links.discogsMaster)
+        let guides = priceGuides()
+        guideTask?.cancel()
+        isPricing = true
+        priceGuide = nil
+        guideTask = Task {
+            let guide = await guides.fullGuide(for: request)
+            guard !Task.isCancelled, self.target == target else { return }
+            priceGuide = guide
+            isPricing = false
+            guideCache[target] = (guide, Date())
+        }
     }
 
     // MARK: Prices

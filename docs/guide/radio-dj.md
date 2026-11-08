@@ -101,6 +101,13 @@ them; a photo costs about two cents the first time it's sent and much less after
 
 On the Mac, right-click the DJ's text to copy it.
 
+## In the Shop
+
+The DJ can look up what an album is worth (Discogs and eBay; see [Shop](shop.md#price-guide)) when you ask what to pay,
+and shows the price guide under its answer. In the Shop it takes on a different voice: your crate-digging friend, a
+bargain-hunting audiophile collector who goes record shopping with you (on the iPhone, from a photo of the record in
+your hand). See [Your crate-digging friend](shop.md#your-crate-digging-friend).
+
 ## On iPhone
 
 The DJ's button (a radio icon) is at the top of every page once the key has synced. Tap it and the DJ comes on in a

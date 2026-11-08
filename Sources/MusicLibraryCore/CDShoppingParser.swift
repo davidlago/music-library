@@ -22,10 +22,7 @@ public enum CDShopParser {
     }
 
     /// Whether the page is a bot check rather than the page asked for.
-    public static func isChallenge(title: String) -> Bool {
-        ["Just a moment", "Attention Required", "Pardon Our Interruption", "Security Measure", "Robot Check"]
-            .contains { title.localizedCaseInsensitiveContains($0) }
-    }
+    public static func isChallenge(title: String) -> Bool { CDShop.isChallenge(title: title) }
 
     /// One fragment per occurrence of `marker` (an opening tag), each ending where the next starts or at `end`.
     static func fragments(_ html: String, marker: String, end: [String] = []) -> [String] {

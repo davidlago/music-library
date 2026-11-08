@@ -4,8 +4,9 @@ import SwiftUI
 
 struct RootView: View {
     /// Raw values are stored (`selectedTab`). `insights` is the Explore tab; versions before 1.28 also had
-    /// `library` (Digital) and `sync`, which no longer decode, so those choices start over on Listen Now.
-    enum Tabs: String, Hashable { case listenNow, collection, insights, search }
+    /// `library` (Digital) and `sync`, which no longer decode, so those choices start over on Listen Now (as `shop`
+    /// does on a version before 1.33).
+    enum Tabs: String, Hashable { case listenNow, collection, insights, shop, search }
 
     @Environment(PhoneModel.self) private var model
     @Environment(PhonePlayer.self) private var player
@@ -30,6 +31,9 @@ struct RootView: View {
             }
             Tab("Explore", systemImage: "sparkles", value: .insights) {
                 InsightsTab()
+            }
+            Tab("Shop", systemImage: "bag", value: .shop) {
+                ShopTab()
             }
             Tab(value: .search, role: .search) {
                 SearchTab()

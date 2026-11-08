@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		4D11A0000000000000000001 /* MusicLibraryCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A0000000000000000002 /* MusicLibraryCore */; };
-		4D11A00000000000000000E0 /* MusicLibraryUI in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A00000000000000000E1 /* MusicLibraryUI */; };
 		4D11A0000000000000000027 /* MusicLibraryGlance in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A0000000000000000026 /* MusicLibraryGlance */; };
 		4D11A0000000000000000029 /* MusicLibraryGlance in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A0000000000000000028 /* MusicLibraryGlance */; };
 		4D11A000000000000000002B /* MusicLibraryGlance in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A000000000000000002A /* MusicLibraryGlance */; };
@@ -16,6 +15,7 @@
 		4D11A0000000000000000049 /* MusicLibraryWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4D11A0000000000000000030 /* MusicLibraryWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		4D11A000000000000000004B /* MusicLibraryWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 4D11A0000000000000000031 /* MusicLibraryWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		4D11A000000000000000004D /* MusicLibraryWatchWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4D11A0000000000000000032 /* MusicLibraryWatchWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		4D11A00000000000000000E0 /* MusicLibraryUI in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A00000000000000000E1 /* MusicLibraryUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -211,6 +211,30 @@
 			productReference = 4D11A0000000000000000003 /* MusicLibraryMobile.app */;
 			productType = "com.apple.product-type.application";
 		};
+		4D11A0000000000000000033 /* MusicLibraryWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4D11A0000000000000000034 /* Build configuration list for PBXNativeTarget "MusicLibraryWidgets" */;
+			buildPhases = (
+				4D11A0000000000000000037 /* Sources */,
+				4D11A0000000000000000038 /* Frameworks */,
+				4D11A0000000000000000039 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4D11A0000000000000000020 /* Shared */,
+				4D11A0000000000000000021 /* MusicLibraryWidgets */,
+			);
+			name = MusicLibraryWidgets;
+			packageProductDependencies = (
+				4D11A0000000000000000028 /* MusicLibraryGlance */,
+			);
+			productName = MusicLibraryWidgets;
+			productReference = 4D11A0000000000000000030 /* MusicLibraryWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		4D11A000000000000000003A /* MusicLibraryWatch */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 4D11A000000000000000003B /* Build configuration list for PBXNativeTarget "MusicLibraryWatch" */;
@@ -257,30 +281,6 @@
 			);
 			productName = MusicLibraryWatchWidgets;
 			productReference = 4D11A0000000000000000032 /* MusicLibraryWatchWidgets.appex */;
-			productType = "com.apple.product-type.app-extension";
-		};
-		4D11A0000000000000000033 /* MusicLibraryWidgets */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 4D11A0000000000000000034 /* Build configuration list for PBXNativeTarget "MusicLibraryWidgets" */;
-			buildPhases = (
-				4D11A0000000000000000037 /* Sources */,
-				4D11A0000000000000000038 /* Frameworks */,
-				4D11A0000000000000000039 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				4D11A0000000000000000021 /* MusicLibraryWidgets */,
-				4D11A0000000000000000020 /* Shared */,
-			);
-			name = MusicLibraryWidgets;
-			packageProductDependencies = (
-				4D11A0000000000000000028 /* MusicLibraryGlance */,
-			);
-			productName = MusicLibraryWidgets;
-			productReference = 4D11A0000000000000000030 /* MusicLibraryWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -523,15 +523,15 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).Widgets";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) WIDGET_EXTENSION";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).Widgets";
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) WIDGET_EXTENSION";
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
@@ -550,15 +550,15 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).Widgets";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) WIDGET_EXTENSION";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).Widgets";
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) WIDGET_EXTENSION";
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
@@ -637,13 +637,13 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).watchkitapp.Widgets";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).watchkitapp.Widgets";
-				SDKROOT = watchos;
 				TARGETED_DEVICE_FAMILY = 4;
 			};
 			name = Debug;
@@ -662,13 +662,13 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).watchkitapp.Widgets";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).watchkitapp.Widgets";
-				SDKROOT = watchos;
 				TARGETED_DEVICE_FAMILY = 4;
 			};
 			name = Release;

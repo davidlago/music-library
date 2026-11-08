@@ -108,10 +108,13 @@ final class PhoneRadioDJ {
         UserDefaults.standard.set(listenerName, forKey: RadioDJ.listenerNameKey)
     }
 
-    /// `library`: the collection the DJ can search while talking; `linker`: links its words to what you own.
-    func makeSession(_ subject: RadioDJSubject, library: RadioDJLibrary?, linker: RadioDJLinker?) -> RadioDJSession {
+    /// `library`: the collection the DJ can search while talking; `linker`: links its words to what you own;
+    /// `shopping`: the price guides (and, in the Shop, the store mode).
+    func makeSession(_ subject: RadioDJSubject, library: RadioDJLibrary?, linker: RadioDJLinker?,
+                     shopping: RadioDJShopping? = nil) -> RadioDJSession {
         RadioDJSession(name: name, subject: subject, client: client, model: model, library: library,
-                       linker: linker, listenerName: listenerName, wikipedia: WikipediaArticleFinder()) { [weak self] tally in
+                       linker: linker, listenerName: listenerName, wikipedia: WikipediaArticleFinder(),
+                       shopping: shopping) { [weak self] tally in
             self?.record(tally)
         }
     }
@@ -213,7 +216,14 @@ extension PhoneModel {
         let linker = library.map {
             RadioDJLinker(tracks: $0.tracks, collection: collection, subject: subject, canPlay: { present.contains($0.id) })
         }
-        radioDJ.begin(radioDJ.makeSession(subject, library: radioDJLibrary, linker: linker))
+        radioDJ.begin(radioDJ.makeSession(subject, library: radioDJLibrary, linker: linker,
+                                          shopping: RadioDJShopping(guides: shop.guides())))
+    }
+
+    /// The links for a DJ conversation: what you own, playable when it's on this iPhone.
+    func radioDJLinker(_ subject: RadioDJSubject) -> RadioDJLinker? {
+        let present = library?.presentIDs ?? []
+        return library.map { RadioDJLinker(tracks: $0.tracks, collection: collection, subject: subject, canPlay: { present.contains($0.id) }) }
     }
 
     /// A link in the DJ's words: pages open on the tab showing, with the sheet tucked away so you see them (the DJ stays
@@ -279,12 +289,49 @@ extension PhoneModel {
     }
 }
 
-/// The DJ's booth: who's on, what they're saying (with the pages they checked) and a line to talk back, with photos
-/// to show it (taken with the camera, a record in a shop, or chosen from the library).
+/// The DJ's booth as a sheet over any page: the conversation, with the DJ's name and what it's about on top.
 struct RadioDJSheet: View {
     let session: RadioDJSession
     let dj: PhoneRadioDJ
     let open: (RadioDJReference) -> Void
+
+    var body: some View {
+        NavigationStack {
+            RadioDJConversation(session: session, dj: dj, open: open)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        VStack(spacing: 2) {
+                            HStack(spacing: 8) {
+                                OnAirSign(live: session.isBusy)
+                                Text(session.name).font(.headline).lineLimit(1)
+                            }
+                            Text(RadioDJ.attributed(session.subject.headline)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button { dj.isShowing = false } label: { Image(systemName: "chevron.down") }
+                            .accessibilityLabel("Keep listening in the background")
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(role: .close) { dj.endSession() }
+                            .accessibilityLabel("Off the air")
+                    }
+                }
+        }
+    }
+}
+
+/// The DJ's booth: what the DJ is saying (with the pages it checked and the prices it looked up) and a line to talk
+/// back, with photos to show it (taken with the camera, a record in a shop, or chosen from the library). In the
+/// Shop (`session.isInStore`) a photo taken goes straight to the DJ, and the albums it can't tell apart show as
+/// buttons to pick from, with one to take another photo.
+struct RadioDJConversation: View {
+    let session: RadioDJSession
+    let dj: PhoneRadioDJ
+    let open: (RadioDJReference) -> Void
+    /// Opens the camera when the conversation hasn't started (the Shop's "Snap a Record").
+    var autoCamera = false
     @State private var draft = ""
     @FocusState private var focused: Bool
     /// Photos to send with the next message.
@@ -294,96 +341,119 @@ struct RadioDJSheet: View {
     @State private var showingLibrary = false
     @State private var picked: [PhotosPickerItem] = []
 
+    /// Where you are, for the DJ (in the Shop it stays in the store).
+    private var page: RadioDJSubject? { session.isInStore ? nil : dj.here }
+
     var body: some View {
-        NavigationStack {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 20) {
-                        ForEach(session.lines) { line in
-                            RadioDJLineView(line: line, segments: line.role == .dj ? session.segments(line) : [],
-                                            speaking: session.activity == .speaking && line.id == session.lines.last?.id)
-                                .id(line.id)
-                        }
-                        // The questions to start with (gone once one is asked, or when "Tell me about…" takes over).
-                        if !session.suggestions.isEmpty, !session.isBusy, photos.isEmpty, !session.isElsewhere(dj.hereTopic) {
-                            FlowLayout(spacing: 8) {
-                                ForEach(session.suggestions, id: \.self) { question in
-                                    Button(question) { session.send(question, page: dj.here) }
-                                        .font(.subheadline)
-                                        .buttonStyle(.glass)
-                                        .tint(question == session.suggestions.first ? .accentColor : nil)
-                                }
-                            }
-                        }
-                        if let status = statusText { RadioDJStatusRow(text: status) }
-                        if let error = session.error {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 20) {
+                    ForEach(session.lines) { line in
+                        RadioDJLineView(line: line, segments: line.role == .dj ? session.segments(line) : [],
+                                        speaking: session.activity == .speaking && line.id == session.lines.last?.id)
+                            .id(line.id)
+                        ForEach(line.priceGuides) { guide in
                             VStack(alignment: .leading, spacing: 8) {
-                                Label(error, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.orange)
-                                Button("Try Again") { session.retry() }.buttonStyle(.bordered).controlSize(.small)
+                                PriceGuideView(guide: guide, compact: true)
+                                ShopStoreLinks(target: guide.shoppingTarget)
                             }
                         }
-                        Color.clear.frame(height: 1).id("bottom")
                     }
-                    .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 16)
-                }
-                .defaultScrollAnchor(.bottom)
-                .scrollDismissesKeyboard(.interactively)
-                .environment(\.openURL, OpenURLAction { url in
-                    if let reference = RadioDJReference(url: url) { open(reference); return .handled }
-                    return url.isWebLink ? .systemAction : .discarded
-                })
-                // Follow the conversation: your question, the status line, the reply as it streams in, an error.
-                .onChange(of: session.scrollKey) { proxy.scrollTo("bottom", anchor: .bottom) }
-            }
-            .safeAreaInset(edge: .bottom) { composer }
-            .fullScreenCover(isPresented: $showingCamera) {
-                CameraPicker(onPhoto: { data in Task { await addPhoto(data) } }, onDone: { showingCamera = false })
-                    .ignoresSafeArea()
-            }
-            .photosPicker(isPresented: $showingLibrary, selection: $picked,
-                          maxSelectionCount: max(1, RadioDJPhoto.maxPerMessage - photos.count), matching: .images)
-            .onChange(of: picked) {
-                let items = picked
-                picked = []
-                Task {
-                    for item in items {
-                        if let data = try? await item.loadTransferable(type: Data.self) { await addPhoto(data) }
-                        else { photoNote = "Couldn't open that photo." }
-                    }
-                }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    VStack(spacing: 2) {
-                        HStack(spacing: 8) {
-                            OnAirSign(live: session.isBusy)
-                            Text(session.name).font(.headline).lineLimit(1)
+                    // The questions to start with (gone once one is asked, or when "Tell me about…" takes over).
+                    if !session.suggestions.isEmpty, !session.isBusy, photos.isEmpty, !session.isElsewhere(dj.hereTopic) {
+                        FlowLayout(spacing: 8) {
+                            ForEach(session.suggestions, id: \.self) { question in
+                                Button(question) { session.send(question, page: page) }
+                                    .font(.subheadline)
+                                    .buttonStyle(.glass)
+                                    .tint(question == session.suggestions.first ? .accentColor : nil)
+                            }
                         }
-                        Text(RadioDJ.attributed(session.subject.headline)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
+                    if let choices = session.choices, !session.isBusy { choiceButtons(choices) }
+                    if let status = statusText { RadioDJStatusRow(text: status) }
+                    if let error = session.error {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label(error, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.orange)
+                            Button("Try Again") { session.retry() }.buttonStyle(.bordered).controlSize(.small)
+                        }
+                    }
+                    Color.clear.frame(height: 1).id("bottom")
                 }
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { dj.isShowing = false } label: { Image(systemName: "chevron.down") }
-                        .accessibilityLabel("Keep listening in the background")
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(role: .close) { dj.endSession() }
-                        .accessibilityLabel("Off the air")
+                .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 16)
+            }
+            .defaultScrollAnchor(.bottom)
+            .scrollDismissesKeyboard(.interactively)
+            .environment(\.openURL, OpenURLAction { url in
+                if let reference = RadioDJReference(url: url) { open(reference); return .handled }
+                return url.isWebLink ? .systemAction : .discarded
+            })
+            // Follow the conversation: your question, the status line, the reply as it streams in, an error.
+            .onChange(of: session.scrollKey) { proxy.scrollTo("bottom", anchor: .bottom) }
+        }
+        .safeAreaInset(edge: .bottom) { composer }
+        .fullScreenCover(isPresented: $showingCamera) {
+            CameraPicker(onPhoto: { data in Task { await addPhoto(data, fromCamera: true) } }, onDone: { showingCamera = false })
+                .ignoresSafeArea()
+        }
+        .photosPicker(isPresented: $showingLibrary, selection: $picked,
+                      maxSelectionCount: max(1, RadioDJPhoto.maxPerMessage - photos.count), matching: .images)
+        .onChange(of: picked) {
+            let items = picked
+            picked = []
+            Task {
+                for item in items {
+                    if let data = try? await item.loadTransferable(type: Data.self) { await addPhoto(data) }
+                    else { photoNote = "Couldn't open that photo." }
                 }
             }
+        }
+        .onAppear {
+            if autoCamera, hasCamera, session.seesPhotos, !session.lines.contains(where: { $0.role == .listener }) { showingCamera = true }
+        }
+    }
+
+    /// The albums the DJ couldn't tell apart, to tap, and another photo when it would help.
+    private func choiceButtons(_ choices: RadioDJChoices) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(choices.options) { option in
+                Button { session.send(option.answer, page: page) } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(RadioDJ.attributed(option.headline)).font(.callout.weight(.medium)).multilineTextAlignment(.leading)
+                        if !option.details.isEmpty { Text(option.details).font(.caption).foregroundStyle(.secondary) }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.fill))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            HStack(spacing: 8) {
+                if choices.retake, session.seesPhotos {
+                    Button {
+                        if hasCamera { showingCamera = true } else { showingLibrary = true }
+                    } label: {
+                        Label(choices.retakeHint.isEmpty ? "Take Another Photo" : "Photo of \(choices.retakeHint)", systemImage: "camera")
+                    }
+                    .buttonStyle(.glassProminent)
+                }
+                Button("None of These") { focused = true }.buttonStyle(.glass)
+            }
+            .font(.subheadline)
         }
     }
 
     private var statusText: String? {
         switch session.activity {
         case .idle, .speaking: nil
-        case .warmingUp: "Warming up the turntables…"
+        case .warmingUp: session.isInStore ? "Taking a good look…" : "Warming up the turntables…"
         case .searching(let q): q.isEmpty ? "Digging through the crates…" : "Digging through the crates: “\(q)”"
         case .reading(let host): host.isEmpty ? "Reading up…" : "Reading up on \(host)…"
         case .browsing(let q): q.isEmpty ? "Flipping through your shelves…" : "Flipping through your shelves: \(q)"
-        // The phone has no Shop, so its DJ never opens one.
+        // The phone has no Shop listings, so its DJ never opens them.
         case .shopping(let album): album.isEmpty ? "Heading to the record store…" : "Heading to the record store for \(album)…"
+        case .pricing(let album): album.isEmpty ? "Checking prices on Discogs and eBay…" : "Checking what \(album) sells for…"
         }
     }
 
@@ -404,7 +474,7 @@ struct RadioDJSheet: View {
     private var composer: some View {
         VStack(spacing: 4) {
             previewRow
-            if let page = dj.hereTopic, session.isElsewhere(page), !session.isBusy {
+            if !session.isInStore, let page = dj.hereTopic, session.isElsewhere(page), !session.isBusy {
                 Button {
                     session.send("Tell me about this one.", page: dj.here)
                 } label: {
@@ -416,8 +486,7 @@ struct RadioDJSheet: View {
             attachedPhotos
             HStack(alignment: .bottom, spacing: 8) {
                 photoButton
-                TextField(photos.isEmpty ? "Ask \(session.name) anything…" : "Ask about \(photos.count == 1 ? "this photo" : "these photos")…",
-                          text: $draft, axis: .vertical)
+                TextField(placeholder, text: $draft, axis: .vertical)
                     .lineLimit(1...5)
                     .focused($focused)
                     .submitLabel(.send)
@@ -432,10 +501,15 @@ struct RadioDJSheet: View {
                 .disabled(!canSend)
                 .accessibilityLabel("Send")
             }
-            Text("This segment: about \(DollarFormat.string(session.cost))")
+            Text("This \(session.isInStore ? "dig" : "segment"): about \(DollarFormat.string(session.cost))")
                 .font(.caption2).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 16).padding(.bottom, 8).padding(.top, 6)
+    }
+
+    private var placeholder: String {
+        if !photos.isEmpty { return "Ask about \(photos.count == 1 ? "this photo" : "these photos")…" }
+        return session.isInStore ? "Or type what the cover says…" : "Ask \(session.name) anything…"
     }
 
     private var canSend: Bool {
@@ -445,7 +519,7 @@ struct RadioDJSheet: View {
     /// What's typed, or `question` (a chip about the photos).
     private func send(_ question: String? = nil) {
         guard !session.isBusy, question != nil || canSend else { return }
-        session.send(question ?? draft, photos: photos, page: dj.here)
+        session.send(question ?? draft, photos: photos, page: page)
         draft = ""
         photos = []
         photoNote = nil
@@ -495,7 +569,7 @@ struct RadioDJSheet: View {
                 }
                 .padding(.horizontal, 2)
             }
-            if !session.isBusy {
+            if !session.isBusy, !session.isInStore {
                 FlowLayout(spacing: 8) {
                     ForEach(session.photoQuestions(count: photos.count), id: \.self) { question in
                         Button(question) { send(question) }
@@ -508,8 +582,9 @@ struct RadioDJSheet: View {
         }
     }
 
-    /// Scaled and re-encoded off the main thread.
-    private func addPhoto(_ data: Data) async {
+    /// Scaled and re-encoded off the main thread. In the Shop a photo just taken goes to the DJ at once (with
+    /// anything typed).
+    private func addPhoto(_ data: Data, fromCamera: Bool = false) async {
         guard session.seesPhotos else {
             photoNote = "\(session.model.name) can't see photos."
             return
@@ -523,6 +598,7 @@ struct RadioDJSheet: View {
         guard photos.count < RadioDJPhoto.maxPerMessage else { return }
         photoNote = nil
         photos.append(photo)
+        if fromCamera, session.isInStore, !session.isBusy { send() }
     }
 }
 
@@ -671,6 +747,7 @@ extension PhoneModel {
         case "collection": .page("the Collection tab: their physical and digital collections")
         case "insights": .page("Explore: Insights, artists and Music DNA", details: ["Their collection statistics; collection_stats has the numbers."])
         case "search": .page("Search")
+        case "shop": .page("the Shop, where they look up what a record or CD is worth, whether they own it and where to buy it")
         default: .page("Listen Now, their home page")
         }
     }

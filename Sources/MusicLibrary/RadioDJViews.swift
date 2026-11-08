@@ -112,10 +112,11 @@ final class RadioDJStore {
     /// `library`: the collection the DJ can search while talking; `linker`: links its words to what you own; `shop`:
     /// opens the Shop on an album (`open_shop`).
     func makeSession(_ subject: RadioDJSubject, library: RadioDJLibrary?, linker: RadioDJLinker?,
+                     shopping: RadioDJShopping? = nil,
                      shop: (@MainActor (RadioDJShopRequest) async -> String)?) -> RadioDJSession {
         RadioDJSession(name: displayName, subject: subject, client: client, model: model, library: library,
                        linker: linker, listenerName: trimmedListenerName, wikipedia: WikipediaArticleFinder(),
-                       shop: shop) { [weak self] tally in
+                       shop: shop, shopping: shopping) { [weak self] tally in
             self?.record(tally)
         }
     }
@@ -240,10 +241,29 @@ extension AppModel {
     /// Puts the DJ on the air about `subject`, with the collection to search and link to.
     func startRadioDJ(_ subject: RadioDJSubject) {
         let linker = RadioDJLinker(tracks: tracks, collection: collection, subject: subject)
-        radioDJ.begin(radioDJ.makeSession(subject, library: radioDJLibrary, linker: linker) { [weak self] request in
+        radioDJ.begin(radioDJ.makeSession(subject, library: radioDJLibrary, linker: linker,
+                                          shopping: RadioDJShopping(guides: cdShop.priceGuides())) { [weak self] request in
             guard let self else { return "The app closed." }
             return await self.openShop(for: request)
         })
+    }
+
+    /// The Shop's "Ask the DJ": on the air about the album being shopped for, asked what it is worth.
+    func askRadioDJ(about target: CDShoppingTarget) {
+        var details = ["The listener is shopping for it in the app's Shop, on \(target.format.name)."]
+        if let e = target.edition {
+            details.append("Edition: " + [e.date, e.country, e.label, e.catalogNumber, e.format].filter { !$0.isEmpty }.joined(separator: " · "))
+            if !e.barcode.isEmpty { details.append("Barcode: \(e.barcode)") }
+        }
+        let subject = RadioDJSubject(kind: .album, title: target.album, artist: target.artist, details: details)
+        // In the Shop the DJ is the bargain-hunting collector.
+        let linker = RadioDJLinker(tracks: tracks, collection: collection, subject: subject)
+        radioDJ.begin(radioDJ.makeSession(subject, library: radioDJLibrary, linker: linker,
+                                          shopping: RadioDJShopping(guides: cdShop.priceGuides(), shopper: true)) { [weak self] request in
+            guard let self else { return "The app closed." }
+            return await self.openShop(for: request)
+        })
+        radioDJ.session?.send("Tell me about it: what critics and listeners think, whether it's worth adding to my collection, and what's a fair price for this \(target.edition == nil ? target.format.noun : "edition").")
     }
 
     /// The DJ's `open_shop`: shows the Shop (the DJ stays on the air beside it) searching for the album.
@@ -339,6 +359,7 @@ struct RadioDJPanel: View {
                             RadioDJLineView(line: line, segments: line.role == .dj ? session.segments(line) : [],
                                             speaking: session.activity == .speaking && line.id == session.lines.last?.id)
                                 .id(line.id)
+                            ForEach(line.priceGuides) { PriceGuideView(guide: $0, compact: true) }
                         }
                         suggestionChips
                         if let status = statusText { RadioDJStatusRow(text: status).id("status") }
@@ -420,6 +441,7 @@ struct RadioDJPanel: View {
         case .reading(let host): return host.isEmpty ? "Reading up…" : "Reading up on \(host)…"
         case .browsing(let q): return q.isEmpty ? "Flipping through your shelves…" : "Flipping through your shelves: \(q)"
         case .shopping(let album): return album.isEmpty ? "Heading to the record store…" : "Heading to the record store for \(album)…"
+        case .pricing(let album): return album.isEmpty ? "Checking prices on Discogs and eBay…" : "Checking what \(album) sells for…"
         }
     }
 

@@ -411,6 +411,7 @@ final class AppModel {
             CatalogEnricher(catalog: { path in try await client.get(path, priority: .background) }, musicBrainz: self.musicBrainz, info: self.artistFetcher)
         }
         cdShop.musicBrainz = musicBrainz
+        cdShop.discogsAccount = { [unowned self] in self.discogsSync.account }
         importer = ImportController(model: self)
         cd = CDController(model: self)
         rips = RipChecker(model: self)
@@ -1804,8 +1805,10 @@ final class AppModel {
             concertSettings = SyncConcertSettings(home: home, radius: concerts.radius, unit: concerts.unit,
                                                   ticketmasterKey: concerts.ticketmasterKey, jambaseKey: concerts.jambaseKey)
         }
+        var radioDJSettings = radioDJ.syncSettings
+        (radioDJSettings.discogsToken, radioDJSettings.discogsUsername) = discogsSync.account
         return SyncContext(libraryRoot: libraryRoot, database: database, lastFM: lastFM, concerts: concertSettings,
-                           radioDJ: radioDJ.syncSettings,
+                           radioDJ: radioDJSettings,
                            library: tracks, tracks: { [unowned self] in self.tracks(for: $0) }, collection: collection,
                            collectionReady: collectionLoaded)
     }

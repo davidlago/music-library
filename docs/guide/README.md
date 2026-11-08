@@ -36,7 +36,8 @@ pages explain every feature, how it works and how to set it up. For a quick look
 ## Find more music
 
 - [Local Library CDs](local-library.md): your public library's CD catalog, downloaded and searchable.
-- [Shop](shop.md): compare new and used copies of the exact CD or record edition you want.
+- [Shop](shop.md): compare new and used copies of the exact CD or record edition you want, see what it's worth on
+  Discogs and eBay, and take your iPhone record shopping (barcode scanner, and an AI crate-digging friend).
 
 ## Take it with you
 
