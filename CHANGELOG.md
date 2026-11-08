@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.35.0
+
 - Record a CD's or record's pressing and condition: **Runouts** (the matrix/runout codes in the dead wax or around a
   CD's centre ring) and a **Condition** grade for the record or disc and for the sleeve or case (Mint down to Poor, on
   the Goldmine scale Discogs uses), on the copy's page and in Add to Collection. See
