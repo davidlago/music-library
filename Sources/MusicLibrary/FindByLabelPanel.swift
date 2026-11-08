@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Find by Label (⌘L, anywhere): a series and a number, and what's at that spot on your shelf, with its neighbors,

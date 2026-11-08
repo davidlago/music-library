@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Listen Now, the first tab: the album playing (or played last) at the top, tinted by its cover, then what you've

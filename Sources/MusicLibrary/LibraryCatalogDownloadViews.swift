@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// The downloaded catalog, searched instantly in the app's query language, with genre and decade chips to

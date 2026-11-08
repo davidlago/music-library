@@ -1,5 +1,6 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Digitize Vinyl (sidebar ▸ Import): pick one of your records, record it from an input, cut the recording into

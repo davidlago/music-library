@@ -17,11 +17,14 @@ let package = Package(
         .library(name: "MusicLibraryCore", targets: ["MusicLibraryCore"]),
         // What the iPhone's widgets and the watch app show; Foundation only, so they don't need the core.
         .library(name: "MusicLibraryGlance", targets: ["MusicLibraryGlance"]),
+        // SwiftUI views the Mac and iPhone apps both draw (jewel cases, record sleeves, label stickers, badges).
+        .library(name: "MusicLibraryUI", targets: ["MusicLibraryUI"]),
     ],
     targets: [
         .target(name: "MusicLibraryGlance"),
         .target(name: "MusicLibraryCore", dependencies: ["MusicLibraryGlance"]),
-        .executableTarget(name: "MusicLibrary", dependencies: ["MusicLibraryCore"]),
+        .target(name: "MusicLibraryUI", dependencies: ["MusicLibraryCore"]),
+        .executableTarget(name: "MusicLibrary", dependencies: ["MusicLibraryCore", "MusicLibraryUI"]),
         // Makes the iPhone app's sample library (scripts/make-sample-library.sh).
         .executableTarget(name: "SampleLibraryMaker", dependencies: ["MusicLibraryCore"]),
         .testTarget(

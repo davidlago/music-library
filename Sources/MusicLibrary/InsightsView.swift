@@ -1,6 +1,7 @@
 import AppKit
 import Charts
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 // MARK: Palette
@@ -315,45 +316,6 @@ func sparseLabels(_ labels: [String], maxCount: Int) -> [String] {
     guard labels.count > maxCount else { return labels }
     let step = Int((Double(labels.count) / Double(maxCount)).rounded(.up))
     return labels.enumerated().filter { $0.offset % step == 0 }.map(\.element)
-}
-
-/// Lays children out left to right, wrapping onto new lines as needed.
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = arrange(proposal.width ?? .infinity, subviews)
-        return CGSize(width: rows.map(\.width).max() ?? 0, height: rows.last.map { $0.y + $0.height } ?? 0)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        for row in arrange(bounds.width, subviews) {
-            var x = bounds.minX
-            for i in row.indices {
-                let size = subviews[i].sizeThatFits(.unspecified)
-                subviews[i].place(at: CGPoint(x: x, y: bounds.minY + row.y), proposal: ProposedViewSize(size))
-                x += size.width + spacing
-            }
-        }
-    }
-
-    private func arrange(_ maxWidth: CGFloat, _ subviews: Subviews) -> [(indices: [Int], y: CGFloat, width: CGFloat, height: CGFloat)] {
-        var rows: [(indices: [Int], y: CGFloat, width: CGFloat, height: CGFloat)] = []
-        var current: [Int] = [], x: CGFloat = 0, y: CGFloat = 0, height: CGFloat = 0
-        for i in subviews.indices {
-            let size = subviews[i].sizeThatFits(.unspecified)
-            if !current.isEmpty, x + size.width > maxWidth {
-                rows.append((current, y, x - spacing, height))
-                y += height + spacing
-                current = []; x = 0; height = 0
-            }
-            current.append(i)
-            x += size.width + spacing
-            height = max(height, size.height)
-        }
-        if !current.isEmpty { rows.append((current, y, x - spacing, height)) }
-        return rows
-    }
 }
 
 struct Chip: View {

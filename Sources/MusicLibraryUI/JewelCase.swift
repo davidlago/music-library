@@ -4,34 +4,35 @@ import SwiftUI
 /// An album's cover drawn as a CD jewel case (album pages and the album grid), 142 × 125 mm: the cover is the square
 /// booklet behind the clear lid, with the ribbed hinge and its pins on the left, the black tray showing around the
 /// booklet, the two tabs that hold it and the lid's bevelled edges and gloss. The decoration doesn't take clicks, so
-/// controls in the booklet work; the label sticker and the badge only show what they mean on hover.
-/// The iPhone app has the same view (`iOS/MusicLibraryMobile/JewelCase.swift`); a record is a `RecordSleeve`.
-struct JewelCase<Booklet: View>: View {
+/// controls in the booklet work; the label sticker and the badges only say what they mean (on hover on the Mac, on a
+/// press and hold on the iPhone). Shared by the Mac and iPhone apps; a record is a `RecordSleeve`.
+public struct JewelCase<Booklet: View>: View {
     let width: CGFloat
     /// What you own: your CD's label on a sticker across the top of the hinge (where it goes on the real case), a
-    /// small badge on the booklet while it isn't ripped, or a round badge for a borrowed CD or a download.
+    /// small badge on the booklet while it isn't ripped, or a round badge for a borrowed CD or a download; the number of
+    /// copies in the booklet's top-right corner when you own more than one.
     var mark: CopyMark?
     /// Whether the album's music is only in iCloud: a cloud badge beside the mark's.
-    var iCloud: ICloudMark.Placement
+    var iCloud: ICloudPlacement
     var booklet: Booklet
 
-    init(width: CGFloat, mark: CopyMark?, iCloud: ICloudMark.Placement = .onMac, @ViewBuilder booklet: () -> Booklet) {
+    public init(width: CGFloat, mark: CopyMark?, iCloud: ICloudPlacement = .onMac, @ViewBuilder booklet: () -> Booklet) {
         self.width = width
         self.mark = mark
         self.iCloud = iCloud
         self.booklet = booklet()
     }
 
-    static func height(width: CGFloat) -> CGFloat { width * 125 / 142 }
+    public static func height(width: CGFloat) -> CGFloat { width * 125 / 142 }
     /// The booklet's side in a case this wide.
-    static func bookletSide(width: CGFloat) -> CGFloat { height(width: width) * 0.944 }
-    static func cornerRadius(width: CGFloat) -> CGFloat { width * 0.014 }
+    public static func bookletSide(width: CGFloat) -> CGFloat { height(width: width) * 0.944 }
+    public static func cornerRadius(width: CGFloat) -> CGFloat { width * 0.014 }
     /// The label sticker's width on a case this wide (a record's sleeve takes the same, in the same place).
-    static func stickerWidth(width: CGFloat) -> CGFloat { width * 0.105 * 0.88 }
+    public static func stickerWidth(width: CGFloat) -> CGFloat { width * 0.105 * 0.88 }
     /// Where the sticker's top-left corner sits on a case this wide: across the top of the hinge.
-    static func stickerOffset(width: CGFloat) -> CGSize { CGSize(width: width * 0.105 * 0.04, height: height(width: width) * 0.012) }
+    public static func stickerOffset(width: CGFloat) -> CGSize { CGSize(width: width * 0.105 * 0.04, height: height(width: width) * 0.012) }
 
-    var body: some View {
+    public var body: some View {
         let w = width, h = Self.height(width: w)
         let radius = Self.cornerRadius(width: w)
         let side = Self.bookletSide(width: w)
@@ -61,7 +62,7 @@ struct JewelCase<Booklet: View>: View {
                                   lineWidth: 1)
             }
             .allowsHitTesting(false)
-            // The sticker and the badge take the pointer only to show what they mean.
+            // The sticker and the badges take the pointer only to say what they mean.
             if let sticker = mark?.sticker, sticker.series == .cd {
                 LabelSticker(number: sticker.number, series: .cd, width: Self.stickerWidth(width: w))
                     .offset(Self.stickerOffset(width: w))
@@ -69,6 +70,11 @@ struct JewelCase<Booklet: View>: View {
             CopyBadges(mark: mark, iCloud: iCloud, coverSide: side)
                 .frame(width: side, height: side, alignment: .bottomTrailing)
                 .offset(x: w - margin - side, y: margin)
+            if let mark, mark.more > 0, width >= 120 {
+                CopiesChip(count: mark.more + 1, coverSide: side)
+                    .frame(width: side, height: side, alignment: .topTrailing)
+                    .offset(x: w - margin - side, y: margin)
+            }
         }
         .frame(width: w, height: h)
         .background {

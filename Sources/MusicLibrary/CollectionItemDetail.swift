@@ -1,5 +1,6 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// An item's page: its case or sleeve with the label, its digital copy, the release's tracks (from the album info

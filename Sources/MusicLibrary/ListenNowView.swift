@@ -1,5 +1,6 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Listen Now, the first row of the sidebar: the album playing (or played last) at the top, tinted by its cover,

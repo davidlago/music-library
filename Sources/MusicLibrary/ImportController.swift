@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import MusicLibraryCore
+import MusicLibraryUI
 
 @MainActor @Observable
 final class ImportEntry: Identifiable {

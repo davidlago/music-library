@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// The artist page, top to bottom: the photo on a blurred backdrop with who they are (summary, genres), Play and

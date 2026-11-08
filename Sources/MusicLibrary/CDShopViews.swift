@@ -1,5 +1,6 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// The Shop: find the CD or record on MusicBrainz (album, artist, barcode or catalog number), pick the edition, then
