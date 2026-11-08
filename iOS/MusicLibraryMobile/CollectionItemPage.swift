@@ -66,7 +66,7 @@ private struct CollectionItemContent: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 32)
         }
-        .background { AlbumBackdrop(url: library.coverURL(item: item)) }
+        .background { PageBackdrop(url: library.coverURL(item: item)) }
         .navigationTitle(item.sticker?.text ?? title)
         .navigationBarTitleDisplayMode(.inline)
         .radioDJ { [model, item] in model.radioDJSubject(item: item) }

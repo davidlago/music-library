@@ -4,31 +4,6 @@ import SwiftUI
 
 // MARK: Colors
 
-/// Categorical colors for what people do, the Mac's palette (validated together for color-vision deficiency),
-/// adapting to light and dark mode.
-enum DNAPalette {
-    static let performance = Color(uiColor: dynamic(light: 0x2a78d6, dark: 0x3987e5))
-    static let writing = Color(uiColor: dynamic(light: 0x1baf7a, dark: 0x199e70))
-    static let production = Color(uiColor: dynamic(light: 0xeb6834, dark: 0xd95926))
-
-    static func of(_ c: CollaborationGraph.Category) -> Color {
-        switch c {
-        case .performance: performance
-        case .writing: writing
-        case .production: production
-        }
-    }
-
-    nonisolated private static func dynamic(light: UInt32, dark: UInt32) -> UIColor {
-        UIColor { traits in rgb(traits.userInterfaceStyle == .dark ? dark : light) }
-    }
-
-    nonisolated private static func rgb(_ hex: UInt32) -> UIColor {
-        UIColor(red: CGFloat((hex >> 16) & 0xff) / 255, green: CGFloat((hex >> 8) & 0xff) / 255,
-                blue: CGFloat(hex & 0xff) / 255, alpha: 1)
-    }
-}
-
 // MARK: Page
 
 /// Music DNA, centered on `name` (nil: the starting page). Each person opened is pushed onto the stack, so Back
@@ -104,7 +79,7 @@ private struct DNALanding: View {
                             ForEach(graph.mostConnected(limit: 30)) { p in
                                 NavigationLink(value: DNARoute(name: p.name)) {
                                     VStack(spacing: 6) {
-                                        DNABubble(person: p, size: 76)
+                                        PersonBubble(person: p, size: 76)
                                         Text(p.name).font(.footnote.weight(.medium)).lineLimit(1)
                                         Text(dnaCollaborators(p.degree)).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                                     }
@@ -173,7 +148,7 @@ private struct DNAPersonRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Circle().fill(DNAPalette.of(person.category)).frame(width: 9, height: 9)
+            Circle().fill(DNAColor.of(person.category)).frame(width: 9, height: 9)
                 .accessibilityLabel(person.category.rawValue)
             Text(person.name).lineLimit(1)
             Spacer(minLength: 8)
@@ -182,53 +157,17 @@ private struct DNAPersonRow: View {
     }
 }
 
-private struct DNALegend: View {
-    var body: some View {
-        HStack(spacing: 12) {
-            ForEach(CollaborationGraph.Category.allCases, id: \.self) { c in
-                HStack(spacing: 4) {
-                    Circle().fill(DNAPalette.of(c)).frame(width: 9, height: 9)
-                    Text(c.rawValue).font(.caption).foregroundStyle(.secondary).fixedSize()
-                }
-            }
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityHint("Colored by what each person mostly does in your music")
-    }
-}
-
-private func dnaCollaborators(_ n: Int) -> String { "\(n.formatted()) collaborator\(n == 1 ? "" : "s")" }
-
-/// A circle in the person's category color with their photo (if they're an artist with one) or initials.
-private struct DNABubble: View {
+/// A person's bubble (`DNABubble`) with their photo when they're an artist with one.
+private struct PersonBubble: View {
     @Environment(PhoneModel.self) private var model
     let person: CollaborationGraph.Person
     let size: CGFloat
     var highlighted = false
 
     var body: some View {
-        let color = DNAPalette.of(person.category)
         let hasPhoto = model.library?.artistImageURL(person.name) != nil
-        ZStack {
-            Circle().fill(Color(.secondarySystemBackground))
-            Circle().fill(color.opacity(0.16))
-            if hasPhoto {
-                ArtistPhoto(name: person.name, size: size - 6)
-            } else {
-                Text(Self.initials(person.name))
-                    .font(.system(size: max(9, size * 0.32), weight: .semibold, design: .rounded))
-                    .foregroundStyle(color)
-                    .minimumScaleFactor(0.5)
-            }
-        }
-        .frame(width: size, height: size)
-        .overlay(Circle().strokeBorder(color, lineWidth: highlighted ? 3.5 : max(1.5, size / 28)))
-        .shadow(color: .black.opacity(highlighted ? 0.3 : 0.12), radius: highlighted ? 8 : 3, y: 2)
-    }
-
-    static func initials(_ name: String) -> String {
-        name.split(separator: " ").filter { $0.contains(where: \.isLetter) }.prefix(2)
-            .compactMap { $0.first(where: \.isLetter) }.map(String.init).joined().uppercased()
+        DNABubble(person: person, size: size, highlighted: highlighted,
+                  photo: hasPhoto ? ArtistPhoto(name: person.name, size: size - 6) : nil)
     }
 }
 
@@ -294,24 +233,6 @@ private struct DNAPersonPage: View {
 
 // MARK: Graph
 
-/// A line between two points whose ends animate when the layout changes.
-nonisolated private struct DNAEdgeShape: Shape {
-    var from: CGPoint
-    var to: CGPoint
-
-    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
-        get { AnimatablePair(AnimatablePair(from.x, from.y), AnimatablePair(to.x, to.y)) }
-        set { from = CGPoint(x: newValue.first.first, y: newValue.first.second); to = CGPoint(x: newValue.second.first, y: newValue.second.second) }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        p.move(to: from)
-        p.addLine(to: to)
-        return p
-    }
-}
-
 /// Rings, edges and bubbles. Pinch to zoom, drag to pan; tapping a bubble selects it, tapping it again centers
 /// on it, tapping the center or the background clears the selection.
 private struct DNAGraph: View {
@@ -373,10 +294,12 @@ private struct DNAGraph: View {
                     // Taps attach to the bubble itself, before it's positioned; after `.position` they would
                     // cover the whole graph.
                     Button { tap(node) } label: {
-                        DNANodeView(node: node, size: bubble, isSelected: isSelected,
+                        DNANodeView(node: node, size: bubble, isHighlighted: isSelected,
                                     showsLabel: node.level <= 1 || isSelected || (node.level == 2 && scale >= 1.6) || scale >= 2.4,
                                     outward: Self.labelDirection(layout: positions[node.id] ?? .zero, at: point(node.id),
-                                                                 bubble: bubble, width: geo.size.width))
+                                                                 bubble: bubble, width: geo.size.width)) { size, highlighted in
+                            PersonBubble(person: node.person, size: size, highlighted: highlighted)
+                        }
                             // A slightly bigger target than the bubble, for fingers.
                             .padding(bubble < 40 ? 6 : 2)
                             .contentShape(Circle())
@@ -422,7 +345,7 @@ private struct DNAGraph: View {
     static func labelDirection(layout p: CGPoint, at: CGPoint, bubble: CGFloat, width: CGFloat) -> CGVector {
         let length = hypot(p.x, p.y)
         var v = length > 0 ? CGVector(dx: p.x / length, dy: p.y / length) : CGVector(dx: 0, dy: 1)
-        let reach = bubble / 2 + 6 + DNANodeView.labelWidth
+        let reach = bubble / 2 + 6 + DNANodeMetrics.labelWidth
         if abs(v.dx) > 0.35, (v.dx > 0 && at.x + reach > width - 4) || (v.dx < 0 && at.x - reach < 4) { v.dx = -v.dx }
         return v
     }
@@ -454,42 +377,6 @@ private struct DNAGraph: View {
     }
 }
 
-private struct DNANodeView: View {
-    let node: CollaborationGraph.Node
-    let size: CGFloat
-    let isSelected: Bool
-    let showsLabel: Bool
-    /// Unit vector pointing away from the center; the name sits on that side so neighbors on a ring
-    /// don't collide.
-    let outward: CGVector
-
-    static let labelWidth: CGFloat = 100
-
-    var body: some View {
-        let shown = isSelected ? size * 1.15 : size
-        // Outer rings are denser: one shorter line until selected.
-        let labelWidth = node.level >= 2 && !isSelected ? 84 : Self.labelWidth
-        DNABubble(person: node.person, size: shown, highlighted: isSelected || node.level == 0)
-            .overlay {
-                if showsLabel {
-                    let horizontal = abs(outward.dx) > 0.35
-                    Text(node.person.name)
-                        .font(node.level == 0 ? .subheadline.weight(.semibold) : (node.level == 1 || isSelected ? .caption2.weight(.medium) : .caption2))
-                        .multilineTextAlignment(horizontal ? (outward.dx > 0 ? .leading : .trailing) : .center)
-                        .lineLimit(node.level >= 2 && !isSelected ? 1 : 2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 4).padding(.vertical, 1)
-                        .background(RoundedRectangle(cornerRadius: 4).fill(Color(.systemBackground).opacity(isSelected ? 0.95 : 0.7)))
-                        .frame(width: labelWidth, alignment: horizontal ? (outward.dx > 0 ? .leading : .trailing) : .center)
-                        .offset(x: outward.dx * (shown / 2 + 5 + (horizontal ? labelWidth / 2 : 0)),
-                                y: outward.dy * (shown / 2 + 5) + (horizontal ? 0 : outward.dy * 8))
-                        .allowsHitTesting(false)
-                }
-            }
-            .animation(.easeOut(duration: 0.15), value: isSelected)
-    }
-}
-
 // MARK: Details
 
 /// The center (or the selected bubble): who they are, play, their artist page, top collaborators and songs.
@@ -507,11 +394,11 @@ private struct DNADetail: View {
         let person = selected?.person ?? center
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
-                DNABubble(person: person, size: 64, highlighted: true)
+                PersonBubble(person: person, size: 64, highlighted: true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(person.name).font(.title3.bold()).lineLimit(2)
                     HStack(spacing: 4) {
-                        Circle().fill(DNAPalette.of(person.category)).frame(width: 7, height: 7)
+                        Circle().fill(DNAColor.of(person.category)).frame(width: 7, height: 7)
                         Text(person.category.rawValue).font(.caption).foregroundStyle(.secondary)
                     }
                     Text("\(songCount(person.trackCount)) · \(dnaCollaborators(person.degree))")
@@ -593,7 +480,7 @@ private struct DNADetail: View {
                 ForEach(Array(top.enumerated()), id: \.element.person.id) { i, c in
                     NavigationLink(value: DNARoute(name: c.person.name)) {
                         HStack(spacing: 10) {
-                            Circle().fill(DNAPalette.of(c.person.category)).frame(width: 8, height: 8)
+                            Circle().fill(DNAColor.of(c.person.category)).frame(width: 8, height: 8)
                             Text(c.person.name).foregroundStyle(Color.accentColor).lineLimit(1)
                             Spacer(minLength: 8)
                             Text("\(c.shared)").font(.caption).monospacedDigit().foregroundStyle(.secondary)
