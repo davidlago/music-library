@@ -55,6 +55,15 @@ public enum DiscogsLink {
     }
 }
 
+extension URLComponents {
+    /// Sets the query with a "+" in a value sent as %2B: `URLComponents` leaves it as is, and Discogs (like most
+    /// servers) reads it as a space, so "Very Good Plus (VG+)" would arrive as "Very Good Plus (VG )" and be refused.
+    mutating func setDiscogsQuery(_ items: [URLQueryItem]) {
+        queryItems = items
+        percentEncodedQuery = percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+    }
+}
+
 /// One code on a Discogs release: "Matrix / Runout" "XSM 47326" (side A, stamped), "Barcode", "Label Code"…
 public struct DiscogsIdentifier: Hashable, Sendable, Identifiable {
     public var type: String
@@ -436,8 +445,8 @@ public actor DiscogsClient {
 
     private func search(_ params: [String: String], medium: CollectionMedium?) async throws -> [CollectionEdition] {
         guard var c = URLComponents(string: "\(Self.baseURL)/database/search") else { return [] }
-        c.queryItems = [.init(name: "type", value: "release"), .init(name: "per_page", value: "50")]
-            + params.sorted { $0.key < $1.key }.map { .init(name: $0.key, value: $0.value) }
+        c.setDiscogsQuery([.init(name: "type", value: "release"), .init(name: "per_page", value: "50")]
+            + params.sorted { $0.key < $1.key }.map { .init(name: $0.key, value: $0.value) })
         guard let url = c.url else { return [] }
         return try DiscogsParser.parseSearch(try await get(url), medium: medium)
     }

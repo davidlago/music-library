@@ -383,7 +383,7 @@ public actor DiscogsCollectionClient {
 
     func send(_ method: String, path: String, query: [String: String] = [:]) async throws -> Data {
         guard var c = URLComponents(string: DiscogsClient.baseURL + path) else { throw DiscogsError.badResponse }
-        if !query.isEmpty { c.queryItems = query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) } }
+        if !query.isEmpty { c.setDiscogsQuery(query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }) }
         guard let url = c.url else { throw DiscogsError.badResponse }
         await throttle()
         var request = URLRequest(url: url)

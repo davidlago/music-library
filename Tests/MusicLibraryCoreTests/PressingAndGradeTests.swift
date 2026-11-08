@@ -277,6 +277,18 @@ import Testing
         #expect(grades.changes(for: item, current: [1: "Very Good Plus (VG+)", 2: "Generic"]).isEmpty)
     }
 
+    @Test func gradesWithAPlusReachDiscogsAsWritten() async throws {
+        // An unencoded "+" reads as a space on the server: "VG+" arrived as "VG " and Discogs answered 422.
+        let account = DiscogsAccountStub()
+        let instance = DiscogsInstance(instanceID: 10, releaseID: 2772432, folderID: 1)
+        try await account.client().setField(1, value: "Very Good Plus (VG+)", instance: instance, username: "example_user")
+        let url = try #require(account.all.last?.url)
+        #expect(url.path == "/users/example_user/collection/folders/1/releases/2772432/instances/10/fields/1")
+        #expect(url.query(percentEncoded: true) == "value=Very%20Good%20Plus%20(VG%2B)")
+        let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first?.value
+        #expect(value == "Very Good Plus (VG+)")
+    }
+
     @Test func planWritesGradesOnLinkedAndAdoptedCopies() {
         var linked = CollectionItem(id: "linked", medium: .vinyl, album: "Kind of Blue", artist: "Miles Davis")
         linked.mediaGrade = .nearMint
