@@ -1,5 +1,6 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// What Add to Collection… starts from when it's opened for something in particular (a library CD's catalog page, a

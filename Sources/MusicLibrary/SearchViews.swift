@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Completions under the toolbar search field: recent searches when empty, then filters and library values.
@@ -271,26 +272,6 @@ struct TopHitsStrip: View {
             .padding(.vertical, 10)
         }
         .frame(height: size + 58)
-    }
-}
-
-struct InitialsBadge: View {
-    let name: String
-    var size: CGFloat = 76
-
-    var body: some View {
-        // "Rachael & Vilray" → "RV": skip words without letters.
-        let initials = name.split(separator: " ").filter { $0.contains(where: \.isLetter) }.prefix(2)
-            .compactMap { $0.first(where: \.isLetter) }.map(String.init).joined()
-        ZStack {
-            Circle().fill(.quaternary)
-            if initials.isEmpty {
-                Image(systemName: "music.mic").font(.system(size: size / 3)).foregroundStyle(.secondary)
-            } else {
-                Text(initials.uppercased()).font(.system(size: size / 3, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
-            }
-        }
-        .frame(width: size, height: size)
     }
 }
 

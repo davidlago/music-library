@@ -1,5 +1,6 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -193,16 +194,6 @@ final class RadioDJStore {
             }
             loadingOpenRouterModels = false
         }
-    }
-}
-
-/// The DJ's symbol: a chat bubble with sparkles (an AI to talk with), or sparkles alone on systems without it.
-enum RadioDJIcon {
-    static let name = symbol("text.bubble.badge.sparkles")
-    static func name(filled: Bool) -> String { filled ? symbol("text.bubble.badge.sparkles.fill") : name }
-
-    private static func symbol(_ preferred: String) -> String {
-        NSImage(systemSymbolName: preferred, accessibilityDescription: nil) != nil ? preferred : "sparkles"
     }
 }
 
@@ -726,43 +717,6 @@ struct OnAirSign: View {
             .background(RoundedRectangle(cornerRadius: 5).fill(Color.red.gradient))
             .shadow(color: .red.opacity(live ? 0.8 : 0.25), radius: live ? 7 : 2)
             .animation(live ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true) : .default, value: live)
-    }
-}
-
-private struct DJAvatar: View {
-    let speaking: Bool
-
-    var body: some View {
-        ZStack {
-            Circle().fill(LinearGradient(colors: [.orange, .pink], startPoint: .topLeading, endPoint: .bottomTrailing))
-            if speaking {
-                EqualizerBars(color: .white).frame(width: 14, height: 12)
-            } else {
-                Image(systemName: "music.mic").font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
-            }
-        }
-        .frame(width: 30, height: 30)
-    }
-}
-
-/// Four bars bouncing like a VU meter.
-struct EqualizerBars: View {
-    var color: Color = .orange
-
-    var body: some View {
-        TimelineView(.animation) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
-            GeometryReader { geo in
-                HStack(alignment: .bottom, spacing: geo.size.width * 0.12) {
-                    ForEach(0..<4) { i in
-                        let level = 0.3 + 0.7 * abs(sin(t * (3.1 + Double(i) * 0.9) + Double(i) * 1.7))
-                        RoundedRectangle(cornerRadius: 1.5).fill(color)
-                            .frame(height: geo.size.height * level)
-                    }
-                }
-                .frame(maxHeight: .infinity, alignment: .bottom)
-            }
-        }
     }
 }
 

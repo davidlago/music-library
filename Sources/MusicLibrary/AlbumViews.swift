@@ -1,5 +1,6 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// The album page: a blurred-cover backdrop with the album's details on the left and the track list on
@@ -559,28 +560,6 @@ struct AlbumTrackRow: View {
         .foregroundStyle(.secondary)
         .opacity(0.6)
         .padding(.horizontal, 14).padding(.vertical, 7)
-    }
-}
-
-/// Five stars with halves, plus the vote count.
-struct RatingView: View {
-    let rating: Double
-    let votes: Int
-
-    var body: some View {
-        HStack(spacing: 6) {
-            HStack(spacing: 1) {
-                ForEach(0..<5) { i in
-                    let fill = rating - Double(i)
-                    Image(systemName: fill >= 0.75 ? "star.fill" : (fill >= 0.25 ? "star.leadinghalf.filled" : "star"))
-                }
-            }
-            .foregroundStyle(AppColor.accent)
-            Text(String(format: "%.1f", rating)).monospacedDigit().fontWeight(.semibold)
-            Text("· \(votes) MusicBrainz rating\(votes == 1 ? "" : "s")").foregroundStyle(.secondary)
-        }
-        .font(.callout)
-        .help("Community rating on MusicBrainz")
     }
 }
 

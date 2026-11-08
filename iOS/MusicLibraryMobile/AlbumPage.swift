@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// The album page, top to bottom: the cover on a blurred backdrop with what the album is (type, year, artist,

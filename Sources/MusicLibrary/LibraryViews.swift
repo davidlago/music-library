@@ -155,7 +155,6 @@ struct AlbumsView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 CopyArt(mark: mark, url: model.coverURL(forAlbum: a), width: 150, revision: model.coverRevision,
                                         iCloud: model.offload.placement(model.tracks(of: a)))
-                                    .overlay(alignment: .topTrailing) { copiesChip(mark) }
                                     .padding(.bottom, 4)
                                 Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.headline).lineLimit(1)
                                 Text(a.artist.isEmpty ? "Unknown Artist" : a.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
@@ -206,25 +205,6 @@ struct AlbumsView: View {
         case .all: albums
         case .inCollection: albums.filter { !model.collection.copies(albumKey: key($0)).isEmpty }
         case .notInCollection: albums.filter { model.collection.copies(albumKey: key($0)).isEmpty }
-        }
-    }
-
-    /// "2" in the corner of an album you have more than one copy of.
-    @ViewBuilder
-    private func copiesChip(_ mark: CopyMark) -> some View {
-        let more: Int = switch mark {
-        case .cd(_, _, let more), .vinyl(_, _, let more), .download(_, let more), .other(let more): more
-        case .notInCollection: 0
-        }
-        if more > 0 {
-            Text("\(more + 1)")
-                .font(.caption2.weight(.bold).monospacedDigit())
-                .foregroundStyle(.white)
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(Capsule().fill(.black.opacity(0.65)))
-                .padding(4)
-                .help("You have \(more + 1) copies of this album")
-                .accessibilityLabel("\(more + 1) copies")
         }
     }
 

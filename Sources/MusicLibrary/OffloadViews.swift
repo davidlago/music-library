@@ -1,16 +1,12 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Where a song's, album's or list's music is: a struck-through cloud when it's only in iCloud (it downloads when
 /// played) or some of it is, like the not-digitized badge, an arrow while it downloads. Nothing when it's all on this
 /// Mac.
 struct ICloudMark: View {
-    enum Placement: Equatable {
-        case onMac
-        case partly
-        case iCloudOnly
-        case downloading
-    }
+    typealias Placement = ICloudPlacement
 
     let placement: Placement
 

@@ -7,6 +7,10 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- Changed: the Mac and the iPhone now draw CDs, records, label stickers and badges with the same code, so they look
+  alike: on the Mac, the number of copies you own shows on the case or sleeve itself (as on the iPhone), and on the
+  iPhone, record sleeves get the Mac's cardboard finish and a download album with only some songs bought says so.
+
 ## 1.32.1
 
 - Fixed: on the Mac, 48, 96 and 192 kHz songs put Bluetooth earbuds into their 16 kHz mono call mode. They now play at

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		4D11A0000000000000000001 /* MusicLibraryCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A0000000000000000002 /* MusicLibraryCore */; };
+		4D11A00000000000000000E0 /* MusicLibraryUI in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A00000000000000000E1 /* MusicLibraryUI */; };
 		4D11A0000000000000000027 /* MusicLibraryGlance in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A0000000000000000026 /* MusicLibraryGlance */; };
 		4D11A0000000000000000029 /* MusicLibraryGlance in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A0000000000000000028 /* MusicLibraryGlance */; };
 		4D11A000000000000000002B /* MusicLibraryGlance in Frameworks */ = {isa = PBXBuildFile; productRef = 4D11A000000000000000002A /* MusicLibraryGlance */; };
@@ -119,6 +120,7 @@
 			files = (
 				4D11A0000000000000000001 /* MusicLibraryCore in Frameworks */,
 				4D11A0000000000000000027 /* MusicLibraryGlance in Frameworks */,
+				4D11A00000000000000000E0 /* MusicLibraryUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -203,6 +205,7 @@
 			packageProductDependencies = (
 				4D11A0000000000000000002 /* MusicLibraryCore */,
 				4D11A0000000000000000026 /* MusicLibraryGlance */,
+				4D11A00000000000000000E1 /* MusicLibraryUI */,
 			);
 			productName = MusicLibraryMobile;
 			productReference = 4D11A0000000000000000003 /* MusicLibraryMobile.app */;
@@ -747,6 +750,10 @@
 		4D11A000000000000000002C /* MusicLibraryGlance */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MusicLibraryGlance;
+		};
+		4D11A00000000000000000E1 /* MusicLibraryUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MusicLibraryUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

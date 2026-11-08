@@ -1,5 +1,6 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Sync to Discogs (Physical Collection menu, the Shelf's header): what would change in the user's Discogs collection,

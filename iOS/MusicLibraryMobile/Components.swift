@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 // MARK: Routes
@@ -102,45 +103,6 @@ func countryName(_ code: String) -> String {
 }
 
 // MARK: Layout
-
-/// Lays children out left to right, wrapping onto new lines as needed.
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = arrange(proposal.width ?? .infinity, subviews)
-        return CGSize(width: rows.map(\.width).max() ?? 0, height: rows.last.map { $0.y + $0.height } ?? 0)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        for row in arrange(bounds.width, subviews) {
-            var x = bounds.minX
-            for i in row.indices {
-                let size = subviews[i].sizeThatFits(.unspecified)
-                subviews[i].place(at: CGPoint(x: x, y: bounds.minY + row.y), proposal: ProposedViewSize(size))
-                x += size.width + spacing
-            }
-        }
-    }
-
-    private func arrange(_ maxWidth: CGFloat, _ subviews: Subviews) -> [(indices: [Int], y: CGFloat, width: CGFloat, height: CGFloat)] {
-        var rows: [(indices: [Int], y: CGFloat, width: CGFloat, height: CGFloat)] = []
-        var current: [Int] = [], x: CGFloat = 0, y: CGFloat = 0, height: CGFloat = 0
-        for i in subviews.indices {
-            let size = subviews[i].sizeThatFits(.unspecified)
-            if !current.isEmpty, x + size.width > maxWidth {
-                rows.append((current, y, x - spacing, height))
-                y += height + spacing
-                current = []; x = 0; height = 0
-            }
-            current.append(i)
-            x += size.width + spacing
-            height = max(height, size.height)
-        }
-        if !current.isEmpty { rows.append((current, y, x - spacing, height)) }
-        return rows
-    }
-}
 
 struct SectionHeader: View {
     let title: String
@@ -275,28 +237,6 @@ struct PersonLinks: View {
     }
 }
 
-/// Five stars with halves, plus the vote count.
-struct RatingView: View {
-    let rating: Double
-    let votes: Int
-
-    var body: some View {
-        HStack(spacing: 6) {
-            HStack(spacing: 1) {
-                ForEach(0..<5) { i in
-                    let fill = rating - Double(i)
-                    Image(systemName: fill >= 0.75 ? "star.fill" : (fill >= 0.25 ? "star.leadinghalf.filled" : "star"))
-                }
-            }
-            .foregroundStyle(Color.accentColor)
-            Text(String(format: "%.1f", rating)).monospacedDigit().fontWeight(.semibold)
-            Text("· \(votes) MusicBrainz rating\(votes == 1 ? "" : "s")").foregroundStyle(.secondary)
-        }
-        .font(.footnote)
-        .accessibilityElement(children: .combine)
-    }
-}
-
 /// Text that shows a few lines with Read More, and where it came from.
 struct ExpandableText: View {
     let text: String
@@ -365,26 +305,6 @@ struct PhotoImage: View {
             guard let url else { return }
             image = await CoverLoader.image(at: url, maxPixel: size * scale)
         }
-    }
-}
-
-struct InitialsBadge: View {
-    let name: String
-    var size: CGFloat = 76
-
-    var body: some View {
-        // "Rachael & Vilray" → "RV": skip words without letters.
-        let initials = name.split(separator: " ").filter { $0.contains(where: \.isLetter) }.prefix(2)
-            .compactMap { $0.first(where: \.isLetter) }.map(String.init).joined()
-        ZStack {
-            Circle().fill(Color(.tertiarySystemFill))
-            if initials.isEmpty {
-                Image(systemName: "music.mic").font(.system(size: size / 3)).foregroundStyle(.secondary)
-            } else {
-                Text(initials.uppercased()).font(.system(size: size / 3, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
-            }
-        }
-        .frame(width: size, height: size)
     }
 }
 

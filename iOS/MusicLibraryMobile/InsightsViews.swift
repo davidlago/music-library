@@ -1,5 +1,6 @@
 import Charts
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 import UIKit
 

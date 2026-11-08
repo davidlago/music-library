@@ -1,5 +1,6 @@
 import Charts
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 import UIKit
 
@@ -306,25 +307,6 @@ extension ListeningSection where Accessory == EmptyView {
     init(title: String) { self.init(title: title, accessory: { EmptyView() }) }
 }
 
-/// "↑ 13%" or "↓ 4%"; on a dark panel it's white, elsewhere the arrow is green or red.
-private struct DeltaLabel: View {
-    let delta: Double
-    var onPanel = false
-
-    var body: some View {
-        let up = delta >= 0
-        HStack(spacing: 2) {
-            Image(systemName: up ? "arrow.up" : "arrow.down").fontWeight(.bold)
-                .foregroundStyle(onPanel ? AnyShapeStyle(.white) : AnyShapeStyle(up ? Color.green : Color.red))
-            Text(abs(delta).formatted(.percent.precision(.fractionLength(0))))
-                .foregroundStyle(onPanel ? AnyShapeStyle(.white.opacity(0.9)) : AnyShapeStyle(.secondary))
-        }
-        .font(.caption.weight(.semibold)).monospacedDigit()
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(up ? "Up" : "Down") \(abs(delta).formatted(.percent.precision(.fractionLength(0))))")
-    }
-}
-
 // MARK: Banner
 
 /// The period's plays, big, over a blurred photo of your top artist, with each day (week, month) against the
@@ -564,23 +546,6 @@ private struct SpotlightCard: View {
 
     private func detail(_ item: ListeningStats.Item) -> String {
         measure == .plays ? playCount(item.plays) : formatListened(item.listened)
-    }
-}
-
-/// A row of small bars, the shape of a ranking at a glance.
-private struct MiniBars: View {
-    let values: [Double]
-
-    var body: some View {
-        let top = max(values.max() ?? 1, 0.0001)
-        HStack(alignment: .bottom, spacing: 3) {
-            ForEach(Array(values.enumerated()), id: \.offset) { _, v in
-                RoundedRectangle(cornerRadius: 1).fill(.white.opacity(0.9))
-                    .frame(width: 4, height: max(2, 24 * v / top))
-            }
-        }
-        .frame(height: 24, alignment: .bottom)
-        .accessibilityHidden(true)
     }
 }
 
