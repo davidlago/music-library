@@ -10,6 +10,12 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 - Changed: the Mac and the iPhone now draw CDs, records, label stickers and badges with the same code, so they look
   alike: on the Mac, the number of copies you own shows on the case or sleeve itself (as on the iPhone), and on the
   iPhone, record sleeves get the Mac's cardboard finish and a download album with only some songs bought says so.
+- Changed: Insights, Music DNA, the Radio DJ's conversation and the artwork tint behind pages are now drawn by the
+  same code on the Mac and the iPhone, so the two apps show the same cards with the same wording. On the Mac, New to You
+  is one card, the Owned pane's shelves show the next label with a button to add a copy, the find field lists matching
+  items as you type, and spending has a Running Total view. On the iPhone, the Listening banner names your top artist,
+  the Owned pane groups Artists and Genres / Release Eras / Record Labels under pickers, and artist pages are tinted by
+  the artist's photo all the way down, like album pages.
 
 ## 1.32.1
 
