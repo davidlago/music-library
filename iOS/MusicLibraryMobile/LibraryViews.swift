@@ -239,6 +239,8 @@ extension View {
             .navigationDestination(for: QueryRoute.self) { QueryPage(route: $0).radioDJButton(djButton) }
             .navigationDestination(for: CollectionRoute.self) { CollectionRoutePage(route: $0).radioDJButton(djButton) }
             .navigationDestination(for: CollectionItemRoute.self) { CollectionItemPage(id: $0.id).radioDJButton(djButton) }
+            .navigationDestination(for: BuyListRoute.self) { BuyListRoutePage(route: $0).radioDJButton(djButton) }
+            .navigationDestination(for: ShopAlbumRoute.self) { ShopAlbumPage(route: $0).radioDJButton(djButton) }
     }
 }
 

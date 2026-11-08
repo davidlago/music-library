@@ -564,9 +564,10 @@ public actor PriceGuides {
         return try await client.searchBarcodeAlbums(String(digits.dropFirst()))
     }
 
-    /// Discogs and eBay together (eBay read while Discogs is).
-    public func fullGuide(for request: PriceGuideRequest) async -> PriceGuide {
-        async let ebay = ebayPrices(for: request)
+    /// Discogs and eBay together (eBay read while Discogs is). `readsForSale` overrides the reader's own setting
+    /// (the Mac's Buy List and item pages want eBay's listings even though its Shop reads them itself).
+    public func fullGuide(for request: PriceGuideRequest, readsForSale: Bool? = nil) async -> PriceGuide {
+        async let ebay = ebayPrices(for: request, readsForSale: readsForSale)
         var guide = await guide(for: request)
         let (sold, forSale, notes) = await ebay
         guide.ebaySold = sold
@@ -576,7 +577,7 @@ public actor PriceGuides {
     }
 
     /// What eBay shows for the album: recent sales when signed in, and copies for sale now. Never throws.
-    public func ebayPrices(for request: PriceGuideRequest) async -> (sold: EbayPriceSummary?, forSale: EbayPriceSummary?, notes: [String]) {
+    public func ebayPrices(for request: PriceGuideRequest, readsForSale: Bool? = nil) async -> (sold: EbayPriceSummary?, forSale: EbayPriceSummary?, notes: [String]) {
         guard let ebay else { return (nil, nil, []) }
         let now = now()
         @Sendable func read(sold: Bool) async -> (EbayPriceSummary?, String?) {
@@ -592,8 +593,32 @@ public actor PriceGuides {
             }
         }
         let sold = await ebay.signedIn() ? await read(sold: true) : (nil, nil)
-        let forSale = ebay.readsForSale ? await read(sold: false) : (nil, nil)
+        let forSale = readsForSale ?? ebay.readsForSale ? await read(sold: false) : (nil, nil)
         return (sold.0, forSale.0, [sold.1, forSale.1].compactMap { $0 })
+    }
+
+    /// A quick guide to one edition, for valuing many copies in a row: with its Discogs release known, only that
+    /// release (and its suggested prices with an account: two requests); otherwise the whole Discogs guide. No eBay.
+    public func editionGuide(for request: PriceGuideRequest) async -> PriceGuide {
+        guard let releaseID = request.releaseID else { return await guide(for: request) }
+        var guide = PriceGuide(request: request)
+        guide.currency = currency
+        do {
+            let release = try await client.marketRelease(id: releaseID, currency: currency)
+            var edition = release.edition
+            edition.roles = [.identified]
+            if hasAccount { edition.suggestions = (try? await client.priceSuggestions(releaseID: releaseID)) ?? [] }
+            guide.editions = [edition]
+            guide.masterID = release.masterID
+            guide.title = edition.title
+            guide.artist = release.artist
+            guide.thumbnail = release.thumbnail
+        } catch DiscogsError.busy {
+            guide.notes.append("Discogs is busy (too many requests); try again in a minute.")
+        } catch {
+            guide.notes.append("Couldn't read the edition from Discogs (\(error.localizedDescription)).")
+        }
+        return guide
     }
 
     /// Discogs' guide for an album. Never throws: what couldn't be read is in its `notes`.

@@ -271,20 +271,10 @@ struct LibraryCatalogSettings: View {
                 TextField("Library card number or username", text: $catalog.username)
                 SecureField("PIN or password", text: $catalog.password)
                 LabeledContent("Status") { accountStatus }
-                if catalog.isSignedIn {
-                    Picker("List for Music Library", selection: $catalog.listId) {
-                        Text("None").tag("")
-                        ForEach(catalog.userLists) { Text($0.title).tag($0.id) }
-                    }
-                    .disabled(catalog.userLists.isEmpty)
-                    if catalog.userLists.isEmpty, let url = catalog.webURL("/MyAccount/Lists") {
-                        Link("You have no lists yet. Create one on the local library's website.", destination: url).font(.caption)
-                    }
-                }
             } header: {
                 Text("Account")
             } footer: {
-                Text("Used to show what you have checked out, and to add CDs to one of your lists on the local library's website so you know what to look for. The password is stored in your keychain on this Mac.")
+                Text("Used to show what you have checked out. The password is stored in your keychain on this Mac.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             CatalogDownloadSettings()

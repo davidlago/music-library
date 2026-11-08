@@ -253,6 +253,15 @@ extension PhoneModel {
         }
     }
 
+    /// The preview player for the Shop's track lists; the library's player pauses while a preview plays.
+    func previewControls(player: PhonePlayer) -> PreviewControls {
+        let previews = radioDJ.previews
+        return PreviewControls(current: previews.current?.id, isPlaying: previews.isPlaying, progress: previews.progress) { track, list in
+            if !(previews.current?.id == track.id && previews.isPlaying) { player.pause() }
+            previews.toggle(track, in: list)
+        }
+    }
+
     /// A song not in the collection: its Apple Music preview, found by searching Apple's catalog (once per song), or
     /// paused and resumed when it's the one playing. The library's player pauses while it plays.
     func playRadioDJPreview(title: String, artist: String?, player: PhonePlayer) {
@@ -645,12 +654,18 @@ struct CameraPicker: UIViewControllerRepresentable {
     }
 }
 
-/// Plays Apple Music previews of songs the DJ mentions that aren't in the collection: one clip at a time, apart from
-/// the library's player (never in its queue, history or Last.fm).
+/// Plays Apple Music previews (songs the DJ mentions that aren't in the collection, an album's songs in the Shop):
+/// one clip at a time, then the next in `queue` when there is one, apart from the library's player (never in its
+/// queue, history or Last.fm).
 @Observable
 final class PhonePreviewPlayer {
     private(set) var current: ApplePreviewTrack?
     private(set) var isPlaying = false
+    /// How far into the clip (0…1).
+    private(set) var progress: Double = 0
+    /// The clips to play after the current one.
+    @ObservationIgnored private var queue: [ApplePreviewTrack] = []
+    @ObservationIgnored private var timeObserver: Any?
     /// Why the last clip didn't play.
     private(set) var lastError: String?
 
@@ -661,14 +676,28 @@ final class PhonePreviewPlayer {
     /// Plays `track`'s clip. The playback session is set up first: until one of your own songs has played, the app's
     /// session is the default one, which the silent switch mutes.
     func play(_ track: ApplePreviewTrack) {
+        queue = []
+        start(track)
+    }
+
+    private func start(_ track: ApplePreviewTrack) {
         guard let url = track.previewURL, ApplePreviewParser.isAppleURL(url) else { return }
         lastError = nil
         if current?.id != track.id {
             let item = AVPlayerItem(url: url)
             if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
             endObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.isPlaying = false; self?.current = nil }
+                MainActor.assumeIsolated { self?.clipEnded() }
             }
+            if timeObserver == nil {
+                timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main) { [weak self] time in
+                    MainActor.assumeIsolated {
+                        guard let self, let duration = self.player.currentItem?.duration.seconds, duration.isFinite, duration > 0 else { return }
+                        self.progress = min(1, max(0, time.seconds / duration))
+                    }
+                }
+            }
+            progress = 0
             statusObservation = item.observe(\.status) { [weak self] item, _ in
                 guard item.status == .failed else { return }
                 let message = item.error?.localizedDescription ?? "unknown error"
@@ -694,12 +723,41 @@ final class PhonePreviewPlayer {
         }
     }
 
+    /// Plays `tracks` from `track` on, one after another.
+    func play(_ tracks: [ApplePreviewTrack], from track: ApplePreviewTrack) {
+        let playable = tracks.filter { $0.previewURL != nil }
+        guard let i = playable.firstIndex(where: { $0.id == track.id }) else { return }
+        queue = Array(playable[(i + 1)...])
+        start(track)
+    }
+
+    /// Pauses or resumes `track` when it's the one loaded, else plays it and the ones after it in `list`.
+    func toggle(_ track: ApplePreviewTrack, in list: [ApplePreviewTrack]) {
+        if current?.id == track.id {
+            if isPlaying { pause() } else { start(track) }
+        } else {
+            play(list, from: track)
+        }
+    }
+
+    private func clipEnded() {
+        if !queue.isEmpty {
+            start(queue.removeFirst())
+        } else {
+            isPlaying = false
+            current = nil
+            progress = 0
+        }
+    }
+
     func pause() {
         player.pause()
         isPlaying = false
     }
 
     func stop() {
+        queue = []
+        progress = 0
         player.pause()
         player.replaceCurrentItem(with: nil)
         statusObservation = nil

@@ -73,6 +73,8 @@ final class SyncStore {
 
     /// Called after a sync that added the phone's plays, likes or ownership changes to the library.
     @ObservationIgnored var onHistoryChanged: () -> Void = {}
+    /// A sync finished (the phone's Buy List changes are in the database now).
+    @ObservationIgnored var onSynced: () -> Void = {}
     /// The library as a sync needs it; nil while no library is open.
     @ObservationIgnored var context: () -> SyncContext? = { nil }
     @ObservationIgnored private var browser: SyncBrowser?
@@ -389,6 +391,7 @@ final class SyncStore {
                     if let usage = hello.radioDJUsage { phones[i].radioDJUsage = usage }
                 }
                 if summary.plays > 0 || summary.likes > 0 || (summary.purchases ?? 0) > 0 { onHistoryChanged() }
+                onSynced()
             } catch is CancellationError {
                 lastError = "Sync cancelled. Everything copied so far is on the iPhone."
             } catch {

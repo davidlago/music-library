@@ -32,6 +32,15 @@ struct CollectionContent: View {
                         CollectionShelvesCard(stats: stats, collection: model.collection)
                         CollectionMediaCard(stats: stats)
                     }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 400), spacing: 18, alignment: .top)], alignment: .leading, spacing: 18) {
+                        let values = model.values
+                        CollectionValueCard(stats: values.stats, progress: values.progress, update: { values.updateAll() },
+                                            stop: { values.stop() }) { item in
+                            CopyArt(mark: model.collection.mark(item: item), url: model.coverURL(for: item), width: 34,
+                                    revision: model.coverRevision, title: item.album)
+                        }
+                        BuyListCard(shown: model.buyList.shown) { model.showBuyList() }
+                    }
                     if !stats.timeline.isEmpty { CollectionSpendingCard(stats: stats) }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 400), spacing: 18, alignment: .top)], alignment: .leading, spacing: 18) {
                         CollectionListsCard(stats: stats) { item in

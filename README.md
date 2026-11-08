@@ -35,7 +35,8 @@ playback, and a Claude-powered radio DJ who tells you the story behind every rec
 
 - **Catalog what you own.** Add CDs, records and downloads by barcode, give every case a label number (CD #12 and
   Vinyl #12 are never mixed up), find any of them with **Find by Label** on the Mac, iPhone, Apple Watch or with
-  Siri, and send them to your Discogs collection. [Physical Collection →](docs/guide/physical-collection.md)
+  Siri, see what each one is worth on Discogs and eBay, and send them to your Discogs collection.
+  [Physical Collection →](docs/guide/physical-collection.md)
 - **Build your digital collection.** Import files matched on MusicBrainz, rip CDs to FLAC checked bit for bit against
   AccurateRip, and record your records from the turntable into tracks.
   [Importing →](docs/guide/importing.md) · [Ripping CDs →](docs/guide/ripping-cds.md) ·
@@ -51,9 +52,10 @@ playback, and a Claude-powered radio DJ who tells you the story behind every rec
 - **Play it properly.** Each song at its own sample rate and bit depth, AirPlay, a real play queue, playlists and smart
   playlists, and Last.fm scrobbling. [Playback →](docs/guide/playback.md)
 - **Find more music.** Concerts near you by your artists, your public library's CD catalog downloaded and searchable,
-  new and used CDs and records compared across stores, and a price guide from Discogs and eBay. In a record store, scan a
-  barcode on your iPhone, or show its AI crate-digging friend the record you're holding: what it is, which pressing,
-  what to pay and whether you already have it. [Concerts →](docs/guide/concerts.md) ·
+  new and used CDs and records compared across stores, a price guide from Discogs and eBay, and a Buy List that keeps
+  what the albums you're after go for and tells you when one is a deal. In a record store, scan a barcode on your
+  iPhone, or show its AI crate-digging friend the record you're holding: what it is, which pressing, what to pay and
+  whether you already have it. [Concerts →](docs/guide/concerts.md) ·
   [Local Library CDs →](docs/guide/local-library.md) · [Shop →](docs/guide/shop.md)
 - **Take it with you.** The iPhone app browses both collections and plays what you sync to it, offline and through a USB
   DAC at each song's rate, with widgets and an Apple Watch app. Back up the library and the music you choose to your

@@ -266,6 +266,28 @@ extension AppModel {
         radioDJ.session?.send("Tell me about it: what critics and listeners think, whether it's worth adding to my collection, and what's a fair price for this \(target.edition == nil ? target.format.noun : "edition").")
     }
 
+    /// The Apple Music preview player, for the Shop's track lists.
+    var previewControls: PreviewControls {
+        let previews = previews
+        return PreviewControls(current: previews.current?.id, isPlaying: previews.isPlaying, progress: previews.progress) { track, list in
+            previews.toggle(track, in: list)
+        }
+    }
+
+    /// Ask the DJ about an album on the Buy List: what it is, whether it's worth it and what to pay.
+    func askRadioDJ(about album: WantedAlbum) {
+        var details = ["It's on the listener's Buy List (\(album.format.name)): \(album.radioDJLine)."]
+        if album.isEdition { details.append("They want this edition: \(album.editionDetails)\(album.barcode.isEmpty ? "" : ", barcode \(album.barcode)").") }
+        let subject = RadioDJSubject(kind: .album, title: album.album, artist: album.artist, details: details)
+        let linker = RadioDJLinker(tracks: tracks, collection: collection, subject: subject)
+        radioDJ.begin(radioDJ.makeSession(subject, library: radioDJLibrary, linker: linker,
+                                          shopping: RadioDJShopping(guides: cdShop.priceGuides(), shopper: true)) { [weak self] request in
+            guard let self else { return "The app closed." }
+            return await self.openShop(for: request)
+        })
+        radioDJ.session?.send("It's on my Buy List. Is it worth it, which edition should I look for, and what's a good price to wait for?")
+    }
+
     /// The DJ's `open_shop`: shows the Shop (the DJ stays on the air beside it) searching for the album.
     func openShop(for request: RadioDJShopRequest) async -> String {
         nowPlayingExpanded = false
@@ -947,7 +969,8 @@ extension AppModel {
         case .iCloud?: return .page("the music they back up to iCloud")
         case .catalog?: return .page("their public library's CD catalog")
         case .catalogCheckouts?: return .page("their public library checkouts")
-        case .catalogList?: return .page("their public library list")
+        case .buyList?: return .page("their Buy List, the albums they're looking for, with what each goes for now",
+                                     details: buyList.shown.prefix(40).map(\.radioDJLine))
         case .cdShop?: return cdShop.radioDJPage
         case .cd?: return .page("the page of the CD in the drive")
         case nil: return .page("Music Library")

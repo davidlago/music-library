@@ -116,23 +116,6 @@ public enum CatalogPaths {
         "/bookcover.php?" + query([("id", workId), ("size", size), ("type", "grouped_work"), ("category", "Music")])
     }
 
-    /// The "Add to List" form, which lists the patron's lists.
-    public static let userLists = "/MyAccount/AJAX?method=getSaveToListForm&source=GroupedWork&sourceId=lists"
-
-    public static func addToList(listId: String, workId: String, notes: String = "") -> String {
-        "/MyAccount/AJAX?" + query([("method", "saveToList"), ("notes", notes), ("listId", listId),
-                                    ("source", "GroupedWork"), ("sourceId", workId)])
-    }
-
-    public static func list(_ listId: String, page: Int = 1) -> String {
-        "/MyAccount/MyList/\(encode(listId))" + (page > 1 ? "?page=\(page)" : "")
-    }
-
-    /// Removes an entry; the reply is the list's first page without it.
-    public static func removeFromList(listId: String, entryId: String) -> String {
-        "/MyAccount/MyList/\(encode(listId))?delete=\(encode(entryId))"
-    }
-
     public static let login = "/AJAX/JSON?method=loginUser"
     public static let logout = "/MyAccount/Logout"
     public static let checkouts = "/MyAccount/AJAX?method=getCheckouts&source=all"
@@ -302,29 +285,6 @@ public struct CatalogWorkDetails: Hashable, Codable, Sendable {
     public var contents: [Contents] = []
 
     public init() {}
-}
-
-/// One of the patron's lists on the catalog site.
-public struct CatalogUserList: Identifiable, Hashable, Codable, Sendable {
-    public var id: String
-    public var title: String
-
-    public init(id: String, title: String) { self.id = id; self.title = title }
-}
-
-/// A title on one of the patron's lists; `entryId` identifies it for removal.
-public struct CatalogListEntry: Identifiable, Hashable, Codable, Sendable {
-    public var id: String { entryId }
-    public var entryId: String
-    public var item: CatalogItem
-
-    public init(entryId: String, item: CatalogItem) { self.entryId = entryId; self.item = item }
-}
-
-public struct CatalogListPage: Sendable {
-    public var entries: [CatalogListEntry]
-    public var total: Int
-    public var page: Int
 }
 
 /// A title the signed-in patron has checked out.

@@ -257,60 +257,6 @@ public enum CatalogParser {
         return String(rest[..<stop])
     }
 
-    // MARK: Lists
-
-    /// The patron's lists, from the "Add to List" form (`getSaveToListForm`).
-    public static func parseUserLists(_ data: Data) throws -> [CatalogUserList] {
-        let o = try jsonObject(data)
-        guard let body = o["modalBody"] as? String else {
-            if o["success"] as? Bool == false { throw CatalogError.notSignedIn }
-            throw CatalogError.badResponse("no lists")
-        }
-        let doc = try HTMLFragment(body)
-        return doc.all("//select[@id='addToList-list']/option").compactMap { option in
-            guard let id = option.attr("value"), !id.isEmpty else { return nil }
-            return CatalogUserList(id: id, title: option.text)
-        }
-    }
-
-    /// One page of a list (`/MyAccount/MyList/<id>`): its entries and how many there are in all.
-    public static func parseList(_ html: String, page: Int = 1) throws -> CatalogListPage {
-        var total = 0
-        if let m = html.range(of: #"Showing [\d,]+ - [\d,]+ of ([\d,]+)"#, options: .regularExpression) {
-            total = CatalogText.number(html[m].split(separator: " ")[5]) ?? 0
-        }
-        let entries: [CatalogListEntry] = try fragments(html, startingAt: #"<div[^>]*\bid="listEntry\d+""#).compactMap { part in
-            guard let entryRange = part.range(of: #"listEntry\d+"#, options: .regularExpression) else { return nil }
-            let entryId = String(part[entryRange].dropFirst("listEntry".count))
-            // The work ID is in the entry's own "Add to List" button (titles link to their records).
-            var workId: String?
-            for pattern in [#"'GroupedWork', '([0-9a-f-]+-[a-z]{3})'"#, #"/GroupedWork/([0-9a-f-]+-[a-z]{3})"#] {
-                if let regex = try? NSRegularExpression(pattern: pattern),
-                   let m = regex.firstMatch(in: part, range: NSRange(part.startIndex..., in: part)),
-                   let r = Range(m.range(at: 1), in: part) {
-                    workId = String(part[r])
-                    break
-                }
-            }
-            guard let workId else { return nil }
-            let doc = try HTMLFragment(part)
-            guard let root = doc.first("//div[starts-with(@id,'listEntry')]") else { return nil }
-            return CatalogListEntry(entryId: entryId, item: item(root, id: workId))
-        }
-        if total == 0 { total = entries.count }
-        return CatalogListPage(entries: entries, total: total, page: page)
-    }
-
-    /// The reply to `saveToList`: its message, or why the title couldn't be added.
-    public static func parseSaveToList(_ data: Data) throws -> String {
-        let o = try jsonObject(data)
-        let message = (o["message"] as? String).map { HTMLFragment.plainText($0) } ?? ""
-        guard o["success"] as? Bool == true else {
-            throw CatalogError.badResponse(message.isEmpty ? "the title wasn't added to the list" : message)
-        }
-        return message
-    }
-
     // MARK: Account
 
     /// The reply to `/AJAX/JSON?method=loginUser`: the patron's name, or why sign-in failed.

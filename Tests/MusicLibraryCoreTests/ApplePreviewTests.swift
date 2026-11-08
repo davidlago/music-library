@@ -187,6 +187,27 @@ import Testing
         #expect(!nothing.isMatched && nothing.match == nil)
     }
 
+    @Test func findsAnyAlbumForTheShop() async throws {
+        // A barcode first (with a scanner's leading 0), then artist and title.
+        let byCode = FakeApple([("upc=634904078164", "itunes_upc_okcomputer")])
+        let album = try await finder(byCode).album(title: "OK Computer", artist: "Radiohead", barcodes: ["0634904078164"])
+        #expect(album?.tracks.count == 12 && album?.pageURL?.host == "music.apple.com")
+        let bySearch = FakeApple([("search?", "itunes_search_hamilton"), ("id=1129446206", "itunes_album_hamilton")])
+        let hamilton = try await finder(bySearch).album(title: "Hamilton", artist: "Lin-Manuel Miranda", year: 2015)
+        #expect(hamilton?.id == 1129446206 && hamilton?.previews.isEmpty == false)
+        #expect(try await finder(FakeApple([])).album(title: "Nothing", artist: "Nobody") == nil)
+    }
+
+    @Test func opensInTheMusicApp() {
+        let page = URL(string: "https://music.apple.com/us/album/ok-computer/1097861387?i=1097862062")!
+        #expect(AppleMusicLink.appURL(page)?.absoluteString == "music://music.apple.com/us/album/ok-computer/1097861387?i=1097862062")
+        #expect(AppleMusicLink.appURL(URL(string: "https://itunes.apple.com/us/album/id1097861387")!)?.absoluteString
+                == "music://music.apple.com/us/album/id1097861387")
+        #expect(AppleMusicLink.appURL(URL(string: "http://music.apple.com/us/album/x/1")!) == nil)
+        #expect(AppleMusicLink.appURL(URL(string: "https://evil.example/music.apple.com/album/1")!) == nil)
+        #expect(AppleMusicLink.appURL(URL(string: "https://audio-ssl.itunes.apple.com/x.m4a")!) == nil)
+    }
+
     @Test func cacheRoundTrip() throws {
         let db = try Database(path: ":memory:")
         let album = try #require(try ApplePreviewParser.parseAlbums(try TestSupport.fixture("itunes_upc_okcomputer")).first)

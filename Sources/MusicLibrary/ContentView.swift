@@ -194,10 +194,10 @@ struct SidebarView: View {
                 Label("My Checkouts", systemImage: "books.vertical")
                     .badge(model.catalog.cdCheckouts.count)
                     .tag(SidebarItem.catalogCheckouts)
-                Label(model.catalog.listTitle, systemImage: "bookmark")
-                    .badge(model.catalog.listEntries.count)
-                    .tag(SidebarItem.catalogList)
                 Label("Shop", systemImage: "cart").tag(SidebarItem.cdShop)
+                Label("Buy List", systemImage: "bag")
+                    .badge(model.buyList.shown.count)
+                    .tag(SidebarItem.buyList)
             }
             Section("Devices") {
                 Label("iPhone", systemImage: "iphone")
@@ -330,7 +330,7 @@ struct DetailRouter: View {
         case .iCloud: ICloudBackupView()
         case .catalog: CatalogView()
         case .catalogCheckouts: CatalogCheckoutsView()
-        case .catalogList: CatalogListView()
+        case .buyList: BuyListView()
         case .cdShop: CDShopView()
         case .likedSongs: LikedSongsView()
         case .cd(let path):

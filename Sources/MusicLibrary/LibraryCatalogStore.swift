@@ -16,7 +16,6 @@ final class LibraryCatalogStore {
         static let ownership = "catalogOwnershipFilter"
         static let libraries = "catalogLibraries"
         static let librariesDate = "catalogLibrariesDate"
-        static let listId = "catalogListId"
         static let downloadLibraries = "catalogDownloadLibraries"
         static let downloadDates = "catalogDownloadDates"
         static let localText = "catalogLocalQuery"
@@ -117,25 +116,22 @@ final class LibraryCatalogStore {
     private(set) var checkoutsError: String?
     private(set) var checkoutsLoaded = false
 
-    // MARK: List
+    // MARK: Buy List
 
-    /// The patron's list Music Library adds titles to.
-    var listId: String {
-        didSet {
-            guard listId != oldValue else { return }
-            UserDefaults.standard.set(listId, forKey: Keys.listId)
-            listEntries = []
-            listLoaded = false
-            if isSignedIn, !listId.isEmpty { loadList() }
-        }
+    /// The Buy List (set by the app as it changes): catalog CDs on it are marked, and `is:onlist` finds them.
+    var wanted: [WantedAlbum] = [] { didSet { if wanted != oldValue { runLocalSearch() } } }
+
+    /// The CD's album and artist as MusicBrainz names them, else as the catalog does.
+    func albumName(_ item: CatalogItem) -> (album: String, artist: String) {
+        let d = details[item.id]
+        return (d?.mbTitle ?? item.displayTitle, d?.mbArtist ?? item.artist)
     }
-    private(set) var userLists: [CatalogUserList] = []
-    private(set) var listEntries: [CatalogListEntry] = [] { didSet { runLocalSearch() } }
-    private(set) var listLoading = false
-    private(set) var listLoaded = false
-    private(set) var listError: String?
-    /// Titles being added to or removed from the list.
-    private(set) var listBusy: Set<String> = []
+
+    /// The Buy List's entry for a catalog CD (on CD or any format), if it's on it.
+    func wantedEntry(_ item: CatalogItem) -> WantedAlbum? {
+        let name = albumName(item)
+        return BuyList.entry(in: wanted, artist: name.artist, album: name.album, format: .cd)
+    }
 
     // MARK: Details
 
@@ -220,6 +216,7 @@ final class LibraryCatalogStore {
     }
     var localAvailability = LocalAvailability.any { didSet { runLocalSearch() } }
     var localOwnership = OwnershipFilter.all { didSet { runLocalSearch() } }
+    /// Only CDs on the Buy List.
     var localOnList = false { didSet { runLocalSearch() } }
     /// Searching the library's website instead of the downloaded catalog.
     var liveMode: Bool { didSet { UserDefaults.standard.set(liveMode, forKey: Keys.liveMode) } }
@@ -249,7 +246,6 @@ final class LibraryCatalogStore {
         let siteLibrary = CatalogPaths.siteLibrary(siteURL) ?? ""
         homeLibrary = defaults.string(forKey: Keys.homeLibrary) ?? siteLibrary
         username = defaults.string(forKey: Keys.username) ?? ""
-        listId = defaults.string(forKey: Keys.listId) ?? ""
         password = KeychainStore.app.string(for: Keys.password) ?? ""
         autoLookup = defaults.object(forKey: Keys.autoLookup) == nil ? true : defaults.bool(forKey: Keys.autoLookup)
         query = defaults.data(forKey: Keys.query).flatMap { try? JSONDecoder().decode(CatalogQuery.self, from: $0) }
@@ -446,7 +442,6 @@ final class LibraryCatalogStore {
                 let name = try CatalogParser.parseLogin(try await client.post(CatalogPaths.login, form: body))
                 account = .signedIn(name)
                 refreshCheckouts()
-                loadUserLists()
             } catch {
                 account = .failed(error.localizedDescription)
             }
@@ -457,9 +452,6 @@ final class LibraryCatalogStore {
         account = .signedOut
         checkouts = []
         checkoutsLoaded = false
-        userLists = []
-        listEntries = []
-        listLoaded = false
         password = ""
         Task { _ = try? await client.get(CatalogPaths.logout) }
     }
@@ -485,98 +477,6 @@ final class LibraryCatalogStore {
     }
 
     var cdCheckouts: [CatalogCheckout] { checkouts.filter { $0.format?.localizedCaseInsensitiveContains("CD") == true && $0.format?.localizedCaseInsensitiveContains("Spoken") != true } }
-
-    // MARK: List
-
-    var selectedList: CatalogUserList? { userLists.first { $0.id == listId } }
-
-    /// The list's name, even before the lists have loaded.
-    var listTitle: String { selectedList?.title ?? "My List" }
-
-    func loadUserLists() {
-        guard isSignedIn else { return }
-        Task {
-            do {
-                userLists = try CatalogParser.parseUserLists(try await client.get(CatalogPaths.userLists))
-                // Keep the chosen list if it still exists; with a single list, use it.
-                if !userLists.contains(where: { $0.id == listId }) { listId = userLists.count == 1 ? userLists[0].id : "" }
-                if !listId.isEmpty, !listLoaded { loadList() }
-            } catch {
-                listError = error.localizedDescription
-            }
-        }
-    }
-
-    /// Every entry on the chosen list (a page at a time, as the site shows it).
-    func loadList() {
-        guard isSignedIn, !listId.isEmpty, !listLoading else { return }
-        let id = listId
-        listLoading = true
-        listError = nil
-        Task {
-            do {
-                var entries: [CatalogListEntry] = []
-                var page = 1
-                while page <= 25 {
-                    let html = String(decoding: try await client.get(CatalogPaths.list(id, page: page)), as: UTF8.self)
-                    let number = page
-                    let result = try await Task.detached { try CatalogParser.parseList(html, page: number) }.value
-                    let known = Set(entries.map(\.entryId))
-                    let fresh = result.entries.filter { !known.contains($0.entryId) }
-                    entries += fresh
-                    if fresh.isEmpty || entries.count >= result.total { break }
-                    page += 1
-                }
-                guard id == listId else { listLoading = false; return }
-                listEntries = entries
-                listLoaded = true
-                if autoLookup { lookUp(entries.map(\.item)) }
-            } catch {
-                listError = error.localizedDescription
-            }
-            listLoading = false
-        }
-    }
-
-    func listEntry(for item: CatalogItem) -> CatalogListEntry? { listEntries.first { $0.item.id == item.id } }
-
-    func isOnList(_ item: CatalogItem) -> Bool { listEntry(for: item) != nil }
-
-    func addToList(_ item: CatalogItem) {
-        guard isSignedIn, !listId.isEmpty, !listBusy.contains(item.id) else { return }
-        let id = listId
-        listBusy.insert(item.id)
-        listError = nil
-        Task {
-            do {
-                _ = try CatalogParser.parseSaveToList(try await client.get(CatalogPaths.addToList(listId: id, workId: item.id)))
-                // Show it right away; the reload brings its entry ID (needed to remove it).
-                if !isOnList(item) { listEntries.append(CatalogListEntry(entryId: "", item: item)) }
-                listLoaded = false
-                loadList()
-            } catch {
-                listError = "Couldn't add “\(item.displayTitle)”: \(error.localizedDescription)"
-            }
-            listBusy.remove(item.id)
-        }
-    }
-
-    func removeFromList(_ item: CatalogItem) {
-        guard let entry = listEntry(for: item), !entry.entryId.isEmpty, !listBusy.contains(item.id) else { return }
-        let id = listId
-        listBusy.insert(item.id)
-        listError = nil
-        Task {
-            do {
-                _ = try await client.get(CatalogPaths.removeFromList(listId: id, entryId: entry.entryId))
-                listEntries.removeAll { $0.entryId == entry.entryId }
-                loadList()
-            } catch {
-                listError = "Couldn't remove “\(item.displayTitle)”: \(error.localizedDescription)"
-            }
-            listBusy.remove(item.id)
-        }
-    }
 
     // MARK: Album details
 

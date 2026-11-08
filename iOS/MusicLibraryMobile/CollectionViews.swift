@@ -184,6 +184,13 @@ struct CollectionHome: View {
                     detail: "Digitized, not on this iPhone yet")
             }
             .buttonStyle(.plain)
+            divider
+            NavigationLink(value: BuyListRoute.list) {
+                let deals = model.market.shown.count(where: \.isDeal)
+                row("Buy List", systemImage: "bag", count: model.market.shown.count,
+                    detail: deals > 0 ? "\(deals) at or under your max" : "What you're looking for, and what it goes for")
+            }
+            .buttonStyle(.plain)
         }
         .padding(.vertical, 2)
         .card()

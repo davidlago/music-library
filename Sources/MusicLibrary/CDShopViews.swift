@@ -84,12 +84,16 @@ private struct CDShopEditionsSection: View {
         let format = store.format
         switch store.searchState {
         case .idle:
-            ContentUnavailableView {
-                Label("Find a CD or Record", systemImage: "cart")
-            } description: {
-                Text("Pick CD or Vinyl, then search by album and artist, by artist alone to browse their albums, or by the barcode or catalog number on the case or sleeve. Pick the edition you want, then compare copies for sale on Discogs, eBay, CDandLP and Alibris. No accounts needed.")
+            if store.finds.isEmpty {
+                ContentUnavailableView {
+                    Label("Find a CD or Record", systemImage: "cart")
+                } description: {
+                    Text("Pick CD or Vinyl, then search by album and artist, by artist alone to browse their albums, or by the barcode or catalog number on the case or sleeve. Pick the edition you want, then compare copies for sale on Discogs, eBay, CDandLP and Alibris. No accounts needed.")
+                }
+                .padding(.top, 40)
+            } else {
+                CDShopRecentFinds(store: store)
             }
-            .padding(.top, 40)
         case .searching where store.albums.isEmpty:
             ProgressView("Searching MusicBrainz…").frame(maxWidth: .infinity).padding(.top, 40)
         case .failed(let message):
@@ -122,6 +126,46 @@ private struct CDShopEditionsSection: View {
                     .font(.callout).padding(.top, 4)
                 }
             }
+        }
+    }
+}
+
+/// Albums priced in the Shop here or on the iPhone, newest first: click one to shop for it again.
+private struct CDShopRecentFinds: View {
+    let store: CDShopStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Recent Finds").font(.title3.bold())
+                Text("Priced in the Shop on this Mac or your iPhone").font(.caption).foregroundStyle(.secondary)
+            }
+            VStack(spacing: 0) {
+                ForEach(store.finds) { find in
+                    Button { store.shop(find) } label: {
+                        HStack(spacing: 12) {
+                            DiscogsThumbnail(url: find.thumbnail, side: 40, symbol: find.format == .vinyl ? "record.circle" : "opticaldisc")
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(find.album).lineLimit(1)
+                                Text("\(find.artist) · \(find.format.name)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            Spacer()
+                            if let price = find.fairPrice { Text(price).monospacedDigit().foregroundStyle(.secondary) }
+                            Text(find.at.formatted(date: .abbreviated, time: .omitted)).font(.caption).foregroundStyle(.tertiary)
+                                .frame(width: 90, alignment: .trailing)
+                        }
+                        .padding(.horizontal, 14).padding(.vertical, 7)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button("Shop for It") { store.shop(find) }
+                        Button("Remove from Recent Finds", role: .destructive) { store.removeFinds([find.id]) }
+                    }
+                    if find.id != store.finds.last?.id { Divider().opacity(0.5) }
+                }
+            }
+            .card()
         }
     }
 }
@@ -255,6 +299,7 @@ private struct CDShopOffersSection: View {
             } else if let guide = store.priceGuide {
                 PriceGuideView(guide: guide)
             }
+            AppleAlbumTracks(album: store.appleAlbum, loading: store.isFindingApple, controls: model.previewControls)
             shopChips
             filters
             if let error = store.resolveError {
@@ -327,6 +372,17 @@ private struct CDShopOffersSection: View {
                                                            barcode: target.typedBarcode))
             }
             .help("Add this \(target.format.noun) to your physical collection, with your label number and what you paid")
+            if let guide = store.priceGuide {
+                AddToBuyListButton(guide: guide)
+            } else if let entry = model.buyList.entry(artist: target.artist, album: target.album, format: PriceGuideRequest.Format(target.format)) {
+                Button { model.showBuyList(entry.id) } label: { Label("On Buy List", systemImage: "bag.fill") }
+            } else {
+                Button {
+                    model.buyList.add(artist: target.artist, album: target.album, format: PriceGuideRequest.Format(target.format),
+                                      barcode: target.edition?.barcode ?? target.typedBarcode ?? "")
+                } label: { Label("Add to Buy List", systemImage: "bag.badge.plus") }
+                .disabled(store.isPricing)
+            }
             if model.radioDJ.isEnabled {
                 Button { model.askRadioDJ(about: target) } label: { Label("Ask \(model.radioDJ.displayName)", systemImage: RadioDJIcon.name) }
                     .help("\(model.radioDJ.displayName) tells you about it, whether it's worth adding to your collection and what to pay")

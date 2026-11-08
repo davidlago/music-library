@@ -76,8 +76,10 @@ Both collections on one tab: the CDs and records you own first, then your digita
   what's on either side of it on the shelf.
 - **CDs**, **Vinyl** (with the next free label), **To Digitize**, **Ready to Download**, and the **Shelf**, as covers or
   a list, sorted and filtered ("Filter, or a label like 12").
-- Item pages like the Mac's: the case or sleeve, previous and next on the shelf, the digital copy, tracks, your copy's
-  details and other copies.
+- Item pages like the Mac's: the case or sleeve, previous and next on the shelf, the digital copy, what it's worth,
+  tracks, your copy's details and other copies.
+- **Buy List**: the albums you're looking for, with what they go for. Add, edit and remove them here too; your Mac gets
+  the changes at the next sync. See [Buy List](shop.md#buy-list).
 - **Digital Collection**: **Albums**, **Songs**, **Liked Songs**, **Downloads** and your playlists. Switch between
   **All Music** and **On This iPhone**. Music that isn't on the phone is dimmed; tap it to download it. With nothing on
   the shelf, the tab is just this list.
@@ -102,7 +104,7 @@ your copies, plays, links, and concerts near you. They take their color from the
 
 For record stores and fairs: look a CD or record up by name or by scanning its barcode, and see its price guide (Discogs
 and eBay), whether you already have it, and where to buy it; with the Radio DJ on, show your crate-digging friend a
-photo of it instead. See [Shop](shop.md#on-iphone).
+photo of it instead. Your Buy List is at the top. See [Shop](shop.md#on-iphone).
 
 ### Search
 

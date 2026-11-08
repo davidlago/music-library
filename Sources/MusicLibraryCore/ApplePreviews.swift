@@ -397,3 +397,41 @@ public struct ApplePreviewFinder: Sendable {
         return result
     }
 }
+
+// MARK: Any album
+
+extension ApplePreviewFinder {
+    /// An album on Apple Music with its songs (and their previews), for the Shop: by barcode first (the first two
+    /// codes given, each in the forms Apple may list it under), then by artist and title (`ApplePreviewMatcher.bestAlbum`).
+    /// Nil when Apple doesn't have it.
+    public func album(title: String, artist: String, barcodes: [String] = [], trackCount: Int? = nil, year: Int? = nil) async throws -> AppleAlbum? {
+        var tried = Set<String>()
+        for code in barcodes where tried.count < 2 {
+            guard let upc = CatalogText.barcodeVariants(code).first, tried.insert(upc).inserted else { continue }
+            if let album = try await client.album(upc: upc), !album.tracks.isEmpty { return album }
+        }
+        let title = title.trimmingCharacters(in: .whitespaces)
+        guard !title.isEmpty else { return nil }
+        let various = CatalogText.key(artist) == "various artists"
+        let term = artist.isEmpty || various ? title : "\(artist) \(title)"
+        let candidates = try await client.searchAlbums(term: term)
+        guard let best = ApplePreviewMatcher.bestAlbum(candidates, titles: [title], artists: artist.isEmpty ? [] : [artist],
+                                                        trackCount: trackCount, year: year) else { return nil }
+        guard let album = try await client.album(id: best.id), !album.tracks.isEmpty else { return nil }
+        return album
+    }
+}
+
+/// Opening an album or song in the Music app (an Apple Music subscriber's library and player) rather than a browser.
+public enum AppleMusicLink {
+    /// `music://music.apple.com/…` for an Apple Music page: the Music app opens it on the album (or song) on both the
+    /// Mac and the iPhone. Nil for anything that isn't an https page on music.apple.com or itunes.apple.com.
+    public static func appURL(_ page: URL) -> URL? {
+        guard ApplePreviewParser.isAppleURL(page), let host = page.host?.lowercased(),
+              host == "music.apple.com" || host == "itunes.apple.com",
+              var c = URLComponents(url: page, resolvingAgainstBaseURL: false) else { return nil }
+        c.scheme = "music"
+        c.host = "music.apple.com"
+        return c.url
+    }
+}

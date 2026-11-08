@@ -45,6 +45,8 @@ final class PhoneModel {
     let concerts = PhoneConcerts()
     /// The Shop: price guides, the DJ in a record store, recent finds.
     let shop = PhoneShop()
+    /// The Buy List and what copies are worth.
+    let market = PhoneMarket()
     /// The Radio DJ, on once the Mac has handed over a Claude API key.
     let radioDJ = PhoneRadioDJ()
     /// Plays and likes since the last sync (and ownership changes from versions that could edit it here).
@@ -148,7 +150,8 @@ final class PhoneModel {
         cloud.outgoing = { [weak self] in
             // The sample library's changes never go to the Mac.
             guard let self, !isSample, let id = library?.libraryID else { return nil }
-            return PhoneCloud.Outgoing(libraryID: id, events: outbox.events, requests: requestQueue.requests)
+            return PhoneCloud.Outgoing(libraryID: id, events: outbox.events, requests: requestQueue.requests, wanted: market.pendingChanges,
+                                       shopFinds: shop.pendingFinds)
         }
         cloud.phone = { [weak self] in (self?.sync.deviceID ?? "", self?.sync.deviceName ?? "") }
         cloud.downloads = { [weak self] in
@@ -174,6 +177,12 @@ final class PhoneModel {
             return (outbox.events, requestQueue.requests, library?.libraryID)
         }
         recoverInterruptedPlay()
+        sync.pendingWanted = { [weak self] in self?.market.pendingChanges ?? [] }
+        sync.pendingFinds = { [weak self] in self?.shop.pendingFinds ?? [] }
+        shop.onChange = { [weak self] in self?.cloud.changesPending() }
+        market.guides = { [weak self] in self?.shop.guides() }
+        shop.onGuide = { [weak self] in self?.market.noteGuide($0) }
+        market.onChange = { [weak self] in self?.cloud.changesPending() }
         sync.onEventsDelivered = { [weak self] events, requests in
             self?.outbox.remove(events)
             self?.requestQueue.remove(requests)
@@ -302,6 +311,8 @@ final class PhoneModel {
     private func forgetSample() {
         wantsSample = false
         sampleOutbox.remove(Set(sampleOutbox.events.map(\.id)))
+        market.forgetSample()
+        shop.forgetSample()
         try? FileManager.default.removeItem(at: Self.playerStateURL(sample: true))
     }
 
@@ -352,6 +363,8 @@ final class PhoneModel {
         self.collection = collection
         collectionIndex = index
         collectionVersion += 1
+        market.update(library: library, collection: collection, isSample: isSample)
+        shop.update(library: library, isSample: isSample)
         glance.setNeedsUpdate()
         LabelShortcuts.update(for: collection)
     }

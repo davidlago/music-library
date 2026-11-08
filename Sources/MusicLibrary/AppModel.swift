@@ -8,7 +8,9 @@ enum SidebarItem: Hashable {
     case listenNow
     /// The Shelf (`.all`), one medium, or To Digitize.
     case collection(CollectionScope)
-    case songs, albums, artists, insights, musicDNA, concerts, importQueue, exportList, iPhone, catalog, catalogCheckouts, catalogList, cdShop
+    case songs, albums, artists, insights, musicDNA, concerts, importQueue, exportList, iPhone, catalog, catalogCheckouts, cdShop
+    /// The Buy List: albums you're looking for and what they go for.
+    case buyList
     /// The music chosen for the iCloud backup.
     case iCloud
     /// Digitize Vinyl: recording a record and cutting it into tracks.
@@ -312,6 +314,10 @@ final class AppModel {
     @ObservationIgnored let radioDJ = RadioDJStore()
     /// Shopping for new and used CDs.
     @ObservationIgnored let cdShop = CDShopStore()
+    /// Albums you're looking for, with their prices.
+    @ObservationIgnored let buyList = BuyListStore()
+    /// What the CDs and records are worth.
+    @ObservationIgnored let values = CollectionValueStore()
     /// Wi-Fi sync to the iPhone app.
     @ObservationIgnored let iPhone = SyncStore()
     /// Sending the physical collection to the user's Discogs collection.
@@ -376,6 +382,7 @@ final class AppModel {
             self.historyVersion += 1
         }
         iPhone.context = { [unowned self] in self.syncContext }
+        iPhone.onSynced = { [unowned self] in self.buyList.reload(); self.cdShop.reloadFinds() }
         cloud.context = { [unowned self] in self.database.map { (self.libraryRoot, $0) } }
         cloud.tracks = { [unowned self] in self.tracks(for: $0) }
         cloud.allTracks = { [unowned self] in self.tracks }
@@ -412,6 +419,14 @@ final class AppModel {
         }
         cdShop.musicBrainz = musicBrainz
         cdShop.discogsAccount = { [unowned self] in self.discogsSync.account }
+        cdShop.onPriceGuide = { [unowned self] guide in self.buyList.noteGuide(guide) }
+        buyList.database = { [unowned self] in self.database }
+        cdShop.database = { [unowned self] in self.database }
+        buyList.onChanged = { [unowned self] in self.catalog.wanted = $0 }
+        buyList.guides = { [unowned self] in self.cdShop.priceGuides() }
+        values.database = { [unowned self] in self.database }
+        values.priceGuides = { [unowned self] in self.cdShop.priceGuides() }
+        values.collection = { [unowned self] in self.collection }
         importer = ImportController(model: self)
         cd = CDController(model: self)
         rips = RipChecker(model: self)
@@ -517,6 +532,8 @@ final class AppModel {
         trackPurchases = [:]
         offload.load(nil, root: url)
         collection = .empty; collectionIndex = .empty; collectionStats = nil; collectionStatsRequest = nil; collectionLoaded = false
+        buyList.stopRefreshing(); values.stop()
+        buyList.reload(); values.reload(); cdShop.reloadFinds()
         unsettledItems = [:]; searchItems = []; searchLabelHits = []; collectionVersion += 1
         openLibrary()
     }
@@ -540,6 +557,10 @@ final class AppModel {
             loadPurchases()
             offload.load(db, root: libraryRoot)
             offload.dropMissing()
+            // A sync or the iCloud inbox may have brought the phone's Buy List changes.
+            buyList.reload()
+            values.reload()
+            cdShop.reloadFinds()
             iPhone.dropMissing()
             // What the iPhone gets depends on the collection, so not before it's built.
             if collectionLoaded { cloud.dropMissing() }
@@ -944,6 +965,18 @@ final class AppModel {
     func copyMark(for album: AlbumSummary) -> CopyMark { collection.mark(albumKey: AlbumInfoStore.key(album)) }
 
     /// Opens an item's page on top of whatever is showing.
+    /// The Buy List album to open on its page (set by `showBuyList`).
+    var buyListFocus: String?
+
+    /// Shows the Buy List, opened on an album when one is given.
+    func showBuyList(_ id: String? = nil) {
+        nowPlayingExpanded = false
+        if !searchText.isEmpty { searchText = "" }
+        sidebar = .buyList
+        navigationPath = NavigationPath()
+        buyListFocus = id
+    }
+
     func showItem(id: String) {
         nowPlayingExpanded = false
         navigationPath.append(CollectionItemRoute(id: id))
@@ -1195,6 +1228,7 @@ final class AppModel {
         collectionVersion += 1
         for (id, change) in unsettled where unsettledItems[id] == change { unsettledItems.removeValue(forKey: id) }
         catalog.collection = collection
+        values.recompute()
         refreshCollectionPlaylistCounts()
         // The app opens on Listen Now once there's anything to show, unless something else was picked already
         // (a page opened or a search typed while it loaded counts too). An empty library stays on Songs, which

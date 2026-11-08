@@ -84,7 +84,7 @@ analytics. Export compliance: `ITSAppUsesNonExemptEncryption = NO` (only the enc
 version):
 
 ```
-New: back up to your own iCloud and get your music on iPhone even when your Mac isn't nearby. Find any CD or record by its label, and play your music offline.
+New: a Buy List that watches prices, what each of your records is worth, and a Shop tab to scan barcodes in record stores, with previews of every song.
 ```
 
 **Keywords** (at most 100 characters):
@@ -99,7 +99,7 @@ cd,vinyl,record,collection,shelf,flac,lossless,offline,hi-res,dac,scrobble,lastf
 Your CDs, your records and your music files, on your iPhone and Apple Watch. Dave's Music Library is the companion to Music Library for Mac, a free and open-source app for people who own their music: catalog your CDs and vinyl with a label number on every case, rip and digitize them, tag everything from MusicBrainz, and explore your collection in ways streaming apps don't.
 
 Your shelf, by its label
-Every CD and record you own comes over from your Mac, ripped or not, in its jewel case or sleeve, with its edition, label number, purchase date and price. Find by Label shows what's at a number and what sits on either side of it, so you can go and grab it from the shelf. On Apple Watch, turn the Digital Crown to a label, even away from your iPhone. Or ask Siri: "Find CD 12 in Music Library".
+Every CD and record you own comes over from your Mac, ripped or not, in its jewel case or sleeve, with its edition, label number, purchase date and price, and what it's worth now. Find by Label shows what's at a number and what sits on either side of it, so you can go and grab it from the shelf. On Apple Watch, turn the Digital Crown to a label, even away from your iPhone. Or ask Siri: "Find CD 12 in Music Library".
 
 Every album and artist
 Browse your whole digital collection with the Mac's album and artist pages: descriptions, ratings, credits, the full track list, your copies and your plays. Choose which music to keep on the phone; everything else can still be browsed and downloaded when you want it, from your Mac over Wi-Fi or from its backup in your own iCloud when the Mac isn't nearby, and Ready to Download lists the CDs and records you've digitized that aren't on the phone yet.
@@ -108,13 +108,13 @@ A radio DJ who knows your records
 With your own Claude API key (set up in the Mac app), tap the radio button on any page and a DJ tells you the story behind what you're looking at: who made it, who played on it and how it connects to everything else you own. Ask anything; the DJ checks the web and searches your own collection to answer, with links to your albums and previews of songs you don't have.
 
 Play it properly
-Gapless playback when songs share a sample rate, and with a USB DAC the output switches to each song's own rate. Lock screen and Control Center controls, a play queue with Play Next, Liked Songs, and your queue kept between launches.
+Gapless playback when songs share a sample rate, and with a USB DAC the output switches to each song's own rate. AirPlay to speakers and TVs. Lock screen and Control Center controls, a play queue with Play Next, Liked Songs, and your queue kept between launches.
 
 Insights and Music DNA
-See what you own (how much is digitized, your free label numbers, what you've spent and the cost per play), what your music files are made of, and a listening report for the last week, month, year or all time: top artists, albums and songs, what was new to you, your listening clock and forgotten favorites. Music DNA maps who played, wrote and produced with whom.
+See what you own (how much is digitized, your free label numbers, what you've spent, what your collection is worth now and the cost per play), what your music files are made of, and a listening report for the last week, month, year or all time: top artists, albums and songs, what was new to you, your listening clock and forgotten favorites. Music DNA maps who played, wrote and produced with whom.
 
 Take it record shopping
-The Shop tab is made for record stores and fairs: scan a CD's or record's barcode (or type its name) and see what it's worth on Discogs and eBay, whether you already own it and where to buy it. With the Radio DJ set up, snap the record you're holding instead: your crate-digging friend, a bargain-hunting audiophile collector, works out which pressing it is, checks your collection and tells you whether it's worth taking home at that price.
+The Shop tab is made for record stores and fairs: scan a barcode (or type a name) and see what it's worth on Discogs and eBay, whether you already own it and where to buy it, and preview every song or open it in Apple Music. Your Buy List keeps what each album you're after goes for and flags a deal; it's the same list on your Mac. With the Radio DJ, snap the record you're holding: your crate-digging friend works out the pressing, checks your collection and tells you whether it's worth taking home.
 
 Widgets and Apple Watch
 Home and lock screen widgets for what's playing (with controls), your listening, your physical collection and next labels, your digital collection and albums to rediscover. On Apple Watch: a remote for your iPhone, your listening, and Find by Label.
@@ -128,8 +128,37 @@ Get the companion Mac app
 Your music comes from Music Library for Mac (free, macOS 14 or later): it catalogs your CDs and records, imports, rips and digitizes your music, then syncs both collections to your iPhone. Download it, and find the full documentation and the source code, at https://davidlago.github.io/music-library/
 ```
 
-**What's New in 1.33.0** (draft: covers the iPhone changes of 1.33.0; if the live version is older than 1.32.0, add
-1.32's AirPlay and the clearer iCloud messages from the changelog):
+**What's New in 1.34.0** (the live version is 1.31.0, so it covers the iPhone changes of 1.32.0, 1.32.1, 1.33.0 and
+1.34.0; 1.32.0–1.33.0 were never submitted):
+
+```
+Your Buy List
+• Look an album up in the Shop (or scan its barcode) and tap Add to Buy List: it keeps what the album goes for now, the cheapest copy for sale on Discogs or eBay and the fair price, and how that moved since the last check.
+• Set the most you'd pay, and albums at or under it go to the top. Refresh Prices checks them all again; open one for its price history.
+• It's the same list in Music Library on your Mac: what you add, change or remove on either side syncs, over Wi-Fi or iCloud.
+
+What your records are worth
+• A CD's or record's page shows What It's Worth: what that edition sells for on Discogs and eBay, against what you paid, with the full price guide.
+• Insights ▸ Owned adds Collection Value (the total, what it has gained, your most valuable copies) and your Buy List.
+
+Take your iPhone record shopping
+• A new Shop tab for record stores and fairs: scan a CD's or record's barcode, or type its name, and see a price guide from Discogs and eBay, whether you already own it and where to buy it.
+• Listen before you buy: tap any song for a 30-second preview, or Open in Apple Music to play the album with your subscription.
+• Recent Finds keeps what you looked up, here or on your Mac, on both.
+• Connect Discogs on your Mac and sync to add suggested prices by condition and the versions in your Discogs collection. Sign in to eBay in Settings ▸ Shop (optional, on eBay's own page) to add what copies recently sold for.
+• With the Radio DJ set up, tap Show a Record and snap what you're holding: your crate-digging friend, a bargain-hunting audiophile collector, works out which pressing it is, prices it, checks your collection and tells you whether it's worth taking home.
+
+AirPlay
+• Send your music to AirPlay speakers and TVs from Now Playing, several at once, without gaps between songs.
+
+Also
+• Songs start right away, even big hi-res files.
+• The reminder to turn the volume all the way up for bit-perfect output now also shows for USB-C DACs iOS lists as headphones.
+• When the iPhone can't use iCloud, it says why (not signed in, or iCloud Drive turned off for the app), and keeps your plays and likes until it can.
+• Insights, Music DNA and the DJ's conversation look the same as on the Mac, artist pages are tinted by the artist's photo, and record sleeves get the Mac's cardboard finish.
+```
+
+**What's New in 1.33.0** (never submitted: 1.34.0's text includes it):
 
 ```
 Take your iPhone record shopping
@@ -215,6 +244,8 @@ Optional: with iCloud backup turned on in the Mac app (Settings ▸ iCloud), the
 Optional features need the user's own accounts or keys, entered by the user: Last.fm scrobbling (Settings, with a Last.fm API key), concerts on artist pages (Ticketmaster or JamBase keys set on the Mac) and the Radio DJ (the user's own Anthropic Claude API key or OpenRouter key, entered in the Mac app and handed to the phone when they sync; without one, the DJ doesn't appear at all). The DJ runs only when the user taps its button, and sends the page being viewed and the user's questions to Anthropic with the user's own key.
 
 The Shop tab works without any account: it searches Discogs' public database for what the user types or scans, and reads eBay's public listings for the album. The barcode scanner uses the camera on the device only; nothing it sees is kept or sent except the barcode's digits. Optionally the user can sign in to eBay on eBay's own sign-in page shown in the app (the app never sees the password, only eBay's cookies) to see recent sold prices, and a Discogs token set up in the Mac app adds Discogs' suggested prices. With the Radio DJ set up, the Shop's "Show a Record" sends the photo the user takes to Anthropic (or OpenRouter) with the user's own key, like the DJ's photos.
+
+The Buy List (Collection tab and the Shop tab) keeps albums the user wants to buy, with prices read from the same public Discogs and eBay pages as the Shop; it works in the sample library too. A CD's or record's page shows what that edition is worth, read the same way (at most once a day per item). The Shop's track lists and 30-second song previews come from Apple's public iTunes Search API, and "Open in Apple Music" opens the album in Apple's Music app with a music:// link; nothing is bought or played through the app's own player except the previews.
 ```
 
 **Attachment:** the demo video (`build/app-store/review-demo.mp4`).

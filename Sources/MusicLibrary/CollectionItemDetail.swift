@@ -36,6 +36,7 @@ struct CollectionItemDetail: View {
                             VStack(alignment: .leading, spacing: 24) {
                                 hero(item, info, coverSize: min(340, geo.size.width * 0.42 - 56))
                                 digitalCopy(item)
+                                worth(item)
                                 yourCopy(item)
                                 otherCopies(item)
                             }
@@ -55,6 +56,7 @@ struct CollectionItemDetail: View {
                         VStack(alignment: .leading, spacing: 24) {
                             hero(item, info, coverSize: min(300, geo.size.width - 48))
                             digitalCopy(item)
+                            worth(item)
                             tracks(item, info)
                             yourCopy(item)
                             otherCopies(item)
@@ -74,7 +76,11 @@ struct CollectionItemDetail: View {
                     .help("Download the latest description, rating, links and track list")
             }
         }
-        .task(id: item.id) { model.ensureAlbumInfo(for: item) }
+        .task(id: item.id) {
+            model.ensureAlbumInfo(for: item)
+            // What it's worth, read again when it's more than a day old.
+            model.values.price(item)
+        }
         .task(id: "\(coverURL?.path ?? "")|\(model.coverRevision)") {
             guard let coverURL else { cover = nil; return }
             let data = await Task.detached { try? Data(contentsOf: coverURL) }.value
@@ -460,6 +466,17 @@ struct CollectionItemDetail: View {
     private func playTotal(_ row: AlbumTracklist.Row) -> PlayTotal? {
         if case .owned(let t, _) = row { return model.playTotals[t.id] }
         return nil
+    }
+
+    // MARK: What it's worth
+
+    @ViewBuilder
+    private func worth(_ item: CollectionItem) -> some View {
+        if CollectionValue.canValue(item) {
+            let values = model.values
+            CollectionValueSection(value: values.values[item.id], guide: values.guide(for: item), paid: item.price,
+                                   pricing: values.pricing.contains(item.id)) { values.price(item, force: true) }
+        }
     }
 
     // MARK: Your copy, other copies

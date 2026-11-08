@@ -188,7 +188,8 @@ extension LibraryCatalogStore {
     }
 
     func runLocalSearch() {
-        let context = CatalogSearchContext(owned: ownedIds, onList: Set(listEntries.map(\.item.id)), siteLibrary: siteLibrary,
+        let onList = wanted.contains { !$0.removed } ? Set(records.values.filter { wantedEntry($0.item) != nil }.map(\.id)) : []
+        let context = CatalogSearchContext(owned: ownedIds, onList: onList, siteLibrary: siteLibrary,
                                            collection: collectionMedia)
         localResult = index.search(localQuery, libraries: localLibraries.isEmpty ? nil : Set(localLibraries), context: context, sort: localSort)
     }

@@ -51,12 +51,23 @@ final class CDShopStore {
     private(set) var discogsStats: DiscogsMarketStats?
     /// The price guide for the target (nil while it's read).
     private(set) var priceGuide: PriceGuide?
+    /// The target album on Apple Music, with its songs and their previews (nil: not found, or not looked up yet).
+    private(set) var appleAlbum: AppleAlbum?
+    private(set) var isFindingApple = false
+    @ObservationIgnored private let appleFinder = ApplePreviewFinder(client: ApplePreviewClient(country: Locale.current.region?.identifier ?? "US"))
+    @ObservationIgnored private var appleCache: [String: AppleAlbum?] = [:]
+    @ObservationIgnored private var appleTask: Task<Void, Never>?
+    /// The lookup whose answer is wanted (the target itself changes once its store links are read, so it can't be
+    /// compared).
+    @ObservationIgnored private var appleRun = UUID()
     private(set) var isPricing = false
     private(set) var rates = ExchangeRates()
     /// The eBay sign-in for sold prices (opt-in, Settings ▸ Shop).
     let ebay = EbaySession()
     /// The Discogs account's token and username, for suggested prices and what's in the user's Discogs collection.
     @ObservationIgnored var discogsAccount: () -> (token: String?, username: String?) = { (nil, nil) }
+    /// Each price guide read (the Buy List keeps it as the album's latest price when it's on the list).
+    @ObservationIgnored var onPriceGuide: (PriceGuide) -> Void = { _ in }
     @ObservationIgnored private var guides: (key: String, guides: PriceGuides)?
     @ObservationIgnored private var guideCache: [CDShoppingTarget: (guide: PriceGuide, at: Date)] = [:]
     @ObservationIgnored private var guideTask: Task<Void, Never>?
@@ -213,6 +224,51 @@ final class CDShopStore {
                               format: format))
     }
 
+    /// Shops for an album from the Buy List: its Discogs master or release when known, else by name.
+    func shop(_ album: WantedAlbum) {
+        shop(album: album.album, artist: album.artist, format: album.format, barcode: album.barcode,
+             master: album.discogsMasterID, release: album.discogsReleaseID)
+    }
+
+    /// Shops for one of the Recent Finds again.
+    func shop(_ find: ShopFind) {
+        shop(album: find.album, artist: find.artist, format: find.format, barcode: find.barcode, master: find.masterID, release: find.releaseID)
+    }
+
+    private func shop(album: String, artist: String, format: PriceGuideRequest.Format, barcode: String, master: Int?, release: Int?) {
+        query = CDSearchQuery(album: album, artist: artist, format: format.shopFormat)
+        var links = CDShopLinks()
+        links.discogsMaster = master
+        links.discogsRelease = release
+        var target = CDShoppingTarget(album: album, artist: artist, releaseGroupId: nil, edition: nil, links: links,
+                                      format: format.shopFormat)
+        target.typedBarcode = barcode.isEmpty ? nil : barcode
+        lock(target)
+    }
+
+    // MARK: Recent Finds
+
+    /// Albums priced in the Shop on this Mac or the iPhone, newest first (`ShopFinds.swift`; in the library database,
+    /// so they sync both ways).
+    private(set) var finds: [ShopFind] = []
+    @ObservationIgnored var database: () -> Database? = { nil }
+
+    func reloadFinds() {
+        finds = ShopFind.shown((try? database()?.shopFinds()) ?? [])
+    }
+
+    private func recordFind(_ guide: PriceGuide) {
+        guard let find = ShopFind(guide: guide), let db = database() else { return }
+        _ = try? db.saveShopFinds([find])
+        reloadFinds()
+    }
+
+    func removeFinds(_ ids: Set<String>) {
+        guard let db = database() else { return }
+        _ = try? db.saveShopFinds(finds.filter { ids.contains($0.id) }.map { $0.removing() })
+        reloadFinds()
+    }
+
     /// Shops for what was typed, for a CD or record MusicBrainz doesn't list (new, local or rare releases).
     func shopByName() {
         guard !query.isEmpty else { return }
@@ -229,10 +285,40 @@ final class CDShopStore {
         shopStates = Dictionary(uniqueKeysWithValues: CDShop.searched.map { ($0, .waiting) })
         shopTask?.cancel()
         shopTask = Task { await run(target, force: false) }
+        findOnApple(target)
+    }
+
+    /// The album's songs on Apple Music, for the track list and its previews (once per album and format).
+    private func findOnApple(_ target: CDShoppingTarget) {
+        appleTask?.cancel()
+        let key = "\(target.artist)|\(target.album)|\(target.edition?.barcode ?? target.typedBarcode ?? "")".lowercased()
+        if let cached = appleCache[key] { appleRun = UUID(); appleAlbum = cached; isFindingApple = false; return }
+        appleAlbum = nil
+        isFindingApple = true
+        let run = UUID()
+        appleRun = run
+        let finder = appleFinder
+        let barcodes = [target.edition?.barcode, target.typedBarcode].compactMap { $0 }.filter { !$0.isEmpty }
+        let year = target.edition.flatMap { Int($0.date.prefix(4)) }
+        appleTask = Task {
+            let tracks = target.edition.map(\.trackCount).flatMap { $0 > 0 ? $0 : nil }
+            var found: AppleAlbum?
+            do {
+                found = try await finder.album(title: target.album, artist: target.artist, barcodes: barcodes, trackCount: tracks, year: year)
+                // Only a real answer is remembered (a failed request is tried again next time).
+                appleCache[key] = .some(found)
+            } catch {}
+            guard appleRun == run else { return }
+            appleAlbum = found
+            isFindingApple = false
+        }
     }
 
     func unlock() {
         shopTask?.cancel()
+        appleTask?.cancel()
+        appleRun = UUID()
+        isFindingApple = false
         guideTask?.cancel()
         isPricing = false
         runID = UUID()
@@ -389,6 +475,8 @@ final class CDShopStore {
             priceGuide = guide
             isPricing = false
             guideCache[target] = (guide, Date())
+            recordFind(guide)
+            onPriceGuide(guide)
         }
     }
 

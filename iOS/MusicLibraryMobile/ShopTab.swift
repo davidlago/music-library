@@ -28,7 +28,6 @@ struct ShopTab: View {
                         Button("Settings", systemImage: "gearshape") { showSettings = true }
                     }
                 }
-                .navigationDestination(for: ShopAlbumRoute.self) { ShopAlbumPage(route: $0) }
                 .navigationDestination(for: ShopDJRoute.self) { ShopDJPage(route: $0) }
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
@@ -91,12 +90,30 @@ private struct ShopHome: View {
                     }
                 }
             }
+            Section {
+                NavigationLink(value: BuyListRoute.list) {
+                    let market = model.market
+                    let totals = BuyList.totals(market.shown)
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Buy List")
+                            Text(market.shown.isEmpty ? "Albums you're looking for, with what they go for"
+                                 : "\(totals.count) album\(totals.count == 1 ? "" : "s")\(totals.deals > 0 ? " · \(totals.deals) at or under your max" : "")")
+                                .font(.caption).foregroundStyle(totals.deals > 0 ? .green : .secondary)
+                        }
+                    } icon: { Image(systemName: "bag") }
+                }
+            }
             if !shop.finds.isEmpty {
-                Section("Recent Finds") {
+                Section {
                     ForEach(shop.finds) { find in
                         NavigationLink(value: ShopAlbumRoute(request: find.request)) { FindRow(find: find) }
                     }
                     .onDelete { offsets in shop.remove(Set(offsets.map { shop.finds[$0].id })) }
+                } header: {
+                    Text("Recent Finds")
+                } footer: {
+                    Text("Albums priced here or in the Shop on your Mac; they sync with it.")
                 }
             }
         }
@@ -188,11 +205,12 @@ private struct HitRow: View {
 }
 
 private struct FindRow: View {
-    let find: PhoneShop.Find
+    @Environment(PhoneModel.self) private var model
+    let find: ShopFind
 
     var body: some View {
         HStack(spacing: 12) {
-            if let data = find.photo, let image = UIImage(data: data) {
+            if let data = model.shop.photos[find.id], let image = UIImage(data: data) {
                 Image(uiImage: image).resizable().scaledToFill().frame(width: 44, height: 44).clipShape(RoundedRectangle(cornerRadius: 6))
             } else {
                 DiscogsThumb(url: find.thumbnail, side: 44)
@@ -200,7 +218,7 @@ private struct FindRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(find.album).lineLimit(1)
                 Text(find.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-                Text([PriceGuideRequest.Format(rawValue: find.format)?.name ?? "", find.date.formatted(date: .abbreviated, time: .omitted)]
+                Text([find.format.name, find.at.formatted(date: .abbreviated, time: .omitted)]
                         .filter { !$0.isEmpty }.joined(separator: " · "))
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -230,7 +248,7 @@ private struct DiscogsThumb: View {
 // MARK: Album
 
 /// One album in the Shop: what you have of it, its price guide and the stores' searches for it, and the DJ's take.
-private struct ShopAlbumPage: View {
+struct ShopAlbumPage: View {
     @Environment(PhoneModel.self) private var model
     @Environment(\.openRoute) private var openRoute
     let route: ShopAlbumRoute
@@ -238,6 +256,9 @@ private struct ShopAlbumPage: View {
     @State private var guide: PriceGuide?
     @State private var loading = false
     @State private var ownership = ShopOwnership()
+    @State private var apple: AppleAlbum?
+    @State private var findingApple = true
+    @Environment(PhonePlayer.self) private var player
 
     init(route: ShopAlbumRoute) {
         self.route = route
@@ -276,6 +297,7 @@ private struct ShopAlbumPage: View {
                                               openRoute(found)
                                           }
                                       })
+                    if let guide { AddToBuyListButton(guide: guide).padding(.top, 4) }
                     if let owned = guide?.ownedOnDiscogs, !owned.isEmpty {
                         Label("\(owned.count) cop\(owned.count == 1 ? "y" : "ies") in your Discogs collection\(owned.contains(where: \.sameEdition) ? ", this edition among them" : "")",
                               systemImage: "checkmark.seal")
@@ -298,6 +320,7 @@ private struct ShopAlbumPage: View {
                 } else if let guide {
                     PriceGuideView(guide: guide)
                 }
+                AppleAlbumTracks(album: apple, loading: findingApple, controls: model.previewControls(player: player))
                 VStack(alignment: .leading, spacing: 8) {
                     SectionHeader(title: "Find a Copy")
                     ShopStoreLinks(target: guide?.shoppingTarget ?? CDShoppingTarget(byName: CDSearchQuery(album: title, artist: artist, format: format.shopFormat)))
@@ -309,6 +332,7 @@ private struct ShopAlbumPage: View {
         .radioDJPage(.page("the Shop, looking at *\(route.request.album)* by \(route.request.artist)",
                            details: guide.map { [$0.summary] } ?? []))
         .task(id: format) { await load() }
+        .task { await findOnApple() }
     }
 
     private func load() async {
@@ -324,6 +348,19 @@ private struct ShopAlbumPage: View {
         guide = found
         loading = false
         model.shop.record(found)
+    }
+
+    /// The album's songs on Apple Music (once per album), for the track list and its previews.
+    private func findOnApple() async {
+        let r = route.request
+        let key = "\(r.artist)|\(r.album)|\(r.barcode)".lowercased()
+        if let cached = model.shop.appleAlbums[key] { apple = cached; findingApple = false; return }
+        let finder = ApplePreviewFinder(client: model.radioDJ.previewClient)
+        let found = try? await finder.album(title: r.album, artist: r.artist, barcodes: r.barcode.isEmpty ? [] : [r.barcode], year: r.year)
+        guard !Task.isCancelled else { return }
+        if let found { model.shop.appleAlbums[key] = .some(found) } else { model.shop.appleAlbums[key] = .some(nil) }
+        apple = found ?? nil
+        findingApple = false
     }
 
     private func askDJ() {
