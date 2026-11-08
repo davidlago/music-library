@@ -716,6 +716,15 @@ public struct ExchangeRates: Hashable, Codable, Sendable {
         NSDecimalRound(&rounded, &value, 2, .plain)
         return rounded
     }
+
+    /// Dollars in another currency, or nil for a currency without a rate.
+    public func money(dollars: Decimal, in currency: String) -> Money? {
+        if currency == "USD" { return Money(dollars, "USD") }
+        guard let rate = perDollar[currency], rate > 0 else { return nil }
+        var value = dollars * rate, rounded = Decimal()
+        NSDecimalRound(&rounded, &value, 2, .plain)
+        return Money(rounded, currency)
+    }
 }
 
 public struct CDOffer: Identifiable, Hashable, Sendable {
@@ -766,6 +775,24 @@ public struct CDOffer: Identifiable, Hashable, Sendable {
         self.shippingNote = shippingNote; self.quotedTotal = quotedTotal; self.seller = seller
         self.sellerRating = sellerRating; self.shipsFrom = shipsFrom; self.saleFormat = saleFormat; self.url = url
         self.imageURL = imageURL; self.match = match
+    }
+
+    /// Whether it ships from the United States, as Discogs and eBay write the country.
+    public var shipsFromUS: Bool {
+        let place = shipsFrom.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return ["united states", "us", "usa", "united states of america"].contains(place) || place.hasSuffix(", united states")
+            || place.hasSuffix(", us") || place.hasSuffix(", usa")
+    }
+
+    /// What a Discogs seller in the US typically charges to ship a copy: the median of the shipping shown on Discogs
+    /// listings that ship from the US, in `currency`. Nil with fewer than two such listings.
+    public static func usShipping(_ offers: [CDOffer], currency: String, rates: ExchangeRates) -> Money? {
+        let costs = offers.filter { $0.shop == .discogs && $0.shipsFromUS }
+            .compactMap { $0.shipping.flatMap(rates.dollars) }.sorted()
+        guard costs.count >= 2 else { return nil }
+        let middle = costs.count / 2
+        let median = costs.count % 2 == 1 ? costs[middle] : (costs[middle - 1] + costs[middle]) / 2
+        return rates.money(dollars: median, in: currency)
     }
 
     /// Price plus shipping in US dollars when known (shipping unknown counts as nothing).

@@ -318,7 +318,7 @@ struct ShopAlbumPage: View {
                     }
                     .frame(maxWidth: .infinity).padding(.vertical, 20)
                 } else if let guide {
-                    PriceGuideView(guide: guide)
+                    PriceGuideView(guide: guide, lead: .shop(usShipping: nil))
                 }
                 AppleAlbumTracks(album: apple, loading: findingApple, controls: model.previewControls(player: player))
                 VStack(alignment: .leading, spacing: 8) {

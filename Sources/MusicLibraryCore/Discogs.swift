@@ -55,6 +55,39 @@ public enum DiscogsLink {
     }
 }
 
+extension URLComponents {
+    /// Sets the query with a "+" in a value sent as %2B: `URLComponents` leaves it as is, and Discogs (like most
+    /// servers) reads it as a space, so "Very Good Plus (VG+)" would arrive as "Very Good Plus (VG )" and be refused.
+    mutating func setDiscogsQuery(_ items: [URLQueryItem]) {
+        queryItems = items
+        percentEncodedQuery = percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+    }
+}
+
+/// One code on a Discogs release: "Matrix / Runout" "XSM 47326" (side A, stamped), "Barcode", "Label Code"…
+public struct DiscogsIdentifier: Hashable, Sendable, Identifiable {
+    public var type: String
+    public var value: String
+    /// What Discogs says about where it is: "Side A, variant 1", "Runout stamp".
+    public var description: String
+
+    public init(type: String, value: String, description: String = "") {
+        self.type = type; self.value = value; self.description = description
+    }
+
+    public var id: String { "\(type)|\(value)|\(description)" }
+    public var isRunout: Bool { type.caseInsensitiveCompare("Matrix / Runout") == .orderedSame }
+
+    /// The most kept from a release (the page is untrusted), and the longest value or description.
+    static let maxCount = 60, maxLength = 300
+
+    /// Runouts first, then barcodes, then the rest; Discogs' order within each.
+    static func ordered(_ list: [DiscogsIdentifier]) -> [DiscogsIdentifier] {
+        func rank(_ i: DiscogsIdentifier) -> Int { i.isRunout ? 0 : i.type.caseInsensitiveCompare("Barcode") == .orderedSame ? 1 : 2 }
+        return list.enumerated().sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }.map(\.element)
+    }
+}
+
 /// One Discogs release, as its page lists it.
 public struct DiscogsRelease: Hashable, Sendable {
     public var id: Int
@@ -78,8 +111,16 @@ public struct DiscogsRelease: Hashable, Sendable {
     /// The primary image first.
     public var images: [URL]
     public var thumbnail: URL?
+    /// The codes printed or etched on the release: matrix/runouts first (what tells one pressing from another),
+    /// then barcodes, label codes and the rest, in Discogs' order within each.
+    public var identifiers: [DiscogsIdentifier] = []
+    /// The plants that pressed or made it ("Pressed By", "Manufactured By").
+    public var pressedBy: [String] = []
 
     public var webURL: URL? { DiscogsLink.releaseURL(id) }
+
+    /// The matrix/runout values, one per side or variant listed.
+    public var runouts: [DiscogsIdentifier] { identifiers.filter(\.isRunout) }
 
     /// The release as an edition to pick.
     public var edition: CollectionEdition {
@@ -156,7 +197,7 @@ public enum DiscogsParser {
         let code = barcode(identifiers.filter { $0["type"] as? String == "Barcode" }.compactMap { $0["value"] as? String })
         let images = (r["images"] as? [[String: Any]] ?? [])
             .sorted { ($0["type"] as? String == "primary" ? 0 : 1) < ($1["type"] as? String == "primary" ? 0 : 1) }
-        return DiscogsRelease(
+        var release = DiscogsRelease(
             id: id, title: trimmed(r["title"] as? String ?? ""), artist: artist, released: date(r["released"] as? String ?? ""),
             year: (r["year"] as? Int).flatMap { (1000...9999).contains($0) ? $0 : nil }, country: r["country"] as? String ?? "",
             labels: labels.compactMap { ($0["name"] as? String).map(clean) }.filter { !$0.isEmpty },
@@ -169,6 +210,26 @@ public enum DiscogsParser {
             genres: CreditDerivation.dedupe((r["genres"] as? [String] ?? []) + (r["styles"] as? [String] ?? [])),
             tracks: tracks(r["tracklist"] as? [[String: Any]] ?? [], media: media, artist: artist),
             images: images.compactMap { image($0["uri"]) }, thumbnail: images.lazy.compactMap { image($0["uri150"]) }.first)
+        release.identifiers = Self.identifiers(identifiers)
+        release.pressedBy = CreditDerivation.dedupe((r["companies"] as? [[String: Any]] ?? []).compactMap { c -> String? in
+            guard let role = c["entity_type_name"] as? String, ["Pressed By", "Manufactured By"].contains(role),
+                  let name = c["name"] as? String else { return nil }
+            let n = clean(name)
+            return n.isEmpty || n.count > DiscogsIdentifier.maxLength ? nil : n
+        })
+        return release
+    }
+
+    /// The release's identifiers, trimmed, capped and ordered (`DiscogsIdentifier.ordered`).
+    static func identifiers(_ list: [[String: Any]]) -> [DiscogsIdentifier] {
+        let max = DiscogsIdentifier.maxLength
+        let parsed = list.compactMap { i -> DiscogsIdentifier? in
+            let type = trimmed(i["type"] as? String ?? ""), value = trimmed(i["value"] as? String ?? "")
+            let description = trimmed(i["description"] as? String ?? "")
+            guard !type.isEmpty, !value.isEmpty, type.count <= max, value.count <= max, description.count <= max else { return nil }
+            return DiscogsIdentifier(type: type, value: value, description: description)
+        }
+        return DiscogsIdentifier.ordered(Array(parsed.prefix(DiscogsIdentifier.maxCount)))
     }
 
     // MARK: Tracks
@@ -384,8 +445,8 @@ public actor DiscogsClient {
 
     private func search(_ params: [String: String], medium: CollectionMedium?) async throws -> [CollectionEdition] {
         guard var c = URLComponents(string: "\(Self.baseURL)/database/search") else { return [] }
-        c.queryItems = [.init(name: "type", value: "release"), .init(name: "per_page", value: "50")]
-            + params.sorted { $0.key < $1.key }.map { .init(name: $0.key, value: $0.value) }
+        c.setDiscogsQuery([.init(name: "type", value: "release"), .init(name: "per_page", value: "50")]
+            + params.sorted { $0.key < $1.key }.map { .init(name: $0.key, value: $0.value) })
         guard let url = c.url else { return [] }
         return try DiscogsParser.parseSearch(try await get(url), medium: medium)
     }

@@ -13,14 +13,18 @@ public struct CollectionValueSection: View {
     let value: CollectionValue?
     let guide: PriceGuide?
     let paid: Decimal?
+    /// The copy's media grade: the guide underneath leads with its price, and an ungraded copy is valued at VG to NM.
+    let grade: CollectionGrade?
     let pricing: Bool
     let refresh: () -> Void
     @State private var showsGuide = false
 
-    public init(value: CollectionValue?, guide: PriceGuide?, paid: Decimal?, pricing: Bool, refresh: @escaping () -> Void) {
+    public init(value: CollectionValue?, guide: PriceGuide?, paid: Decimal?, grade: CollectionGrade? = nil, pricing: Bool,
+                refresh: @escaping () -> Void) {
         self.value = value
         self.guide = guide
         self.paid = paid
+        self.grade = grade
         self.pricing = pricing
         self.refresh = refresh
     }
@@ -46,6 +50,13 @@ public struct CollectionValueSection: View {
                         if let delta = gain(value) { gainLabel(delta) }
                     }
                     if let source = value.source { Text("From \(source)").font(.caption).foregroundStyle(.secondary) }
+                    if let note = gradeNote(value) {
+                        Label(note, systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let sold = guide?.ebaySold?.used ?? guide?.ebaySold?.new, sold.count >= 3 {
+                        Text("eBay sales, any condition: \(PriceGuide.text(sold.typicalLow))–\(PriceGuide.text(sold.typicalHigh)) (\(sold.count) sold)")
+                            .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    }
                     figures(value)
                 } else if let value, !value.found {
                     Text("Nothing on Discogs or eBay matched this edition when it was priced.")
@@ -64,7 +75,7 @@ public struct CollectionValueSection: View {
                 }
                 if let guide, guide.hasPrices {
                     DisclosureGroup(isExpanded: $showsGuide) {
-                        PriceGuideView(guide: guide).padding(.top, 6)
+                        PriceGuideView(guide: guide, lead: .copy(grade: grade)).padding(.top, 6)
                     } label: {
                         Text("Price Guide").font(.callout.weight(.medium))
                     }
@@ -74,6 +85,13 @@ public struct CollectionValueSection: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .card()
         }
+    }
+
+    /// Why a copy's value isn't for its grade: it has none, or Discogs gave no price for it.
+    private func gradeNote(_ value: CollectionValue) -> String? {
+        guard let grade else { return "Set the copy's condition for a price for its grade." }
+        guard let source = value.source, !source.contains(" in \(grade.short)") else { return nil }
+        return "Discogs gave no price for \(grade.short) on this pressing (Discogs' prices by condition need a Discogs token, set on the Mac in Settings ▸ Discogs)."
     }
 
     private func gain(_ value: CollectionValue) -> Decimal? {

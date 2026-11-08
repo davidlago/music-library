@@ -64,6 +64,8 @@ final class VinylController {
     private(set) var release: ReleaseInfo?
     private(set) var isLoadingRelease = false
     private(set) var releaseError: String?
+    /// The record and editions the track list was last asked for (`releaseKey`).
+    @ObservationIgnored private var releaseFor: String?
 
     // Saving
     private(set) var isSaving = false
@@ -612,10 +614,23 @@ final class VinylController {
         return ((used + library).max() ?? 0) + 1
     }
 
+    /// Downloads the page's record's track list unless it has it, is downloading it or failed (Try Again): the record
+    /// can be set before the collection has loaded (a recording brought back at launch), when there's nothing to
+    /// download yet, and starting another recording of the same record doesn't set it again.
+    func ensureRelease() {
+        guard let item else { return }
+        if Self.releaseKey(item) != releaseFor || (release == nil && !isLoadingRelease && releaseError == nil) { loadRelease() }
+    }
+
+    static func releaseKey(_ item: CollectionItem) -> String {
+        "\(item.id)|\(item.releaseID ?? "")|\(item.discogsReleaseID ?? 0)"
+    }
+
     private func loadRelease() {
         releaseTask?.cancel()
         release = nil
         releaseError = nil
+        releaseFor = item.map(Self.releaseKey)
         guard let item, item.releaseID != nil || item.discogsReleaseID != nil else { return }
         isLoadingRelease = true
         let mb = model.musicBrainz, discogs = model.discogs

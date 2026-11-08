@@ -9,9 +9,31 @@ public struct PriceGuideView: View {
     /// Under a DJ line: the header is the album's name, without the thumbnail.
     let compact: Bool
 
-    public init(guide: PriceGuide, compact: Bool = false) {
+    let lead: Lead
+
+    /// The price at the top.
+    public enum Lead: Hashable, Sendable {
+        /// `PriceGuide.fairPrice`: eBay's sales first (the DJ, the Buy List).
+        case fair
+        /// The Shop: Discogs' estimate for the most common pressing, with US shipping on top when it's known
+        /// (`PriceGuide.shopEstimate`).
+        case shop(usShipping: Money?)
+        /// A copy you own: Discogs' price for its pressing and grade (`PriceGuide.copyEstimate`).
+        case copy(grade: CollectionGrade?)
+    }
+
+    public init(guide: PriceGuide, compact: Bool = false, lead: Lead = .fair) {
         self.guide = guide
         self.compact = compact
+        self.lead = lead
+    }
+
+    private var estimate: PriceGuide.FairPrice? {
+        switch lead {
+        case .fair: guide.fairPrice
+        case .shop(let shipping): guide.shopEstimate(shipping: shipping)
+        case .copy(let grade): guide.copyEstimate(grade: grade)
+        }
     }
 
     public var body: some View {
@@ -21,10 +43,11 @@ public struct PriceGuideView: View {
                 Text("Nothing on Discogs\(guide.ebayForSale == nil ? "" : " or eBay") matches \(guide.request.album.isEmpty ? "this" : "“\(guide.request.album)”")\(guide.request.format == .any ? "" : " on \(guide.request.format.name)").")
                     .font(.callout).foregroundStyle(.secondary)
             }
-            if let fair = guide.fairPrice {
+            if let fair = estimate {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(fair.text).font(.title2.weight(.semibold)).monospacedDigit()
-                    Text("Fair price: \(fair.source)").font(.caption).foregroundStyle(.secondary)
+                    Text("\(lead == .fair ? "Fair price" : "Estimate"): \(fair.source)").font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             if let owned = guide.ownedOnDiscogs, !owned.isEmpty {

@@ -102,8 +102,8 @@ Click any CD or record to open its page.
   your digital collection, and offers what fits: **Rip Now** when the CD is in a drive, **Digitize…** or **Digitize the
   Rest…** for a record, **Import a Transfer…**, **Link…**, **Rip Again**.
 - **Tracks**: the release's track list, a record's with its sides; songs not in your digital collection are dimmed.
-- **Your Copy**: medium, label number, date bought, price paid, notes, edition and cover, all edited in place. A new
-  cover can go to the digital album too.
+- **Your Copy**: medium, label number, date bought, price paid, notes, [condition and runouts](#pressing-and-condition),
+  edition and cover, all edited in place. A new cover can go to the digital album too.
 - **What It's Worth**: see [below](#what-its-worth).
 - **Your Other Copies**, and the album's description, reviews and links.
 - The **…** menu has **Change Cover…**, **Link Digital Copy…**, the queue and export items, **Digitize This Record…**,
@@ -111,14 +111,39 @@ Click any CD or record to open its page.
 
 An album page lists **Your Copies** (CDs, records and downloads), with what the album has cost you per play.
 
+### Pressing and condition
+
+Two copies of the same edition can be different pressings, and a copy's condition matters as much for what it's worth.
+A CD's or record's **Your Copy** has:
+
+- **Condition**: a grade for the record (or disc) and one for the sleeve (or case), on the Goldmine scale Discogs and
+  most sellers use: **M** (Mint), **NM** (Near Mint), **VG+**, **VG**, **G+**, **G**, **F** (Fair) and **P** (Poor). A
+  sleeve can also be **Generic**, **Not graded** or **No cover**.
+- **Runouts**: the codes etched or stamped in the dead wax between the last track and the label (on a CD, the ring
+  around the centre hole), one per line. Discogs lists them for each pressing, so they're what tells yours apart.
+
+When you pick an edition from Discogs (in Add to Collection or **Change Edition…**), its runouts, barcodes and the plant
+that pressed it show beside it: compare them with your copy before you pick. **Use Runouts** copies Discogs' runouts
+into your copy, for you to trim to the ones on yours (Discogs often lists every variant). For a copy with a Discogs
+edition, **Discogs' Runouts…** under the field shows them again.
+
+New to grading? The **?** next to the grades opens the **Grading Guide** (on the iPhone, **Grading Guide** on a copy's
+page): how to grade, then each grade with a drawing of the wear to look for on a record, a CD and a sleeve. In short:
+grade the record and the sleeve apart, under a bright light, and listen to a few minutes of each side; take the lower of
+how it looks and how it sounds; and be strict: most played copies are VG+ or VG, and Mint usually means still sealed.
+
+Search for them with `grade:` (`grade:vg+`, `grade:>=vg+`, `grade:<vg`, `grade:none`) and `runout:`.
+
 ### What it's worth
 
-A CD's or record's page shows what its edition sells for, from the Shop's [price guide](shop.md#price-guide): the fair
-price (recent eBay sales, else Discogs' suggested prices for a playable copy, else eBay's asking prices or the cheapest
-Discogs copy), how that compares with what you paid, the cheapest copy for sale on Discogs, how many people have and
-want it, and the whole price guide underneath. The edition is found by its Discogs release (yours, or the one
-[Sync to Discogs](#sync-to-discogs) matched), else by its barcode, catalog number, country and year. It's checked again
-when you open the page and the price is more than a day old, or with **Refresh**.
+A CD's or record's page shows what your copy is worth on Discogs: Discogs' suggested price for its pressing in its grade
+(the record's or disc's), or for a Very Good to Near Mint copy when it isn't graded; without suggested prices, the
+cheapest copy of that pressing for sale. The pressing is your copy's own Discogs release (yours, or the one
+[Sync to Discogs](#sync-to-discogs) matched, else found by its barcode, catalog number, country and year), else the
+album's most common pressing. Discogs gives suggested prices only with a Discogs token (Settings ▸ Discogs on the Mac).
+Below it: what eBay buyers paid recently (any condition), how that compares with what you paid, the cheapest copy for
+sale on Discogs, how many people have and want it, and the whole price guide. It's checked again when you open the
+page and the price is more than a day old, when you change the copy's grade, or with **Refresh**.
 
 The values add up in the **Owned** pane of [Insights](insights.md#owned): **Collection Value**. On the Mac, **Update
 Values** there prices every CD and record not priced in the last month, using Discogs alone (two requests per copy when
@@ -168,6 +193,11 @@ Then it reads your Discogs collection and shows what it would do:
   here, and the old edition of an item you changed. Nothing is removed unless you tick it; unticked copies stay.
 - **Not Found on Discogs**: CDs and records with no release found. Pick their edition with **Change Edition…** (choose
   **Discogs** as the source) or add a barcode, and they're found on the next sync.
+
+Your grades go along: **Update grades on N copies** (ticked) writes the grades set here into each copy's **Media
+Condition** and **Sleeve Condition** on Discogs, for copies already there and copies being added. Only grades you've
+entered are sent, and nothing there is ever cleared. If you renamed or removed those fields on Discogs, grades stay here
+and the preview says so.
 
 **Make Changes** adds and removes what's ticked, one at a time (Discogs allows about a minute's worth of requests at
 once, so a big first sync takes a few minutes). It can be stopped; what's done is kept. Copies of the same edition are

@@ -7,6 +7,23 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- Record a CD's or record's pressing and condition: **Runouts** (the matrix/runout codes in the dead wax or around a
+  CD's centre ring) and a **Condition** grade for the record or disc and for the sleeve or case (Mint down to Poor, on
+  the Goldmine scale Discogs uses), on the copy's page and in Add to Collection. See
+  [Physical Collection](https://github.com/davidlago/music-library/blob/main/docs/guide/physical-collection.md#pressing-and-condition).
+- A **Grading Guide** (the ? next to the grades on the Mac, and on a copy's page on the iPhone) explains each grade,
+  with drawings of the wear to look for on a record, a CD and a sleeve.
+- Picking an edition from Discogs (Add to Collection, Change Edition…) shows its runouts, barcodes and pressing plant,
+  so you can tell which pressing you have; **Use Runouts** copies them into your copy.
+- What a copy is worth now comes from Discogs: its own pressing (or the album's most common one), at Discogs' suggested
+  price for its grade, or Very Good to Near Mint when it isn't graded. eBay's sales show alongside.
+- The Shop's price at the top is now Discogs' suggested price (Very Good to Near Mint) for the album's most common
+  pressing, plus what US sellers typically charge to ship it (on the Mac, from the Discogs listings the Shop reads),
+  rather than eBay's sales.
+- Sync to Discogs writes your grades into your Discogs collection's Media Condition and Sleeve Condition. It only sets
+  grades you've entered here, and never clears one.
+- Search your collection by `runout:` and `grade:` (`grade:vg+`, `grade:>=vg+`, `grade:none`).
+
 ## 1.34.0
 
 - New: a **Buy List** for the albums you're looking for, on the Mac (Acquire ▸ Buy List) and the iPhone (Collection tab

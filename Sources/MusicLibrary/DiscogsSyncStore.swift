@@ -37,6 +37,8 @@ final class DiscogsSyncStore {
     var chosenAdditions: Set<String> = []
     /// Never picked for the user: removals are only made when ticked.
     var chosenRemovals: Set<Int> = []
+    /// Write the grades set here into the copies' Media and Sleeve Condition fields (on by default: only additions).
+    var sendsGrades = true
     /// How sure each item's match is, for the plan's additions.
     private(set) var qualities: [String: DiscogsMatchQuality] = [:]
     /// Items that couldn't be looked up this time (no network, MusicBrainz busy): tried again next sync.
@@ -183,11 +185,14 @@ final class DiscogsSyncStore {
                 }
                 try Task.checkCancellation()
                 let links = rows.compactMapValues { $0.link(for: username) }
-                let plan = DiscogsSyncPlan.make(items: items, releases: releases, links: links, remote: remote)
+                // Without the fields (an error reading them), grades simply aren't sent this time.
+                let gradeFields = (try? await client.fields(username: username)).map(DiscogsGradeFields.init)
+                let plan = DiscogsSyncPlan.make(items: items, releases: releases, links: links, remote: remote, gradeFields: gradeFields)
                 self.plan = plan
                 self.qualities = qualities
                 chosenAdditions = Set(plan.additions.map(\.id))
                 chosenRemovals = []
+                sendsGrades = true
                 lookupFailures = failures
                 phase = .ready
             } catch is CancellationError {
@@ -203,12 +208,12 @@ final class DiscogsSyncStore {
         guard let plan, let token, let username, let db = model.database else { return }
         let additions = plan.additions.filter { chosenAdditions.contains($0.id) }
         let removals = plan.removals.filter { chosenRemovals.contains($0.id) }
-        let folder = folderID
-        phase = .syncing(done: 0, of: additions.count + removals.count)
+        let folder = folderID, grades = sendsGrades
+        phase = .syncing(done: 0, of: additions.count + removals.count + (grades ? plan.gradeUpdates.count : 0))
         task = Task {
             do {
                 let outcome = try await DiscogsSync.run(
-                    plan, additions: additions, removals: removals, client: DiscogsCollectionClient(token: token),
+                    plan, additions: additions, removals: removals, grades: grades, client: DiscogsCollectionClient(token: token),
                     username: username, folderID: folder, database: db
                 ) { done, total in
                     Task { @MainActor [weak self] in

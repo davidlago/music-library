@@ -61,7 +61,13 @@ public struct CollectionSearchQuery: Equatable, Sendable {
             case barcode(String)
             /// Part of the catalog number, lowercased letters and digits only ("cl1355").
             case catalogNumber(String)
+            /// Part of the runouts, lowercased letters and digits only ("xsm47326").
+            case runout(String)
+            /// The media grade: exactly one, at least/at most one (`orBetter`, `orWorse`), or none set (nil).
+            case grade(CollectionGrade?, Comparison)
         }
+
+        public enum Comparison: Hashable, Sendable { case exactly, orBetter, orWorse }
 
         public var kind: Kind
         public var negated: Bool
@@ -81,7 +87,7 @@ public struct CollectionSearchQuery: Equatable, Sendable {
     public var hasCollectionFilters: Bool { !filters.isEmpty }
     public var isEmpty: Bool { base.isEmpty && filters.isEmpty }
 
-    enum Key: Sendable { case own, ripped, sticker, bought, paid, copies, barcode, catno }
+    enum Key: Sendable { case own, ripped, sticker, bought, paid, copies, barcode, catno, runout, grade }
 
     static let keyNames: [String: Key] = [
         "own": .own, "medium": .own, "media": .own,
@@ -92,6 +98,8 @@ public struct CollectionSearchQuery: Equatable, Sendable {
         "copies": .copies,
         "barcode": .barcode,
         "catno": .catno,
+        "runout": .runout, "matrix": .runout,
+        "grade": .grade, "condition": .grade,
     ]
 
     /// The collection keys with an example and the help shown for each (search help, completions).
@@ -105,6 +113,8 @@ public struct CollectionSearchQuery: Equatable, Sendable {
         ("copies", "copies:>1", "Copies you have of the same album"),
         ("barcode", "barcode:886976389413", "Barcode (UPC/EAN) of your copy"),
         ("catno", "catno:\"cl 1355\"", "Catalog number of your copy"),
+        ("runout", "runout:\"xsm 47326\"", "Part of your copy's matrix/runout etchings"),
+        ("grade", "grade:>=vg+", "Your copy's record or disc condition: m, nm, vg+, vg, g+, g, f, p, >=vg+, <vg, none"),
     ]
 
     /// `shorthand`: whether `#12`-style terms are labels (search boxes) or text, as they were before the collection
@@ -176,7 +186,26 @@ public struct CollectionSearchQuery: Equatable, Sendable {
         case .catno:
             let code = compact(value)
             return code.isEmpty ? nil : .catalogNumber(code)
+        case .runout:
+            let code = compact(value)
+            return code.isEmpty ? nil : .runout(code)
+        case .grade: return grade(value)
         }
+    }
+
+    /// "vg+", ">=vg+" (that or better), "<=vg", "<vg" (worse than VG), ">vg" (better), "none".
+    static func grade(_ value: String) -> Filter.Kind? {
+        if ["none", "no", "ungraded"].contains(value) { return .grade(nil, .exactly) }
+        let ops: [(String, Filter.Comparison, Int)] = [(">=", .orBetter, 0), ("<=", .orWorse, 0), (">", .orBetter, -1), ("<", .orWorse, 1)]
+        for (op, comparison, step) in ops where value.hasPrefix(op) {
+            guard let g = CollectionGrade(rawValue: String(value.dropFirst(op.count))), g.isMediaGrade else { return nil }
+            // A strict comparison is the next grade over, inclusive.
+            let media = CollectionGrade.media
+            guard let i = media.firstIndex(of: g), media.indices.contains(i + step) else { return nil }
+            return .grade(media[i + step], comparison)
+        }
+        guard let g = CollectionGrade(rawValue: value), g.isMediaGrade else { return nil }
+        return .grade(g, .exactly)
     }
 
     static func ownership(_ value: String) -> Ownership? {
@@ -277,6 +306,7 @@ public struct CollectionIndex: Sendable {
         var tracks: [Int]
         var barcode: String?
         var catalogNumber: String
+        var runouts: String
     }
 
     let entries: [Entry]
@@ -321,7 +351,8 @@ public struct CollectionIndex: Sendable {
         let songTitles: [String] = tracklist.map(\.title)
         let songArtists: [String] = Array(Set(tracklist.map(\.artist)))
         let genres: [String] = info?.genres ?? []
-        let fields: [String] = [item.recordLabel, item.catalogNumber, item.barcode, item.country, item.formatDetail, item.notes]
+        let fields: [String] = [item.recordLabel, item.catalogNumber, item.barcode, item.country, item.formatDetail, item.notes,
+                                item.runouts]
             .map { $0 ?? "" }
         var all: [String] = [item.album, item.artist, item.medium.name]
         all += fields
@@ -335,7 +366,8 @@ public struct CollectionIndex: Sendable {
             country: IndexedText([item.country ?? ""]), all: IndexedText(all),
             hasRecordLabel: !(item.recordLabel ?? "").trimmingCharacters(in: .whitespaces).isEmpty,
             year: item.year, tracks: tracks, barcode: item.barcode.flatMap(MusicCollection.barcodeKey),
-            catalogNumber: CollectionSearchQuery.compact(item.catalogNumber ?? ""))
+            catalogNumber: CollectionSearchQuery.compact(item.catalogNumber ?? ""),
+            runouts: CollectionSearchQuery.compact(item.runouts ?? ""))
     }
 
     public func search(_ text: String, now: Date = Date()) -> [CollectionItem] {
@@ -408,6 +440,18 @@ public struct CollectionIndex: Sendable {
         case .copies(let range): result = range.contains(Double(e.copies))
         case .barcode(let code): result = e.barcode == code
         case .catalogNumber(let code): result = e.catalogNumber.contains(code)
+        case .runout(let code): result = e.runouts.contains(code)
+        case .grade(let grade, let comparison):
+            switch (grade, item.mediaGrade) {
+            case (nil, let have): result = have == nil && item.medium.isPhysical
+            case (_, nil): result = false
+            case (let want?, let have?):
+                switch comparison {
+                case .exactly: result = have == want
+                case .orBetter: result = have <= want
+                case .orWorse: result = have >= want
+                }
+            }
         }
         return result != filter.negated
     }
@@ -479,8 +523,11 @@ public struct CollectionIndex: Sendable {
                 options = [("0", "Free"), (">20", "More than 20"), ("none", "No price")]
             case .copies:
                 options = [(">1", count(.copies(.init(lower: 2))))]
-            case .barcode, .catno:
+            case .barcode, .catno, .runout:
                 options = []
+            case .grade:
+                options = CollectionGrade.media.map { ($0.short.lowercased(), count(.grade($0, .exactly))) }
+                    + [(">=vg+", count(.grade(.veryGoodPlus, .orBetter))), ("none", count(.grade(nil, .exactly)))]
             }
             return options.filter { typed.isEmpty || $0.value.hasPrefix(typed) }.prefix(limit).map {
                 SearchCompletion(label: "\(key):\($0.value)", detail: $0.detail, replacement: prefix + key + ":" + $0.value + " ")

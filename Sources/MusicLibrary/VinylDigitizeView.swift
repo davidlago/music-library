@@ -146,7 +146,8 @@ private struct VinylSessionPage: View {
             }
             .padding(24)
         }
-        .onChange(of: "\(item.releaseID ?? "")-\(item.discogsReleaseID ?? 0)") { vinyl.reloadRelease() }
+        // On showing the record and when its edition changes (Change Edition…).
+        .task(id: VinylController.releaseKey(item)) { vinyl.ensureRelease() }
         .confirmationDialog("Discard this recording?", isPresented: $confirmDiscard) {
             Button("Discard Recording", role: .destructive) { vinyl.discard() }
         } message: {

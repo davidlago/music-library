@@ -36,13 +36,13 @@ public struct ShopFind: SyncedRecord, Identifiable {
         self.barcode = barcode; self.fairPrice = fairPrice; self.thumbnail = thumbnail; self.at = at; updatedAt = at; removed = false
     }
 
-    /// A guide the Shop read (nil when it found nothing).
+    /// A guide the Shop read (nil when it found nothing), with the Shop's estimate before shipping.
     public init?(guide: PriceGuide, at: Date = Date()) {
         guard guide.hasPrices else { return nil }
         self.init(album: guide.title.isEmpty ? guide.request.album : guide.title,
                   artist: guide.artist.isEmpty ? guide.request.artist : guide.artist, format: guide.request.format,
                   masterID: guide.masterID, releaseID: guide.editions.first { $0.roles.contains(.identified) }?.releaseID,
-                  barcode: guide.request.barcodeDigits ?? "", fairPrice: guide.fairPrice?.text, thumbnail: guide.thumbnail, at: at)
+                  barcode: guide.request.barcodeDigits ?? "", fairPrice: guide.shopEstimate(shipping: nil)?.text, thumbnail: guide.thumbnail, at: at)
     }
 
     private enum CodingKeys: String, CodingKey {

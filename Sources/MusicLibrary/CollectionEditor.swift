@@ -77,6 +77,31 @@ struct CollectionItemEditor: View {
                 }
                 .frame(maxWidth: 360)
             }
+            if item.medium.isPhysical {
+                CopyGradeRows(medium: item.medium, media: binding(\.mediaGrade), sleeve: binding(\.sleeveGrade))
+                GridRow(alignment: .firstTextBaseline) {
+                    Text("Runouts").foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        CommitTextField(title: "Runouts", value: item.runouts,
+                                        prompt: item.medium == .cd ? "Codes around the disc's centre ring" : "Etched or stamped in the dead wax",
+                                        axis: .vertical) { v in
+                            model.changeItem(id: item.id) { $0.runouts = v }
+                        }
+                        .font(.callout.monospaced())
+                        .frame(maxWidth: 360)
+                        // A vertical field doesn't grow for text set from outside (Use Runouts): make it again.
+                        .id(item.runouts ?? "")
+                        .help("The matrix/runout codes on your copy, one per line (⌥Return for a new line): they tell its pressing apart")
+                        if let release = item.discogsReleaseID {
+                            DiscogsRunoutsButton(releaseID: release) { runouts in
+                                let current = model.item(id: item.id)?.runouts
+                                model.changeItem(id: item.id) { $0.runouts = RunoutText.adding(runouts, to: current) }
+                            }
+                            .font(.caption)
+                        }
+                    }
+                }
+            }
             Divider().gridCellUnsizedAxes(.horizontal)
             textRow("Record label", \.recordLabel, prompt: "Columbia")
             textRow("Cat. No.", \.catalogNumber, prompt: "CL 1355")
@@ -187,7 +212,9 @@ struct CollectionItemEditor: View {
             ("Medium", item.formatDetail ?? item.medium.name),
             ("Label", item.sticker?.text), ("Bought", item.purchasedOn.map { $0.date().formatted(date: .long, time: .omitted) }),
             ("Paid", item.price.map { formatMoney($0) }), ("Record label", item.recordLabel), ("Cat. No.", item.catalogNumber),
-            ("Barcode", item.barcode), ("Country", item.country), ("Notes", item.notes),
+            ("Barcode", item.barcode), ("Country", item.country),
+            ("Condition", GradeText.pair(media: item.mediaGrade, sleeve: item.sleeveGrade)), ("Runouts", item.runouts),
+            ("Notes", item.notes),
         ].compactMap { k, v in v.map { (k, $0) } }
         return Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
             ForEach(rows, id: \.0) { k, v in
@@ -232,18 +259,28 @@ struct CollectionItemEditor: View {
 struct CommitTextField: View {
     let title: String
     let value: String?
-    var prompt = ""
+    var prompt: String
     var width: CGFloat?
-    var axis: Axis = .horizontal
+    var axis: Axis
     let commit: (String?) -> Void
-    @State private var text = ""
+    @State private var text: String
     @FocusState private var focused: Bool
 
+    /// The text starts as the value: a vertical field set only once it appears stays one line tall on macOS.
+    init(title: String, value: String?, prompt: String = "", width: CGFloat? = nil, axis: Axis = .horizontal,
+         commit: @escaping (String?) -> Void) {
+        self.title = title
+        self.value = value
+        self.prompt = prompt
+        self.width = width
+        self.axis = axis
+        self.commit = commit
+        _text = State(initialValue: value ?? "")
+    }
+
     var body: some View {
-        TextField(title, text: $text, prompt: Text(prompt), axis: axis)
-            .textFieldStyle(.roundedBorder)
+        field
             .labelsHidden()
-            .lineLimit(axis == .vertical ? 1...6 : 1...1)
             .frame(width: width)
             .focused($focused)
             .onSubmit(save)
@@ -251,6 +288,22 @@ struct CommitTextField: View {
             .onChange(of: value) { if !focused { text = value ?? "" } }
             .onChange(of: focused) { if !focused { save() } }
             .onDisappear(perform: save)
+    }
+
+    /// A vertical field is plain with a drawn border: in the rounded-border style macOS keeps it one line tall.
+    @ViewBuilder
+    private var field: some View {
+        if axis == .vertical {
+            TextField(title, text: $text, prompt: Text(prompt), axis: .vertical)
+                .textFieldStyle(.plain)
+                .lineLimit(1...8)
+                .padding(.horizontal, 6).padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 5).fill(Color(nsColor: .textBackgroundColor)))
+                .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(AppColor.separator, lineWidth: 1))
+        } else {
+            TextField(title, text: $text, prompt: Text(prompt))
+                .textFieldStyle(.roundedBorder)
+        }
     }
 
     private func save() {

@@ -18,6 +18,7 @@ extension Database {
         "id", "medium", "sticker", "album", "artist", "album_key", "year", "mb_release_id", "mb_release_group_id",
         "barcode", "catalog_number", "record_label", "country", "format_detail", "disc_count", "track_count",
         "purchased_on", "price", "notes", "cover_file", "digital_source", "created_at", "updated_at", "discogs_release_id",
+        "runouts", "media_grade", "sleeve_grade",
     ]
 
     /// The collection, created on open without a schema change (like `rip_checks`): phones on older versions read
@@ -35,6 +36,11 @@ extension Database {
         // Added in 1.28 (older versions' upserts name their columns and keep it).
         if try !columns(of: "collection_items").contains("discogs_release_id") {
             try exec("ALTER TABLE collection_items ADD COLUMN discogs_release_id INTEGER")
+        }
+        // Added in 1.35, the same way: the copy's pressing and condition.
+        let present = try columns(of: "collection_items")
+        for column in ["runouts", "media_grade", "sleeve_grade"] where !present.contains(column) {
+            try exec("ALTER TABLE collection_items ADD COLUMN \(column) TEXT")
         }
         try exec("CREATE INDEX IF NOT EXISTS collection_items_album ON collection_items(album_key)")
         try exec("CREATE INDEX IF NOT EXISTS collection_items_sticker ON collection_items(medium, sticker)")
@@ -112,6 +118,11 @@ extension Database {
         item.digitalSource = r.string(20).flatMap(DigitalSource.init(rawValue:))
         item.updatedAt = date(22)
         item.discogsReleaseID = r.int(23).flatMap { DiscogsLink.isValid($0) ? $0 : nil }
+        if medium.isPhysical {
+            item.runouts = text(24, max: CollectionItem.maxRunouts)
+            item.mediaGrade = r.string(25).flatMap(CollectionGrade.init(rawValue:)).flatMap { $0.isMediaGrade ? $0 : nil }
+            item.sleeveGrade = r.string(26).flatMap(CollectionGrade.init(rawValue:))
+        }
         return item
     }
 
@@ -347,7 +358,7 @@ extension Database {
             .int(item.discCount), .int(item.trackCount), .text(item.purchasedOn?.string), .text(AlbumPurchase.priceText(item.price)),
             .text(item.notes), .text(item.coverFile), .text(item.digitalSource?.rawValue),
             .double(item.createdAt.timeIntervalSince1970), .double(item.updatedAt.timeIntervalSince1970),
-            .int(item.discogsReleaseID),
+            .int(item.discogsReleaseID), .text(item.runouts), .text(item.mediaGrade?.rawValue), .text(item.sleeveGrade?.rawValue),
         ])
     }
 

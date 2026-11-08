@@ -211,11 +211,17 @@ import Testing
         let d = CollectionItem(medium: .download, album: "D", artist: "W")
         let collection = MusicCollection(items: [a, b, c, d], songPurchases: [:], tracks: [])
         let now = t0 + 40 * 86_400
+        // Priced the way this version prices (`CollectionValue.method`).
+        func current(_ v: CollectionValue) -> CollectionValue { var v = v; v.method = CollectionValue.method; return v }
         let values = [
-            a.id: CollectionValue(itemID: a.id, at: now, found: true, low: Money(40, "USD"), high: Money(60, "USD")),
-            b.id: CollectionValue(itemID: b.id, at: t0, found: true, low: Money(10, "USD")),
-            c.id: CollectionValue(itemID: c.id, at: now, found: false),
+            a.id: current(CollectionValue(itemID: a.id, at: now, found: true, low: Money(40, "USD"), high: Money(60, "USD"))),
+            b.id: current(CollectionValue(itemID: b.id, at: t0, found: true, low: Money(10, "USD"))),
+            c.id: current(CollectionValue(itemID: c.id, at: now, found: false)),
         ]
+        // A value priced before 1.35 (eBay first) is due again, however recent.
+        var old = values[a.id]!
+        old.method = nil
+        #expect(CollectionValueStats.make(collection: collection, values: values.merging([a.id: old]) { $1 }, now: now).stale == 2)
         let s = CollectionValueStats.make(collection: collection, values: values, now: now)
         #expect(s.eligible == 3 && s.valued == 2 && s.notFound == 1 && s.stale == 1)
         #expect(s.total == 60 && s.paid == 35 && s.paidValue == 60 && s.gain == 25)
