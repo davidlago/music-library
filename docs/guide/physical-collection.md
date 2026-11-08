@@ -128,7 +128,9 @@ into your copy, for you to trim to the ones on yours (Discogs often lists every 
 edition, **Discogs' Runouts…** under the field shows them again.
 
 New to grading? The **?** next to the grades opens the **Grading Guide** (on the iPhone, **Grading Guide** on a copy's
-page): how to grade, then each grade with a drawing of the wear to look for on a record, a CD and a sleeve. In short:
+page): how to grade, then each grade with what decides it and a drawing of the wear to look for, for a record, a CD and a
+sleeve or case. On the Mac, click a grade in the guide to give it to your copy; switch to **Sleeve or case** to grade
+that too. In short:
 grade the record and the sleeve apart, under a bright light, and listen to a few minutes of each side; take the lower of
 how it looks and how it sounds; and be strict: most played copies are VG+ or VG, and Mint usually means still sealed.
 
