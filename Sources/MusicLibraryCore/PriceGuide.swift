@@ -221,6 +221,61 @@ public struct PriceGuide: Hashable, Sendable, Identifiable {
         return nil
     }
 
+    /// The Shop's estimate: what Discogs suggests for a Very Good to Near Mint copy of the album's most common
+    /// pressing (the most collected edition), plus what a seller in the US typically charges to ship one when that's
+    /// known (`shipping`, in the guide's currency). Without suggestions (they need a Discogs token), the cheapest copy
+    /// of that pressing on Discogs; without any Discogs prices, `fairPrice`.
+    public func shopEstimate(shipping: Money?) -> FairPrice? {
+        guard let edition = mostCommon else { return fairPrice }
+        let pressing = edition.details.isEmpty ? "" : " (\(edition.details))"
+        func plus(_ money: Money) -> Money {
+            guard let shipping, shipping.currency == money.currency else { return money }
+            return Money(money.amount + shipping.amount, money.currency)
+        }
+        let shipped: String
+        if let shipping, (edition.fairRange?.low.currency ?? edition.lowest?.currency) == shipping.currency {
+            shipped = ", plus about \(Self.text(shipping)) shipping from a US seller"
+        } else {
+            shipped = ", before shipping"
+        }
+        if let range = edition.fairRange {
+            return FairPrice(low: plus(range.low), high: plus(range.high),
+                             source: "Discogs' suggestion for the most common pressing, VG to NM\(shipped)\(pressing)")
+        }
+        if let lowest = edition.lowest {
+            return FairPrice(low: plus(lowest), high: plus(lowest),
+                             source: "the cheapest copy of the most common pressing on Discogs\(shipped)\(pressing)")
+        }
+        return fairPrice
+    }
+
+    /// What a copy you own is worth, looked up on Discogs as the Shop does: the copy's own pressing when the guide
+    /// identified it, else the album's most common one; Discogs' suggestion for the copy's media grade when it's
+    /// graded and Discogs has one, else its Very Good to Near Mint suggestions, else the cheapest copy of that pressing
+    /// for sale; `fairPrice` only when Discogs has no price at all. No shipping: it's what the copy is worth.
+    public func copyEstimate(grade: CollectionGrade?) -> FairPrice? {
+        let own = editions.first { $0.roles.contains(.identified) }
+        guard let edition = own ?? mostCommon else { return fairPrice }
+        let pressing = own != nil ? "this pressing" : "the most common pressing"
+        if let grade, grade.isMediaGrade,
+           let suggestion = edition.suggestions.first(where: { $0.condition.caseInsensitiveCompare(grade.discogsName) == .orderedSame }) {
+            return FairPrice(low: suggestion.price, high: suggestion.price,
+                             source: "Discogs' suggestion for \(pressing) in \(grade.short)")
+        }
+        if let range = edition.fairRange {
+            return FairPrice(low: range.low, high: range.high, source: "Discogs' suggestion for \(pressing), VG to NM")
+        }
+        if let lowest = edition.lowest {
+            return FairPrice(low: lowest, high: lowest, source: "the cheapest copy of \(pressing) on Discogs")
+        }
+        return fairPrice
+    }
+
+    /// The album's most common pressing: the most collected edition, else the one to lead with.
+    public var mostCommon: DiscogsPricedEdition? {
+        editions.first { $0.roles.contains(.mostCollected) } ?? headline
+    }
+
     /// The edition to lead with: the one identified, else the most collected.
     public var headline: DiscogsPricedEdition? {
         editions.first { $0.roles.contains(.identified) } ?? editions.first { $0.roles.contains(.mostCollected) } ?? editions.first

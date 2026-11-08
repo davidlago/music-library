@@ -70,6 +70,8 @@ public struct DiscogsInstance: Hashable, Sendable, Identifiable {
     public var dateAdded: Date?
     /// The album (Discogs master) the release is a version of.
     public var masterID: Int?
+    /// The copy's collection fields on Discogs, by field ID ("Media Condition" is usually 1, "Sleeve Condition" 2).
+    public var fields: [Int: String] = [:]
 
     public var id: Int { instanceID }
     public var webURL: URL? { DiscogsLink.releaseURL(releaseID) }
@@ -80,6 +82,58 @@ public struct DiscogsInstance: Hashable, Sendable, Identifiable {
         self.instanceID = instanceID; self.releaseID = releaseID; self.folderID = folderID; self.title = title
         self.artist = artist; self.formatDetail = formatDetail; self.medium = medium; self.year = year
         self.catalogNumber = catalogNumber; self.dateAdded = dateAdded; self.masterID = masterID
+    }
+}
+
+extension DiscogsInstance {
+    func with(fields: [Int: String]) -> DiscogsInstance {
+        var i = self
+        i.fields = fields
+        return i
+    }
+}
+
+/// One of the user's collection fields on Discogs: a dropdown with its options, or text.
+public struct DiscogsCollectionField: Hashable, Sendable {
+    public var id: Int
+    public var name: String
+    /// "dropdown", "textarea".
+    public var type: String
+    public var options: [String]
+
+    public init(id: Int, name: String, type: String, options: [String] = []) {
+        self.id = id; self.name = name; self.type = type; self.options = options
+    }
+}
+
+/// The Media Condition and Sleeve Condition fields grades go in: found by name, and only as dropdowns. A field the
+/// user renamed or deleted is nil, and its grade isn't sent.
+public struct DiscogsGradeFields: Hashable, Sendable {
+    public var media: DiscogsCollectionField?
+    public var sleeve: DiscogsCollectionField?
+
+    public init(media: DiscogsCollectionField?, sleeve: DiscogsCollectionField?) { self.media = media; self.sleeve = sleeve }
+
+    public init(_ fields: [DiscogsCollectionField]) {
+        func find(_ name: String) -> DiscogsCollectionField? {
+            fields.first { $0.type == "dropdown" && $0.name.caseInsensitiveCompare(name) == .orderedSame }
+        }
+        self.init(media: find("Media Condition"), sleeve: find("Sleeve Condition"))
+    }
+
+    public var isEmpty: Bool { media == nil && sleeve == nil }
+
+    /// The field values to set for an item's grades on a copy that has `current`: only grades set here, that the
+    /// field offers, and that differ from what's there. Nothing is ever cleared.
+    public func changes(for item: CollectionItem, current: [Int: String] = [:]) -> [Int: String] {
+        var out: [Int: String] = [:]
+        for (field, grade) in [(media, item.mediaGrade), (sleeve, item.sleeveGrade)] {
+            guard let field, let grade else { continue }
+            let value = field.options.first { $0.caseInsensitiveCompare(grade.discogsName) == .orderedSame } ?? ""
+            guard !value.isEmpty, current[field.id] != value else { continue }
+            out[field.id] = value
+        }
+        return out
     }
 }
 
@@ -123,8 +177,32 @@ public enum DiscogsCollectionParser {
                 year: (info["year"] as? Int).flatMap { (1000...9999).contains($0) ? $0 : nil }, catalogNumber: catno ?? "",
                 dateAdded: (r["date_added"] as? String).flatMap(dates.date(from:)),
                 masterID: (info["master_id"] as? Int).flatMap { DiscogsLink.isValid($0) ? $0 : nil })
+                .with(fields: instanceFields(r["notes"]))
         }
         return (instances, max(1, pages))
+    }
+
+    /// An instance's `notes`: field ID and value, short values only (the page is untrusted).
+    static func instanceFields(_ raw: Any?) -> [Int: String] {
+        var out: [Int: String] = [:]
+        for note in raw as? [[String: Any]] ?? [] {
+            guard let id = note["field_id"] as? Int, id > 0, let value = note["value"] as? String, value.count <= 500 else { continue }
+            out[id] = DiscogsParser.trimmed(value)
+        }
+        return out
+    }
+
+    /// The collection's fields (`/users/{u}/collection/fields`).
+    public static func fields(_ data: Data) throws -> [DiscogsCollectionField] {
+        guard let o = try JSONSerialization.jsonObject(with: data) as? [String: Any], let list = o["fields"] as? [[String: Any]] else {
+            throw DiscogsError.badResponse
+        }
+        return list.compactMap { f in
+            guard let id = f["id"] as? Int, id > 0, let name = f["name"] as? String else { return nil }
+            let options = (f["options"] as? [String] ?? []).prefix(100).map(DiscogsParser.trimmed)
+            return DiscogsCollectionField(id: id, name: DiscogsParser.trimmed(String(name.prefix(200))),
+                                          type: f["type"] as? String ?? "", options: Array(options))
+        }
     }
 
     /// One page of a master's versions (its releases), as candidates, and how many pages there are.
@@ -193,6 +271,21 @@ public actor DiscogsCollectionClient {
 
     public func folders(username: String) async throws -> [DiscogsFolder] {
         try DiscogsCollectionParser.folders(try await send("GET", path: "\(try Self.user(username))/collection/folders"))
+    }
+
+    /// The collection's fields (Media Condition, Sleeve Condition, Notes and any the user added).
+    public func fields(username: String) async throws -> [DiscogsCollectionField] {
+        try DiscogsCollectionParser.fields(try await send("GET", path: "\(try Self.user(username))/collection/fields"))
+    }
+
+    /// Sets one field of a copy (a dropdown's value must be one of its options).
+    public func setField(_ fieldID: Int, value: String, instance: DiscogsInstance, username: String) async throws {
+        guard DiscogsLink.isValid(instance.releaseID), instance.instanceID > 0, fieldID > 0, !value.isEmpty, value.count <= 200 else {
+            throw DiscogsError.badResponse
+        }
+        let folder = instance.folderID > 0 ? instance.folderID : DiscogsFolder.uncategorized
+        let path = "\(try Self.user(username))/collection/folders/\(folder)/releases/\(instance.releaseID)/instances/\(instance.instanceID)/fields/\(fieldID)"
+        _ = try await send("POST", path: path, query: ["value": value])
     }
 
     /// Every release in the collection (folder 0, oldest first), page by page; `progress` gets pages read and pages.
@@ -660,9 +753,22 @@ public struct DiscogsSyncPlan: Sendable {
         public var instance: DiscogsInstance
     }
 
+    /// Grades to write on a copy already there: field ID to Discogs' value.
+    public struct GradeUpdate: Identifiable, Hashable, Sendable {
+        public var item: CollectionItem
+        public var instance: DiscogsInstance
+        public var values: [Int: String]
+        public var id: String { item.id }
+    }
+
     public var additions: [Addition] = []
     public var removals: [Removal] = []
     public var adoptions: [Adoption] = []
+    public var gradeUpdates: [GradeUpdate] = []
+    /// The fields grades go in (nil: grades aren't sent).
+    public var gradeFields: DiscogsGradeFields?
+    /// Grades set here that this collection can't take: its Media or Sleeve Condition field was renamed or removed.
+    public var gradesWithoutField = 0
     /// Items whose copy on Discogs is already linked and up to date.
     public var inSync = 0
     /// CDs and records with no Discogs release found.
@@ -672,9 +778,16 @@ public struct DiscogsSyncPlan: Sendable {
 
     /// `releases`: each item's release, where known. `links`: the instance each item (here or removed) was linked to
     /// in this account. `remote`: the collection on Discogs.
+    /// `gradeFields`: the collection's condition fields, to send grades set here (none: grades stay here).
     public static func make(items: [CollectionItem], releases: [String: Int], links: [String: DiscogsSyncRow.Link],
-                            remote: [DiscogsInstance]) -> DiscogsSyncPlan {
+                            remote: [DiscogsInstance], gradeFields: DiscogsGradeFields? = nil) -> DiscogsSyncPlan {
         var plan = DiscogsSyncPlan()
+        plan.gradeFields = gradeFields
+        func grade(_ item: CollectionItem, _ instance: DiscogsInstance) {
+            guard let gradeFields else { return }
+            let values = gradeFields.changes(for: item, current: instance.fields)
+            if !values.isEmpty { plan.gradeUpdates.append(GradeUpdate(item: item, instance: instance, values: values)) }
+        }
         let byInstance = Dictionary(remote.map { ($0.instanceID, $0) }, uniquingKeysWith: { a, _ in a })
         var claimed = Set<Int>()
         var oldEditions: [Int: String] = [:]
@@ -689,6 +802,7 @@ public struct DiscogsSyncPlan: Sendable {
                     // Up to date, or no longer matched here: a copy is never removed for that.
                     claimed.insert(instance.instanceID)
                     plan.inSync += 1
+                    grade(item, instance)
                 } else if let release {
                     oldEditions[instance.instanceID] = item.id
                     unlinked.append((item, release, .editionChanged))
@@ -711,6 +825,7 @@ public struct DiscogsSyncPlan: Sendable {
                 free[release] = copies
                 claimed.insert(instance.instanceID)
                 plan.adoptions.append(Adoption(itemID: item.id, instance: instance))
+                grade(item, instance)
             } else {
                 plan.additions.append(Addition(item: item, releaseID: release, reason: reason))
             }
@@ -723,10 +838,15 @@ public struct DiscogsSyncPlan: Sendable {
                 else { .onlyOnDiscogs }
             plan.removals.append(Removal(instance: instance, reason: reason))
         }
+        if let gradeFields {
+            plan.gradesWithoutField = synced.filter {
+                ($0.mediaGrade != nil && gradeFields.media == nil) || ($0.sleeveGrade != nil && gradeFields.sleeve == nil)
+            }.count
+        }
         return plan
     }
 
-    public var isEmpty: Bool { additions.isEmpty && removals.isEmpty && adoptions.isEmpty }
+    public var isEmpty: Bool { additions.isEmpty && removals.isEmpty && adoptions.isEmpty && gradeUpdates.isEmpty }
 }
 
 /// What a sync did.
@@ -734,6 +854,8 @@ public struct DiscogsSyncOutcome: Sendable, Equatable {
     public var added = 0
     public var linked = 0
     public var removed = 0
+    /// Copies whose grades were written.
+    public var graded = 0
     /// "Kind of Blue: Discogs answered with an error (HTTP 404)."
     public var failures: [String] = []
     public var cancelled = false
@@ -744,29 +866,40 @@ public struct DiscogsSyncOutcome: Sendable, Equatable {
 public enum DiscogsSync {
     /// Links the adopted copies, adds `additions`, then removes `removals` (each saved as it's done, so an
     /// interrupted sync loses nothing). A rejected token stops it (thrown); other failures are listed and it goes on.
+    /// `grades`: write grades set here, on the copies in `plan.gradeUpdates` and on each copy added.
     public static func run(_ plan: DiscogsSyncPlan, additions: [DiscogsSyncPlan.Addition], removals: [DiscogsSyncPlan.Removal],
-                           client: DiscogsCollectionClient, username: String, folderID: Int, database: Database,
-                           progress: (@Sendable (Int, Int) -> Void)? = nil) async throws -> DiscogsSyncOutcome {
+                           grades: Bool = false, client: DiscogsCollectionClient, username: String, folderID: Int,
+                           database: Database, progress: (@Sendable (Int, Int) -> Void)? = nil) async throws -> DiscogsSyncOutcome {
         var outcome = DiscogsSyncOutcome()
         let folder = folderID > 0 ? folderID : DiscogsFolder.uncategorized
         for a in plan.adoptions {
             try database.linkDiscogsInstance(itemID: a.itemID, username: username, instance: a.instance)
             outcome.linked += 1
         }
-        let total = additions.count + removals.count
+        let updates = grades ? plan.gradeUpdates : []
+        let total = additions.count + removals.count + updates.count
         var done = 0
         progress?(0, total)
         func failed(_ name: String, _ error: Error) throws {
             if case DiscogsError.unauthorized = error { throw error }
             outcome.failures.append("\(name): \((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)")
         }
+        func setGrades(_ values: [Int: String], on instance: DiscogsInstance) async throws {
+            for (field, value) in values.sorted(by: { $0.key < $1.key }) {
+                try await client.setField(field, value: value, instance: instance, username: username)
+            }
+        }
         for a in additions {
             if Task.isCancelled { outcome.cancelled = true; return outcome }
             do {
                 let instance = try await client.add(releaseID: a.releaseID, folderID: folder, username: username)
-                try database.linkDiscogsInstance(itemID: a.item.id, username: username,
-                                                 instance: DiscogsInstance(instanceID: instance, releaseID: a.releaseID, folderID: folder))
+                let added = DiscogsInstance(instanceID: instance, releaseID: a.releaseID, folderID: folder)
+                try database.linkDiscogsInstance(itemID: a.item.id, username: username, instance: added)
                 outcome.added += 1
+                if grades, let values = plan.gradeFields?.changes(for: a.item), !values.isEmpty {
+                    try await setGrades(values, on: added)
+                    outcome.graded += 1
+                }
             } catch is CancellationError {
                 outcome.cancelled = true; return outcome
             } catch {
@@ -785,6 +918,19 @@ public enum DiscogsSync {
                 outcome.cancelled = true; return outcome
             } catch {
                 try failed(r.instance.title.isEmpty ? "Release \(r.instance.releaseID)" : r.instance.title, error)
+            }
+            done += 1
+            progress?(done, total)
+        }
+        for u in updates {
+            if Task.isCancelled { outcome.cancelled = true; return outcome }
+            do {
+                try await setGrades(u.values, on: u.instance)
+                outcome.graded += 1
+            } catch is CancellationError {
+                outcome.cancelled = true; return outcome
+            } catch {
+                try failed(u.item.album.isEmpty ? u.item.artist : u.item.album, error)
             }
             done += 1
             progress?(done, total)

@@ -402,6 +402,12 @@ final class CDShopStore {
     }
 
     /// Offers left after the filters, in order (best matches, then cheapest).
+    /// What Discogs sellers in the US charge to ship the copies found, in the guide's currency (`CDOffer.usShipping`).
+    func usShipping(in guide: PriceGuide) -> Money? {
+        guard let currency = guide.mostCommon?.fairRange?.low.currency ?? guide.mostCommon?.lowest?.currency else { return nil }
+        return CDOffer.usShipping(offers, currency: currency, rates: rates)
+    }
+
     var shownOffers: [CDOffer] {
         offers.filter { offer in
             guard !hiddenShops.contains(offer.shop) else { return false }

@@ -354,6 +354,7 @@ public struct RadioDJSubject: Hashable, Sendable {
             if item.album.isEmpty == false, items.count > 1 { line += ": *\(item.album)*" }
             if let sticker = item.sticker { line += ", shelf label \(sticker.text)" }
             if let day = item.purchasedOn { line += ", bought \(day.string)" }
+            if let grade = GradeTextPlain.pair(media: item.mediaGrade, sleeve: item.sleeveGrade) { line += ", in \(grade) condition" }
             if let notes = item.notes, !notes.isEmpty { line += ". Their notes: \(String(notes.prefix(300)))" }
             return line
         }
@@ -543,6 +544,18 @@ public struct SyncRadioDJ: Codable, Equatable, Sendable {
         discogsToken = (try? c.decodeIfPresent(String.self, forKey: .discogsToken))?.flatMap(DiscogsToken.cleaned)
         discogsUsername = (try? c.decodeIfPresent(String.self, forKey: .discogsUsername))?.flatMap {
             DiscogsIdentity.isValidUsername($0) ? $0 : nil
+        }
+    }
+}
+
+/// "VG+ (sleeve VG)" for the DJ: a copy's grades in words it can repeat.
+enum GradeTextPlain {
+    static func pair(media: CollectionGrade?, sleeve: CollectionGrade?) -> String? {
+        switch (media, sleeve) {
+        case (nil, nil): nil
+        case (let m?, nil): m.short
+        case (nil, let s?): "sleeve \(s.short)"
+        case (let m?, let s?): "\(m.short) (sleeve \(s.short))"
         }
     }
 }

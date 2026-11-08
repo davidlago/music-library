@@ -52,6 +52,8 @@ final class EditionSearch {
     @ObservationIgnored private var task: Task<Void, Never>?
     /// Discogs releases looked up, by release ID: a search result has only some of the release's details.
     @ObservationIgnored private var releases: [Int: Task<DiscogsRelease, Error>] = [:]
+    /// The Discogs releases looked up so far, by release ID: their identifiers (runouts) show beside the edition.
+    private(set) var loaded: [Int: DiscogsRelease] = [:]
     /// Small cover pictures, by edition; nil once known to have none.
     private(set) var thumbnails: [String: Data?] = [:]
 
@@ -124,6 +126,7 @@ final class EditionSearch {
         releases[id] = lookup
         do {
             let release = try await lookup.value
+            if loaded[id] != release { loaded[id] = release }
             if let i = results.firstIndex(where: { $0.id == edition.id }) {
                 var refined = release.edition
                 refined.releaseGroupTitle = results[i].releaseGroupTitle
@@ -306,6 +309,9 @@ struct AddToCollectionSheet: View {
     @State private var purchasedOn: PurchaseDay? = PurchaseDay(Date())
     @State private var price: Decimal?
     @State private var notes = ""
+    @State private var mediaGrade: CollectionGrade?
+    @State private var sleeveGrade: CollectionGrade?
+    @State private var runouts = ""
     @State private var link = true
     /// The library album the item would be linked to, and whether that's a sure match (same key, release or release
     /// group) rather than one by title.
@@ -436,8 +442,26 @@ struct AddToCollectionSheet: View {
                             TextField("Notes", text: $notes, prompt: Text("Where you got it, its condition…"), axis: .vertical)
                                 .textFieldStyle(.roundedBorder).labelsHidden().lineLimit(1...4)
                         }
+                        if chosenMedium.isPhysical {
+                            CopyGradeRows(medium: chosenMedium, media: $mediaGrade, sleeve: $sleeveGrade)
+                            GridRow(alignment: .firstTextBaseline) {
+                                Text("Runouts").foregroundStyle(.secondary)
+                                TextField("Runouts", text: $runouts,
+                                          prompt: Text(chosenMedium == .cd ? "Codes around the disc's centre ring" : "Etched or stamped in the dead wax"),
+                                          axis: .vertical)
+                                    .textFieldStyle(.roundedBorder).labelsHidden().lineLimit(1...4)
+                                    .font(.callout.monospaced())
+                            }
+                        }
                     }
                     .font(.callout)
+                    if chosenMedium.isPhysical, let id = edition?.discogsReleaseID, let release = search.loaded[id] {
+                        DiscogsIdentifierList(release: release, limit: 12) { found in
+                            runouts = RunoutText.adding(found, to: runouts)
+                        }
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(AppColor.fill))
+                    }
                     if let match = libraryMatch, match.ownKey {
                         // The songs under this title and artist are always its digital copy: there's nothing to turn off.
                         VStack(alignment: .leading, spacing: 2) {
@@ -663,6 +687,9 @@ struct AddToCollectionSheet: View {
         item.purchasedOn = purchasedOn
         item.price = price
         item.notes = Self.field(notes)
+        item.mediaGrade = mediaGrade
+        item.sleeveGrade = sleeveGrade
+        item.runouts = Self.field(runouts)
         // A match under the item's own key is linked either way (its songs are its digital copy).
         if linking, let match = libraryMatch, link || match.ownKey {
             item.albumKey = AlbumInfoStore.key(match.album)
@@ -694,6 +721,9 @@ struct AddToCollectionSheet: View {
             selection = nil
             manual = Manual()
             notes = ""
+            mediaGrade = nil
+            sleeveGrade = nil
+            runouts = ""
             price = nil
             cover = nil
             coverSource = nil
@@ -764,8 +794,14 @@ struct ChangeEditionSheet: View {
                     Text("“\(item.album)”?").lineLimit(1)
                 }
                 .font(.callout)
-                EditionResults(search: search, medium: item.medium, selection: $selection, focused: $searchFocused,
-                               submitCurrent: { apply(item) })
+                HStack(alignment: .top, spacing: 16) {
+                    EditionResults(search: search, medium: item.medium, selection: $selection, focused: $searchFocused,
+                                   submitCurrent: { apply(item) })
+                    if item.medium.isPhysical {
+                        Divider()
+                        runoutPane(item).frame(width: 300)
+                    }
+                }
             }
             HStack {
                 Spacer()
@@ -776,7 +812,7 @@ struct ChangeEditionSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 600, height: 560)
+        .frame(width: item?.medium.isPhysical == true ? 920 : 600, height: 560)
         .onAppear {
             guard let item else { return }
             search.text = item.barcode ?? [item.artist, item.album].filter { !$0.isEmpty }.joined(separator: " ")
@@ -785,6 +821,37 @@ struct ChangeEditionSheet: View {
                 if let id = item.releaseID, found.contains(where: { $0.id == id }) { selection = id }
                 if let id = item.discogsReleaseID, let e = found.first(where: { $0.discogsReleaseID == id }) { selection = e.id }
             }
+        }
+    }
+
+    /// The picked Discogs edition's runouts beside your copy's, to tell which pressing it is.
+    @ViewBuilder
+    private func runoutPane(_ item: CollectionItem) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Your copy’s runouts").font(.subheadline.weight(.semibold))
+                    if let runouts = item.runouts {
+                        Text(runouts).font(.callout.monospaced()).textSelection(.enabled)
+                    } else {
+                        Text("None typed yet. Compare the codes in your copy’s dead wax (or a CD’s centre ring) with each edition’s.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                let picked = search.results.first { $0.id == selection }
+                if let id = picked?.discogsReleaseID {
+                    if let release = search.loaded[id] {
+                        DiscogsIdentifierList(release: release)
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                } else if picked != nil {
+                    Text("MusicBrainz doesn’t list runouts. Search Discogs to compare them.").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("Pick an edition from Discogs to see its runouts.").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

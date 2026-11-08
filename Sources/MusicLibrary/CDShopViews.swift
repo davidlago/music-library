@@ -297,7 +297,7 @@ private struct CDShopOffersSection: View {
             if store.isPricing {
                 ProgressView("Reading the price guide on Discogs\(store.ebay.isSignedIn ? " and eBay" : "")…").controlSize(.small)
             } else if let guide = store.priceGuide {
-                PriceGuideView(guide: guide)
+                PriceGuideView(guide: guide, lead: .shop(usShipping: store.usShipping(in: guide)))
             }
             AppleAlbumTracks(album: store.appleAlbum, loading: store.isFindingApple, controls: model.previewControls)
             shopChips

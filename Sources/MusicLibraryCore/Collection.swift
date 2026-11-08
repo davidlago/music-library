@@ -195,6 +195,107 @@ public enum CollectionError: Error, LocalizedError {
     }
 }
 
+// MARK: Condition
+
+/// A copy's condition on the Goldmine scale Discogs uses, for its media (the disc or record) or its sleeve. The last
+/// three are for a sleeve only. Raw values are what `collection_items` stores; anything else reads as nil.
+public enum CollectionGrade: String, CaseIterable, Hashable, Comparable, Sendable {
+    case mint = "m", nearMint = "nm", veryGoodPlus = "vg+", veryGood = "vg", goodPlus = "g+", good = "g", fair = "f",
+         poor = "p"
+    case generic, notGraded = "not-graded", noCover = "no-cover"
+
+    /// Mint down to Poor.
+    public static let media: [CollectionGrade] = [.mint, .nearMint, .veryGoodPlus, .veryGood, .goodPlus, .good, .fair, .poor]
+    /// The media grades, then the sleeve-only ones.
+    public static let sleeve: [CollectionGrade] = media + [.generic, .notGraded, .noCover]
+
+    public init?(rawValue: String) {
+        let raw = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch raw {
+        case "m": self = .mint
+        case "nm", "m-", "nm or m-": self = .nearMint
+        case "vg+": self = .veryGoodPlus
+        case "vg": self = .veryGood
+        case "g+": self = .goodPlus
+        case "g": self = .good
+        case "f": self = .fair
+        case "p": self = .poor
+        case "generic": self = .generic
+        case "not-graded": self = .notGraded
+        case "no-cover": self = .noCover
+        default: return nil
+        }
+    }
+
+    /// Discogs' own wording, as its Media Condition and Sleeve Condition fields and price suggestions write it.
+    public init?(discogsName: String) {
+        let name = discogsName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let grade = Self.allCases.first(where: { $0.discogsName.caseInsensitiveCompare(name) == .orderedSame }) else {
+            return nil
+        }
+        self = grade
+    }
+
+    public var isMediaGrade: Bool { Self.media.contains(self) }
+
+    /// "VG+", "NM"; "Generic", "Not graded", "No cover" for the sleeve-only ones.
+    public var short: String {
+        switch self {
+        case .mint: "M"
+        case .nearMint: "NM"
+        case .veryGoodPlus: "VG+"
+        case .veryGood: "VG"
+        case .goodPlus: "G+"
+        case .good: "G"
+        case .fair: "F"
+        case .poor: "P"
+        case .generic: "Generic"
+        case .notGraded: "Not graded"
+        case .noCover: "No cover"
+        }
+    }
+
+    /// "Very Good Plus".
+    public var name: String {
+        switch self {
+        case .mint: "Mint"
+        case .nearMint: "Near Mint"
+        case .veryGoodPlus: "Very Good Plus"
+        case .veryGood: "Very Good"
+        case .goodPlus: "Good Plus"
+        case .good: "Good"
+        case .fair: "Fair"
+        case .poor: "Poor"
+        case .generic: "Generic sleeve"
+        case .notGraded: "Not graded"
+        case .noCover: "No cover"
+        }
+    }
+
+    /// "Very Good Plus (VG+)": Discogs' exact text.
+    public var discogsName: String {
+        switch self {
+        case .mint: "Mint (M)"
+        case .nearMint: "Near Mint (NM or M-)"
+        case .veryGoodPlus: "Very Good Plus (VG+)"
+        case .veryGood: "Very Good (VG)"
+        case .goodPlus: "Good Plus (G+)"
+        case .good: "Good (G)"
+        case .fair: "Fair (F)"
+        case .poor: "Poor (P)"
+        case .generic: "Generic"
+        case .notGraded: "Not Graded"
+        case .noCover: "No Cover"
+        }
+    }
+
+    /// Best first: Mint is the lowest rank.
+    var rank: Int { Self.sleeve.firstIndex(of: self) ?? Self.sleeve.count }
+
+    /// Better grades sort first.
+    public static func < (a: CollectionGrade, b: CollectionGrade) -> Bool { a.rank < b.rank }
+}
+
 // MARK: Items
 
 /// One thing you own: a CD or record (ripped or not, with or without tracks in the library) or an album download.
@@ -236,6 +337,13 @@ public struct CollectionItem: Identifiable, Hashable, Sendable {
         didSet { if let p = price, AlbumPurchase.validPrice(p) == nil { price = nil } }
     }
     public var notes: String?
+    /// The matrix/runout etchings in the dead wax (or a CD's inner ring), one per line: what tells this copy's
+    /// pressing apart. CDs and records only.
+    public var runouts: String?
+    /// The disc's or record's condition (a media grade only). CDs and records only.
+    public var mediaGrade: CollectionGrade?
+    /// The sleeve's, case's or cover's condition. CDs and records only.
+    public var sleeveGrade: CollectionGrade?
     /// A file in `CollectionCovers.folder`; nil shows the linked album's cover.jpg.
     public var coverFile: String?
     /// Nil: never linked.
@@ -294,7 +402,7 @@ public struct CollectionItem: Identifiable, Hashable, Sendable {
     }
 
     /// The longest album or artist, record label (and the other release fields) and notes `collection_items` reads.
-    static let maxTitle = 1000, maxField = 200, maxNotes = 10_000
+    static let maxTitle = 1000, maxField = 200, maxNotes = 10_000, maxRunouts = 2000
 
     /// The item as `collection_items` reads it back: text trimmed and clipped to the lengths read (empty fields nil),
     /// and values out of range dropped. Saving goes through it, so nothing written reads back blank or unreadable.
@@ -316,6 +424,12 @@ public struct CollectionItem: Identifiable, Hashable, Sendable {
         item.discCount = discCount.flatMap { (1...99).contains($0) ? $0 : nil }
         item.trackCount = trackCount.flatMap { (1...999).contains($0) ? $0 : nil }
         item.notes = field(notes, Self.maxNotes)
+        if medium.isPhysical {
+            item.runouts = field(runouts, Self.maxRunouts)
+            item.mediaGrade = mediaGrade.flatMap { $0.isMediaGrade ? $0 : nil }
+        } else {
+            item.runouts = nil; item.mediaGrade = nil; item.sleeveGrade = nil
+        }
         item.coverFile = coverFile.flatMap { CollectionCovers.isFileName($0) ? $0 : nil }
         return item
     }

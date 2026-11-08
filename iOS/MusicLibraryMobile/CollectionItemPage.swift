@@ -32,6 +32,7 @@ private struct CollectionItemContent: View {
     let library: LibrarySnapshot
     /// Shows another item in place (the shelf's neighbors).
     let step: (String) -> Void
+    @State private var showsGradingGuide = false
 
     private var title: String { item.album.isEmpty ? "Unknown Album" : item.album }
     private var collection: MusicCollection { model.collection }
@@ -47,7 +48,7 @@ private struct CollectionItemContent: View {
                 if CollectionValue.canValue(item) {
                     let market = model.market
                     CollectionValueSection(value: market.values[item.id], guide: market.itemGuides[item.id], paid: item.price,
-                                           pricing: market.pricing.contains(item.id)) { market.price(item, force: true) }
+                                           grade: item.mediaGrade, pricing: market.pricing.contains(item.id)) { market.price(item, force: true) }
                 }
                 yourCopy(state)
                 AlbumTrackList(album: model.album(for: item), tracks: tracks, info: info, source: title)
@@ -73,7 +74,7 @@ private struct CollectionItemContent: View {
         }
         .background { PageBackdrop(url: library.coverURL(item: item)) }
         // What it's worth, read again when it's more than a day old.
-        .task(id: item.id) { model.market.price(item) }
+        .task(id: "\(item.id)|\(item.mediaGrade?.rawValue ?? "")") { model.market.price(item) }
         .navigationTitle(item.sticker?.text ?? title)
         .navigationBarTitleDisplayMode(.inline)
         .radioDJ { [model, item] in model.radioDJSubject(item: item) }
@@ -268,9 +269,28 @@ private struct CollectionItemContent: View {
                 }
                 .card()
             }
+            if let runouts = item.runouts {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Runouts").font(.caption).foregroundStyle(.secondary)
+                    Text(runouts).font(.callout.monospaced()).textSelection(.enabled)
+                }
+                .padding(12).frame(maxWidth: .infinity, alignment: .leading).card()
+            }
             if let notes = item.notes {
                 Text(notes).font(.callout).textSelection(.enabled)
                     .padding(12).frame(maxWidth: .infinity, alignment: .leading).card()
+            }
+            if item.medium.isPhysical {
+                Button("Grading Guide", systemImage: "questionmark.circle") { showsGradingGuide = true }
+                    .font(.callout)
+                    .sheet(isPresented: $showsGradingGuide) {
+                        NavigationStack {
+                            GradingGuide(part: item.medium == .cd ? .cd : .record, highlighted: item.mediaGrade)
+                                .navigationTitle("Grading Guide")
+                                .navigationBarTitleDisplayMode(.inline)
+                                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showsGradingGuide = false } } }
+                        }
+                    }
             }
             if item.origin == .songs {
                 Text("Made of the songs you bought as downloads, one by one.").font(.caption).foregroundStyle(.secondary)
@@ -289,6 +309,10 @@ private struct CollectionItemContent: View {
         }
         if let day = item.purchasedOn { rows.append(("Bought", day.date().formatted(date: .abbreviated, time: .omitted), false)) }
         if let price = item.price { rows.append(("Paid", formatMoney(price), false)) }
+        if let grade = item.mediaGrade { rows.append((item.medium == .cd ? "Disc" : "Record", "\(grade.short) · \(grade.name)", false)) }
+        if let grade = item.sleeveGrade {
+            rows.append((item.medium == .cd ? "Case" : "Sleeve", grade.isMediaGrade ? "\(grade.short) · \(grade.name)" : grade.name, false))
+        }
         if let price = item.price, price > 0, state.hasMusic {
             let plays = tracks.reduce(0) { $0 + (model.playTotals[$1.id]?.plays ?? 0) }
             if plays > 0 { rows.append(("Per play", "\(formatMoney(price / Decimal(plays))) · \(playCount(plays))", false)) }

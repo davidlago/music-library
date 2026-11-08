@@ -84,7 +84,8 @@ struct DiscogsSyncSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             let parts = [outcome.added > 0 ? "\(outcome.added) added" : nil,
                          outcome.linked > 0 ? "\(outcome.linked) matched to copies already there" : nil,
-                         outcome.removed > 0 ? "\(outcome.removed) removed" : nil].compactMap { $0 }
+                         outcome.removed > 0 ? "\(outcome.removed) removed" : nil,
+                         outcome.graded > 0 ? "grades written on \(outcome.graded)" : nil].compactMap { $0 }
             Label(outcome.cancelled ? "Stopped. What was done is kept." : parts.isEmpty ? "Nothing changed." : parts.joined(separator: " · "),
                   systemImage: outcome.failures.isEmpty && !outcome.cancelled ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                 .foregroundStyle(outcome.failures.isEmpty && !outcome.cancelled ? .green : .orange)
@@ -113,7 +114,7 @@ struct DiscogsSyncSheet: View {
             case .ready:
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 if let plan = store.plan {
-                    let count = store.chosenAdditions.count + store.chosenRemovals.count
+                    let count = store.chosenAdditions.count + store.chosenRemovals.count + (store.sendsGrades ? plan.gradeUpdates.count : 0)
                     Button(count > 0 ? "Make \(count) Change\(count == 1 ? "" : "s")" : plan.adoptions.isEmpty ? "Done" : "Save Matches") {
                         if count == 0 && plan.adoptions.isEmpty { dismiss() } else { store.sync(model: model) }
                     }
@@ -141,13 +142,14 @@ private struct PlanList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(summary).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            if plan.additions.isEmpty && plan.removals.isEmpty && plan.unmatched.isEmpty {
+            if plan.additions.isEmpty && plan.removals.isEmpty && plan.unmatched.isEmpty && plan.gradeUpdates.isEmpty {
                 ContentUnavailableView("Discogs Is Up to Date", systemImage: "checkmark.circle",
                                        description: Text(plan.adoptions.isEmpty ? "Every CD and record here is in your Discogs collection."
                                                          : "Save the matches so later syncs know which copy is which."))
             } else {
                 List {
                     if !plan.additions.isEmpty { additions }
+                    if !plan.gradeUpdates.isEmpty { grades }
                     if !plan.removals.isEmpty { removals }
                     if !plan.unmatched.isEmpty { unmatched }
                 }
@@ -171,7 +173,34 @@ private struct PlanList: View {
             text += (text.isEmpty ? "" : ". ") + "\(closest) found by album only, marked Closest edition: check they're your pressing."
         }
         text += (text.isEmpty ? "" : ". ") + "New copies go in your “\(store.folderName)” folder."
+        if plan.gradesWithoutField > 0 {
+            text += " \(plan.gradesWithoutField) graded cop\(plan.gradesWithoutField == 1 ? "y keeps its" : "ies keep their") grades here only: your Discogs collection has no Media Condition or Sleeve Condition field to put them in."
+        } else if store.sendsGrades, plan.gradeFields != nil {
+            text += " Grades set here go into the copies' Media and Sleeve Condition."
+        }
         return text
+    }
+
+    /// Copies already on Discogs whose grades differ from the ones set here.
+    private var grades: some View {
+        Section {
+            ForEach(plan.gradeUpdates) { u in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(u.item.album.isEmpty ? u.item.artist : u.item.album).lineLimit(1)
+                        Text(u.values.sorted { $0.key < $1.key }.map(\.value).joined(separator: " · "))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Show") { open(u.item.id) }.buttonStyle(.link).font(.caption)
+                }
+                .opacity(store.sendsGrades ? 1 : 0.5)
+            }
+        } header: {
+            Toggle("Update grades on \(plan.gradeUpdates.count.formatted()) cop\(plan.gradeUpdates.count == 1 ? "y" : "ies") on Discogs",
+                   isOn: $store.sendsGrades)
+                .font(.callout.weight(.semibold))
+        }
     }
 
     private var additions: some View {

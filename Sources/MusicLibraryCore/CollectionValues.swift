@@ -21,6 +21,13 @@ public struct CollectionValue: Codable, Hashable, Sendable {
     public var want: Int?
     /// The Discogs release priced, when one was.
     public var releaseID: Int?
+    /// The copy's media grade it was priced for (`CollectionGrade` raw value; nil: ungraded, or priced before 1.35).
+    public var grade: String?
+    /// How it was worked out (`CollectionValue.method`); nil: before 1.35, when eBay's sales led.
+    public var method: Int?
+
+    /// 2: Discogs first, for the copy's grade (`PriceGuide.copyEstimate`).
+    public static let method = 2
 
     public init(itemID: String, at: Date, found: Bool, low: Money? = nil, high: Money? = nil, source: String? = nil,
                 lowest: Money? = nil, forSale: Int? = nil, have: Int? = nil, want: Int? = nil, releaseID: Int? = nil) {
@@ -28,11 +35,14 @@ public struct CollectionValue: Codable, Hashable, Sendable {
         self.lowest = lowest; self.forSale = forSale; self.have = have; self.want = want; self.releaseID = releaseID
     }
 
-    public init(itemID: String, guide: PriceGuide, at: Date = Date()) {
+    /// The copy's value from a guide, for its media grade (`PriceGuide.copyEstimate`).
+    public init(itemID: String, guide: PriceGuide, grade: CollectionGrade? = nil, at: Date = Date()) {
         self.itemID = itemID
         self.at = at
         found = guide.hasPrices
-        if let fair = guide.fairPrice { low = fair.low; high = fair.high; source = fair.source }
+        self.grade = grade?.rawValue
+        method = Self.method
+        if let fair = guide.copyEstimate(grade: grade) { low = fair.low; high = fair.high; source = fair.source }
         let edition = guide.editions.first { $0.roles.contains(.identified) } ?? guide.headline
         lowest = edition?.lowest
         forSale = edition?.forSale
@@ -66,6 +76,7 @@ public struct CollectionValue: Codable, Hashable, Sendable {
         v.have = have.map { max(0, $0) }
         v.want = want.map { max(0, $0) }
         v.releaseID = releaseID.flatMap { DiscogsLink.isValid($0) ? $0 : nil }
+        v.grade = grade.flatMap(CollectionGrade.init(rawValue:))?.rawValue
         return v
     }
 
@@ -80,6 +91,14 @@ public struct CollectionValue: Codable, Hashable, Sendable {
         PriceGuideRequest(artist: item.artist, album: item.album, format: item.medium == .vinyl ? .vinyl : .cd,
                           barcode: item.barcode ?? "", catalogNumber: item.catalogNumber ?? "", label: item.recordLabel ?? "",
                           country: item.country ?? "", year: item.year, releaseID: item.discogsReleaseID ?? discogsMatch)
+    }
+
+    /// Whether it was priced for the copy as it is now: the same media grade and, when the copy names its Discogs
+    /// release, that release. Otherwise it's priced again (changing a grade re-values the copy).
+    public func matches(_ item: CollectionItem) -> Bool {
+        guard method == Self.method, grade == item.mediaGrade?.rawValue else { return false }
+        if let own = item.discogsReleaseID, let releaseID, own != releaseID { return false }
+        return true
     }
 
     /// Prices older than this are offered for updating.
@@ -139,7 +158,7 @@ public struct CollectionValueStats: Hashable, Sendable {
     public var eligible = 0
     public var valued = 0
     public var notFound = 0
-    /// Priced longer ago than `CollectionValue.staleAge`.
+    /// Priced longer ago than `CollectionValue.staleAge`, or not for the copy as it is now (`CollectionValue.matches`).
     public var stale = 0
     /// What was paid for the priced copies that have a price paid, and what those copies are worth now.
     public var paid: Decimal = 0
@@ -164,7 +183,7 @@ public struct CollectionValueStats: Hashable, Sendable {
         var byCurrency: [String: Int] = [:]
         for item in items {
             guard let v = values[item.id] else { continue }
-            if now.timeIntervalSince(v.at) >= CollectionValue.staleAge { s.stale += 1 }
+            if now.timeIntervalSince(v.at) >= CollectionValue.staleAge || !v.matches(item) { s.stale += 1 }
             s.lastCheck = max(s.lastCheck ?? v.at, v.at)
             guard let estimate = v.estimate else { if !v.found { s.notFound += 1 }; continue }
             counted.append((item, v, estimate))

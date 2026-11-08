@@ -54,9 +54,11 @@ few seconds apart, and only when you ask.
 What the album (or the edition you picked) is worth, on the Mac under the album you're shopping for and on the iPhone on
 each album's page:
 
-- **A fair price** to lead with: the middle half of what used copies recently sold for on eBay (when you're signed in
-  to eBay), else Discogs' suggested prices for a playable copy (Very Good to Near Mint), else what used copies are listed
-  for on eBay now, else the cheapest copy on Discogs.
+- **An estimate** to lead with: Discogs' suggested prices for a Very Good to Near Mint copy of the album's **most common
+  pressing** (the edition most people have), plus what Discogs sellers in the US typically charge to ship one. On the
+  Mac the shipping is the middle of what the US sellers among the Shop's Discogs listings ask; on the iPhone it says
+  "before shipping". Discogs gives suggested prices only with your Discogs account; without one, it's the cheapest copy
+  of that pressing on Discogs.
 - **Discogs**: for a few editions (the one you picked or scanned, the most collected one and the original, or the latest
   reissue), how many are for sale and from what price, and how many people have and want it. With your Discogs account,
   Discogs' **suggested prices by condition** (Mint down to Good; Discogs gives them only to accounts with seller settings
@@ -65,7 +67,8 @@ each album's page:
   to eBay, what copies **sold for recently**. Listings of other albums, other formats and lots are left out; titles that
   carry the edition's catalog number are counted on their own.
 
-Prices are before shipping. They're in your currency where Discogs has it (eBay's are in dollars).
+Other prices are before shipping. They're in your currency where Discogs has it (eBay's are in dollars). The Buy List
+and the Radio DJ still lead with a fair price from eBay's recent sales when there are some.
 
 ## Track list and Apple Music
 
@@ -112,7 +115,7 @@ The **Shop** tab:
   top to see the other format's editions and prices.
 - **Add to Buy List** on an album's page keeps it on your [Buy List](#buy-list), with its prices.
 - **Tracks** with Apple Music previews, and **Open in Apple Music** (see [Track list and Apple Music](#track-list-and-apple-music)).
-- **Recent Finds**: the albums you looked up here or on the Mac, with the fair price, newest first (swipe to delete).
+- **Recent Finds**: the albums you looked up here or on the Mac, with the estimate, newest first (swipe to delete).
   See [Recent Finds](#recent-finds).
 
 ## Buy List

@@ -41,14 +41,19 @@ final class CollectionValueStore {
     /// Prices one copy with the whole guide, when it isn't priced or was priced more than a day ago (or `force`).
     func price(_ item: CollectionItem, force: Bool = false) {
         guard CollectionValue.canValue(item), !pricing.contains(item.id), let guides = priceGuides() else { return }
-        if !force, let v = values[item.id], Date().timeIntervalSince(v.at) < Self.pageAge { return }
+        if !force, let v = values[item.id], v.matches(item), Date().timeIntervalSince(v.at) < Self.pageAge { return }
+        // A new grade: the guide read this session already has Discogs' price for it.
+        if !force, let guide = fullGuides[item.id], guide.request == CollectionValue.request(for: item, discogsMatch: discogsMatches()[item.id]) {
+            save([CollectionValue(itemID: item.id, guide: guide, grade: item.mediaGrade)])
+            return
+        }
         pricing.insert(item.id)
         let request = CollectionValue.request(for: item, discogsMatch: discogsMatches()[item.id])
         Task {
             let guide = await guides.fullGuide(for: request, readsForSale: true)
             pricing.remove(item.id)
             fullGuides[item.id] = guide
-            save([CollectionValue(itemID: item.id, guide: guide)])
+            save([CollectionValue(itemID: item.id, guide: guide, grade: item.mediaGrade)])
         }
     }
 
@@ -59,7 +64,7 @@ final class CollectionValueStore {
         guard bulk == nil, let guides = priceGuides() else { return }
         let now = Date()
         let items = collection().items.filter(CollectionValue.canValue).filter { item in
-            values[item.id].map { now.timeIntervalSince($0.at) >= CollectionValue.staleAge } ?? true
+            values[item.id].map { now.timeIntervalSince($0.at) >= CollectionValue.staleAge || !$0.matches(item) } ?? true
         }
         guard !items.isEmpty else { return }
         let matches = discogsMatches()
@@ -77,7 +82,7 @@ final class CollectionValueStore {
                     try? await Task.sleep(for: .seconds(60))
                     continue
                 }
-                batch.append(CollectionValue(itemID: item.id, guide: guide))
+                batch.append(CollectionValue(itemID: item.id, guide: guide, grade: item.mediaGrade))
                 progress = (i + 1, items.count)
                 if batch.count >= 10 { save(batch); batch = [] }
             }

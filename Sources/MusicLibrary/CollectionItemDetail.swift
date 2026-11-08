@@ -76,11 +76,9 @@ struct CollectionItemDetail: View {
                     .help("Download the latest description, rating, links and track list")
             }
         }
-        .task(id: item.id) {
-            model.ensureAlbumInfo(for: item)
-            // What it's worth, read again when it's more than a day old.
-            model.values.price(item)
-        }
+        .task(id: item.id) { model.ensureAlbumInfo(for: item) }
+        // What it's worth, read again when it's more than a day old or the copy's grade changed.
+        .task(id: "\(item.id)|\(item.mediaGrade?.rawValue ?? "")|\(item.discogsReleaseID ?? 0)") { model.values.price(item) }
         .task(id: "\(coverURL?.path ?? "")|\(model.coverRevision)") {
             guard let coverURL else { cover = nil; return }
             let data = await Task.detached { try? Data(contentsOf: coverURL) }.value
@@ -180,11 +178,12 @@ struct CollectionItemDetail: View {
         }
     }
 
-    /// "1959 · 12″ Vinyl · Columbia CL 1355 · US".
+    /// "1959 · 12″ Vinyl · Columbia CL 1355 · US · VG+ / VG".
     private func metaLine(_ item: CollectionItem) -> String? {
         let label = [item.recordLabel, item.catalogNumber].compactMap { $0 }.joined(separator: " ")
         let parts = [item.year.map(String.init), item.formatDetail, label.isEmpty ? nil : label,
-                     item.country.map(LabelsCard.countryName)].compactMap { $0 }
+                     item.country.map(LabelsCard.countryName),
+                     GradeText.pair(media: item.mediaGrade, sleeve: item.sleeveGrade)].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
@@ -475,7 +474,7 @@ struct CollectionItemDetail: View {
         if CollectionValue.canValue(item) {
             let values = model.values
             CollectionValueSection(value: values.values[item.id], guide: values.guide(for: item), paid: item.price,
-                                   pricing: values.pricing.contains(item.id)) { values.price(item, force: true) }
+                                   grade: item.mediaGrade, pricing: values.pricing.contains(item.id)) { values.price(item, force: true) }
         }
     }
 
