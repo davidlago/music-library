@@ -58,17 +58,6 @@ struct PersonLinks: View {
     }
 }
 
-/// Categorical colors for what people do, validated together (all pairs) for color-vision deficiency.
-enum DNAColor {
-    static func of(_ c: CollaborationGraph.Category) -> Color {
-        switch c {
-        case .performance: Color(light: 0x2a78d6, dark: 0x3987e5)
-        case .writing: Color(light: 0x1baf7a, dark: 0x199e70)
-        case .production: Color(light: 0xeb6834, dark: 0xd95926)
-        }
-    }
-}
-
 // MARK: Page
 
 struct MusicDNAView: View {
@@ -130,20 +119,6 @@ struct MusicDNAView: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
-    }
-}
-
-struct DNALegend: View {
-    var body: some View {
-        HStack(spacing: 10) {
-            ForEach(CollaborationGraph.Category.allCases, id: \.self) { c in
-                HStack(spacing: 4) {
-                    Circle().fill(DNAColor.of(c)).frame(width: 9, height: 9)
-                    Text(c.rawValue).font(.caption).foregroundStyle(.secondary)
-                }
-            }
-        }
-        .help("Colored by what each person mostly does on your music")
     }
 }
 
@@ -218,7 +193,7 @@ struct DNALanding: View {
                             VStack(spacing: 6) {
                                 PersonBubble(person: p, size: 72)
                                 Text(p.name).font(.callout.weight(.medium)).lineLimit(1)
-                                Text("\(p.degree) collaborator\(p.degree == 1 ? "" : "s")").font(.caption).foregroundStyle(.secondary)
+                                Text(dnaCollaborators(p.degree)).font(.caption).foregroundStyle(.secondary)
                             }
                             .frame(maxWidth: .infinity)
                             .contentShape(Rectangle())
@@ -232,7 +207,7 @@ struct DNALanding: View {
     }
 }
 
-/// A circle in the person's category color with their photo (if they're an artist with one) or initials.
+/// A person's bubble (`DNABubble`) with their photo when they're an artist with one.
 struct PersonBubble: View {
     @Environment(AppModel.self) private var model
     let person: CollaborationGraph.Person
@@ -240,49 +215,13 @@ struct PersonBubble: View {
     var highlighted = false
 
     var body: some View {
-        let color = DNAColor.of(person.category)
         let hasPhoto = model.artistInfo.imageFile(for: person.name) != nil
-        ZStack {
-            Circle().fill(Color(nsColor: .controlBackgroundColor))
-            Circle().fill(color.opacity(0.16))
-            if hasPhoto {
-                ArtistPhoto(name: person.name, size: size - 6)
-            } else {
-                Text(Self.initials(person.name))
-                    .font(.system(size: max(9, size * 0.32), weight: .semibold, design: .rounded))
-                    .foregroundStyle(color)
-            }
-        }
-        .frame(width: size, height: size)
-        .overlay(Circle().strokeBorder(color, lineWidth: highlighted ? 3.5 : max(1.5, size / 28)))
-        .shadow(color: .black.opacity(highlighted ? 0.3 : 0.12), radius: highlighted ? 8 : 3, y: 2)
-    }
-
-    static func initials(_ name: String) -> String {
-        name.split(separator: " ").filter { $0.contains(where: \.isLetter) }.prefix(2)
-            .compactMap { $0.first(where: \.isLetter) }.map(String.init).joined().uppercased()
+        DNABubble(person: person, size: size, highlighted: highlighted,
+                  photo: hasPhoto ? ArtistPhoto(name: person.name, size: size - 6) : nil)
     }
 }
 
 // MARK: Graph
-
-/// A line between two points whose ends animate when the layout changes.
-struct EdgeShape: Shape {
-    var from: CGPoint
-    var to: CGPoint
-
-    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
-        get { AnimatablePair(AnimatablePair(from.x, from.y), AnimatablePair(to.x, to.y)) }
-        set { from = CGPoint(x: newValue.first.first, y: newValue.first.second); to = CGPoint(x: newValue.second.first, y: newValue.second.second) }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        p.move(to: from)
-        p.addLine(to: to)
-        return p
-    }
-}
 
 struct DNAGraphView: View {
     let neighborhood: CollaborationGraph.Neighborhood
@@ -332,7 +271,7 @@ struct DNAGraphView: View {
                 }
                 ForEach(neighborhood.edges) { e in
                     let active = hovered == e.a || hovered == e.b
-                    EdgeShape(from: point(e.a), to: point(e.b))
+                    DNAEdgeShape(from: point(e.a), to: point(e.b))
                         .stroke(active ? AppColor.accent : Color.primary.opacity(e.isTree ? 0.3 : 0.1),
                                 lineWidth: active ? 2 : (e.isTree ? min(4, 1 + log2(CGFloat(e.weight))) : 0.75))
                         .allowsHitTesting(false)
@@ -343,9 +282,11 @@ struct DNAGraphView: View {
                     // they would cover the whole graph.
                     Button { if node.level > 0 { onSelect(node.person) } } label: {
                         DNANodeView(node: node, size: bubble,
-                                    isHovered: hovered == node.id, showsLabel: node.level <= 2 || hovered == node.id,
+                                    isHighlighted: hovered == node.id, showsLabel: node.level <= 2 || hovered == node.id,
                                     outward: Self.labelDirection(layout: positions[node.id] ?? .zero, at: point(node.id),
-                                                                 bubble: bubble, width: geo.size.width))
+                                                                 bubble: bubble, width: geo.size.width)) { size, highlighted in
+                            PersonBubble(person: node.person, size: size, highlighted: highlighted)
+                        }
                     }
                     .buttonStyle(.plain)
                     .onHover { h in hovered = h ? node.id : (hovered == node.id ? nil : hovered) }
@@ -371,7 +312,7 @@ struct DNAGraphView: View {
     static func labelDirection(layout p: CGPoint, at: CGPoint, bubble: CGFloat, width: CGFloat) -> CGVector {
         let length = hypot(p.x, p.y)
         var v = length > 0 ? CGVector(dx: p.x / length, dy: p.y / length) : CGVector(dx: 0, dy: 1)
-        let reach = bubble / 2 + 6 + DNANodeView.labelWidth
+        let reach = bubble / 2 + 6 + DNANodeMetrics.labelWidth
         if abs(v.dx) > 0.35, (v.dx > 0 && at.x + reach > width - 4) || (v.dx < 0 && at.x - reach < 4) { v.dx = -v.dx }
         return v
     }
@@ -397,43 +338,6 @@ struct DNAGraphView: View {
         var s = "\(p.name) · \(p.roles.prefix(3).joined(separator: ", "))"
         if node.level > 0 { s += "\n\(node.shared) track\(node.shared == 1 ? "" : "s") with the person they connect to\nClick to center" }
         return s
-    }
-}
-
-struct DNANodeView: View {
-    let node: CollaborationGraph.Node
-    let size: CGFloat
-    let isHovered: Bool
-    let showsLabel: Bool
-    /// Unit vector pointing away from the center; the name sits on that side so neighbors on a ring
-    /// don't collide.
-    let outward: CGVector
-
-    static let labelWidth: CGFloat = 116
-
-    var body: some View {
-        let shown = isHovered ? size * 1.12 : size
-        // Outer rings are denser: one shorter line until hovered.
-        let labelWidth = node.level >= 2 && !isHovered ? 96 : Self.labelWidth
-        PersonBubble(person: node.person, size: shown, highlighted: isHovered || node.level == 0)
-            .overlay {
-                if showsLabel {
-                    let horizontal = abs(outward.dx) > 0.35
-                    Text(node.person.name)
-                        .font(node.level == 0 ? .headline : (node.level == 1 ? .caption.weight(.medium) : .caption2))
-                        .multilineTextAlignment(horizontal ? (outward.dx > 0 ? .leading : .trailing) : .center)
-                        .lineLimit(node.level >= 2 && !isHovered ? 1 : 2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 4).padding(.vertical, 1)
-                        .background(RoundedRectangle(cornerRadius: 4).fill(.background.opacity(isHovered ? 0.95 : 0.7)))
-                        .frame(width: labelWidth, alignment: horizontal ? (outward.dx > 0 ? .leading : .trailing) : .center)
-                        .offset(x: outward.dx * (shown / 2 + 6 + (horizontal ? labelWidth / 2 : 0)),
-                                y: outward.dy * (shown / 2 + 6) + (horizontal ? 0 : outward.dy * 9))
-                        .allowsHitTesting(false)
-                }
-            }
-            .contentShape(Circle())
-            .animation(.easeOut(duration: 0.15), value: isHovered)
     }
 }
 

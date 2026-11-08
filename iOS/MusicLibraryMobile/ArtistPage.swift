@@ -70,7 +70,7 @@ private struct ArtistPageContent: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 32)
         }
-        .background(Color(.systemGroupedBackground))
+        .background { PageBackdrop(url: library.artistImageURL(artistName)) }
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
         .radioDJ { [model, artistName, tracks, albums, info] in
@@ -134,7 +134,6 @@ private struct ArtistPageContent: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.bottom, 4)
-        .background { ArtistBackdrop(url: library.artistImageURL(artistName)) }
     }
 
     private var statTiles: some View {
@@ -299,29 +298,6 @@ private struct ArtistSongRow: View {
     }
 }
 
-/// The artist's photo, blurred, behind the top of the page.
-private struct ArtistBackdrop: View {
-    let url: URL?
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                PhotoImage(url: url, size: 100)
-                    .scaleEffect(max(geo.size.width, geo.size.height) / 100 * 1.2)
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .blur(radius: 40)
-                    .opacity(0.4)
-                    .clipped()
-                LinearGradient(colors: [Color(.systemGroupedBackground).opacity(0.1), Color(.systemGroupedBackground)],
-                               startPoint: .top, endPoint: .bottom)
-            }
-        }
-        .padding(.horizontal, -20)
-        .padding(.top, -200)
-        .accessibilityHidden(true)
-    }
-}
-
 // MARK: Concerts
 
 /// Upcoming concerts near home, with the Mac's concert settings (sent at each sync).
@@ -431,15 +407,15 @@ private struct ConcertRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            dateTile
+            ConcertDateTile(day: concert.day)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(concert.venue).font(.headline).lineLimit(2)
-                    statusBadge
+                    ConcertStatusBadge(status: concert.status)
                 }
                 Text(details).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                if let extra { Text(extra).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
-                if let price = priceText { Text(price).font(.caption).foregroundStyle(.secondary).monospacedDigit() }
+                if let extra = concert.extraLine(besides: pageArtist) { Text(extra).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
+                if let price = concert.priceLine { Text(price).font(.caption).foregroundStyle(.secondary).monospacedDigit() }
             }
             Spacer(minLength: 6)
             if let url = concert.url?.webLink {
@@ -461,54 +437,12 @@ private struct ConcertRow: View {
         }
     }
 
-    /// A calendar-page date: "NOV" over "2".
-    private var dateTile: some View {
-        let date = concert.day.date()
-        return VStack(spacing: 0) {
-            Text(date.formatted(.dateTime.month(.abbreviated)).uppercased())
-                .font(.caption2.weight(.bold)).foregroundStyle(Color.accentColor)
-            Text(date.formatted(.dateTime.day())).font(.system(size: 20, weight: .semibold, design: .rounded))
-            Text(date.formatted(.dateTime.weekday(.abbreviated))).font(.caption2).foregroundStyle(.secondary)
-        }
-        .frame(width: 48, height: 56)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color(.tertiarySystemFill)))
-    }
-
     /// "Boston, MA · 3 mi · 7:30 PM"
     private var details: String {
         [concert.place, store.distance(concert.distanceKm), concert.formattedTime()]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
-    /// The tour or festival, or who else is playing.
-    private var extra: String? {
-        if let title = concert.title(for: pageArtist) { return title }
-        let others = concert.otherActs(than: pageArtist)
-        guard !others.isEmpty else { return nil }
-        let shown = others.prefix(3)
-        return "with " + ListFormatter.localizedString(byJoining: Array(shown)) + (others.count > 3 ? " and more" : "")
-    }
-
-    private var priceText: String? {
-        guard let price = concert.minPrice, price > 0, let currency = concert.currency else { return nil }
-        return "from " + price.formatted(.currency(code: currency).precision(.fractionLength(0...2)))
-    }
-
-    @ViewBuilder
-    private var statusBadge: some View {
-        let label: String? = switch concert.status {
-        case .cancelled: "Cancelled"
-        case .postponed: "Postponed"
-        case .rescheduled: "Rescheduled"
-        case .scheduled: nil
-        }
-        if let label {
-            Text(label).font(.caption2.weight(.semibold))
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(Capsule().fill(Color.orange.opacity(0.2)))
-                .foregroundStyle(.orange)
-        }
-    }
 }
 
 // MARK: Song info

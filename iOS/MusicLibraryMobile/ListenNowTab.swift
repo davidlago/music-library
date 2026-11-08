@@ -57,7 +57,7 @@ private struct ListenNowPage: View {
             .padding(.top, 4)
             .padding(.bottom, 28)
         }
-        .background { AlbumBackdrop(url: library.coverURL(album: album)) }
+        .background { PageBackdrop(url: library.coverURL(album: album)) }
         .refreshable { model.reload() }
         .onAppear { model.loadWeekListening() }
         .onChange(of: model.historyVersion) { model.loadWeekListening() }

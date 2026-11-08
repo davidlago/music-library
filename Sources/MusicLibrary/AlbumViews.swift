@@ -562,27 +562,3 @@ struct AlbumTrackRow: View {
         .padding(.horizontal, 14).padding(.vertical, 7)
     }
 }
-
-/// The cover, blurred and tinted toward the window background, filling the page.
-struct AlbumBackdrop: View {
-    let image: NSImage?
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                AppColor.background
-                if let image {
-                    Image(nsImage: image).resizable().scaledToFill()
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .blur(radius: 70)
-                        .saturation(1.3)
-                        .opacity(0.75)
-                        .clipped()
-                    LinearGradient(colors: [AppColor.background.opacity(0.15), AppColor.background.opacity(0.75)],
-                                   startPoint: .top, endPoint: .bottom)
-                }
-            }
-        }
-        .ignoresSafeArea()
-    }
-}
