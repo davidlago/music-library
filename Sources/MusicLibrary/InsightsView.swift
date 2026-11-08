@@ -4,39 +4,6 @@ import MusicLibraryCore
 import MusicLibraryUI
 import SwiftUI
 
-// MARK: Palette
-
-extension Color {
-    /// A color with separate sRGB values for light and dark appearances.
-    init(light: UInt32, dark: UInt32) {
-        self.init(nsColor: NSColor(name: nil) { appearance in
-            let hex = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
-            return NSColor(srgbRed: CGFloat((hex >> 16) & 0xff) / 255, green: CGFloat((hex >> 8) & 0xff) / 255,
-                           blue: CGFloat(hex & 0xff) / 255, alpha: 1)
-        })
-    }
-}
-
-/// Chart colors, validated for contrast and color-vision deficiency against the card surface in both appearances.
-enum VizColor {
-    /// Single-series marks.
-    static let series = Color(light: 0x2a78d6, dark: 0x3987e5)
-
-    /// Ordinal blue ramp for quality tiers, best quality most prominent; "unknown" is neutral gray.
-    static func tier(_ t: LibraryStats.QualityTier) -> Color {
-        switch t {
-        case .hiRes: Color(light: 0x104281, dark: 0xcde2fb)
-        case .cd: Color(light: 0x256abf, dark: 0x86b6ef)
-        case .lossyHigh: Color(light: 0x5598e7, dark: 0x3987e5)
-        case .lossy: Color(light: 0x86b6ef, dark: 0x1c5cab)
-        case .unknown: Color(light: 0xb5b4ae, dark: 0x5f5e5a)
-        }
-    }
-
-    static let card = Color(nsColor: .controlBackgroundColor)
-    static let track = Color.primary.opacity(0.07)
-}
-
 // MARK: Page
 
 struct InsightsView: View {
@@ -140,37 +107,6 @@ struct InsightsStack: View {
 }
 
 // MARK: Building blocks
-
-struct InsightCard<Content: View, Accessory: View>: View {
-    let title: String
-    var subtitle: String?
-    @ViewBuilder var accessory: () -> Accessory
-    @ViewBuilder var content: () -> Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.headline)
-                    if let subtitle { Text(subtitle).font(.caption).foregroundStyle(.secondary) }
-                }
-                Spacer()
-                accessory()
-            }
-            content()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
-    }
-}
-
-extension InsightCard where Accessory == EmptyView {
-    init(title: String, subtitle: String? = nil, @ViewBuilder content: @escaping () -> Content) {
-        self.init(title: title, subtitle: subtitle, accessory: { EmptyView() }, content: content)
-    }
-}
 
 struct RankedItem: Identifiable {
     var id: String { key ?? name }
@@ -367,27 +303,6 @@ struct TileGrid<Content: View>: View {
 
     var body: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12, alignment: .top)], spacing: 12, content: content)
-    }
-}
-
-/// A big number with a label, and optionally a line of context under it.
-struct InsightTile: View {
-    let value: String
-    let label: String
-    let icon: String
-    var detail: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Image(systemName: icon).font(.callout).foregroundStyle(.secondary)
-            Text(value).font(.system(size: 26, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.6)
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            if let detail { Text(detail).font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8) }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
     }
 }
 

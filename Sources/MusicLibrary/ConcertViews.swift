@@ -1,25 +1,9 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 // MARK: Rows
-
-/// A calendar-page date: "NOV" over "2".
-struct ConcertDateTile: View {
-    let day: PurchaseDay
-
-    var body: some View {
-        let date = day.date()
-        VStack(spacing: 0) {
-            Text(date.formatted(.dateTime.month(.abbreviated)).uppercased())
-                .font(.caption2.weight(.bold)).foregroundStyle(AppColor.accent)
-            Text(date.formatted(.dateTime.day())).font(.system(size: 20, weight: .semibold, design: .rounded))
-            Text(date.formatted(.dateTime.weekday(.abbreviated))).font(.caption2).foregroundStyle(.secondary)
-        }
-        .frame(width: 48, height: 56)
-        .background(RoundedRectangle(cornerRadius: 8).fill(AppColor.fill))
-    }
-}
 
 /// One concert. With `artist` set, the row leads with that artist (the Concerts page); without, with the venue
 /// (an artist's own page, `pageArtist`).
@@ -45,20 +29,20 @@ struct ConcertRow: View {
                         } else {
                             Text(pageArtist).font(.headline)
                         }
-                        statusBadge
+                        ConcertStatusBadge(status: concert.status)
                     }
                     Text(concert.venue).lineLimit(1)
                 } else {
                     HStack(spacing: 6) {
                         Text(concert.venue).font(.headline).lineLimit(1)
-                        statusBadge
+                        ConcertStatusBadge(status: concert.status)
                     }
                 }
                 Text(details).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                if let extra { Text(extra).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                if let extra = concert.extraLine(besides: pageArtist) { Text(extra).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
             }
             Spacer(minLength: 8)
-            if let price = priceText {
+            if let price = concert.priceLine {
                 Text(price).font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
             if let url = concert.url?.webLink {
@@ -89,36 +73,6 @@ struct ConcertRow: View {
     private var details: String {
         [concert.place, store.distance(concert.distanceKm), concert.formattedTime()]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
-    }
-
-    /// The tour or festival, or who else is playing.
-    private var extra: String? {
-        if let title = concert.title(for: pageArtist) { return title }
-        let others = concert.otherActs(than: pageArtist)
-        guard !others.isEmpty else { return nil }
-        let shown = others.prefix(3)
-        return "with " + ListFormatter.localizedString(byJoining: Array(shown)) + (others.count > 3 ? " and more" : "")
-    }
-
-    private var priceText: String? {
-        guard let price = concert.minPrice, price > 0, let currency = concert.currency else { return nil }
-        return "from " + price.formatted(.currency(code: currency).precision(.fractionLength(0...2)))
-    }
-
-    @ViewBuilder
-    private var statusBadge: some View {
-        let label: String? = switch concert.status {
-        case .cancelled: "Cancelled"
-        case .postponed: "Postponed"
-        case .rescheduled: "Rescheduled"
-        case .scheduled: nil
-        }
-        if let label {
-            Text(label).font(.caption2.weight(.semibold))
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(Capsule().fill(Color.orange.opacity(0.2)))
-                .foregroundStyle(.orange)
-        }
     }
 }
 

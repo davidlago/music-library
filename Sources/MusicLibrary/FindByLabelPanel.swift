@@ -181,7 +181,7 @@ struct LabelLookupCard: View {
                 Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).foregroundStyle(.secondary).lineLimit(1)
                 let meta = [item.year.map(String.init), item.formatDetail, item.recordLabel].compactMap { $0 }
                 if !meta.isEmpty { Text(meta.joined(separator: " · ")).font(.callout).foregroundStyle(.secondary).lineLimit(1) }
-                DigitalStatusLabel(state: state, medium: item.medium, from: Self.from(state, in: model)).font(.callout)
+                DigitalStatusLabel(state: state, medium: item.medium, collection: model.collection).font(.callout)
                 if let bought = Self.purchaseLine(item) { Text(bought).font(.callout).foregroundStyle(.secondary) }
                 Button("Open") { open(item) }.controlSize(.small).padding(.top, 2)
             }
@@ -216,11 +216,6 @@ struct LabelLookupCard: View {
         } else {
             Text(edge).foregroundStyle(.secondary)
         }
-    }
-
-    static func from(_ state: DigitalState, in model: AppModel) -> CollectionItem? {
-        if case .otherCopy(_, let id?) = state { return model.item(id: id) }
-        return nil
     }
 
     /// "Bought 3 May 2019 · $12.99".

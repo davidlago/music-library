@@ -556,7 +556,7 @@ struct CopyRow: View {
                     Text(item.formatDetail ?? item.medium.name).font(.callout.weight(.medium)).lineLimit(1)
                 }
                 if let line = LabelLookupCard.purchaseLine(item) { Text(line).font(.caption).foregroundStyle(.secondary) }
-                DigitalStatusLabel(state: state, medium: item.medium, from: LabelLookupCard.from(state, in: model)).font(.caption)
+                DigitalStatusLabel(state: state, medium: item.medium, collection: model.collection).font(.caption)
             }
             Spacer()
             Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)

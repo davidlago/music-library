@@ -12,13 +12,17 @@ Your CDs, records and downloads.
 
 - **Totals**: items, how much is digitized, what's left to digitize, what you've spent (in all and this year) and the
   cost per play and per hour listened.
-- **Your Shelves**: each label series (CD and Vinyl) with its range, the next number, free numbers and duplicates, a
-  find field, and **Label Check**.
-- **How You Own It**: per medium, how many items are digitized, partly digitized, digitized from another copy or not yet.
-- **Spending Over Time**, by medium, by month or year, with a running total.
+- **Your Shelves**: each label series (CD and Vinyl) with its range and the next number; click a series for
+  **Label Check** (free numbers and duplicates), or **+** to add a copy with the next label. The find field lists the
+  items that match as you type; a label nobody has opens **Find by Label**.
+- **How You Own It**: per medium, how many items are digitized, partly digitized, digitized from another copy or not
+  yet, and what you spent on it.
+- **Spending Over Time**, by medium and year: **Spent**, **Items** or the **Running Total**.
 - Lists: Recently Added, To Digitize, Priciest, Best Value (most plays for the money) and Still in the Wrapper (never
   played).
-- What you own by artist, genre, decade and record label, by money spent or by items.
+- **Artists** (by money spent or by items) and **Genres**, **Release Eras** or **Record Labels**.
+
+The iPhone shows the same cards, one under the other.
 
 Prices are in your Mac's currency. Plays count once per album, whichever copy they came from.
 

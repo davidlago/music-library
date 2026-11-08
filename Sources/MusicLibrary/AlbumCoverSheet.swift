@@ -1,5 +1,6 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Image data turned into the JPEG saved as a cover: any format AppKit reads, scaled down to at most 1600 px.

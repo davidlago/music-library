@@ -1,27 +1,7 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
-
-extension Color {
-    init(_ rgb: RGB) { self.init(.sRGB, red: rgb.r, green: rgb.g, blue: rgb.b) }
-}
-
-/// The colors views draw with, all native macOS colors, so they follow the light or dark appearance.
-enum AppColor {
-    static let background = Color(nsColor: .windowBackgroundColor)
-    static let card = Color(nsColor: .controlBackgroundColor)
-    static let separator = Color(nsColor: .separatorColor)
-    static let accent = Color.accentColor
-    static let series = VizColor.series
-    /// The unfilled part of bar and progress tracks.
-    static let track = Color.primary.opacity(0.07)
-    /// Reference marks drawn next to `series`, like the library's share beside your listening.
-    static let neutral = VizColor.tier(.unknown)
-    /// Subtle fills for hover states and chips.
-    static let fill = Color.primary.opacity(0.06)
-
-    static func tier(_ t: LibraryStats.QualityTier) -> Color { VizColor.tier(t) }
-}
 
 /// A small preview of an appearance: sidebar, content with a card, accent and chart colors. System shows both halves.
 struct AppearanceSwatch: View {

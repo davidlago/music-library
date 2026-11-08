@@ -1,5 +1,6 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Something picked for export. Resolved to tracks when exporting, so playlists export their current contents.

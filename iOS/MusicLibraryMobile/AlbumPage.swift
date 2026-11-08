@@ -69,7 +69,7 @@ private struct AlbumPageContent: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 32)
         }
-        .background { AlbumBackdrop(url: library.coverURL(album: album)) }
+        .background { PageBackdrop(url: library.coverURL(album: album)) }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .radioDJ { [model, album, tracks, info] in model.radioDJSubject(album: album, tracks: tracks, info: info) }
@@ -501,7 +501,7 @@ struct CopyRow: View {
                 if !bought.isEmpty {
                     Text(bought.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 }
-                DigitalStatusLabel(item: item, state: state, collection: model.collection)
+                DigitalStatusLabel(state: state, medium: item.medium, collection: model.collection)
                     .font(.caption)
             }
             Spacer(minLength: 6)
@@ -521,27 +521,19 @@ struct CopyRow: View {
 
 // MARK: Backdrop
 
-/// The cover, blurred and faded toward the background, behind the page.
-struct AlbumBackdrop: View {
+/// The shared `AlbumBackdrop` for a picture file in the library (a cover or an artist photo), decoded small off the
+/// main thread: it's blurred to a wash anyway.
+struct PageBackdrop: View {
     let url: URL?
+    @Environment(\.displayScale) private var scale
+    @State private var image: UIImage?
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                Color(.systemGroupedBackground)
-                PhotoImage(url: url, size: 120)
-                    .scaleEffect(max(geo.size.width, geo.size.height) / 120 * 1.2)
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .blur(radius: 50)
-                    .saturation(1.3)
-                    .opacity(0.65)
-                    .clipped()
-                LinearGradient(colors: [Color(.systemGroupedBackground).opacity(0.1), Color(.systemGroupedBackground).opacity(0.75),
-                                        Color(.systemGroupedBackground)],
-                               startPoint: .top, endPoint: .bottom)
+        AlbumBackdrop(image: image)
+            .task(id: url) {
+                image = nil
+                guard let url else { return }
+                image = await CoverLoader.image(at: url, maxPixel: 120 * scale)
             }
-        }
-        .ignoresSafeArea()
-        .accessibilityHidden(true)
     }
 }

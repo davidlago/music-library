@@ -125,7 +125,7 @@ CD 12 in Music Library". See [iPhone app](iphone.md#physical) and [Widgets and A
 
 ## Label Check
 
-**Label Check** (at the top of the Shelf, and in the Your Shelves panel of Insights' Owned pane) lists, for each series, the
+**Label Check** (at the top of the Shelf, and from a series in the Your Shelves panel of Insights' Owned pane) lists, for each series, the
 range in use, the next number, the free numbers in between and any number used twice. Duplicates can come from older
 versions of the app; they stay saveable, but a new duplicate is refused.
 

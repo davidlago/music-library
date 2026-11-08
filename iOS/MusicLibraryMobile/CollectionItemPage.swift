@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// One thing you own, ripped or not: its case or sleeve with the label, where its digital copy stands (play it, download
@@ -65,7 +66,7 @@ private struct CollectionItemContent: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 32)
         }
-        .background { AlbumBackdrop(url: library.coverURL(item: item)) }
+        .background { PageBackdrop(url: library.coverURL(item: item)) }
         .navigationTitle(item.sticker?.text ?? title)
         .navigationBarTitleDisplayMode(.inline)
         .radioDJ { [model, item] in model.radioDJSubject(item: item) }
