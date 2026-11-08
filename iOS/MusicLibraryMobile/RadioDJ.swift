@@ -315,12 +315,7 @@ struct RadioDJSheet: View {
                                 }
                             }
                         }
-                        if let status = statusText {
-                            HStack(spacing: 10) {
-                                EqualizerBars().frame(width: 28, height: 16)
-                                Text(status).font(.callout).italic().foregroundStyle(.secondary).lineLimit(2)
-                            }
-                        }
+                        if let status = statusText { RadioDJStatusRow(text: status) }
                         if let error = session.error {
                             VStack(alignment: .leading, spacing: 8) {
                                 Label(error, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.orange)
@@ -531,26 +526,6 @@ struct RadioDJSheet: View {
     }
 }
 
-/// A photo the listener showed (or is about to show) the DJ, cropped to a square.
-struct RadioDJPhotoThumb: View {
-    let photo: RadioDJPhoto
-    let size: CGFloat
-
-    var body: some View {
-        Group {
-            if let image = UIImage(data: photo.thumbnail) {
-                Image(uiImage: image).resizable().aspectRatio(contentMode: .fill)
-            } else {
-                Image(systemName: "photo").foregroundStyle(.secondary)
-            }
-        }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.15), lineWidth: 1))
-        .accessibilityLabel("Photo")
-    }
-}
-
 /// The camera, for a photo to show the DJ: hands back the picture taken as JPEG data, the right way up.
 struct CameraPicker: UIViewControllerRepresentable {
     let onPhoto: (Data) -> Void
@@ -591,152 +566,6 @@ struct CameraPicker: UIViewControllerRepresentable {
                 image.draw(in: CGRect(origin: .zero, size: size))
             }
         }
-    }
-}
-
-private struct RadioDJLineView: View {
-    let line: RadioDJSession.Line
-    let segments: [RadioDJSegment]
-    let speaking: Bool
-
-    var body: some View {
-        switch line.role {
-        case .listener:
-            VStack(alignment: .trailing, spacing: 6) {
-                if !line.photos.isEmpty {
-                    HStack(spacing: 6) {
-                        Spacer(minLength: 48)
-                        ForEach(line.photos) { RadioDJPhotoThumb(photo: $0, size: line.photos.count == 1 ? 160 : 68) }
-                    }
-                }
-                HStack {
-                    Spacer(minLength: 48)
-                    Text(line.text)
-                        .textSelection(.enabled)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14).padding(.vertical, 9)
-                        .background(RoundedRectangle(cornerRadius: 18).fill(Color.accentColor))
-                }
-            }
-        case .dj:
-            HStack(alignment: .top, spacing: 10) {
-                DJAvatar(speaking: speaking)
-                VStack(alignment: .leading, spacing: 10) {
-                    RadioDJText.text(segments)
-                        .lineSpacing(3)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .modifier(IconLinks())
-                    if !line.sources.isEmpty {
-                        FlowLayout(spacing: 6) {
-                            ForEach(line.sources) { source in
-                                Link(destination: source.url) {
-                                    Label(source.host, systemImage: "link").font(.caption).lineLimit(1)
-                                        .padding(.horizontal, 9).padding(.vertical, 4)
-                                        .background(Capsule().fill(Color(.tertiarySystemFill)))
-                                }
-                                .accessibilityLabel("Source: \(source.title)")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// The red sign over the studio door, glowing while the DJ is talking or looking something up.
-struct OnAirSign: View {
-    let live: Bool
-
-    var body: some View {
-        Text("ON AIR")
-            .font(.system(size: 9, weight: .heavy, design: .rounded))
-            .tracking(1.4)
-            .foregroundStyle(.white)
-            .padding(.horizontal, 6).padding(.vertical, 3)
-            .background(RoundedRectangle(cornerRadius: 4).fill(Color.red.gradient))
-            .shadow(color: .red.opacity(live ? 0.8 : 0.25), radius: live ? 6 : 2)
-            .animation(live ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true) : .default, value: live)
-    }
-}
-
-/// The DJ's words in one `Text` (so they select and wrap as one): links to the collection, and songs to play with a
-/// play icon before them. Links to what you own are in the accent color, the rest (previews, web pages) in `outside`.
-enum RadioDJText {
-    /// The light red at the top of the On Air sign's gradient.
-    static let outside = Color(red: 1, green: 0.42, blue: 0.39)
-
-    static func text(_ segments: [RadioDJSegment]) -> Text {
-        segments.reduce(Text(verbatim: "")) { text, segment in
-            switch segment {
-            case .text(let words):
-                return Text("\(text)\(words)")
-            case .play(let title):
-                let icon = linked(Text(Image(systemName: "play.circle.fill")).foregroundStyle(Color.accentColor), to: title)
-                return Text("\(text)\(icon)\u{202F}\(title)")
-            case .preview(var title):
-                // Not yours: a 30-second sample, in headphones rather than the play button, in the not-yours color.
-                title.foregroundColor = outside
-                let icon = linked(Text(Image(systemName: "headphones.circle")).foregroundStyle(outside), to: title)
-                return Text("\(text)\(icon)\u{202F}\(title)")
-            case .external(var title):
-                // Not yours: opens a page on the web.
-                title.foregroundColor = outside
-                let icon = linked(Text(Image(systemName: "arrow.up.right.square")).font(.caption).foregroundStyle(outside), to: title)
-                return Text("\(text)\(title)\u{202F}\(icon)")
-            }
-        }
-    }
-
-    /// An icon goes where its title's link does (`IconLinks`): a symbol in a `Text` can't carry a link itself.
-    private static func linked(_ icon: Text, to title: AttributedString) -> Text {
-        guard let url = title.runs.first?.link else { return icon }
-        return icon.customAttribute(IconLink(url: url))
-    }
-}
-
-/// Where an icon's run in the DJ's text links to.
-struct IconLink: TextAttribute {
-    let url: URL
-}
-
-/// Makes the icons beside the DJ's links (play, preview, web page) tappable like the links: the text is drawn as
-/// usual while noting where those icons are, and a tap on one opens its link (with `openURL`, as the links do).
-struct IconLinks: ViewModifier {
-    @Environment(\.openURL) private var openURL
-    @State private var icons = IconLinkFrames()
-
-    func body(content: Content) -> some View {
-        content
-            .textRenderer(IconLinkRenderer(icons: icons))
-            .simultaneousGesture(SpatialTapGesture().onEnded { tap in
-                if let url = icons.url(at: tap.location) { openURL(url) }
-            })
-    }
-}
-
-/// The icons' frames as last drawn (a reference, so drawing doesn't update the view).
-final class IconLinkFrames {
-    var frames: [(rect: CGRect, url: URL)] = []
-
-    func url(at point: CGPoint) -> URL? {
-        frames.first { $0.rect.insetBy(dx: -4, dy: -4).contains(point) }?.url
-    }
-}
-
-private struct IconLinkRenderer: TextRenderer {
-    let icons: IconLinkFrames
-
-    func draw(layout: Text.Layout, in ctx: inout GraphicsContext) {
-        var frames: [(rect: CGRect, url: URL)] = []
-        for line in layout {
-            for run in line {
-                if let link = run[IconLink.self] { frames.append((run.typographicBounds.rect, link.url)) }
-                ctx.draw(run)
-            }
-        }
-        icons.frames = frames
     }
 }
 
