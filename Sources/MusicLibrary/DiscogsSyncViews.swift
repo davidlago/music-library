@@ -320,7 +320,7 @@ struct DiscogsSettings: View {
             } header: {
                 Text("Account")
             } footer: {
-                Text("The token is stored in your keychain on this Mac and is only sent to Discogs.")
+                Text("The token is stored in your keychain on this Mac and sent only to Discogs, and to your iPhone when you sync (the Shop there uses it for suggested prices and your Discogs collection).")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if store.isConnected {

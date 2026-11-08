@@ -497,6 +497,12 @@ public enum CDShop: String, Codable, CaseIterable, Sendable, Identifiable {
         }
     }
 
+    /// Whether a page is a bot check rather than the page asked for.
+    public static func isChallenge(title: String) -> Bool {
+        ["Just a moment", "Attention Required", "Pardon Our Interruption", "Security Measure", "Robot Check"]
+            .contains { title.localizedCaseInsensitiveContains($0) }
+    }
+
     /// Whether `url` is an https link on this store's site.
     public func owns(_ url: URL) -> Bool {
         guard url.scheme?.lowercased() == "https", let host = url.host?.lowercased() else { return false }

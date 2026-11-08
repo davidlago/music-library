@@ -24,6 +24,8 @@ public final class RadioDJSession {
         /// What the listener showed with their message.
         public var photos: [RadioDJPhoto] = []
         public var sources: [Source] = []
+        /// Price guides the DJ looked up for this line (`price_guide`), to show with it.
+        public var priceGuides: [PriceGuide] = []
 
         init(role: Role, text: String, photos: [RadioDJPhoto] = []) {
             id = UUID(); self.role = role; self.text = text; self.photos = photos
@@ -40,6 +42,8 @@ public final class RadioDJSession {
         case browsing(String)
         /// Opening the Shop on an album (`open_shop`).
         case shopping(String)
+        /// Looking up what an album sells for (`price_guide`).
+        case pricing(String)
         case speaking
     }
 
@@ -56,7 +60,11 @@ public final class RadioDJSession {
     /// Wikipedia articles checked for artists and albums the DJ mentioned that aren't in the collection
     /// (`WikipediaArticleFinder.key`); only these are linked.
     public private(set) var webPages: [String: URL] = [:]
+    /// Albums the DJ put on screen to pick from (`offer_choices`), until the next message.
+    public private(set) var choices: RadioDJChoices?
     public var isBusy: Bool { activity != .idle }
+    /// In the phone's Shop, with the listener in a record store.
+    public var isInStore: Bool { shopping?.inStore == true }
 
     /// Changes whenever the bottom of the conversation does (a line, the reply growing, the status, an error), for
     /// views to keep it in sight.
@@ -88,6 +96,10 @@ public final class RadioDJSession {
     @ObservationIgnored private let wikipedia: WikipediaArticleFinder?
     /// Opens the Shop for `open_shop` and says what it found (nil: no tool, as on the phone).
     @ObservationIgnored private let shop: (@MainActor (RadioDJShopRequest) async -> String)?
+    /// Prices albums for `price_guide`, and puts the DJ in the record store (nil: no tool).
+    @ObservationIgnored private let shopping: RadioDJShopping?
+    /// Told about each price guide looked up, with the last photo shown (the Shop keeps a list of finds).
+    @ObservationIgnored public var onPriceGuide: (@MainActor (PriceGuide, RadioDJPhoto?) -> Void)?
     @ObservationIgnored private var checkedWeb = Set<String>()
     /// The system prompt, fixed for the whole conversation: the API ties the model's thinking to it, so a changed one
     /// makes every earlier turn invalid ("bound to a different conversation"). Later pages go in the messages.
@@ -98,13 +110,20 @@ public final class RadioDJSession {
     public init(name: String, subject: RadioDJSubject, client: any RadioDJClient, model: RadioDJModel = .default,
                 library: RadioDJLibrary? = nil,
                 linker: RadioDJLinker? = nil, listenerName: String? = nil, wikipedia: WikipediaArticleFinder? = nil,
-                shop: (@MainActor (RadioDJShopRequest) async -> String)? = nil, now: @escaping () -> Date = Date.init,
-                onUsage: @escaping @MainActor (RadioDJTally) -> Void) {
+                shop: (@MainActor (RadioDJShopRequest) async -> String)? = nil, shopping: RadioDJShopping? = nil,
+                now: @escaping () -> Date = Date.init, onUsage: @escaping @MainActor (RadioDJTally) -> Void) {
         self.name = name; self.subject = subject; self.client = client; self.model = model; self.library = library
         self.linker = linker; self.listenerName = listenerName; self.wikipedia = wikipedia; self.shop = shop
-        self.now = now; self.onUsage = onUsage
-        system = [RadioDJ.persona(name: name, listener: listenerName, canSearchCollection: library != nil, canShop: shop != nil),
-                  subject.context]
+        self.shopping = shopping; self.now = now; self.onUsage = onUsage
+        // In the Shop it's the bargain-hunting collector, not the radio host.
+        let persona = if let shopping, shopping.shopper {
+            RadioDJShopping.shopperPersona(name: name, listener: listenerName, canSearchCollection: library != nil,
+                                           readsEbay: shopping.guides.readsEbay, inStore: shopping.inStore)
+        } else {
+            RadioDJ.persona(name: name, listener: listenerName, canSearchCollection: library != nil, canShop: shop != nil)
+                + (shopping.map { RadioDJShopping.persona(readsEbay: $0.guides.readsEbay) } ?? "")
+        }
+        system = [persona, subject.context]
     }
 
     @ObservationIgnored private let now: () -> Date
@@ -122,6 +141,10 @@ public final class RadioDJSession {
         guard !started else { return }
         started = true
         openedFrom = subject
+        if isInStore {
+            lines.append(Line(role: .dj, text: RadioDJShopping.greeting(name: name, listener: listenerName, at: now())))
+            return
+        }
         lines.append(Line(role: .dj, text: RadioDJ.greeting(name: name, listener: listenerName, subject: subject, at: now())))
         suggestions = RadioDJ.suggestions(for: subject, canSearchCollection: library != nil, canShop: shop != nil)
     }
@@ -143,7 +166,10 @@ public final class RadioDJSession {
     public func send(_ text: String, photos: [RadioDJPhoto] = [], page: RadioDJSubject? = nil) {
         let photos = seesPhotos ? Array(photos.prefix(RadioDJPhoto.maxPerMessage)) : []
         var text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if text.isEmpty, !photos.isEmpty { text = RadioDJ.photoQuestion(count: photos.count, canSearchCollection: library != nil) }
+        if text.isEmpty, !photos.isEmpty {
+            text = isInStore ? (lines.contains { !$0.photos.isEmpty } && choices?.retake == true ? RadioDJShopping.anotherPhoto : RadioDJShopping.photoQuestion)
+                : RadioDJ.photoQuestion(count: photos.count, canSearchCollection: library != nil)
+        }
         guard !text.isEmpty, !isBusy else { return }
         var message = text
         if let page, isElsewhere(page) {
@@ -171,10 +197,12 @@ public final class RadioDJSession {
         error = nil
         failed = nil
         suggestions = []
+        choices = nil
         if let display, !repeating { lines.append(Line(role: .listener, text: display, photos: photos)) }
         let turnStart = history.count
         if history.isEmpty, let openedFrom {
-            history.append(.user(RadioDJ.opener(openedFrom, at: now()) + "\n\n" + text, photos: photos))
+            let opener = isInStore ? RadioDJShopping.opener(at: now()) : RadioDJ.opener(openedFrom, at: now())
+            history.append(.user(opener + "\n\n" + text, photos: photos))
             if !countedSegment {
                 countedSegment = true
                 var segment = RadioDJTally()
@@ -210,6 +238,7 @@ public final class RadioDJSession {
     private func reply(into lineID: UUID) async throws {
         let tools = RadioDJ.tools(for: model) + (library == nil ? [] : [RadioDJLibrary.tool, RadioDJLibrary.statsTool])
             + (shop == nil ? [] : [RadioDJShopRequest.tool])
+            + (shopping == nil ? [] : [PriceGuideRequest.tool]) + (isInStore ? [RadioDJChoices.tool] : [])
         var resuming = false
         breakBeforeText = false
         for _ in 0..<RadioDJ.maxRounds {
@@ -233,7 +262,7 @@ public final class RadioDJSession {
                 resuming = true
             case "tool_use" where !result.toolCalls.isEmpty:
                 resuming = false
-                history.append(ClaudeMessage(role: "user", content: await runTools(result.toolCalls)))
+                history.append(ClaudeMessage(role: "user", content: await runTools(result.toolCalls, for: lineID)))
                 try Task.checkCancellation()
             default:
                 return
@@ -266,7 +295,7 @@ public final class RadioDJSession {
     }
 
     /// One `tool_result` per call, all in one message. Collection searches run off the main thread; the Shop opens on it.
-    private func runTools(_ calls: [JSONValue]) async -> [JSONValue] {
+    private func runTools(_ calls: [JSONValue], for lineID: UUID) async -> [JSONValue] {
         var results: [JSONValue] = []
         for call in calls {
             let id = call["id"]?.string ?? ""
@@ -279,6 +308,28 @@ public final class RadioDJSession {
             } else if call["name"]?.string == RadioDJShopRequest.toolName, let shop {
                 switch RadioDJShopRequest.parse(input) {
                 case .success(let request): output = (await shop(request), false)
+                case .failure(let error): output = ("Invalid input: \(error.message).", true)
+                }
+            } else if call["name"]?.string == PriceGuideRequest.toolName, let shopping {
+                switch PriceGuideRequest.parse(input) {
+                case .success(let request):
+                    let guide = await shopping.guides.fullGuide(for: request)
+                    var text = guide.summary
+                    if let library {
+                        let album = guide.title.isEmpty ? request.album : guide.title
+                        let artist = guide.artist.isEmpty ? request.artist : guide.artist
+                        text += "\n" + (await Task.detached(priority: .userInitiated) { library.ownership(album: album, artist: artist) }.value)
+                    }
+                    if let i = lines.firstIndex(where: { $0.id == lineID }) { lines[i].priceGuides.append(guide) }
+                    onPriceGuide?(guide, lines.last { !$0.photos.isEmpty }?.photos.first)
+                    output = (text, false)
+                case .failure(let error): output = ("Invalid input: \(error.message).", true)
+                }
+            } else if call["name"]?.string == RadioDJChoices.toolName, isInStore {
+                switch RadioDJChoices.parse(input) {
+                case .success(let offered):
+                    choices = offered
+                    output = (offered.result, false)
                 case .failure(let error): output = ("Invalid input: \(error.message).", true)
                 }
             } else {
@@ -306,6 +357,8 @@ public final class RadioDJSession {
             case "web_fetch": .reading("")
             case RadioDJLibrary.toolName, RadioDJLibrary.statsToolName: .browsing("")
             case RadioDJShopRequest.toolName: .shopping("")
+            case PriceGuideRequest.toolName: .pricing("")
+            case RadioDJChoices.toolName: .speaking
             default: .searching("")
             }
         case .toolInput(let name, let input):
@@ -314,6 +367,8 @@ public final class RadioDJSession {
             case RadioDJLibrary.toolName: activity = .browsing(input["query"]?.string ?? "")
             case RadioDJLibrary.statsToolName: activity = .browsing(input["section"]?.string.map { "your \($0) stats" } ?? "")
             case RadioDJShopRequest.toolName: activity = .shopping(input["album"]?.string ?? "")
+            case PriceGuideRequest.toolName: activity = .pricing(input["album"]?.string ?? "")
+            case RadioDJChoices.toolName: break
             default: activity = .searching(input["query"]?.string ?? "")
             }
         }

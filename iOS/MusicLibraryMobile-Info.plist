@@ -22,7 +22,7 @@
 	<key>MusicLibraryICloudSigned</key>
 	<string>$(APP_ICLOUD_SIGNED)</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Take a photo of a record or CD to show the Radio DJ, who tells you what it is, whether you have it and what it's worth.</string>
+	<string>Scan a record or CD's barcode in the Shop to see what it's worth and whether you have it, or take a photo of it to show the Radio DJ.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_musiclib-sync._tcp</string>

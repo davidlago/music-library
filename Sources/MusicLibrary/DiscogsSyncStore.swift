@@ -55,6 +55,12 @@ final class DiscogsSyncStore {
 
     var isConnected: Bool { username != nil && hasToken }
 
+    /// The token and username while connected, for the Shop's price guide and the phone.
+    var account: (token: String?, username: String?) {
+        guard isConnected, let token else { return (nil, nil) }
+        return (token, username)
+    }
+
     var folderName: String {
         folders.first { $0.id == folderID }?.name ?? (folderID == DiscogsFolder.uncategorized ? "Uncategorized" : "Folder \(folderID)")
     }

@@ -98,6 +98,12 @@ your copies, plays, links, and concerts near you. They take their color from the
 
 ![The iPhone app: Music DNA centered on Joe Cocker, the Listening report for 30 days, and the Owned pane](../screenshots/iphone-dna-insights.png)
 
+### Shop
+
+For record stores and fairs: look a CD or record up by name or by scanning its barcode, and see its price guide (Discogs
+and eBay), whether you already have it, and where to buy it; with the Radio DJ on, show your crate-digging friend a
+photo of it instead. See [Shop](shop.md#on-iphone).
+
 ### Search
 
 The same search language as the Mac, including `own:` and labels like `cd 12`.
@@ -123,10 +129,12 @@ phone looks for the Mac's syncs only while Sync is open.
 
 ## Settings
 
-The gear at the top of Listen Now (and of the Collection tab):
+The gear at the top of Listen Now (and of the Collection and Shop tabs):
 
 - **Appearance**: **System** (follows your iPhone's light or dark setting), **Light** or **Dark**.
 - **Match the DAC's sample rate** (on by default) and the current output.
+- **Shop**: the Discogs account your Mac handed over, and **Sign In to eBay…** for recent sold prices in the price
+  guide (see [Shop](shop.md#ebay-sold-prices)).
 - **Radio DJ**: the DJ's name, yours, and this phone's spending (set up on the Mac; see [Radio DJ](radio-dj.md)).
 - **Last.fm**: connected from the Mac at the first sync, or enter an API key and shared secret and tap **Connect…**. The
   phone scrobbles what it plays itself; scrobbles made offline are sent when it's back online.

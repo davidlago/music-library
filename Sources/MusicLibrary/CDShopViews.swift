@@ -250,6 +250,11 @@ private struct CDShopOffersSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
+            if store.isPricing {
+                ProgressView("Reading the price guide on Discogs\(store.ebay.isSignedIn ? " and eBay" : "")…").controlSize(.small)
+            } else if let guide = store.priceGuide {
+                PriceGuideView(guide: guide)
+            }
             shopChips
             filters
             if let error = store.resolveError {
@@ -322,6 +327,10 @@ private struct CDShopOffersSection: View {
                                                            barcode: target.typedBarcode))
             }
             .help("Add this \(target.format.noun) to your physical collection, with your label number and what you paid")
+            if model.radioDJ.isEnabled {
+                Button { model.askRadioDJ(about: target) } label: { Label("Ask \(model.radioDJ.displayName)", systemImage: RadioDJIcon.name) }
+                    .help("\(model.radioDJ.displayName) tells you about it, whether it's worth adding to your collection and what to pay")
+            }
             Button { store.unlock() } label: { Label("Choose Another", systemImage: "chevron.backward") }
                 .help("Back to the editions")
         }

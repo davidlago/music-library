@@ -43,6 +43,8 @@ final class PhoneModel {
     /// The library from the Mac's iCloud backup, when the app has an iCloud container.
     let cloud = PhoneCloud()
     let concerts = PhoneConcerts()
+    /// The Shop: price guides, the DJ in a record store, recent finds.
+    let shop = PhoneShop()
     /// The Radio DJ, on once the Mac has handed over a Claude API key.
     let radioDJ = PhoneRadioDJ()
     /// Plays and likes since the last sync (and ownership changes from versions that could edit it here).
@@ -178,7 +180,11 @@ final class PhoneModel {
             self?.refreshOverlays()
         }
         sync.storeConcerts = { [weak self] settings in self?.concerts.adopt(settings) }
-        sync.storeRadioDJ = { [weak self] settings in self?.radioDJ.adopt(settings) }
+        sync.storeRadioDJ = { [weak self] settings in
+            self?.radioDJ.adopt(settings)
+            self?.shop.adoptDiscogs(token: settings.discogsToken, username: settings.discogsUsername)
+            if self?.radioDJ.isEnabled != true { self?.shop.endSession() }
+        }
         sync.radioDJUsage = { [weak self] in self?.radioDJ.usage }
         radioDJ.location = { [weak self] in self?.radioDJLocation }
         sync.isLastFMConnected = { [weak self] in

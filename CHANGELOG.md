@@ -7,6 +7,22 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.33.0
+
+- New: the Shop has a price guide, on the Mac and the iPhone: a fair price to lead with, Discogs' figures for the edition,
+  the most collected one and the original (with suggested prices by condition and the versions in your Discogs collection
+  when Discogs is connected), and what copies are listed for on eBay. Sign in to eBay in **Settings ▸ Shop** (optional; on
+  eBay's own page, the app never sees your password) to add what copies recently sold for.
+  [Shop](https://github.com/davidlago/music-library/blob/main/docs/guide/shop.md#price-guide)
+- New: a **Shop** tab on the iPhone, for record stores and fairs: look a CD or record up by name or by scanning its
+  barcode, and see its price guide, whether you already have it and where to buy it, with your recent finds kept.
+  Your Mac hands over its Discogs account when you sync.
+  [Shop on iPhone](https://github.com/davidlago/music-library/blob/main/docs/guide/shop.md#on-iphone)
+- New: with the Radio DJ on, the Shop has an AI crate-digging friend, a bargain-hunting audiophile collector: snap a
+  record in a store and it works out which one it is (offering likely albums to tap, or asking for a photo of the back
+  when it can't tell), prices it, checks your collection and tells you whether it's worth taking home. On the Mac, **Ask**
+  next to the album you're shopping for. The Radio DJ can also look up the price guide anywhere.
+  [Your crate-digging friend](https://github.com/davidlago/music-library/blob/main/docs/guide/shop.md#your-crate-digging-friend)
 - Changed: the Mac and the iPhone now draw CDs, records, label stickers and badges with the same code, so they look
   alike: on the Mac, the number of copies you own shows on the case or sleeve itself (as on the iPhone), and on the
   iPhone, record sleeves get the Mac's cardboard finish and a download album with only some songs bought says so.

@@ -505,8 +505,10 @@ public enum DollarFormat {
 }
 
 /// What the Mac hands the phone at each sync: the API keys (nil when removed on the Mac, which turns the DJ off on the
-/// phone too unless the other one runs the chosen model), the model and the DJ's name. Phones before 1.27 read only
-/// `apiKey` and run Claude Opus 5.5 with it.
+/// phone too unless the other one runs the chosen model), the model and the DJ's name, and the Discogs account for the
+/// Shop's price guide (nil when not connected; it rides here because this is the message that carries secrets, and it
+/// goes whether or not the DJ is on). Phones before 1.27 read only `apiKey` and run Claude Opus 5.5 with it; older
+/// phones ignore the Discogs fields.
 public struct SyncRadioDJ: Codable, Equatable, Sendable {
     /// The Claude API key.
     public var apiKey: String?
@@ -516,13 +518,18 @@ public struct SyncRadioDJ: Codable, Equatable, Sendable {
     public var openRouterKey: String?
     /// The chosen model (nil from Macs before 1.27: Claude Opus 5.5).
     public var model: RadioDJModel?
+    /// The Discogs personal access token and its username (nil: not connected, or a Mac before 1.33).
+    public var discogsToken: String?
+    public var discogsUsername: String?
 
-    public init(apiKey: String?, name: String, listenerName: String? = nil, openRouterKey: String? = nil, model: RadioDJModel? = nil) {
+    public init(apiKey: String?, name: String, listenerName: String? = nil, openRouterKey: String? = nil, model: RadioDJModel? = nil,
+                discogsToken: String? = nil, discogsUsername: String? = nil) {
         self.apiKey = apiKey; self.name = name; self.listenerName = listenerName
         self.openRouterKey = openRouterKey; self.model = model
+        self.discogsToken = discogsToken; self.discogsUsername = discogsUsername
     }
 
-    private enum CodingKeys: String, CodingKey { case apiKey, name, listenerName, openRouterKey, model }
+    private enum CodingKeys: String, CodingKey { case apiKey, name, listenerName, openRouterKey, model, discogsToken, discogsUsername }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -532,5 +539,10 @@ public struct SyncRadioDJ: Codable, Equatable, Sendable {
         openRouterKey = try? c.decodeIfPresent(String.self, forKey: .openRouterKey)
         // A model this version can't read (a provider added later) mustn't fail the whole message: the default runs.
         model = (try? c.decodeIfPresent(RadioDJModel.self, forKey: .model))?.sanitized
+        // Untrusted like everything from the wire: only a token that can go in a header, a username that can go in a path.
+        discogsToken = (try? c.decodeIfPresent(String.self, forKey: .discogsToken))?.flatMap(DiscogsToken.cleaned)
+        discogsUsername = (try? c.decodeIfPresent(String.self, forKey: .discogsUsername))?.flatMap {
+            DiscogsIdentity.isValidUsername($0) ? $0 : nil
+        }
     }
 }

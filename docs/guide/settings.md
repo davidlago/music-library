@@ -44,7 +44,13 @@ artist pages** (on). See [Concerts](concerts.md).
 ## Discogs
 
 Your Discogs personal access token (**Connect**), the account it's connected to, and the folder **Sync to Discogs**
-adds new copies to. See [Physical Collection](physical-collection.md#sync-to-discogs).
+adds new copies to. See [Physical Collection](physical-collection.md#sync-to-discogs). The Shop's price guide uses the
+same account, and your iPhone gets it when you sync.
+
+## Shop
+
+Whether Discogs is connected (for suggested prices and your Discogs collection in the price guide), and **Sign In to
+eBay…** / **Sign Out** for recent sold prices. See [Shop](shop.md#price-guide).
 
 ## iCloud
 

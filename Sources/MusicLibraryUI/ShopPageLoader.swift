@@ -1,14 +1,13 @@
-import AppKit
 import Foundation
 import MusicLibraryCore
 import WebKit
 
-enum CDShopError: LocalizedError {
+public enum CDShopError: LocalizedError {
     case blocked
     case timedOut
     case unexpectedPage
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .blocked: "The site asked to check that you're not a robot. Open it in your browser instead."
         case .timedOut: "The site didn't answer in time."
@@ -17,19 +16,23 @@ enum CDShopError: LocalizedError {
     }
 }
 
-/// Opens marketplace pages in hidden web views, one per store, and hands back the HTML as WebKit rendered it.
+/// Opens marketplace pages in hidden web views, one per store, and hands back the HTML as WebKit rendered it (the
+/// Mac Shop's listings), or what a script makes of the page (eBay's prices in the price guide, on both apps).
 /// The stores sit behind bot checks (Cloudflare, eBay's own) that turn URLSession away but let a browser engine
-/// through after a moment, and Discogs draws its listings with script. Nothing is signed in to. Each store gets
-/// one page at a time, a few seconds apart, like someone browsing; the default (persistent) website data store
-/// keeps the cookies the checks set, so later visits go straight through.
+/// through after a moment, and Discogs draws its listings with script. Each store gets one page at a time, a few
+/// seconds apart, like someone browsing; the default (persistent) website data store keeps the cookies the checks
+/// set, so later visits go straight through, and the eBay sign-in the user made in `EbaySignInView`, if any (the
+/// only sign-in used: the app never sees the password).
 @MainActor
-final class CDShopPageLoader: NSObject, WKNavigationDelegate {
+public final class CDShopPageLoader: NSObject, WKNavigationDelegate {
     private var views: [CDShop: WKWebView] = [:]
     private var chains: [CDShop: Task<Void, Never>] = [:]
     private var lastLoad: [CDShop: Date] = [:]
     private var waiters: [ObjectIdentifier: [CheckedContinuation<Void, Never>]] = [:]
 
     static let gap: TimeInterval = 3
+
+    public override init() { super.init() }
 
     /// Elements that show a page has its listings, or says it has none.
     private static func readySelector(_ shop: CDShop) -> String? {
@@ -39,7 +42,23 @@ final class CDShopPageLoader: NSObject, WKNavigationDelegate {
         }
     }
 
-    func html(_ url: URL, shop: CDShop) async throws -> String {
+    public func html(_ url: URL, shop: CDShop) async throws -> String {
+        try await queued(shop) { v in
+            (try await v.evaluateJavaScript("document.documentElement.outerHTML")) as? String ?? ""
+        } load: { try await self.load(url, shop: shop) }
+    }
+
+    /// Runs `script` (a function body returning a string, for `callAsyncJavaScript`) in the page once it's loaded.
+    /// An eBay page that went to eBay's sign-in instead throws `EbayReadError.signInNeeded`.
+    public func run(_ script: String, on url: URL, shop: CDShop) async throws -> String {
+        try await queued(shop) { v in
+            (try await v.callAsyncJavaScript(script, arguments: [:], contentWorld: .defaultClient)) as? String ?? ""
+        } load: { try await self.load(url, shop: shop) }
+    }
+
+    /// One page at a time per store, `gap` apart.
+    private func queued(_ shop: CDShop, read: @escaping @MainActor (WKWebView) async throws -> String,
+                        load: @escaping @MainActor () async throws -> WKWebView) async throws -> String {
         let previous = chains[shop]
         let task = Task { @MainActor () async throws -> String in
             await previous?.value
@@ -48,7 +67,7 @@ final class CDShopPageLoader: NSObject, WKNavigationDelegate {
                 if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
             }
             defer { lastLoad[shop] = Date() }
-            return try await load(url, shop: shop)
+            return try await read(try await load())
         }
         chains[shop] = Task { _ = await task.result }
         return try await task.value
@@ -62,13 +81,13 @@ final class CDShopPageLoader: NSObject, WKNavigationDelegate {
         config.preferences.inactiveSchedulingPolicy = .none
         config.mediaTypesRequiringUserActionForPlayback = .all
         // Tall, because Discogs only draws the listings in view.
-        let v = WKWebView(frame: NSRect(x: 0, y: 0, width: 1280, height: 10_000), configuration: config)
+        let v = WKWebView(frame: CGRect(x: 0, y: 0, width: 1280, height: 10_000), configuration: config)
         v.navigationDelegate = self
         views[shop] = v
         return v
     }
 
-    private func load(_ url: URL, shop: CDShop, attempt: Int = 0) async throws -> String {
+    private func load(_ url: URL, shop: CDShop, attempt: Int = 0) async throws -> WKWebView {
         let v = view(for: shop)
         v.load(URLRequest(url: url))
         await waitForNavigation(v, timeout: 30)
@@ -76,7 +95,11 @@ final class CDShopPageLoader: NSObject, WKNavigationDelegate {
         var lastLength = -1
         while true {
             let title = (try? await v.evaluateJavaScript("document.title")) as? String ?? ""
-            if CDShopParser.isChallenge(title: title) {
+            if shop == .ebay, let at = v.url, EbaySession.isSignInPage(at) {
+                // Sold listings need a signed-in eBay (and eBay may ask a signed-out visitor to prove they're human
+                // on the way there): never answered here.
+                throw EbayReadError.signInNeeded
+            } else if CDShop.isChallenge(title: title) {
                 if Date().timeIntervalSince(started) > 25 { throw CDShopError.blocked }
             } else if shop == .ebay, title.hasPrefix("Error Page") {
                 // eBay turns searches away now and then, more so in a row (and wants its home page first on a
@@ -108,7 +131,7 @@ final class CDShopPageLoader: NSObject, WKNavigationDelegate {
             if Date().timeIntervalSince(started) > 40 { throw CDShopError.timedOut }
             try? await Task.sleep(for: .seconds(0.75))
         }
-        return (try await v.evaluateJavaScript("document.documentElement.outerHTML")) as? String ?? ""
+        return v
     }
 
     // MARK: Navigation
@@ -129,15 +152,30 @@ final class CDShopPageLoader: NSObject, WKNavigationDelegate {
         list.forEach { $0.resume() }
     }
 
-    nonisolated func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+    nonisolated public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         MainActor.assumeIsolated { finish(ObjectIdentifier(webView)) }
     }
 
-    nonisolated func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+    nonisolated public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         MainActor.assumeIsolated { finish(ObjectIdentifier(webView)) }
     }
 
-    nonisolated func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+    nonisolated public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         MainActor.assumeIsolated { finish(ObjectIdentifier(webView)) }
+    }
+}
+
+extension CDShopPageLoader {
+    /// eBay for the price guide: pages read here, sign-in state from `session`.
+    public func ebayReader(_ session: EbaySession, readsForSale: Bool = true) -> EbayReader {
+        EbayReader(page: { [weak self] url in
+            guard let self else { throw CancellationError() }
+            do {
+                return try await self.run(EbayPrices.script, on: url, shop: .ebay)
+            } catch EbayReadError.signInNeeded {
+                await MainActor.run { session.signInExpired() }
+                throw EbayReadError.signInNeeded
+            }
+        }, signedIn: { await MainActor.run { session.isSignedIn } }, readsForSale: readsForSale)
     }
 }

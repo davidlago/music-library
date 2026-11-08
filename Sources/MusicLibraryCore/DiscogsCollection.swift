@@ -68,16 +68,18 @@ public struct DiscogsInstance: Hashable, Sendable, Identifiable {
     public var year: Int?
     public var catalogNumber: String
     public var dateAdded: Date?
+    /// The album (Discogs master) the release is a version of.
+    public var masterID: Int?
 
     public var id: Int { instanceID }
     public var webURL: URL? { DiscogsLink.releaseURL(releaseID) }
 
     public init(instanceID: Int, releaseID: Int, folderID: Int = DiscogsFolder.uncategorized, title: String = "", artist: String = "",
                 formatDetail: String = "", medium: CollectionMedium? = nil, year: Int? = nil, catalogNumber: String = "",
-                dateAdded: Date? = nil) {
+                dateAdded: Date? = nil, masterID: Int? = nil) {
         self.instanceID = instanceID; self.releaseID = releaseID; self.folderID = folderID; self.title = title
         self.artist = artist; self.formatDetail = formatDetail; self.medium = medium; self.year = year
-        self.catalogNumber = catalogNumber; self.dateAdded = dateAdded
+        self.catalogNumber = catalogNumber; self.dateAdded = dateAdded; self.masterID = masterID
     }
 }
 
@@ -119,7 +121,8 @@ public enum DiscogsCollectionParser {
                 title: DiscogsParser.trimmed(info["title"] as? String ?? ""), artist: DiscogsParser.credit(info["artists"]),
                 formatDetail: media.isEmpty ? "" : CDEditionParser.formatSummary(media), medium: CollectionMedium(musicBrainzFormats: media),
                 year: (info["year"] as? Int).flatMap { (1000...9999).contains($0) ? $0 : nil }, catalogNumber: catno ?? "",
-                dateAdded: (r["date_added"] as? String).flatMap(dates.date(from:)))
+                dateAdded: (r["date_added"] as? String).flatMap(dates.date(from:)),
+                masterID: (info["master_id"] as? Int).flatMap { DiscogsLink.isValid($0) ? $0 : nil })
         }
         return (instances, max(1, pages))
     }
@@ -285,7 +288,7 @@ public actor DiscogsCollectionClient {
         recent.append(Date())
     }
 
-    private func send(_ method: String, path: String, query: [String: String] = [:]) async throws -> Data {
+    func send(_ method: String, path: String, query: [String: String] = [:]) async throws -> Data {
         guard var c = URLComponents(string: DiscogsClient.baseURL + path) else { throw DiscogsError.badResponse }
         if !query.isEmpty { c.queryItems = query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) } }
         guard let url = c.url else { throw DiscogsError.badResponse }
