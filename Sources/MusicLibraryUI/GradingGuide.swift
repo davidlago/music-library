@@ -22,91 +22,172 @@ public enum GradingNotes {
         public var grades: [CollectionGrade] { self == .sleeve ? CollectionGrade.sleeve : CollectionGrade.media }
     }
 
-    /// One sentence: the grade in a nutshell.
-    public static func summary(_ grade: CollectionGrade) -> String {
-        switch grade {
-        case .mint: "Perfect and, almost always, still sealed. Rarely the right grade for anything you've opened."
-        case .nearMint: "Looks and plays like new. The best grade for an opened copy."
-        case .veryGoodPlus: "Shows that it's been played and cared for. A great copy most buyers are happy with."
-        case .veryGood: "Clearly used: you'll see and hear wear, but it still plays all the way through."
-        case .goodPlus, .good: "Well worn. It plays without skipping, with noise throughout. Mostly a placeholder copy."
-        case .fair, .poor: "Damaged: it skips, repeats, is cracked or badly warped. Bought only when nothing else exists."
-        case .generic: "A plain sleeve, not the original printed one."
-        case .notGraded: "You haven't looked at it closely yet."
-        case .noCover: "The sleeve or case is missing."
+    /// The grade in a sentence, for this part: what decides it.
+    public static func summary(_ grade: CollectionGrade, part: Part) -> String {
+        switch (part, grade) {
+        case (.record, .mint):
+            "Perfect in every way, never played. Almost always still sealed: grade an opened record Near Mint at best."
+        case (.record, .nearMint):
+            "Looks and plays as if it came out of the sleeve for the first time: glossy, unmarked, no added noise."
+        case (.record, .veryGoodPlus):
+            "Played and handled by a careful owner: light signs of use you can see, but they don't spoil the listening."
+        case (.record, .veryGood):
+            "Clearly used. Surface noise and clicks in quiet passages and between tracks, but the music comes first."
+        case (.record, .goodPlus):
+            "Well worn, at the better end of Good: noise throughout, but it plays from start to finish without skipping."
+        case (.record, .good):
+            "Heavily worn. It still plays through without skipping, but the noise is part of every track."
+        case (.record, .fair):
+            "Damaged: it skips or repeats in places, or is warped or cracked enough to affect play."
+        case (.record, .poor):
+            "Barely playable or unplayable: cracked, badly warped, or skipping throughout."
+        case (.cd, .mint):
+            "Sealed and untouched."
+        case (.cd, .nearMint):
+            "No marks you can see, even under a light, and it plays perfectly."
+        case (.cd, .veryGoodPlus):
+            "Light handling marks on the playing side, seen under a light; it plays perfectly."
+        case (.cd, .veryGood):
+            "Scuffs and scratches you see at a glance, but it still plays all the way through without errors."
+        case (.cd, .goodPlus):
+            "Well scratched, but it still plays through; a rip may need a second read."
+        case (.cd, .good):
+            "Heavily scratched: it plays, but some players struggle with it and a rip may come out inaccurate."
+        case (.cd, .fair), (.cd, .poor):
+            "Skips, won't read, or is cracked or rotting."
+        case (.sleeve, .mint):
+            "Still in its original shrink wrap: sharp corners and not a mark on it."
+        case (.sleeve, .nearMint):
+            "Looks new: sharp corners and edges, no ring wear, no creases, no splits, no writing or stickers."
+        case (.sleeve, .veryGoodPlus):
+            "Lightly handled: faint ring wear or a little wear at the corners and edges, but whole and clean."
+        case (.sleeve, .veryGood):
+            "Clearly used: ring wear you see straight on, worn corners, creases, perhaps a short split or some writing."
+        case (.sleeve, .goodPlus):
+            "Well worn but whole: heavy ring wear and worn edges, a split seam or a tape repair, some writing."
+        case (.sleeve, .good):
+            "Heavily worn: splits along more than one seam, tape, heavy writing or stains, but still in one piece."
+        case (.sleeve, .fair), (.sleeve, .poor):
+            "Badly damaged: torn, split along most of its seams, pieces missing, water-damaged or written over."
+        case (_, .generic):
+            "A plain or generic sleeve or case, not the one the album came in."
+        case (_, .notGraded):
+            "Not looked at closely yet."
+        case (_, .noCover):
+            "The sleeve or case is missing: only the record or disc is there."
+        case (.record, _), (.cd, _):
+            ""  // the sleeve-only grades never come up for a record or a disc
         }
     }
 
-    /// What to look for, as short points.
+    /// What to check, as short points.
     public static func points(_ grade: CollectionGrade, part: Part) -> [String] {
         switch (part, grade) {
         case (.record, .mint):
-            ["Factory sealed, or opened but never played", "Not a mark on the vinyl, even under a bright light",
-             "No warp, no wear on the labels"]
+            ["Never played; sealed copies are the usual Mint",
+             "No marks of any kind, no warp, labels perfect"]
         case (.record, .nearMint):
-            ["Glossy with no visible marks: perhaps one faint sleeve scuff seen only at an angle",
-             "Silent between tracks apart from the pressing's own sound", "Labels clean, no spindle marks around the hole"]
+            ["Surface glossy and clean under a bright light",
+             "No added surface noise when played",
+             "Labels clean: no writing, stickers or spindle marks around the hole",
+             "Flat: no warp"]
         case (.record, .veryGoodPlus):
-            ["A few light scuffs or hairlines that you can't feel with a fingernail",
-             "Plays cleanly: maybe a soft tick or a little surface noise in quiet passages",
-             "A few faint spindle marks, or a little writing on the label, are fine", "No warp that affects play"]
+            ["A few light scuffs or fine hairlines you can see but not feel with a fingernail",
+             "Plays cleanly; at most a faint tick or a little noise in the quietest moments",
+             "A few spindle marks or light wear on the label",
+             "A slight warp is fine if it doesn't affect play",
+             "Typically worth about half a Near Mint copy"]
         case (.record, .veryGood):
-            ["Groove wear and light scratches you can see from arm's length",
-             "Surface noise and clicks you'll hear in quiet parts, but they don't drown the music",
-             "Labels may have writing, stickers or wear", "Loses roughly half the price of a VG+ copy"]
+            ["Light scratches you can feel, and groove wear that makes the surface look duller",
+             "Surface noise and clicks you hear in quiet parts and in the lead-in and run-out",
+             "Writing, stickers or tape on the label",
+             "Typically worth about a quarter of a Near Mint copy"]
         case (.record, .goodPlus), (.record, .good):
-            ["Heavy scuffing and scratches; the surface looks dull or grey",
-             "Constant noise, but it plays through without skipping", "Labels torn, written on or stained",
-             "G+ is the better end of this range"]
+            ["Heavy scuffing and scratches; the grooves look grey or worn",
+             "Noise all the way through, but no skips or repeats",
+             "Label worn, torn, written on or stained",
+             "Worth a small fraction of Near Mint; a copy to have until a better one turns up"]
         case (.record, .fair), (.record, .poor):
-            ["Deep scratches that make it skip or repeat", "Cracked, chipped or badly warped",
-             "Worth keeping only for the sleeve or as a rarity"]
+            ["Skips or repeats",
+             "Cracked, chipped, or warped enough that the needle won't track",
+             "Kept for the sleeve, or because it's rare"]
         case (.cd, .mint):
-            ["Sealed, or never played", "No marks on either side of the disc"]
+            ["Factory sealed"]
         case (.cd, .nearMint):
-            ["At most one or two tiny marks seen only under a light", "Plays perfectly, nothing on the label side"]
+            ["No visible marks on either side of the disc",
+             "Case uncracked, booklet and back insert crisp"]
         case (.cd, .veryGoodPlus):
-            ["Light hairline scratches from handling", "Plays with no errors or skips",
-             "Look at the label side too: scratches there can reach the data and can't be polished out"]
+            ["Fine hairlines on the shiny side, seen only under a light",
+             "No marks on the label side (the data sits just under it, so damage there is permanent)",
+             "Plays without errors or skips"]
         case (.cd, .veryGood):
-            ["Plenty of visible scratches and scuffs", "Still plays through (a rip may need a re-read or two)",
-             "Check it with Rip and AccurateRip if it's in the library"]
-        case (.cd, .goodPlus), (.cd, .good):
-            ["Heavily scratched", "Some players struggle with it, a rip may be inaccurate", "Label side worn"]
+            ["Scratches and scuffs visible at a glance on the shiny side",
+             "Still plays through without skips",
+             "A check with AccurateRip after ripping tells you if it reads cleanly"]
+        case (.cd, .goodPlus):
+            ["Many scratches on the shiny side, a few deep",
+             "Plays through; a rip may need Rip Again's extra reads",
+             "Label side lightly worn"]
+        case (.cd, .good):
+            ["Deep scratches all over",
+             "Some players skip; a rip may come out inaccurate",
+             "Label side worn"]
         case (.cd, .fair), (.cd, .poor):
-            ["Skips or won't read", "Cracked, warped, or the label side is peeling (disc rot)"]
+            ["Won't play or skips badly",
+             "Cracked, warped, or the label side is peeling or pinholed (disc rot)"]
         case (.sleeve, .mint):
-            ["Sealed in its original shrink wrap, sharp corners", "No marks of any kind"]
+            ["Original shrink wrap intact",
+             "Corners and spine sharp"]
         case (.sleeve, .nearMint):
-            ["Looks new: sharp corners, no creases, no ring wear", "No writing, stickers or price tags",
-             "For a CD: a clean, uncracked case and a crisp booklet"]
+            ["No ring wear, creases or seam splits",
+             "Sharp corners, clean spine",
+             "No writing, stickers or price tags (an original hype sticker is fine)",
+             "No cut-out mark (a punched hole, clipped corner or saw cut from a remainder bin)",
+             "For a CD: case uncracked, booklet and back insert crisp"]
         case (.sleeve, .veryGoodPlus):
-            ["Slight wear at the corners or edges", "A faint ring where the record pressed through, seen at an angle",
-             "No seam splits; a small price sticker or name in a corner is fine",
-             "For a CD: a scuffed or replaced case is fine if the booklet and back card are good"]
+            ["Faint ring wear, seen when you tilt it to the light",
+             "Slightly worn corners or edges, perhaps a light crease",
+             "No seam splits",
+             "A small price sticker or a name in a corner, a cut-out mark at most",
+             "For a CD: a scuffed case is fine (cases are easily replaced); booklet with light wear"]
         case (.sleeve, .veryGood):
-            ["Ring wear you see straight on, creases, worn corners",
-             "A short seam split (a few centimetres), writing or stickers", "For a CD: a booklet with creases or a stain"]
-        case (.sleeve, .goodPlus), (.sleeve, .good):
-            ["Heavy ring wear, splits along a seam, tape repairs", "Writing, stains or water damage",
-             "For a CD: a torn booklet or a missing back card"]
+            ["Ring wear you see straight on",
+             "Worn corners and edges, creases",
+             "A seam split of a few centimetres",
+             "Writing, stickers or price tags",
+             "For a CD: booklet creased or a little stained"]
+        case (.sleeve, .goodPlus):
+            ["Heavy ring wear, some fading",
+             "A seam split along one side, or taped",
+             "Writing or stickers on the front or back",
+             "For a CD: booklet torn or heavily creased"]
+        case (.sleeve, .good):
+            ["Heavy ring wear, fading or discolouring",
+             "Seams split along more than one side",
+             "Tape repairs, heavy writing, stains or water marks",
+             "For a CD: booklet missing pages, back insert damaged"]
         case (.sleeve, .fair), (.sleeve, .poor):
-            ["Split along most of a seam, pieces missing", "Badly stained, torn or written over"]
+            ["Torn or split along most seams, pieces missing",
+             "Heavy water damage, mould or writing all over",
+             "For a CD: booklet or back insert missing"]
         case (_, .generic):
-            ["A plain paper or card sleeve, or a CD in a case that isn't its own", "Grade the record or disc on its own"]
+            ["A plain paper or card sleeve, a company sleeve, or a CD in a case that isn't its own",
+             "Grade the record or disc on its own"]
         case (_, .notGraded):
-            ["Leave it until you've looked: a grade guessed high can cost more than no grade"]
+            ["Leave it until you've had a proper look: a grade guessed too high misleads more than none"]
         case (_, .noCover):
             ["Only the record or disc is there"]
+        case (.record, _), (.cd, _):
+            []
         }
     }
 
     /// How to grade, before the grades.
     public static let tips = [
-        "Grade the record or disc and its sleeve or case apart: they're two grades.",
-        "Look under a bright lamp, tilting the record or disc to catch the light, then listen to a few minutes of each side.",
-        "When the look and the sound disagree, take the lower of the two.",
-        "Be strict: most played copies are VG+ or VG. Near Mint means hard to tell from new, and Mint usually means sealed.",
+        "Grade the record (or disc) and its sleeve (or case) separately: they're two grades.",
+        "Look under a bright lamp, tilting it to catch the light, then play a few minutes of each side, the quiet parts especially.",
+        "When the look and the sound disagree, use the lower one.",
+        "Be strict. Most played copies are VG+ or VG; Near Mint means hard to tell from new, and Mint usually means sealed.",
         "A mark you can feel with a fingernail is a scratch; one you can only see is a scuff or hairline.",
     ]
 }
@@ -114,25 +195,47 @@ public enum GradingNotes {
 // MARK: The guide
 
 /// The grading guide: tips, then each grade with a drawing of a copy in that condition and what to look for. The
-/// pickers open it with the grade being edited; `part` picks record, CD or sleeve.
+/// pickers open it with the grade being edited; `part` picks record, CD or sleeve. With `choose`, clicking a grade
+/// chooses it for that part (the Mac's editor); without, it's for reading (the iPhone).
 public struct GradingGuide: View {
     @State private var part: GradingNotes.Part
-    private let highlighted: CollectionGrade?
+    private let parts: [GradingNotes.Part]
+    private let selected: (GradingNotes.Part) -> CollectionGrade?
+    private let choose: ((GradingNotes.Part, CollectionGrade) -> Void)?
+    @State private var hovered: CollectionGrade?
 
+    /// For reading, with `highlighted` outlined under `part`.
     public init(part: GradingNotes.Part = .record, highlighted: CollectionGrade? = nil) {
         _part = State(initialValue: part)
-        self.highlighted = highlighted
+        parts = GradingNotes.Part.allCases
+        selected = { [part] p in p == part ? highlighted : nil }
+        choose = nil
     }
+
+    /// For choosing: `parts` are the copy's (its record or disc, and the sleeve), `selected` the grade each has now.
+    public init(part: GradingNotes.Part, parts: [GradingNotes.Part], selected: @escaping (GradingNotes.Part) -> CollectionGrade?,
+                choose: @escaping (GradingNotes.Part, CollectionGrade) -> Void) {
+        _part = State(initialValue: part)
+        self.parts = parts
+        self.selected = selected
+        self.choose = choose
+    }
+
+    private var highlighted: CollectionGrade? { selected(part) }
 
     public var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Picker("Grading", selection: $part) {
-                        ForEach(GradingNotes.Part.allCases) { Text($0.name).tag($0) }
+                        ForEach(parts) { Text($0.name).tag($0) }
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
+                    if choose != nil {
+                        Text("\(Layout.chooseVerb) a grade to give it to your copy\(part == .sleeve ? "'s sleeve" : "").")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
                     tips
                     ForEach(part.grades, id: \.self) { grade in
                         row(grade).id(grade)
@@ -143,6 +246,9 @@ public struct GradingGuide: View {
                 .padding(Layout.padding)
             }
             .onAppear {
+                if let highlighted, part.grades.contains(highlighted) { proxy.scrollTo(highlighted, anchor: .top) }
+            }
+            .onChange(of: part) {
                 if let highlighted, part.grades.contains(highlighted) { proxy.scrollTo(highlighted, anchor: .top) }
             }
         }
@@ -164,7 +270,19 @@ public struct GradingGuide: View {
         .card()
     }
 
+    @ViewBuilder
     private func row(_ grade: CollectionGrade) -> some View {
+        if let choose {
+            Button { choose(part, grade) } label: { card(grade) }
+                .buttonStyle(.plain)
+                .onHover { hovered = $0 ? grade : (hovered == grade ? nil : hovered) }
+                .accessibilityLabel("Choose \(grade.name)")
+        } else {
+            card(grade)
+        }
+    }
+
+    private func card(_ grade: CollectionGrade) -> some View {
         HStack(alignment: .top, spacing: 14) {
             GradeIllustration(grade: grade, part: part)
                 .frame(width: Layout.picture, height: Layout.picture)
@@ -173,8 +291,17 @@ public struct GradingGuide: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(grade.name).font(.headline)
                     if grade.isMediaGrade { Text(grade.short).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary) }
+                    Spacer(minLength: 0)
+                    if choose != nil {
+                        if grade == highlighted {
+                            Label("Chosen", systemImage: "checkmark.circle.fill").font(.caption.weight(.semibold))
+                                .foregroundStyle(Color.accentColor)
+                        } else if grade == hovered {
+                            Text("Choose").font(.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
+                        }
+                    }
                 }
-                Text(GradingNotes.summary(grade)).font(.callout).fixedSize(horizontal: false, vertical: true)
+                Text(GradingNotes.summary(grade, part: part)).font(.callout).fixedSize(horizontal: false, vertical: true)
                 ForEach(GradingNotes.points(grade, part: part), id: \.self) { point in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text("•").foregroundStyle(.secondary)
@@ -187,8 +314,12 @@ public struct GradingGuide: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
         .card()
         .overlay {
+            if grade == hovered, grade != highlighted {
+                RoundedRectangle(cornerRadius: Metrics.cardRadius).strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1.5)
+            }
             if grade == highlighted {
                 RoundedRectangle(cornerRadius: Metrics.cardRadius).strokeBorder(Color.accentColor, lineWidth: 2)
             }
@@ -196,6 +327,11 @@ public struct GradingGuide: View {
     }
 
     enum Layout {
+        #if os(macOS)
+        static let chooseVerb = "Click"
+        #else
+        static let chooseVerb = "Tap"
+        #endif
         #if os(macOS)
         static let picture: CGFloat = 120, padding: CGFloat = 20
         #else

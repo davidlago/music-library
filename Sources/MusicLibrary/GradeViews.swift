@@ -17,7 +17,7 @@ struct GradePicker: View {
         .pickerStyle(.menu)
         .labelsHidden()
         .frame(width: 200, alignment: .leading)
-        .help(grade.map { GradingNotes.summary($0) } ?? "Not graded yet")
+        .help(grade.map { GradingNotes.summary($0, part: part) } ?? "Not graded yet")
     }
 }
 
@@ -46,7 +46,7 @@ struct CopyGradeRows: View {
                 guideButton(.sleeve)
             }
             .sheet(item: $guide) { part in
-                GradingGuideSheet(part: part, highlighted: part == .sleeve ? sleeve : media)
+                GradingGuideSheet(part: part, mediaPart: mediaPart, media: $media, sleeve: $sleeve)
             }
         }
     }
@@ -63,9 +63,13 @@ struct CopyGradeRows: View {
 }
 
 /// The grading guide in a sheet with a Done button.
+/// Clicking a grade gives it to the copy (its record or disc, or its sleeve) and keeps the guide open, so the other
+/// part can be graded too.
 struct GradingGuideSheet: View {
     let part: GradingNotes.Part
-    var highlighted: CollectionGrade?
+    let mediaPart: GradingNotes.Part
+    @Binding var media: CollectionGrade?
+    @Binding var sleeve: CollectionGrade?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -77,7 +81,11 @@ struct GradingGuideSheet: View {
             }
             .padding([.horizontal, .top], 20)
             .padding(.bottom, 8)
-            GradingGuide(part: part, highlighted: highlighted)
+            GradingGuide(part: part, parts: [mediaPart, .sleeve],
+                         selected: { $0 == .sleeve ? sleeve : media },
+                         choose: { part, grade in
+                             if part == .sleeve { sleeve = grade } else if grade.isMediaGrade { media = grade }
+                         })
         }
         .frame(width: 620, height: 700)
     }

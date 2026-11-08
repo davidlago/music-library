@@ -11,8 +11,9 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   CD's centre ring) and a **Condition** grade for the record or disc and for the sleeve or case (Mint down to Poor, on
   the Goldmine scale Discogs uses), on the copy's page and in Add to Collection. See
   [Physical Collection](https://github.com/davidlago/music-library/blob/main/docs/guide/physical-collection.md#pressing-and-condition).
-- A **Grading Guide** (the ? next to the grades on the Mac, and on a copy's page on the iPhone) explains each grade,
-  with drawings of the wear to look for on a record, a CD and a sleeve.
+- A **Grading Guide** (the ? next to the grades on the Mac, and on a copy's page on the iPhone) explains each grade
+  for a record, a CD and a sleeve or case, with drawings of the wear to look for. On the Mac, click a grade in it to
+  choose it.
 - Picking an edition from Discogs (Add to Collection, Change Edition…) shows its runouts, barcodes and pressing plant,
   so you can tell which pressing you have; **Use Runouts** copies them into your copy.
 - What a copy is worth now comes from Discogs: its own pressing (or the album's most common one), at Discogs' suggested
