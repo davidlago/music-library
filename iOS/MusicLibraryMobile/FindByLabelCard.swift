@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Find by Label, at the top of the Collection tab: pick CD or Vinyl, type a number (or step with ‹ ›), and see what

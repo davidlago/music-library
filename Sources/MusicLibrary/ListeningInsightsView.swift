@@ -243,11 +243,6 @@ private func panelTint(_ image: NSImage?) -> RGB? {
     return ArtworkTint.panel(from: average)
 }
 
-private extension AppColor {
-    /// The panel color when there's no picture to take one from.
-    static let defaultPanel = ArtworkTint.panel(from: RGB(0x2a78d6))
-}
-
 /// One ranked item: rank, picture, name and the measure; clicking opens it.
 private struct ListeningRow: View {
     @Environment(AppModel.self) private var model

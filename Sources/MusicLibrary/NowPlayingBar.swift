@@ -1,5 +1,6 @@
 import AVKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 struct FormatCaption: View {

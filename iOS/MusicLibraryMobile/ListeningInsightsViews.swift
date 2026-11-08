@@ -156,10 +156,6 @@ extension ListeningStats {
     }
 }
 
-private extension Color {
-    init(_ rgb: RGB) { self.init(.sRGB, red: rgb.r, green: rgb.g, blue: rgb.b) }
-}
-
 /// A panel color taken from a picture, dark enough for white text.
 private func panelTint(_ image: UIImage?) -> RGB? {
     guard let cg = image?.cgImage, let average = ArtworkTint.average(of: cg) else { return nil }
@@ -294,7 +290,7 @@ private struct ListeningSection<Accessory: View>: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 5) {
                 Text(title).font(.title3.bold())
-                Capsule().fill(InsightColor.series).frame(width: 30, height: 3)
+                Capsule().fill(VizColor.series).frame(width: 30, height: 3)
             }
             Spacer()
             accessory()
@@ -568,8 +564,8 @@ private struct DiscoveriesCard: View {
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 12) {
                 ZStack {
-                    Circle().stroke(InsightColor.track, lineWidth: 6)
-                    Circle().trim(from: 0, to: share).stroke(InsightColor.series, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                    Circle().stroke(VizColor.track, lineWidth: 6)
+                    Circle().trim(from: 0, to: share).stroke(VizColor.series, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                     Text(share.formatted(.percent.precision(.fractionLength(0)))).font(.caption2.weight(.bold)).monospacedDigit()
                 }
@@ -643,10 +639,10 @@ private struct RadialClock: View {
             ZStack {
                 ForEach(0..<24, id: \.self) { h in
                     let reach = values[h] == 0 ? 0 : Self.inner + (1 - Self.inner) * max(0.08, (values[h] / peak).squareRoot())
-                    Wedge(hour: h, inner: Self.inner, outer: 1).fill(InsightColor.track)
+                    Wedge(hour: h, inner: Self.inner, outer: 1).fill(VizColor.track)
                     if reach > 0 {
                         Wedge(hour: h, inner: Self.inner, outer: reach)
-                            .fill(InsightColor.series.opacity(selected == nil || selected == h ? 1 : 0.45))
+                            .fill(VizColor.series.opacity(selected == nil || selected == h ? 1 : 0.45))
                     }
                 }
                 ForEach([0, 6, 12, 18], id: \.self) { h in
@@ -705,7 +701,7 @@ private struct WeekdayBars: View {
             ForEach(0..<7, id: \.self) { d in
                 VStack(spacing: 3) {
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(d == stats.peakWeekday ? InsightColor.series : InsightColor.series.opacity(0.4))
+                        .fill(d == stats.peakWeekday ? VizColor.series : VizColor.series.opacity(0.4))
                         .frame(width: 12, height: max(2, 36 * totals[d] / top))
                     Text(d < stats.weekdaySymbols.count ? String(stats.weekdaySymbols[d].prefix(1)) : "").font(.caption2).foregroundStyle(.secondary)
                 }
@@ -726,7 +722,7 @@ private struct DecadesCard: View {
         InsightCard(title: "Music by Decade", subtitle: subtitle) {
             HStack(spacing: 14) {
                 HStack(spacing: 5) {
-                    Capsule().fill(InsightColor.series).frame(width: 14, height: 7)
+                    Capsule().fill(VizColor.series).frame(width: 14, height: 7)
                     Text("Your listening")
                 }
                 HStack(spacing: 5) {
@@ -742,8 +738,8 @@ private struct DecadesCard: View {
                             Text("\(String(e.decade))s").font(.subheadline).monospacedDigit().frame(width: 52, alignment: .leading)
                             GeometryReader { geo in
                                 ZStack(alignment: .leading) {
-                                    Capsule().fill(InsightColor.track)
-                                    Capsule().fill(InsightColor.series.opacity(e.decade == favorite?.decade ? 1 : 0.7))
+                                    Capsule().fill(VizColor.track)
+                                    Capsule().fill(VizColor.series.opacity(e.decade == favorite?.decade ? 1 : 0.7))
                                         .frame(width: e.listening == 0 ? 0 : max(6, geo.size.width * e.listening / top))
                                     if e.library > 0 {
                                         Capsule().fill(Color.primary).frame(width: 2, height: 16)
@@ -900,7 +896,7 @@ private struct QuickFacts: View {
     private func tile(_ f: Fact) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 5) {
-                Image(systemName: f.icon).foregroundStyle(InsightColor.series)
+                Image(systemName: f.icon).foregroundStyle(VizColor.series)
                 Text(f.title).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
             }
             .font(.caption)

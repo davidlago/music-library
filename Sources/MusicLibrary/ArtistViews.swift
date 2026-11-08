@@ -556,29 +556,6 @@ private struct ArtistBackdrop: View {
     }
 }
 
-struct SectionHeader: View {
-    let title: String
-    var body: some View { Text(title).font(.title2.bold()) }
-}
-
-struct StatTile: View {
-    let value: String
-    let label: String
-    let icon: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Image(systemName: icon).font(.callout).foregroundStyle(.secondary)
-            Text(value).font(.system(size: 22, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.6)
-            Text(label).font(.caption).foregroundStyle(.secondary)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.card))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.separator.opacity(0.6), lineWidth: 0.5))
-    }
-}
-
 struct ArtistSongRow: View {
     @Environment(AppModel.self) private var model
     let index: Int

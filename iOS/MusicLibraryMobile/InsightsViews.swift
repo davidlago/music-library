@@ -6,38 +6,6 @@ import UIKit
 
 // MARK: Palette
 
-/// Chart colors (the Mac's, validated for contrast against the card surface in both appearances).
-nonisolated enum InsightColor {
-    /// A color with separate sRGB values for light and dark appearances.
-    static func dynamic(light: UInt32, dark: UInt32) -> Color {
-        Color(uiColor: UIColor { traits in
-            let hex = traits.userInterfaceStyle == .dark ? dark : light
-            return UIColor(red: CGFloat((hex >> 16) & 0xff) / 255, green: CGFloat((hex >> 8) & 0xff) / 255,
-                           blue: CGFloat(hex & 0xff) / 255, alpha: 1)
-        })
-    }
-
-    /// Single-series marks.
-    static let series = dynamic(light: 0x2a78d6, dark: 0x3987e5)
-
-    /// Ordinal blue ramp for quality tiers, best quality most prominent; "unknown" is neutral gray.
-    static func tier(_ t: LibraryStats.QualityTier) -> Color {
-        switch t {
-        case .hiRes: dynamic(light: 0x104281, dark: 0xcde2fb)
-        case .cd: dynamic(light: 0x256abf, dark: 0x86b6ef)
-        case .lossyHigh: dynamic(light: 0x5598e7, dark: 0x3987e5)
-        case .lossy: dynamic(light: 0x86b6ef, dark: 0x1c5cab)
-        case .unknown: neutral
-        }
-    }
-
-    /// Secondary series (the library next to your listening).
-    static let neutral = dynamic(light: 0xb5b4ae, dark: 0x5f5e5a)
-
-    /// The empty part of a bar.
-    static let track = Color.primary.opacity(0.07)
-}
-
 // MARK: Tab
 
 /// The panes, Owned first. The raw values are saved (`insightsPane`), so they keep their old names.
@@ -207,36 +175,6 @@ struct InsightsLibraryPane: View {
 
 // MARK: Building blocks
 
-/// A titled card; the accessory (a picker) goes under the title.
-struct InsightCard<Accessory: View, Content: View>: View {
-    let title: String
-    var subtitle: String?
-    @ViewBuilder var accessory: () -> Accessory
-    @ViewBuilder var content: () -> Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.headline)
-                if let subtitle, !subtitle.isEmpty {
-                    Text(subtitle).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            accessory()
-            content()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .card()
-    }
-}
-
-extension InsightCard where Accessory == EmptyView {
-    init(title: String, subtitle: String? = nil, @ViewBuilder content: @escaping () -> Content) {
-        self.init(title: title, subtitle: subtitle, accessory: { EmptyView() }, content: content)
-    }
-}
-
 /// A card's segmented picker over all of an enum's cases.
 struct InsightSegments<Value: Hashable & RawRepresentable & CaseIterable>: View where Value.RawValue == String, Value.AllCases: RandomAccessCollection {
     @Binding var selection: Value
@@ -252,7 +190,7 @@ struct InsightSegments<Value: Hashable & RawRepresentable & CaseIterable>: View 
 /// A proportional bar on a faint track.
 struct InsightBar: View {
     var fraction: Double
-    var color = InsightColor.series
+    var color = VizColor.series
     var height: CGFloat = 6
     var minWidth: CGFloat = 4
     /// A zero value draws no bar (otherwise it's a stub, like the ranked lists).
@@ -261,7 +199,7 @@ struct InsightBar: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(InsightColor.track)
+                Capsule().fill(VizColor.track)
                 Capsule().fill(color)
                     .frame(width: hidesZero && fraction <= 0 ? 0 : max(minWidth, geo.size.width * min(max(fraction, 0), 1)))
             }
@@ -428,7 +366,7 @@ struct InsightColumnChart: View {
             }
             Chart(data) { d in
                 BarMark(x: .value("Bucket", d.label), y: .value("Songs", d.value), width: .ratio(0.82))
-                    .foregroundStyle(InsightColor.series.opacity(current == nil || current?.label == d.label ? 1 : 0.35))
+                    .foregroundStyle(VizColor.series.opacity(current == nil || current?.label == d.label ? 1 : 0.35))
                     .cornerRadius(2)
             }
             .chartXAxis {
@@ -544,30 +482,6 @@ struct InsightPairLayout: Layout {
     }
 }
 
-/// A big number with a label, and optionally a line of context under it.
-struct InsightTile: View {
-    let value: String
-    let label: String
-    let icon: String
-    var detail: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Image(systemName: icon).font(.callout).foregroundStyle(.secondary).frame(height: 20)
-            Text(value).font(.system(size: 22, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.6)
-            Text(label).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            if let detail {
-                Text(detail).font(.caption2).foregroundStyle(.secondary).lineLimit(2).minimumScaleFactor(0.8)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .card()
-        .accessibilityElement(children: .combine)
-    }
-}
-
 struct InsightFact: Identifiable {
     var id: String { title }
     var icon: String
@@ -614,7 +528,7 @@ struct InsightFactsGrid: View {
     private func cell(_ f: InsightFact, link: Bool) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack {
-                Image(systemName: f.icon).font(.title3).foregroundStyle(InsightColor.series).frame(height: 26)
+                Image(systemName: f.icon).font(.title3).foregroundStyle(VizColor.series).frame(height: 26)
                 Spacer(minLength: 0)
                 if link { InsightChevron() }
             }
@@ -750,7 +664,7 @@ struct InsightsQualityCard: View {
         InsightCard(title: "Audio Quality", subtitle: "How your files are encoded") {
             Chart(stats.qualityTiers) { t in
                 SectorMark(angle: .value("Songs", t.count), innerRadius: .ratio(0.62), angularInset: 1.5)
-                    .foregroundStyle(InsightColor.tier(t.tier))
+                    .foregroundStyle(VizColor.tier(t.tier))
                     .cornerRadius(2)
             }
             .chartLegend(.hidden)
@@ -794,7 +708,7 @@ struct InsightsQualityCard: View {
 
     private func tierRow(_ t: LibraryStats.TierCount, total: Int, link: Bool) -> some View {
         HStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 3).fill(InsightColor.tier(t.tier)).frame(width: 12, height: 12)
+            RoundedRectangle(cornerRadius: 3).fill(VizColor.tier(t.tier)).frame(width: 12, height: 12)
             Text(t.tier.rawValue).lineLimit(1)
             Spacer(minLength: 6)
             Text(songCount(t.count)).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
@@ -823,17 +737,17 @@ struct InsightsGrowthCard: View {
                         ForEach(stats.growth) { p in
                             AreaMark(x: .value("Date", p.date), y: .value("Songs", p.total))
                                 .interpolationMethod(.stepEnd)
-                                .foregroundStyle(LinearGradient(colors: [InsightColor.series.opacity(0.28), InsightColor.series.opacity(0.03)],
+                                .foregroundStyle(LinearGradient(colors: [VizColor.series.opacity(0.28), VizColor.series.opacity(0.03)],
                                                                 startPoint: .top, endPoint: .bottom))
                             LineMark(x: .value("Date", p.date), y: .value("Songs", p.total))
                                 .interpolationMethod(.stepEnd)
                                 .lineStyle(StrokeStyle(lineWidth: 2))
-                                .foregroundStyle(InsightColor.series)
+                                .foregroundStyle(VizColor.series)
                         }
                         if let h = selected {
                             RuleMark(x: .value("Date", h.date)).lineStyle(StrokeStyle(lineWidth: 1)).foregroundStyle(Color.secondary.opacity(0.6))
                             PointMark(x: .value("Date", h.date), y: .value("Songs", h.total))
-                                .symbolSize(70).foregroundStyle(InsightColor.series)
+                                .symbolSize(70).foregroundStyle(VizColor.series)
                         }
                     }
                     .chartYAxis {

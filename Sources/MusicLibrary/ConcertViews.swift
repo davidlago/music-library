@@ -1,5 +1,6 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 // MARK: Rows

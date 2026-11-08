@@ -1,5 +1,6 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Find or upload a photo for an artist, like the album cover sheet: pictures from Deezer and Wikimedia (the artist's

@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// The queue in the window's inspector: the current song, songs queued with Play Next, then the rest of

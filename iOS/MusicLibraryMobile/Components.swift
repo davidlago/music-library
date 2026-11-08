@@ -104,37 +104,6 @@ func countryName(_ code: String) -> String {
 
 // MARK: Layout
 
-struct SectionHeader: View {
-    let title: String
-    var body: some View { Text(title).font(.title3.bold()).frame(maxWidth: .infinity, alignment: .leading) }
-}
-
-extension View {
-    /// A rounded card on the page background.
-    func card(padding: CGFloat = 0) -> some View {
-        self.padding(padding)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemGroupedBackground)))
-    }
-}
-
-/// A big number with a label.
-struct StatTile: View {
-    let value: String
-    let label: String
-    let icon: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Image(systemName: icon).font(.callout).foregroundStyle(.secondary)
-            Text(value).font(.system(size: 20, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.6)
-            Text(label).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .card()
-    }
-}
-
 /// Two columns of stat tiles.
 struct StatGrid<Content: View>: View {
     @ViewBuilder var content: () -> Content

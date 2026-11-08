@@ -79,10 +79,10 @@ enum InsightCollection {
     /// The pane's color per medium (the chart series, then lighter shades of it).
     static func color(_ m: CollectionMedium) -> Color {
         switch m {
-        case .cd: InsightColor.series
-        case .vinyl: InsightColor.dynamic(light: 0x104281, dark: 0xcde2fb)
-        case .download: InsightColor.dynamic(light: 0x86b6ef, dark: 0x1c5cab)
-        case .other: InsightColor.neutral
+        case .cd: VizColor.series
+        case .vinyl: Color(light: 0x104281, dark: 0xcde2fb)
+        case .download: Color(light: 0x86b6ef, dark: 0x1c5cab)
+        case .other: VizColor.neutral
         }
     }
 }
@@ -128,9 +128,9 @@ private struct DigitizedTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             ZStack {
-                Circle().stroke(InsightColor.track, lineWidth: 4)
+                Circle().stroke(VizColor.track, lineWidth: 4)
                 Circle().trim(from: 0, to: stats.digitizedShare)
-                    .stroke(InsightColor.series, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .stroke(VizColor.series, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             }
             .frame(width: 20, height: 20)
@@ -222,7 +222,7 @@ struct CollectionShelvesCard: View {
 
     private func row(_ s: CollectionStats.SeriesStats) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: s.series == .cd ? "opticaldisc" : "record.circle").foregroundStyle(InsightColor.series).frame(width: 22)
+            Image(systemName: s.series == .cd ? "opticaldisc" : "record.circle").foregroundStyle(VizColor.series).frame(width: 22)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(s.series == .cd ? "CDs" : "Vinyl").font(.subheadline.weight(.semibold))
@@ -288,13 +288,13 @@ struct CollectionMediaCard: View {
 
     private func mediumRow(_ s: CollectionStats.MediumShare) -> some View {
         let parts: [(value: Int, color: Color)] = [
-            (s.digitized, InsightColor.series), (s.partial, InsightColor.series.opacity(0.6)),
-            (s.otherCopy, InsightColor.series.opacity(0.35)), (s.toDigitize, InsightColor.neutral),
+            (s.digitized, VizColor.series), (s.partial, VizColor.series.opacity(0.6)),
+            (s.otherCopy, VizColor.series.opacity(0.35)), (s.toDigitize, VizColor.neutral),
         ]
         let total = max(s.items, 1)
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Image(systemName: InsightCollection.icon(s.medium)).foregroundStyle(InsightColor.series).frame(width: 20)
+                Image(systemName: InsightCollection.icon(s.medium)).foregroundStyle(VizColor.series).frame(width: 20)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(InsightCollection.mediumName(s.medium, count: s.items))
                     if let detail = detail(s) { Text(detail).font(.caption).foregroundStyle(.secondary) }
@@ -337,8 +337,8 @@ struct CollectionMediaCard: View {
 
     private var legend: some View {
         HStack(spacing: 12) {
-            ForEach([("Digitized", InsightColor.series), ("Partly", InsightColor.series.opacity(0.6)),
-                     ("Other copy", InsightColor.series.opacity(0.35)), ("To digitize", InsightColor.neutral)], id: \.0) { name, color in
+            ForEach([("Digitized", VizColor.series), ("Partly", VizColor.series.opacity(0.6)),
+                     ("Other copy", VizColor.series.opacity(0.35)), ("To digitize", VizColor.neutral)], id: \.0) { name, color in
                 HStack(spacing: 4) {
                     RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 10, height: 10)
                     Text(name)
@@ -388,17 +388,17 @@ struct CollectionSpendingCard: View {
                     }
                 case .items:
                     BarMark(x: .value("Period", p.start.date(), unit: unit), y: .value("Items", p.items))
-                        .foregroundStyle(InsightColor.series.opacity(selected == nil || selected == p ? 1 : 0.35))
+                        .foregroundStyle(VizColor.series.opacity(selected == nil || selected == p ? 1 : 0.35))
                         .cornerRadius(2)
                 case .total:
                     AreaMark(x: .value("Period", p.start.date(), unit: unit), y: .value("Total", p.cumulative.doubleValue))
                         .interpolationMethod(.stepEnd)
-                        .foregroundStyle(LinearGradient(colors: [InsightColor.series.opacity(0.28), InsightColor.series.opacity(0.03)],
+                        .foregroundStyle(LinearGradient(colors: [VizColor.series.opacity(0.28), VizColor.series.opacity(0.03)],
                                                         startPoint: .top, endPoint: .bottom))
                     LineMark(x: .value("Period", p.start.date(), unit: unit), y: .value("Total", p.cumulative.doubleValue))
                         .interpolationMethod(.stepEnd)
                         .lineStyle(StrokeStyle(lineWidth: 2))
-                        .foregroundStyle(InsightColor.series)
+                        .foregroundStyle(VizColor.series)
                 }
             }
             if measure == .total, let h = selected {

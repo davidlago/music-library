@@ -1,5 +1,6 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Change Cover… for an item: a Cover Art Archive front (its own release and release group first, then releases found

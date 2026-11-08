@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 struct TrackTable: View {
