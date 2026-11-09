@@ -7,6 +7,9 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- Fixed: on the Mac, **Open in Apple Music** in the Shop (and **Open Song in Apple Music** on a song) opened the Music
+  app but then crashed Music Library.
+
 ## 1.35.0
 
 - Record a CD's or record's pressing and condition: **Runouts** (the matrix/runout codes in the dead wax or around a
