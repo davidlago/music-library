@@ -159,7 +159,7 @@ private struct AppleTrackRow: View {
             if canPlay { Button(playing ? "Pause Preview" : "Play Preview") { controls.toggle(track, queue) } }
             if let page = track.pageURL, let app = AppleMusicLink.appURL(page) {
                 Button("Open Song in Apple Music") {
-                    openURL(app) { accepted in if !accepted, page.isWebLink { openURL(page) } }
+                    AppleMusicLink.open(app, orPage: page, with: openURL)
                 }
             }
         }
@@ -182,7 +182,7 @@ public struct OpenInAppleMusicButton: View {
     public var body: some View {
         Button {
             guard let app = AppleMusicLink.appURL(page) else { if page.isWebLink { openURL(page) }; return }
-            openURL(app) { accepted in if !accepted, page.isWebLink { openURL(page) } }
+            AppleMusicLink.open(app, orPage: page, with: openURL)
         } label: {
             Label("Open in Apple Music", systemImage: "arrow.up.forward.app")
         }
@@ -190,5 +190,19 @@ public struct OpenInAppleMusicButton: View {
         #if os(macOS)
         .help("Open the album in the Music app, ready to play")
         #endif
+    }
+}
+
+extension AppleMusicLink {
+    /// Opens `app` (a `music://` link) and, when nothing takes it, the web `page` instead. macOS calls `openURL`'s
+    /// completion on a LaunchServices queue, not the main thread, so the completion must not be main-actor isolated
+    /// (a closure written in a view's body is, and Swift traps when it runs elsewhere): it's `@Sendable` and hops back.
+    @MainActor
+    static func open(_ app: URL, orPage page: URL, with openURL: OpenURLAction) {
+        let fallback = page.isWebLink ? page : nil
+        openURL(app, completion: { @Sendable accepted in
+            guard !accepted, let fallback else { return }
+            Task { @MainActor in openURL(fallback) }
+        })
     }
 }
