@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.35.1
+
 - Fixed: on the Mac, **Open in Apple Music** in the Shop (and **Open Song in Apple Music** on a song) opened the Music
   app but then crashed Music Library.
 
