@@ -66,3 +66,7 @@ When the files are the digital copy of something you own, the Import page's coll
 - `is:unmatched` and `missing:cover` in [Search](search.md) find what still needs attention.
 - **Remove from Digital Collection…** (album or song menus) moves the files to the Trash. Items in your Physical
   Collection stay, marked not ripped.
+- Your plays and likes of a removed song are kept: when the same song comes back on the same album (a CD ripped again,
+  a record digitized again, a download added again), it picks up its play count, listening history and like where it
+  left off. The song counts as the same when it has the same title (or MusicBrainz recording) on an album with the
+  same name and album artist (or the same MusicBrainz release).
