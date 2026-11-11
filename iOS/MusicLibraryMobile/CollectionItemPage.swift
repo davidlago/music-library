@@ -269,10 +269,20 @@ private struct CollectionItemContent: View {
                 }
                 .card()
             }
-            if let runouts = item.runouts {
+            let runouts = item.runoutSides(filled: true)
+            if !runouts.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Runouts").font(.caption).foregroundStyle(.secondary)
-                    Text(runouts).font(.callout.monospaced()).textSelection(.enabled)
+                    Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 4) {
+                        ForEach(runouts) { side in
+                            GridRow(alignment: .firstTextBaseline) {
+                                if item.runoutSideCount > 1 || item.medium == .vinyl {
+                                    Text(side.name).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Text(side.text).font(.callout.monospaced()).textSelection(.enabled)
+                            }
+                        }
+                    }
                 }
                 .padding(12).frame(maxWidth: .infinity, alignment: .leading).card()
             }

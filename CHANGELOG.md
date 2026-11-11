@@ -7,6 +7,11 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- A copy's **Runouts** are now one field per side: **Side A**, **Side B** (and **C**, **D**… for a set of several
+  records) for a record, one per disc for a CD. Discogs' runouts each have a **Use for** button that copies that one to
+  the side you pick (the side Discogs names is offered first); every side stays editable. Runouts typed in 1.35 aren't
+  carried over: type them again, or pick them from Discogs.
+
 ## 1.35.1
 
 - Fixed: on the Mac, **Open in Apple Music** in the Shop (and **Open Song in Apple Music** on a song) opened the Music

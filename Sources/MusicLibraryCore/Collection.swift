@@ -337,9 +337,10 @@ public struct CollectionItem: Identifiable, Hashable, Sendable {
         didSet { if let p = price, AlbumPurchase.validPrice(p) == nil { price = nil } }
     }
     public var notes: String?
-    /// The matrix/runout etchings in the dead wax (or a CD's inner ring), one per line: what tells this copy's
-    /// pressing apart. CDs and records only.
-    public var runouts: String?
+    /// The matrix/runout etchings in the dead wax (or a CD's inner ring), one entry per side (`RunoutSides`: a
+    /// record's A, B, C…, a CD's one per disc; blank sides are empty, none at the end): what tells this copy's pressing
+    /// apart. CDs and records only.
+    public var runouts: [String] = []
     /// The disc's or record's condition (a media grade only). CDs and records only.
     public var mediaGrade: CollectionGrade?
     /// The sleeve's, case's or cover's condition. CDs and records only.
@@ -402,7 +403,7 @@ public struct CollectionItem: Identifiable, Hashable, Sendable {
     }
 
     /// The longest album or artist, record label (and the other release fields) and notes `collection_items` reads.
-    static let maxTitle = 1000, maxField = 200, maxNotes = 10_000, maxRunouts = 2000
+    static let maxTitle = 1000, maxField = 200, maxNotes = 10_000
 
     /// The item as `collection_items` reads it back: text trimmed and clipped to the lengths read (empty fields nil),
     /// and values out of range dropped. Saving goes through it, so nothing written reads back blank or unreadable.
@@ -425,10 +426,10 @@ public struct CollectionItem: Identifiable, Hashable, Sendable {
         item.trackCount = trackCount.flatMap { (1...999).contains($0) ? $0 : nil }
         item.notes = field(notes, Self.maxNotes)
         if medium.isPhysical {
-            item.runouts = field(runouts, Self.maxRunouts)
+            item.runouts = RunoutSides.normalized(runouts)
             item.mediaGrade = mediaGrade.flatMap { $0.isMediaGrade ? $0 : nil }
         } else {
-            item.runouts = nil; item.mediaGrade = nil; item.sleeveGrade = nil
+            item.runouts = []; item.mediaGrade = nil; item.sleeveGrade = nil
         }
         item.coverFile = coverFile.flatMap { CollectionCovers.isFileName($0) ? $0 : nil }
         return item

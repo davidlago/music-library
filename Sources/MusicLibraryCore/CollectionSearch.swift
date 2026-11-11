@@ -61,7 +61,7 @@ public struct CollectionSearchQuery: Equatable, Sendable {
             case barcode(String)
             /// Part of the catalog number, lowercased letters and digits only ("cl1355").
             case catalogNumber(String)
-            /// Part of the runouts, lowercased letters and digits only ("xsm47326").
+            /// Part of one side's runout, lowercased letters and digits only ("xsm47326").
             case runout(String)
             /// The media grade: exactly one, at least/at most one (`orBetter`, `orWorse`), or none set (nil).
             case grade(CollectionGrade?, Comparison)
@@ -351,9 +351,8 @@ public struct CollectionIndex: Sendable {
         let songTitles: [String] = tracklist.map(\.title)
         let songArtists: [String] = Array(Set(tracklist.map(\.artist)))
         let genres: [String] = info?.genres ?? []
-        let fields: [String] = [item.recordLabel, item.catalogNumber, item.barcode, item.country, item.formatDetail, item.notes,
-                                item.runouts]
-            .map { $0 ?? "" }
+        let fields: [String] = [item.recordLabel, item.catalogNumber, item.barcode, item.country, item.formatDetail, item.notes]
+            .map { $0 ?? "" } + item.runouts
         var all: [String] = [item.album, item.artist, item.medium.name]
         all += fields
         all += genres
@@ -367,7 +366,7 @@ public struct CollectionIndex: Sendable {
             hasRecordLabel: !(item.recordLabel ?? "").trimmingCharacters(in: .whitespaces).isEmpty,
             year: item.year, tracks: tracks, barcode: item.barcode.flatMap(MusicCollection.barcodeKey),
             catalogNumber: CollectionSearchQuery.compact(item.catalogNumber ?? ""),
-            runouts: CollectionSearchQuery.compact(item.runouts ?? ""))
+            runouts: item.runouts.map(CollectionSearchQuery.compact).joined(separator: "|"))
     }
 
     public func search(_ text: String, now: Date = Date()) -> [CollectionItem] {

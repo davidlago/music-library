@@ -311,7 +311,8 @@ struct AddToCollectionSheet: View {
     @State private var notes = ""
     @State private var mediaGrade: CollectionGrade?
     @State private var sleeveGrade: CollectionGrade?
-    @State private var runouts = ""
+    /// One per side (`RunoutSides`); blank sides empty.
+    @State private var runouts: [String] = []
     @State private var link = true
     /// The library album the item would be linked to, and whether that's a sure match (same key, release or release
     /// group) rather than one by title.
@@ -446,18 +447,15 @@ struct AddToCollectionSheet: View {
                             CopyGradeRows(medium: chosenMedium, media: $mediaGrade, sleeve: $sleeveGrade)
                             GridRow(alignment: .firstTextBaseline) {
                                 Text("Runouts").foregroundStyle(.secondary)
-                                TextField("Runouts", text: $runouts,
-                                          prompt: Text(chosenMedium == .cd ? "Codes around the disc's centre ring" : "Etched or stamped in the dead wax"),
-                                          axis: .vertical)
-                                    .textFieldStyle(.roundedBorder).labelsHidden().lineLimit(1...4)
-                                    .font(.callout.monospaced())
+                                runoutFields(draft)
                             }
                         }
                     }
                     .font(.callout)
                     if chosenMedium.isPhysical, let id = edition?.discogsReleaseID, let release = search.loaded[id] {
-                        DiscogsIdentifierList(release: release, limit: 12) { found in
-                            runouts = RunoutText.adding(found, to: runouts)
+                        DiscogsIdentifierList(release: release, limit: 12, medium: chosenMedium,
+                                              sides: draft.runoutSides().map(\.name)) { code, side in
+                            setRunout(code.value, side: side)
                         }
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 8).fill(AppColor.fill))
@@ -689,13 +687,44 @@ struct AddToCollectionSheet: View {
         item.notes = Self.field(notes)
         item.mediaGrade = mediaGrade
         item.sleeveGrade = sleeveGrade
-        item.runouts = Self.field(runouts)
+        item.runouts = RunoutSides.normalized(runouts)
         // A match under the item's own key is linked either way (its songs are its digital copy).
         if linking, let match = libraryMatch, link || match.ownKey {
             item.albumKey = AlbumInfoStore.key(match.album)
             item.digitalSource = LinkAlbumPicker.defaultSource(chosenMedium)
         }
         return item
+    }
+
+    /// A field per side of the copy being added (named once there's more than one, or on a record).
+    private func runoutFields(_ draft: CollectionItem) -> some View {
+        let sides = draft.runoutSides()
+        return Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 4) {
+            ForEach(sides) { side in
+                GridRow(alignment: .firstTextBaseline) {
+                    if sides.count > 1 || chosenMedium == .vinyl {
+                        Text(side.name).font(.caption).foregroundStyle(.secondary)
+                    }
+                    TextField(side.name, text: runoutBinding(side.index),
+                              prompt: Text(chosenMedium == .cd ? "Codes around the centre ring" : "Etched or stamped in the dead wax"),
+                              axis: .vertical)
+                        .textFieldStyle(.roundedBorder).labelsHidden().lineLimit(1...3)
+                        .font(.callout.monospaced())
+                }
+            }
+        }
+    }
+
+    /// One side's text, as typed (trimmed only when the item is made).
+    private func runoutBinding(_ side: Int) -> Binding<String> {
+        Binding(get: { side < runouts.count ? runouts[side] : "" },
+                set: { setRunout($0, side: side, trimming: false) })
+    }
+
+    private func setRunout(_ text: String, side: Int, trimming: Bool = true) {
+        guard side >= 0, side < RunoutSides.maxSides else { return }
+        if runouts.count <= side { runouts += Array(repeating: "", count: side + 1 - runouts.count) }
+        runouts[side] = trimming ? text.trimmingCharacters(in: .whitespacesAndNewlines) : text
     }
 
     private static func field(_ s: String) -> String? {
@@ -723,7 +752,7 @@ struct AddToCollectionSheet: View {
             notes = ""
             mediaGrade = nil
             sleeveGrade = nil
-            runouts = ""
+            runouts = []
             price = nil
             cover = nil
             coverSource = nil
@@ -831,8 +860,16 @@ struct ChangeEditionSheet: View {
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Your copy’s runouts").font(.subheadline.weight(.semibold))
-                    if let runouts = item.runouts {
-                        Text(runouts).font(.callout.monospaced()).textSelection(.enabled)
+                    let sides = item.runoutSides(filled: true)
+                    if !sides.isEmpty {
+                        Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 3) {
+                            ForEach(sides) { side in
+                                GridRow(alignment: .firstTextBaseline) {
+                                    Text(side.name).font(.caption).foregroundStyle(.secondary)
+                                    Text(side.text).font(.callout.monospaced()).textSelection(.enabled)
+                                }
+                            }
+                        }
                     } else {
                         Text("None typed yet. Compare the codes in your copy’s dead wax (or a CD’s centre ring) with each edition’s.")
                             .font(.caption).foregroundStyle(.secondary)
