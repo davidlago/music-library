@@ -76,6 +76,11 @@ public struct CDEdition: Identifiable, Hashable, Codable, Sendable {
     public var releaseGroupId: String?
     public var releaseGroupTitle: String
     public var releaseType: String
+    /// A Discogs release (`id` is then `discogs-<n>`, never a MusicBrainz ID) and the master it's a version of.
+    public var discogsReleaseID: Int?
+    public var discogsMasterID: Int?
+    /// A small picture of its cover (Discogs gives one, with an account).
+    public var thumbnail: URL?
 
     public init(id: String, title: String, artist: String, date: String = "", country: String = "", label: String = "",
                 catalogNumber: String = "", barcode: String = "", format: String = "CD", trackCount: Int = 0,
@@ -89,9 +94,13 @@ public struct CDEdition: Identifiable, Hashable, Codable, Sendable {
     }
 
     public var year: Int? { date.count >= 4 ? Int(date.prefix(4)) : nil }
+
+    /// The MusicBrainz release, for one MusicBrainz found (nil for a Discogs release).
+    public var musicBrainzID: String? { MBID.validated(id) }
 }
 
-/// An album (MusicBrainz release group) and the editions (of the format shopped for) a search found of it.
+/// An album (a MusicBrainz release group, or a Discogs master) and the editions (of the format shopped for) a search
+/// found of it.
 public struct CDAlbum: Identifiable, Hashable, Sendable {
     public var id: String
     public var title: String
@@ -103,6 +112,14 @@ public struct CDAlbum: Identifiable, Hashable, Sendable {
     public var editions: [CDEdition]
     /// False for an album listed from an artist's discography, until its editions are looked up.
     public var editionsLoaded = true
+    /// The Discogs master, for an album Discogs found (its `id` is then `discogs-master-<n>`, or `discogs-<n>` for a
+    /// release with no master).
+    public var discogsMasterID: Int?
+    /// A small picture of its cover (Discogs, with an account).
+    public var thumbnail: URL?
+
+    /// Whether Discogs found it (its editions are Discogs releases).
+    public var isDiscogs: Bool { id.hasPrefix("discogs-") }
 
     public var releaseGroupId: String? { MBID.validated(id) }
     /// The album's first release, or the earliest year among the editions.
@@ -194,6 +211,11 @@ public struct CDSearchQuery: Hashable, Sendable {
     }
 
     public var isEmpty: Bool { [album, artist, code].allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty } }
+
+    /// Only an artist: the search lists their albums.
+    public var isArtistAlone: Bool {
+        !isEmpty && [album, code].allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty }
+    }
 
     /// The code's digits when it reads as a UPC/EAN barcode (8 to 14 digits, spaces and dashes allowed).
     public var barcode: String? {
@@ -289,6 +311,19 @@ public enum CDEditionParser {
             releaseGroupTitle: group?["title"] as? String ?? "", releaseType: group?["primary-type"] as? String ?? "")
     }
 
+    /// Undated editions last; ties in the order given.
+    static func oldestFirst(_ editions: [CDEdition]) -> [CDEdition] {
+        editions.enumerated().sorted { a, b in
+            let da = a.element.date, db = b.element.date
+            if da != db {
+                if da.isEmpty { return false }
+                if db.isEmpty { return true }
+                return da < db
+            }
+            return a.offset < b.offset
+        }.map(\.element)
+    }
+
     /// ["CD", "CD"] → "2×CD"; ["CD", "DVD-Video"] → "CD + DVD-Video".
     static func formatSummary(_ formats: [String]) -> String {
         var counts: [(String, Int)] = []
@@ -313,17 +348,7 @@ public enum CDEditionParser {
                                    artist: e.artist, releaseType: e.releaseType, editions: [e]))
             }
         }
-        for i in out.indices {
-            out[i].editions = out[i].editions.enumerated().sorted { a, b in
-                let da = a.element.date, db = b.element.date
-                if da != db {
-                    if da.isEmpty { return false }
-                    if db.isEmpty { return true }
-                    return da < db
-                }
-                return a.offset < b.offset
-            }.map(\.element)
-        }
+        for i in out.indices { out[i].editions = oldestFirst(out[i].editions) }
         let official = out.map { $0.editions.contains { $0.status == "Official" } }
         return out.indices.sorted { a, b in official[a] != official[b] ? official[a] : a < b }.map { out[$0] }
     }
@@ -368,7 +393,8 @@ public struct CDShopLinks: Hashable, Codable, Sendable {
         return links
     }
 
-    func merged(with other: CDShopLinks) -> CDShopLinks {
+    /// These links, with the other's where these have none.
+    public func merged(with other: CDShopLinks) -> CDShopLinks {
         CDShopLinks(discogsRelease: discogsRelease ?? other.discogsRelease, discogsMaster: discogsMaster ?? other.discogsMaster,
                     asin: asin ?? other.asin)
     }
@@ -510,8 +536,8 @@ public enum CDShop: String, Codable, CaseIterable, Sendable, Identifiable {
     }
 }
 
-/// What's being shopped for: one edition, any edition of an album in the format, or (for a CD or record MusicBrainz
-/// doesn't list, `isByName`) whatever the user typed.
+/// What's being shopped for: one edition, any edition of an album in the format, or (for a CD or record neither
+/// Discogs nor MusicBrainz lists, `isByName`) whatever the user typed.
 public struct CDShoppingTarget: Hashable, Sendable {
     public var album: String
     public var artist: String
@@ -538,7 +564,9 @@ public struct CDShoppingTarget: Hashable, Sendable {
         typedBarcode = query.barcode
     }
 
-    public var isByName: Bool { releaseGroupId == nil && edition == nil }
+    /// Neither an edition nor an album (a MusicBrainz release group or a Discogs master): only the stores' own
+    /// searches find it.
+    public var isByName: Bool { releaseGroupId == nil && edition == nil && links.discogsMaster == nil }
 
     /// Digits of the edition's barcode, when it has a usable one.
     public var barcode: String? { edition.flatMap { CDSearchQuery(code: $0.barcode).barcode } ?? typedBarcode }
