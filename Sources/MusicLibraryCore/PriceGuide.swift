@@ -389,6 +389,7 @@ public enum DiscogsMarketParser {
         public var label: String
         public var have: Int
         public var want: Int
+        public var thumbnail: URL? = nil
     }
 
     /// An album found by a search: a master (all its editions), or a release with no master.
@@ -440,14 +441,16 @@ public enum DiscogsMarketParser {
         guard let o = try JSONSerialization.jsonObject(with: data) as? [String: Any], let list = o["versions"] as? [[String: Any]] else {
             throw DiscogsError.badResponse
         }
-        var extra: [Int: (label: String, have: Int, want: Int)] = [:]
+        var extra: [Int: (label: String, have: Int, want: Int, thumbnail: URL?)] = [:]
         for v in list {
             guard let id = v["id"] as? Int else { continue }
             let community = (v["stats"] as? [String: Any])?["community"] as? [String: Any] ?? [:]
-            extra[id] = (DiscogsParser.clean(v["label"] as? String ?? ""), community["in_collection"] as? Int ?? 0, community["in_wantlist"] as? Int ?? 0)
+            extra[id] = (DiscogsParser.clean(v["label"] as? String ?? ""), community["in_collection"] as? Int ?? 0,
+                         community["in_wantlist"] as? Int ?? 0, DiscogsParser.image(v["thumb"]))
         }
         let versions = read.candidates.map { c in
-            Version(candidate: c, label: extra[c.releaseID]?.label ?? "", have: extra[c.releaseID]?.have ?? 0, want: extra[c.releaseID]?.want ?? 0)
+            Version(candidate: c, label: extra[c.releaseID]?.label ?? "", have: extra[c.releaseID]?.have ?? 0, want: extra[c.releaseID]?.want ?? 0,
+                    thumbnail: extra[c.releaseID]?.thumbnail)
         }
         return (versions, read.pages)
     }
@@ -633,6 +636,17 @@ public actor PriceGuides {
             return try await barcodeHits(digits)
         }
         return try await client.searchAlbums(text, format: format)
+    }
+
+    /// The Shop's first search (`DiscogsCollectionClient.shopAlbums`), through this client so its requests and the
+    /// guide's share one pace.
+    public func shopAlbums(_ query: CDSearchQuery) async throws -> [CDAlbum] {
+        try await client.shopAlbums(query)
+    }
+
+    /// The editions of an album the Shop listed from an artist's masters.
+    public func shopEditions(masterID: Int, format: ShopFormat, artist: String) async throws -> [CDEdition] {
+        try await client.shopEditions(masterID: masterID, format: format, artist: artist)
     }
 
     /// A scanner reads a 12-digit UPC as a 13-digit EAN with a leading 0, and Discogs may list either.

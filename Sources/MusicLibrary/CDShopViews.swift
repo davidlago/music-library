@@ -3,8 +3,8 @@ import MusicLibraryCore
 import MusicLibraryUI
 import SwiftUI
 
-/// The Shop: find the CD or record on MusicBrainz (album, artist, barcode or catalog number), pick the edition, then
-/// compare copies for sale on Discogs, eBay, CDandLP and Alibris.
+/// The Shop: find the CD or record on Discogs, or MusicBrainz when Discogs has nothing (album, artist, barcode or catalog
+/// number), pick the edition, then compare copies for sale on Discogs, eBay, CDandLP and Alibris.
 struct CDShopView: View {
     @Environment(AppModel.self) private var model
 
@@ -76,7 +76,7 @@ private struct CDShopSearchBar: View {
     }
 }
 
-/// Step one: the albums MusicBrainz found and their editions in the format.
+/// Step one: the albums Discogs (or MusicBrainz) found and their editions in the format.
 private struct CDShopEditionsSection: View {
     let store: CDShopStore
 
@@ -95,17 +95,17 @@ private struct CDShopEditionsSection: View {
                 CDShopRecentFinds(store: store)
             }
         case .searching where store.albums.isEmpty:
-            ProgressView("Searching MusicBrainz…").frame(maxWidth: .infinity).padding(.top, 40)
+            ProgressView("Searching \(store.source.name)…").frame(maxWidth: .infinity).padding(.top, 40)
         case .failed(let message):
             Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
         default:
             if store.albums.isEmpty {
                 ContentUnavailableView {
-                    Label("Not on MusicBrainz", systemImage: format.symbol)
+                    Label("Not on Discogs or MusicBrainz", systemImage: format.symbol)
                 } description: {
-                    Text(store.artist != nil ? "MusicBrainz lists no albums for \(store.artist!.name)."
-                         : store.query.album.isEmpty && store.query.code.isEmpty ? "MusicBrainz has no artist by that name."
-                         : "MusicBrainz has no \(format.name) editions matching that. New, local and rare releases are often missing there; the stores may still have it.")
+                    Text(store.discography.map { "Discogs and MusicBrainz list no \(format.name) albums for \($0)." }
+                         ?? (store.query.isArtistAlone ? "Neither Discogs nor MusicBrainz has an artist by that name."
+                             : "Neither Discogs nor MusicBrainz has \(format.name) editions matching that. New, local and rare releases are sometimes missing there; the stores may still have it."))
                 } actions: {
                     Button("Search the Stores by Name") { store.shopByName() }.buttonStyle(.borderedProminent)
                 }
@@ -114,7 +114,8 @@ private struct CDShopEditionsSection: View {
                 VStack(alignment: .leading, spacing: 10) {
                     if store.artists.count > 1 { artistChips }
                     Text((store.albums.count == 1 ? "1 album" : "\(store.albums.count) albums")
-                         + (store.artist.map { " by \($0.name): open one to see its \(format.name) editions" } ?? ""))
+                         + (store.discography.map { " by \($0): open one to see its \(format.name) editions" } ?? "")
+                         + " · from \(store.source.name)")
                         .font(.caption).foregroundStyle(.secondary)
                     ForEach(store.albums) { album in
                         CDShopAlbumCard(store: store, album: album)
@@ -201,7 +202,7 @@ private struct CDShopAlbumCard: View {
                 withAnimation(.snappy) { store.toggle(album) }
             } label: {
                 HStack(spacing: 12) {
-                    CDShopCover(releaseId: nil, releaseGroupId: album.releaseGroupId, side: 56, format: format)
+                    CDShopCover(releaseId: nil, releaseGroupId: album.releaseGroupId, side: 56, format: format, thumbnail: album.thumbnail)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(album.title).font(.headline)
                         Text(album.artist).foregroundStyle(.secondary)
@@ -226,7 +227,7 @@ private struct CDShopAlbumCard: View {
                 } else if let error = store.editionErrors[album.id] {
                     Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.secondary).padding(12)
                 } else if album.editionsLoaded, album.editions.isEmpty {
-                    Text("MusicBrainz lists no \(format.name) editions of this album. “Any \(format.name) Edition” still searches the stores for it.")
+                    Text("\(album.isDiscogs ? "Discogs" : "MusicBrainz") lists no \(format.name) editions of this album. “Any \(format.name) Edition” still searches the stores for it.")
                         .font(.caption).foregroundStyle(.secondary).padding(12)
                 }
                 ForEach(Array(album.editions.enumerated()), id: \.element.id) { i, edition in
@@ -249,7 +250,7 @@ private struct CDShopEditionRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CDShopCover(releaseId: edition.id, releaseGroupId: nil, side: 40, format: format)
+            CDShopCover(releaseId: edition.musicBrainzID, releaseGroupId: nil, side: 40, format: format, thumbnail: edition.thumbnail)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text([edition.date.isEmpty ? "Undated" : edition.date, edition.country].filter { !$0.isEmpty }.joined(separator: " · "))
@@ -342,7 +343,8 @@ private struct CDShopOffersSection: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 14) {
-            CDShopCover(releaseId: target.edition?.id, releaseGroupId: target.releaseGroupId, side: 84, format: target.format)
+            CDShopCover(releaseId: target.edition?.musicBrainzID, releaseGroupId: target.releaseGroupId, side: 84, format: target.format,
+                        thumbnail: target.edition?.thumbnail)
             VStack(alignment: .leading, spacing: 3) {
                 Text(target.isByName ? "\(target.format.name.uppercased()) BY NAME"
                      : target.edition == nil ? "ANY \(target.format.name.uppercased()) EDITION" : "THIS \(target.format.name.uppercased()) EDITION")
@@ -350,7 +352,7 @@ private struct CDShopOffersSection: View {
                 Text(target.album).font(.title2.bold())
                 Text(target.artist).foregroundStyle(.secondary)
                 if target.isByName {
-                    Text("Not on MusicBrainz, so these are the stores' own search results: check each listing is the \(target.format.noun) you want.")
+                    Text("Not on Discogs or MusicBrainz, so these are the stores' own search results: check each listing is the \(target.format.noun) you want.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if let e = target.edition {
@@ -429,7 +431,7 @@ private struct CDShopOffersSection: View {
     private func help(_ shop: CDShop) -> String {
         switch store.shopStates[shop] ?? .waiting {
         case .failed(let message): "\(shop.name): \(message)"
-        case .notLinked: target.isByName ? "Discogs is searched by its MusicBrainz link; use “Search on Discogs” below."
+        case .notLinked: target.isByName ? "Discogs is searched by its release or master; use “Search on Discogs” below."
             : "MusicBrainz doesn't link this \(target.format.noun) to \(shop.name); use “Search on \(shop.name)” below."
         default: store.hiddenShops.contains(shop) ? "Show \(shop.name)" : "Hide \(shop.name)"
         }
@@ -559,13 +561,16 @@ private struct CDOfferRow: View {
 
 // MARK: Covers
 
-/// A release's (or, failing that, its album's) front cover from the Cover Art Archive.
+/// A release's (or, failing that, its album's) front cover from the Cover Art Archive, or a Discogs release's or
+/// master's thumbnail.
 struct CDShopCover: View {
     @Environment(AppModel.self) private var model
     let releaseId: String?
     let releaseGroupId: String?
     let side: CGFloat
     var format: ShopFormat = .cd
+    /// A Discogs thumbnail, for a release or album MusicBrainz didn't find (only loaded from Discogs' own hosts).
+    var thumbnail: URL? = nil
     @State private var image: NSImage?
 
     private static var cache: [String: NSImage] = [:]
@@ -581,11 +586,19 @@ struct CDShopCover: View {
         }
         .frame(width: side, height: side)
         .clipShape(RoundedRectangle(cornerRadius: 4))
-        .task(id: "\(releaseId ?? "")|\(releaseGroupId ?? "")") {
-            let key = "\(releaseId ?? "")|\(releaseGroupId ?? "")"
-            if let hit = Self.cache[key] { image = hit; return }
-            guard let data = try? await model.coverArt.fetchFront(releaseId: releaseId ?? "", releaseGroupId: releaseGroupId, size: 250),
-                  let loaded = NSImage(data: data) else { return }
+        .task(id: "\(releaseId ?? "")|\(releaseGroupId ?? "")|\(thumbnail?.absoluteString ?? "")") {
+            let key = "\(releaseId ?? "")|\(releaseGroupId ?? "")|\(thumbnail?.absoluteString ?? "")"
+            image = Self.cache[key]
+            if image != nil { return }
+            let data: Data?
+            if releaseId != nil || releaseGroupId != nil {
+                data = try? await model.coverArt.fetchFront(releaseId: releaseId ?? "", releaseGroupId: releaseGroupId, size: 250)
+            } else if let thumbnail {
+                data = try? await model.discogs.image(thumbnail)
+            } else {
+                data = nil
+            }
+            guard let data, let loaded = NSImage(data: data) else { return }
             Self.cache[key] = loaded
             image = loaded
         }
@@ -604,20 +617,24 @@ private struct CDShopOwnedNote: View {
     let format: ShopFormat
 
     var body: some View {
-        let copies = model.catalog.collectionMatcher.items(releaseID: edition?.id, releaseGroupID: releaseGroupId, title: album,
+        let copies = model.catalog.collectionMatcher.items(releaseID: edition?.musicBrainzID, releaseGroupID: releaseGroupId, title: album,
                                                            artists: [artist])
         let cds = copies.filter { $0.medium == format.medium }
         if let edition, !cds.isEmpty {
-            let same = cds.filter { $0.releaseID == edition.id }
+            let same = cds.filter { copy in
+                edition.discogsReleaseID.map { copy.discogsReleaseID == $0 } ?? (copy.releaseID == edition.id)
+            }
             CollectionCopyNote(copies: same.isEmpty ? cds : same, edition: !same.isEmpty)
         } else if !copies.isEmpty {
             CollectionCopyNote(copies: copies)
         }
     }
 
-    /// Add to Collection… for an edition: found by its barcode, else by its title and artist, and picked.
+    /// Add to Collection… for an edition: found by its barcode, else by its title and artist, and picked. A Discogs
+    /// release is looked up by its link, so it's the one picked.
     static func prefill(_ e: CDEdition) -> CollectionPrefill {
-        CollectionPrefill(album: e.title, artist: e.artist, releaseID: e.id, releaseGroupID: e.releaseGroupId,
+        CollectionPrefill(query: e.discogsReleaseID.flatMap { DiscogsLink.releaseURL($0)?.absoluteString } ?? "",
+                          album: e.title, artist: e.artist, releaseID: e.id, releaseGroupID: e.releaseGroupId,
                           barcode: e.barcode.isEmpty ? nil : e.barcode, catalogNumber: e.catalogNumber.isEmpty ? nil : e.catalogNumber)
     }
 }

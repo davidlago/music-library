@@ -2,7 +2,7 @@
 
 **Shop** (sidebar **Acquire**; **Shop for This CD** or **Shop for It on Vinyl** in an album's **…** menu; **Shop for
 This CD** or **Shop for This Record** in a CD's or record's **…** menu) finds the exact CD or record you want on
-MusicBrainz and compares new and used copies that ship to the US, from several stores at once, with shipping and a
+Discogs (or MusicBrainz, when Discogs doesn't list it) and compares new and used copies that ship to the US, from several stores at once, with shipping and a
 total in dollars, plus a [price guide](#price-guide) of what it's worth. The [Radio DJ](radio-dj.md) can open it for
 you, too. On the iPhone, the [Shop tab](#on-iphone) is made for record stores and fairs: look a record up by name or
 barcode, or show the AI a photo of it.
@@ -14,16 +14,21 @@ more to the price guide.
 
 ## Find the CD or record
 
-Pick **CD** or **Vinyl**, then search by **Album** and **Artist** (a few words of each are enough), or by the **Barcode
-or catalog number** on the case or sleeve, and press **Find**. Switching between CD and Vinyl runs the same search again
-in the other format.
+Pick **CD** or **Vinyl**, then search by **Album** and **Artist**, or by the **Barcode or catalog number** on the case
+or sleeve, and press **Find**. Switching between CD and Vinyl runs the same search again in the other format.
 
-- Results are grouped by album, with official editions first. **Any CD Edition** (or **Any Vinyl Edition**) shops for
-  every edition of the album in that format; open an album to see its editions (year, country, label, catalog number,
-  barcode, format such as 2×12" Vinyl, packaging) and pick one with **Shop This Edition**.
-- An artist alone lists their discography: studio albums first, then live albums, compilations and EPs, with other
-  close name matches as chips.
-- A CD or record MusicBrainz doesn't list: **Search the stores by name**.
+The search goes to [Discogs](https://www.discogs.com) first: its database lists far more CD and vinyl editions than
+MusicBrainz, especially records and new, local or rare releases. When Discogs finds nothing (or is busy), the Shop
+searches MusicBrainz instead; the line above the results says which one they came from. No Discogs account is needed,
+though with one connected (**Settings ▸ Discogs**) the results show covers.
+
+- Results are grouped by album (a Discogs master, or a MusicBrainz release group). **Any CD Edition** (or **Any Vinyl
+  Edition**) shops for every edition of the album in that format; open an album to see its editions (year, country,
+  label, catalog number, barcode, format such as 2×12" Vinyl or LP, Album, Reissue) and pick one with **Shop This
+  Edition**.
+- An artist alone lists their albums, oldest first (albums, then compilations, EPs and singles); open one to see its
+  editions.
+- A CD or record neither lists: **Search the stores by name**.
 - **I Own This…** adds the edition to your [Physical Collection](physical-collection.md), as a CD or a record.
 
 ## Compare offers

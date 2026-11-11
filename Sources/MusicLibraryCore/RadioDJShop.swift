@@ -1,9 +1,9 @@
 import Foundation
 
 /// The DJ's way to the Shop (Mac only, where the Shop is): the `open_shop` client tool. When the listener wants to
-/// buy an album on CD or vinyl, the DJ calls it with what to look for; the app opens the Shop searching MusicBrainz
-/// for it, and the tool's result tells the DJ which albums and how many editions came up, so it can point the
-/// listener to the right one. The listener picks the edition and sees the copies for sale; nothing is bought.
+/// buy an album on CD or vinyl, the DJ calls it with what to look for; the app opens the Shop searching Discogs
+/// (then MusicBrainz) for it, and the tool's result tells the DJ which albums and how many editions came up, so it can
+/// point the listener to the right one. The listener picks the edition and sees the copies for sale; nothing is bought.
 public struct RadioDJShopRequest: Hashable, Sendable {
     public static let toolName = "open_shop"
 
@@ -24,9 +24,10 @@ public struct RadioDJShopRequest: Hashable, Sendable {
         let description = """
         Open the app's Shop page searching for an album on CD or vinyl, so the listener can compare copies for sale \
         (new and used, from Discogs, eBay, CDandLP and Alibris, shipping to the US). Use it when the listener asks \
-        for help finding, buying or pricing a copy, or agrees when you offer. The Shop searches MusicBrainz for the \
-        album's editions in that format and shows them; the listener picks an edition (or any edition) there, and \
-        nothing is bought. Give the album's title and artist as MusicBrainz would list them, and a barcode or \
+        for help finding, buying or pricing a copy, or agrees when you offer. The Shop searches Discogs (then \
+        MusicBrainz when Discogs has nothing) for the album's editions in that format and shows them; the listener \
+        picks an edition (or any edition) there, and nothing is bought. Give the album's title and artist as Discogs \
+        would list them, and a barcode or \
         catalog number only when you're sure of the exact edition's. The result says what the search found.
         """
         let properties: [String: JSONValue] = [
@@ -70,15 +71,17 @@ public struct RadioDJShopRequest: Hashable, Sendable {
     }
 
     /// What the tool tells the DJ about the search the Shop ran: the albums found (at most `limit`) with their
-    /// editions in the format, or that none were.
-    public static func summary(_ albums: [CDAlbum], request: RadioDJShopRequest, error: String? = nil, limit: Int = 8) -> String {
+    /// editions in the format, or that none were. `source` is where they were found (MusicBrainz is asked only when
+    /// Discogs finds nothing, so finding nothing there means neither lists it).
+    public static func summary(_ albums: [CDAlbum], request: RadioDJShopRequest, error: String? = nil, source: CDSearchSource = .musicBrainz,
+                               limit: Int = 8) -> String {
         let format = request.format
         let looking = "The Shop is open, searching for \(format == .cd ? "CDs" : "vinyl records") of " +
             [request.album.isEmpty ? nil : "*\(request.album)*", request.artist.isEmpty ? nil : "by \(request.artist)"]
                 .compactMap { $0 }.joined(separator: " ") + "."
-        if let error { return "\(looking) The MusicBrainz search failed (\(error)); the listener can try again from the Shop page." }
+        if let error { return "\(looking) The \(source.name) search failed (\(error)); the listener can try again from the Shop page." }
         guard !albums.isEmpty else {
-            return "\(looking) MusicBrainz lists no \(format.name) editions matching it; the page offers to search the stores by name instead, which finds copies of releases MusicBrainz doesn't list."
+            return "\(looking) Discogs and MusicBrainz list no \(format.name) editions matching it; the page offers to search the stores by name instead, which finds copies of releases they don't list."
         }
         let rows = albums.prefix(limit).map { a -> String in
             var line = "- *\(a.title)* — \(a.artist)"
@@ -92,7 +95,7 @@ public struct RadioDJShopRequest: Hashable, Sendable {
         }
         let more = albums.count > limit ? "\n…and \(albums.count - limit) more." : ""
         return """
-        \(looking) MusicBrainz found \(albums.count == 1 ? "1 album" : "\(albums.count) albums"):
+        \(looking) \(source.name) found \(albums.count == 1 ? "1 album" : "\(albums.count) albums"):
         \(rows.joined(separator: "\n"))\(more)
         On the page the listener picks one edition, or any \(format.name) edition of an album, to see copies for sale and their prices.
         """
