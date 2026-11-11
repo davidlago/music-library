@@ -7,6 +7,8 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.36.2
+
 - The Mac's Shop now searches [Discogs](https://www.discogs.com) first, whose database lists far more CD and vinyl
   editions than MusicBrainz, especially records and new, local or rare releases; MusicBrainz is searched only when
   Discogs has nothing. Editions found on Discogs take their release or master straight to the Discogs listings and the
