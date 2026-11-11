@@ -18,7 +18,7 @@ extension Database {
         "id", "medium", "sticker", "album", "artist", "album_key", "year", "mb_release_id", "mb_release_group_id",
         "barcode", "catalog_number", "record_label", "country", "format_detail", "disc_count", "track_count",
         "purchased_on", "price", "notes", "cover_file", "digital_source", "created_at", "updated_at", "discogs_release_id",
-        "runouts", "media_grade", "sleeve_grade",
+        "runout_sides", "media_grade", "sleeve_grade",
     ]
 
     /// The collection, created on open without a schema change (like `rip_checks`): phones on older versions read
@@ -37,10 +37,18 @@ extension Database {
         if try !columns(of: "collection_items").contains("discogs_release_id") {
             try exec("ALTER TABLE collection_items ADD COLUMN discogs_release_id INTEGER")
         }
-        // Added in 1.35, the same way: the copy's pressing and condition.
+        // Added in 1.35, the same way: the copy's condition.
         let present = try columns(of: "collection_items")
-        for column in ["runouts", "media_grade", "sleeve_grade"] where !present.contains(column) {
+        for column in ["media_grade", "sleeve_grade"] where !present.contains(column) {
             try exec("ALTER TABLE collection_items ADD COLUMN \(column) TEXT")
+        }
+        // 1.36 keeps one runout per side (a JSON array). 1.35's single `runouts` text isn't carried over: it's
+        // cleared once, when the new column is added, and nothing reads it any more.
+        if !present.contains("runout_sides") {
+            try exec("ALTER TABLE collection_items ADD COLUMN runout_sides TEXT")
+            if present.contains("runouts") {
+                try exec("UPDATE collection_items SET runouts=NULL WHERE runouts IS NOT NULL")
+            }
         }
         try exec("CREATE INDEX IF NOT EXISTS collection_items_album ON collection_items(album_key)")
         try exec("CREATE INDEX IF NOT EXISTS collection_items_sticker ON collection_items(medium, sticker)")
@@ -119,7 +127,7 @@ extension Database {
         item.updatedAt = date(22)
         item.discogsReleaseID = r.int(23).flatMap { DiscogsLink.isValid($0) ? $0 : nil }
         if medium.isPhysical {
-            item.runouts = text(24, max: CollectionItem.maxRunouts)
+            item.runouts = RunoutSides.decode(r.string(24))
             item.mediaGrade = r.string(25).flatMap(CollectionGrade.init(rawValue:)).flatMap { $0.isMediaGrade ? $0 : nil }
             item.sleeveGrade = r.string(26).flatMap(CollectionGrade.init(rawValue:))
         }
@@ -358,7 +366,7 @@ extension Database {
             .int(item.discCount), .int(item.trackCount), .text(item.purchasedOn?.string), .text(AlbumPurchase.priceText(item.price)),
             .text(item.notes), .text(item.coverFile), .text(item.digitalSource?.rawValue),
             .double(item.createdAt.timeIntervalSince1970), .double(item.updatedAt.timeIntervalSince1970),
-            .int(item.discogsReleaseID), .text(item.runouts), .text(item.mediaGrade?.rawValue), .text(item.sleeveGrade?.rawValue),
+            .int(item.discogsReleaseID), .text(RunoutSides.encode(item.runouts)), .text(item.mediaGrade?.rawValue), .text(item.sleeveGrade?.rawValue),
         ])
     }
 

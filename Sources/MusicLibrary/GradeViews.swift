@@ -92,11 +92,13 @@ struct GradingGuideSheet: View {
 }
 
 /// Opens the popover with a Discogs release's runouts and codes, looked up when it opens, to compare with the copy's
-/// dead wax and copy into its Runouts.
+/// dead wax and put on its sides (`sides`, the copy's side names). It stays open, so each side can take one.
 struct DiscogsRunoutsButton: View {
     @Environment(AppModel.self) private var model
     let releaseID: Int
-    let use: ([DiscogsIdentifier]) -> Void
+    let medium: CollectionMedium
+    let sides: [String]
+    let use: (DiscogsIdentifier, Int) -> Void
     @State private var showing = false
     @State private var release: DiscogsRelease?
     @State private var failed: String?
@@ -110,10 +112,7 @@ struct DiscogsRunoutsButton: View {
                 ScrollView {
                     Group {
                         if let release {
-                            DiscogsIdentifierList(release: release) { runouts in
-                                use(runouts)
-                                showing = false
-                            }
+                            DiscogsIdentifierList(release: release, medium: medium, sides: sides, use: use)
                         } else if let failed {
                             Text(failed).foregroundStyle(.secondary)
                         } else {
@@ -136,16 +135,5 @@ struct DiscogsRunoutsButton: View {
         } catch {
             failed = "Couldn’t look it up on Discogs: \(error.localizedDescription)"
         }
-    }
-}
-
-enum RunoutText {
-    /// The runouts added to what's typed: all of them into an empty field, else only lines not there yet.
-    static func adding(_ runouts: [DiscogsIdentifier], to current: String?) -> String {
-        let text = DiscogsIdentifierList.runoutText(runouts)
-        guard let current, !current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return text }
-        let have = Set(current.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) })
-        let new = text.split(separator: "\n").map(String.init).filter { !have.contains($0) }
-        return new.isEmpty ? current : current + "\n" + new.joined(separator: "\n")
     }
 }

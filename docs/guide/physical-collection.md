@@ -120,12 +120,16 @@ A CD's or record's **Your Copy** has:
   most sellers use: **M** (Mint), **NM** (Near Mint), **VG+**, **VG**, **G+**, **G**, **F** (Fair) and **P** (Poor). A
   sleeve can also be **Generic**, **Not graded** or **No cover**.
 - **Runouts**: the codes etched or stamped in the dead wax between the last track and the label (on a CD, the ring
-  around the centre hole), one per line. Discogs lists them for each pressing, so they're what tells yours apart.
+  around the centre hole), one field per side: **Side A** and **Side B** for a record (**Side C** and **Side D** for a
+  second record, and so on, from **Discs**), one per disc for a CD. Discogs lists them for each pressing, so they're
+  what tells yours apart. Type them as they read on your copy.
 
 When you pick an edition from Discogs (in Add to Collection or **Change Edition…**), its runouts, barcodes and the plant
-that pressed it show beside it: compare them with your copy before you pick. **Use Runouts** copies Discogs' runouts
-into your copy, for you to trim to the ones on yours (Discogs often lists every variant). For a copy with a Discogs
-edition, **Discogs' Runouts…** under the field shows them again.
+that pressed it show beside it: compare them with your copy before you pick. In Add to Collection, each runout has a
+**Use for** button that copies it to one of your copy's sides: it offers the side Discogs says it's on, and its menu
+lists every side (Discogs often lists several variants of a side, so pick the one on yours). It replaces what that side
+had, and you can edit it afterwards. For a copy with a Discogs edition, **Discogs' Runouts…** under the fields shows them
+again, with the same buttons.
 
 New to grading? The **?** next to the grades opens the **Grading Guide** (on the iPhone, **Grading Guide** on a copy's
 page): how to grade, then each grade with what decides it and a drawing of the wear to look for, for a record, a CD and a

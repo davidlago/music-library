@@ -81,25 +81,7 @@ struct CollectionItemEditor: View {
                 CopyGradeRows(medium: item.medium, media: binding(\.mediaGrade), sleeve: binding(\.sleeveGrade))
                 GridRow(alignment: .firstTextBaseline) {
                     Text("Runouts").foregroundStyle(.secondary)
-                    VStack(alignment: .leading, spacing: 4) {
-                        CommitTextField(title: "Runouts", value: item.runouts,
-                                        prompt: item.medium == .cd ? "Codes around the disc's centre ring" : "Etched or stamped in the dead wax",
-                                        axis: .vertical) { v in
-                            model.changeItem(id: item.id) { $0.runouts = v }
-                        }
-                        .font(.callout.monospaced())
-                        .frame(maxWidth: 360)
-                        // A vertical field doesn't grow for text set from outside (Use Runouts): make it again.
-                        .id(item.runouts ?? "")
-                        .help("The matrix/runout codes on your copy, one per line (⌥Return for a new line): they tell its pressing apart")
-                        if let release = item.discogsReleaseID {
-                            DiscogsRunoutsButton(releaseID: release) { runouts in
-                                let current = model.item(id: item.id)?.runouts
-                                model.changeItem(id: item.id) { $0.runouts = RunoutText.adding(runouts, to: current) }
-                            }
-                            .font(.caption)
-                        }
-                    }
+                    runoutFields
                 }
             }
             Divider().gridCellUnsizedAxes(.horizontal)
@@ -121,6 +103,40 @@ struct CollectionItemEditor: View {
             }
         }
         .font(.callout)
+    }
+
+    /// One field per side (a record's A, B…, a CD's one per disc), each saved on its own, and Discogs' runouts to
+    /// pick from for a copy with a Discogs edition.
+    private var runoutFields: some View {
+        let current = model.item(id: item.id) ?? item
+        let sides = current.runoutSides()
+        return VStack(alignment: .leading, spacing: 4) {
+            Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 4) {
+                ForEach(sides) { side in
+                    GridRow(alignment: .firstTextBaseline) {
+                        if sides.count > 1 || current.medium == .vinyl {
+                            Text(side.name).font(.caption).foregroundStyle(.secondary)
+                        }
+                        CommitTextField(title: side.name, value: side.text.isEmpty ? nil : side.text,
+                                        prompt: current.medium == .cd ? "Codes around the centre ring" : "Etched or stamped in the dead wax",
+                                        axis: .vertical) { v in
+                            model.changeItem(id: item.id) { $0.setRunout(v, side: side.index) }
+                        }
+                        .font(.callout.monospaced())
+                        .frame(maxWidth: 320)
+                        // A vertical field doesn't grow for text set from outside (Use for…): make it again.
+                        .id("\(side.index)|\(side.text)")
+                        .help("The matrix/runout code on this side of your copy (⌥Return for a new line): it tells its pressing apart")
+                    }
+                }
+            }
+            if let release = current.discogsReleaseID {
+                DiscogsRunoutsButton(releaseID: release, medium: current.medium, sides: sides.map(\.name)) { code, side in
+                    model.changeItem(id: item.id) { $0.setRunout(code.value, side: side) }
+                }
+                .font(.caption)
+            }
+        }
     }
 
     private func textRow(_ title: String, _ path: WritableKeyPath<CollectionItem, String?>, prompt: String, help: String? = nil) -> some View {
@@ -213,7 +229,7 @@ struct CollectionItemEditor: View {
             ("Label", item.sticker?.text), ("Bought", item.purchasedOn.map { $0.date().formatted(date: .long, time: .omitted) }),
             ("Paid", item.price.map { formatMoney($0) }), ("Record label", item.recordLabel), ("Cat. No.", item.catalogNumber),
             ("Barcode", item.barcode), ("Country", item.country),
-            ("Condition", GradeText.pair(media: item.mediaGrade, sleeve: item.sleeveGrade)), ("Runouts", item.runouts),
+            ("Condition", GradeText.pair(media: item.mediaGrade, sleeve: item.sleeveGrade)), ("Runouts", item.runoutSummary),
             ("Notes", item.notes),
         ].compactMap { k, v in v.map { (k, $0) } }
         return Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {

@@ -22,18 +22,73 @@ import Testing
 
     @Test func gradesAndRunoutsAreCopyFieldsOnly() {
         var item = CollectionItem(medium: .vinyl, album: "Kind of Blue", artist: "Miles Davis")
-        item.runouts = "  XSM 47326\nXSM 47327  "
+        item.runouts = ["  XSM 47326 ", "XSM 47327\n", " ", ""]
         item.mediaGrade = .noCover  // not a media grade
         item.sleeveGrade = .generic
         let n = item.normalized()
-        #expect(n.runouts == "XSM 47326\nXSM 47327" && n.mediaGrade == nil && n.sleeveGrade == .generic)
+        #expect(n.runouts == ["XSM 47326", "XSM 47327"] && n.mediaGrade == nil && n.sleeveGrade == .generic)
         var download = item
         download.medium = .download
         download.mediaGrade = .nearMint
         let d = download.normalized()
-        #expect(d.runouts == nil && d.mediaGrade == nil && d.sleeveGrade == nil)
-        item.runouts = String(repeating: "A", count: CollectionItem.maxRunouts + 50)
-        #expect(item.normalized().runouts?.count == CollectionItem.maxRunouts)
+        #expect(d.runouts.isEmpty && d.mediaGrade == nil && d.sleeveGrade == nil)
+        item.runouts = [String(repeating: "A", count: RunoutSides.maxLength + 50)]
+        #expect(item.normalized().runouts.first?.count == RunoutSides.maxLength)
+        item.runouts = Array(repeating: "x", count: RunoutSides.maxSides + 10)
+        #expect(item.normalized().runouts.count == RunoutSides.maxSides)
+    }
+
+    // MARK: Sides
+
+    @Test func aCopyHasOneRunoutPerSide() {
+        var record = CollectionItem(medium: .vinyl, album: "Kind of Blue", artist: "Miles Davis")
+        #expect(record.runoutSides().map(\.name) == ["Side A", "Side B"])
+        record.discCount = 2
+        #expect(record.runoutSides().map(\.name) == ["Side A", "Side B", "Side C", "Side D"])
+        var cd = CollectionItem(medium: .cd, album: "Abbey Road", artist: "The Beatles")
+        #expect(cd.runoutSides().map(\.name) == ["Disc"])
+        cd.discCount = 3
+        #expect(cd.runoutSides().map(\.name) == ["Disc 1", "Disc 2", "Disc 3"])
+        #expect(CollectionItem(medium: .download, album: "A", artist: "B").runoutSides().isEmpty)
+        #expect(RunoutSides.name(26, medium: .vinyl, count: 30) == "Side 27")
+
+        // Setting one side keeps the others, fills the gaps with blanks and drops blanks at the end.
+        record.setRunout(" XSM 47327 ", side: 1)
+        #expect(record.runouts == ["", "XSM 47327"])
+        record.setRunout("XSM 47326", side: 0)
+        record.setRunout("85700 1B", side: 3)
+        #expect(record.runouts == ["XSM 47326", "XSM 47327", "", "85700 1B"])
+        record.setRunout(nil, side: 3)
+        #expect(record.runouts == ["XSM 47326", "XSM 47327"])
+        #expect(record.runoutSides(filled: true).map(\.name) == ["Side A", "Side B"])
+        #expect(record.runoutSummary == "Side A: XSM 47326\nSide B: XSM 47327")
+
+        // Text on more sides than the disc count has room for still shows.
+        record.discCount = 1
+        record.setRunout("extra", side: 2)
+        #expect(record.runoutSideCount == 3 && record.runout(side: 2) == "extra" && record.runout(side: 9) == "")
+    }
+
+    @Test func discogsSaysWhichSideARunoutIsOn() {
+        func side(_ description: String, _ medium: CollectionMedium = .vinyl) -> Int? {
+            RunoutSides.side(of: DiscogsIdentifier(type: "Matrix / Runout", value: "X", description: description), medium: medium)
+        }
+        #expect(side("Side A [label]") == 0)
+        #expect(side("Side B, variant 1") == 1)
+        #expect(side("side d") == 3)
+        #expect(side("B-Side") == 1)
+        #expect(side("Side 2") == 1)
+        #expect(side("Runout stamp") == nil)
+        #expect(side("Runout side A, variant 1") == 0)
+        #expect(side("Runout B, stamped, variant 1") == 1)
+        #expect(side("Side A Runout") == 0)
+        #expect(side("Matrix C") == 2)
+        #expect(side("") == nil)
+        #expect(side("Disc 2", .cd) == 1)
+        #expect(side("CD2 mirror band", .cd) == 1)
+        #expect(side("Side A", .cd) == nil)
+        let blue = try? DiscogsParser.parseRelease(try TestSupport.fixture("discogs_release_kindofblue"))
+        #expect(blue?.runouts.map { RunoutSides.side(of: $0, medium: .vinyl) } == [0, 1, 0, 1])
     }
 
     // MARK: Storage
@@ -42,7 +97,7 @@ import Testing
         let path = try TestSupport.tempDir().appendingPathComponent("library.sqlite").path
         // A library 1.34 made: none of the new columns.
         var db: Database? = try Database(path: path)
-        for column in ["runouts", "media_grade", "sleeve_grade"] {
+        for column in ["runout_sides", "media_grade", "sleeve_grade"] {
             try db?.exec("ALTER TABLE collection_items DROP COLUMN \(column)")
         }
         try db?.exec("INSERT INTO collection_items(id,medium,sticker,album,artist,album_key,created_at,updated_at) VALUES('old','vinyl',1,'Old','Artist','k',1,1)")
@@ -51,13 +106,13 @@ import Testing
         db = try Database(path: path)
         let reopened = try #require(db)
         let columns = try reopened.columns(of: "collection_items")
-        #expect(columns.isSuperset(of: ["runouts", "media_grade", "sleeve_grade"]))
+        #expect(columns.isSuperset(of: ["runout_sides", "media_grade", "sleeve_grade"]))
         #expect(try reopened.query("PRAGMA user_version") { $0.int(0) ?? 0 }.first == 14)
         let old = try #require(try reopened.collectionItems().items.first)
-        #expect(old.runouts == nil && old.mediaGrade == nil && old.sleeveGrade == nil)
+        #expect(old.runouts.isEmpty && old.mediaGrade == nil && old.sleeveGrade == nil)
 
         var copy = CollectionItem(id: "graded", medium: .vinyl, album: "Kind of Blue", artist: "Miles Davis")
-        copy.runouts = "XSM 47326 (Side A)\nXSM 47327 (Side B)"
+        copy.runouts = ["XSM 47326", "", "XSM 47327 \"Sterling\""]
         copy.mediaGrade = .veryGoodPlus
         copy.sleeveGrade = .veryGood
         try reopened.saveCollectionItem(copy)
@@ -69,20 +124,46 @@ import Testing
         let kept = try #require(try reopened.collectionItems().items.first { $0.id == "graded" })
         #expect(kept.runouts == copy.runouts && kept.mediaGrade == .veryGoodPlus && kept.sleeveGrade == .veryGood)
 
-        // Values that don't read are unknown: a grade from nowhere, a sleeve-only grade as the media's, runouts too long.
+        // Values that don't read are unknown: a grade from nowhere, a sleeve-only grade as the media's, runouts that
+        // aren't a list of short strings.
         try reopened.exec("UPDATE collection_items SET media_grade='excellent', sleeve_grade='no-cover' WHERE id='graded'")
         let odd = try #require(try reopened.collectionItems().items.first { $0.id == "graded" })
         #expect(odd.mediaGrade == nil && odd.sleeveGrade == .noCover)
-        try reopened.exec("UPDATE collection_items SET media_grade='generic', runouts=? WHERE id='graded'",
-                          [.text(String(repeating: "x", count: CollectionItem.maxRunouts + 1))])
-        let bad = try #require(try reopened.collectionItems().items.first { $0.id == "graded" })
-        #expect(bad.mediaGrade == nil && bad.runouts == nil)
+        for bad in ["XSM 47326", "{\"a\":1}", "[1,2]", "[\"\(String(repeating: "x", count: RunoutSides.maxLength + 1))\"]",
+                    "[" + Array(repeating: "\"x\"", count: RunoutSides.maxSides + 1).joined(separator: ",") + "]"] {
+            try reopened.exec("UPDATE collection_items SET media_grade='generic', runout_sides=? WHERE id='graded'", [.text(bad)])
+            let item = try #require(try reopened.collectionItems().items.first { $0.id == "graded" })
+            #expect(item.mediaGrade == nil && item.runouts.isEmpty)
+        }
+    }
+
+    @Test func the135RunoutsTextIsClearedOnce() throws {
+        let path = try TestSupport.tempDir().appendingPathComponent("library.sqlite").path
+        // A library 1.35 made: one `runouts` text per copy, no `runout_sides`.
+        var db: Database? = try Database(path: path)
+        try db?.exec("ALTER TABLE collection_items DROP COLUMN runout_sides")
+        try db?.exec("ALTER TABLE collection_items ADD COLUMN runouts TEXT")
+        try db?.exec("INSERT INTO collection_items(id,medium,album,artist,album_key,created_at,updated_at,runouts,media_grade) VALUES('old','vinyl','Old','Artist','k',1,1,'XSM 47326 (Side A)','vg')")
+        db = nil
+
+        db = try Database(path: path)
+        let reopened = try #require(db)
+        #expect(try reopened.query("SELECT runouts FROM collection_items WHERE id='old'") { $0.string(0) }.first == .some(nil))
+        let item = try #require(try reopened.collectionItems().items.first)
+        #expect(item.runouts.isEmpty && item.mediaGrade == .veryGood)
+
+        // What 1.35 writes there after a downgrade is left alone, and never read.
+        try reopened.exec("UPDATE collection_items SET runouts='typed in 1.35' WHERE id='old'")
+        db = nil
+        db = try Database(path: path)
+        #expect(try db?.query("SELECT runouts FROM collection_items WHERE id='old'") { $0.string(0) }.first == "typed in 1.35")
+        #expect(try db?.collectionItems().items.first?.runouts == [])
     }
 
     @Test func snapshotsWithoutTheColumnsReadThem() throws {
         let path = try TestSupport.tempDir().appendingPathComponent("library.sqlite").path
         var db: Database? = try Database(path: path)
-        for column in ["runouts", "media_grade", "sleeve_grade"] {
+        for column in ["runout_sides", "media_grade", "sleeve_grade"] {
             try db?.exec("ALTER TABLE collection_items DROP COLUMN \(column)")
         }
         try db?.exec("INSERT INTO collection_items(id,medium,album,artist,album_key,created_at,updated_at) VALUES('old','cd','Old','Artist','k',1,1)")
@@ -90,7 +171,7 @@ import Testing
         // A phone opens a synced copy read-only, without migrating it.
         let snapshot = try Database(snapshotAt: path)
         let item = try #require(try snapshot.collectionItems().items.first)
-        #expect(item.id == "old" && item.mediaGrade == nil && item.runouts == nil)
+        #expect(item.id == "old" && item.mediaGrade == nil && item.runouts.isEmpty)
     }
 
     // MARK: Discogs identifiers
@@ -276,19 +357,21 @@ import Testing
     // MARK: Search
 
     @Test func searchFindsRunoutsAndGrades() {
-        func item(_ id: String, _ grade: CollectionGrade?, runouts: String? = nil, medium: CollectionMedium = .vinyl) -> CollectionItem {
+        func item(_ id: String, _ grade: CollectionGrade?, runouts: [String] = [], medium: CollectionMedium = .vinyl) -> CollectionItem {
             var i = CollectionItem(id: id, medium: medium, album: "Album \(id)", artist: "Artist", now: Date(timeIntervalSince1970: 0))
             i.mediaGrade = grade
             i.runouts = runouts
             return i
         }
-        let items = [item("nm", .nearMint, runouts: "XSM 47326 1A"), item("vgp", .veryGoodPlus), item("vg", .veryGood),
+        let items = [item("nm", .nearMint, runouts: ["XSM 47326 1A", "XSM 47327 1B"]), item("vgp", .veryGoodPlus), item("vg", .veryGood),
                      item("none", nil), item("dl", nil, medium: .download)]
         let index = CollectionIndex(collection: MusicCollection(items: items, songPurchases: [:], tracks: []), tracks: [], albumInfos: [:])
         func ids(_ q: String) -> Set<String> { Set(index.search(q).map(\.id)) }
         #expect(ids("runout:xsm47326") == ["nm"])
         #expect(ids("matrix:\"XSM 47326\"") == ["nm"])
         #expect(ids("47326") == ["nm"])  // runouts are text too
+        #expect(ids("runout:1axsm").isEmpty)  // one side's code, never across two sides
+        #expect(ids("runout:47327") == ["nm"])
         #expect(ids("grade:vg+") == ["vgp"])
         #expect(ids("grade:>=vg+") == ["nm", "vgp"])
         #expect(ids("grade:<vg+") == ["vg"])
