@@ -294,6 +294,7 @@ public final class Database: @unchecked Sendable {
         try createRipChecksTable()
         try createDiscogsSyncTable()
         try createOffloadedTracksTable()
+        try createRetiredTracksTables()
         // Added without a schema change too: older phones read the table's other columns by name, so synced copies
         // stay readable there.
         let ownershipColumns = try columns(of: "album_ownership")
@@ -376,12 +377,16 @@ public final class Database: @unchecked Sendable {
     @discardableResult
     public func insertTrack(_ track: Track) throws -> Track {
         try transaction {
+            // A song removed from this album before takes back its ID, plays and like (`RetiredTrack`); a new one gets
+            // an ID no track or removed song has had.
+            let (id, revived) = try idForNewTrack(track)
             try exec("""
-            INSERT INTO tracks(path,title,artist,album,album_artist,year,track_no,track_total,disc_no,disc_total,genre,duration,format,mb_recording_id,mb_release_id,sha256,added_at,search_text,composer,details_json,codec,sample_rate,bit_depth,bitrate,channels)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """, trackBinds(track))
+            INSERT INTO tracks(id,path,title,artist,album,album_artist,year,track_no,track_total,disc_no,disc_total,genre,duration,format,mb_recording_id,mb_release_id,sha256,added_at,search_text,composer,details_json,codec,sample_rate,bit_depth,bitrate,channels)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, [.int(id)] + trackBinds(track))
+            if let revived { try revive(revived, as: id) }
             var t = track
-            t.id = try query("SELECT last_insert_rowid()") { $0.int64(0) }.first ?? 0
+            t.id = id
             return t
         }
     }
@@ -401,8 +406,13 @@ public final class Database: @unchecked Sendable {
         try query("SELECT \(Self.trackColumns) FROM tracks WHERE codec IS NULL ORDER BY id", map: Self.track)
     }
 
+    /// Removes the track (its plays, like, playlist entries and the rest go with it), keeping its history for a new
+    /// copy of the same song on the same album (`RetiredTrack`).
     public func deleteTrack(id: Int64) throws {
-        try exec("DELETE FROM tracks WHERE id=?", [.int(id)])
+        try transaction {
+            if let removed = try self.track(id: id) { try retire(removed) }
+            try exec("DELETE FROM tracks WHERE id=?", [.int(id)])
+        }
     }
 
     public func deleteTracks(ids: [Int64]) throws {

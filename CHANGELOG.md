@@ -7,6 +7,12 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.36.1
+
+- Removing a song no longer loses its plays: when you add the same song to the same album again (rip the CD again,
+  digitize the record again, or add the download again), it gets back its play count, listening history and like.
+  Songs removed before this version can't get theirs back, since their plays were deleted then.
+
 ## 1.36.0
 
 - A copy's **Runouts** are now one field per side: **Side A**, **Side B** (and **C**, **D**… for a set of several

@@ -122,7 +122,13 @@ extension Database {
                                       [.text(e.id), .double(now.timeIntervalSince1970)]) { $0.string(0) }
                 guard !fresh.isEmpty else { continue }
                 guard phoneLibrary == nil || phoneLibrary == ours, let track = try track(id: e.trackID), track.sha256 == e.sha256 else {
-                    result.dropped += 1
+                    // A play of a song removed here since goes with its kept history (`RetiredTrack`).
+                    if phoneLibrary == nil || phoneLibrary == ours, case .play(let listened, let counted) = e.kind,
+                       try recordRetiredPlay(trackID: e.trackID, sha256: e.sha256, startedAt: e.at, listened: listened, counted: counted) {
+                        result.plays += 1
+                    } else {
+                        result.dropped += 1
+                    }
                     continue
                 }
                 switch e.kind {

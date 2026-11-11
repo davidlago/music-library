@@ -1607,7 +1607,8 @@ final class AppModel {
     }
 
     /// Moves the songs' files to the Trash (with album and artist folders left empty but for a cover) and removes
-    /// them from the library, their playlists, likes and listening history, and the play queue. Items whose album
+    /// them from the library, their playlists, likes and listening history, and the play queue (the plays and like
+    /// are kept aside: a new copy of the same song on the same album takes them back, `RetiredTrack`). Items whose album
     /// leaves the library stay in the collection: first each one without a cover of its own takes a copy of the
     /// album's cover.jpg (which goes to the Trash with the folder), then once the songs are gone it's marked not
     /// ripped (its digital source cleared).

@@ -96,11 +96,12 @@ extension Database {
     static let snapshotAtKey = "snapshot_at"
 
     /// A compact copy of the library database for the phone, without the downloaded library catalog (Mac only,
-    /// and often the biggest part), the Discogs links or which songs are offloaded from the Mac. `scratch` is a
-    /// folder for the intermediate copy.
+    /// and often the biggest part), the Discogs links, which songs are offloaded from the Mac or the history kept for
+    /// removed songs. `scratch` is a folder for the intermediate copy.
     public func writeSyncSnapshot(to target: URL, scratch: URL, snapshotAt: Date = Date()) throws {
         try writeSnapshot(to: target, scratch: scratch, snapshotAt: snapshotAt,
-                          emptying: ["catalog_items", "catalog_info", "catalog_previews", "discogs_sync", "offloaded_tracks"])
+                          emptying: ["catalog_items", "catalog_info", "catalog_previews", "discogs_sync", "offloaded_tracks",
+                                     "retired_plays", "retired_tracks"])
     }
 
     /// A copy for the iCloud backup: like the phone's, but keeping the Discogs links, since without them the next
