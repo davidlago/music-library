@@ -238,3 +238,15 @@ Discovery:
   reopened after a relaunch and exported into. **Not tested yet**: a real CD (no disc in the drive), vinyl input, iPhone
   sync, iCloud and the keychain move (need a signed TestFlight build).
   Review video shrunk to `build/app-store/music-library-mac-review.mp4` (8.1 MB, 1920 × 1268, 71 s).
+- 2026-11-19 (later, with the user's go-ahead for each): PR davidlago/music-library#82 opened. **Mac App Store
+  profile** "io.github.davidlago.MusicLibrary Mac App Store (CI)" made through the API (expires 2027-10-12). Local
+  `.pkg` built and checked; the first upload was refused (fpcalc's embedded bundle ID `org.acoustid.fpcalc` must be
+  its signing identifier; fixed in build-app.sh), then **uploaded 1.36.2 (202611191647)**, delivery
+  ad58850f-d75d-4469-bef3-dd0931aae317. **Mac record filled in through the API**: content rights (third-party), category
+  Music, age rating (the iPhone's answers), privacy policy URL, subtitle; version 34c409c6 (still named **1.0**):
+  description, keywords, promotional text, URLs, copyright, release after approval; review details 5dec096e (contact
+  copied from the iPhone's, notes from docs/app-store) with the **review video attached** (cf316250, COMPLETE);
+  **7 screenshots** (set e6d1cb57, APP_DESKTOP, all COMPLETE) from the sample library, committed in
+  `docs/app-store/mac`. **Still to do**: the App Privacy label (website only: copy the iPhone's), pricing and
+  availability (free, all territories), the user's TestFlight test on this Mac, renaming the version to the submitted
+  build's, attaching the build, storing MAC_INSTALLER_CERTIFICATE secrets, merging, `MAC_APP_STORE=1`, submitting.

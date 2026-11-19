@@ -275,8 +275,12 @@ second platform of the iPhone record). The store build is sandboxed; the Develop
 (docs/distribution.md ▸ The Mac App Store). App Information, App Privacy, the age rating and pricing are the iPhone
 app's answers above, entered again for this record: the same third-party services, with the same data.
 
-**Screenshots** (`mac/`, 2880 × 1800): the real window of a test build at 1440 × 900 points, captured with
-`screencapture -l <window id> -o -x`.
+**Screenshots** (`mac/`, 2880 × 1800, no alpha): the sample library in a sandboxed test build
+(`BUNDLE_ID=local.musiclibrary.sandboxtest SANDBOX=1 scripts/build-app.sh`), opened from a copy under another folder
+name so Listen Now doesn't show the sample banner, light mode, the window at 1440 × 900 points (its saved `NSWindow
+Frame` default), captured with `screencapture -l <window id> -o -x` while in front and flattened onto white with
+ffmpeg. In order: Listen Now, the Shelf, a record's page, Insights ▸ Listening, Insights ▸ Owned, Music DNA, an artist
+page.
 
 **Promotional text:**
 
