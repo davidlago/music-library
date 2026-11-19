@@ -103,6 +103,8 @@ info() { /usr/libexec/PlistBuddy -c "Print :$1" "$INNER/Contents/Info.plist"; }
 [[ "$(info CFBundleShortVersionString)" == "$VERSION" && "$(info CFBundleVersion)" == "$BUILD" ]] || fail "wrong version in the Info.plist"
 [[ "$(info ITSAppUsesNonExemptEncryption)" == "false" ]] || fail "no ITSAppUsesNonExemptEncryption"
 [[ -f "$INNER/Contents/Resources/PrivacyInfo.xcprivacy" ]] || fail "no privacy manifest"
+[[ -f "$INNER/Contents/Resources/Assets.car" ]] || fail "no asset catalog (Assets.car) with the app icon"
+[[ "$(info CFBundleIconName)" == "AppIcon" ]] || fail "no CFBundleIconName"
 rm -rf "$EXPANDED"
 echo "Checked: signed, sandboxed, universal, profile embedded, helpers inherit the sandbox."
 

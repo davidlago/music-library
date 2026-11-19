@@ -123,6 +123,27 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/MusicLibrary" "$APP/Contents/MacOS/MusicLibrary"
 cp "$ICON" "$APP/Contents/Resources/AppIcon.icns"
+# The App Store refuses an app without a compiled asset catalog (Assets.car) holding its icon (error 90546), so one is
+# made from AppIcon-1024.png with actool, which comes with Xcode; with only the Command Line Tools the .icns is used.
+if xcrun --find actool > /dev/null 2>&1; then
+    ASSETS="$SIGNING/Assets.xcassets"
+    ICONSET="$ASSETS/AppIcon.appiconset"
+    mkdir -p "$ICONSET"
+    printf '{"info":{"author":"xcode","version":1}}\n' > "$ASSETS/Contents.json"
+    images=""
+    for size in 16 32 128 256 512; do
+        for scale in 1 2; do
+            px=$((size * scale)); file="icon_${size}x${size}@${scale}x.png"
+            sips -z "$px" "$px" Resources/AppIcon-1024.png --out "$ICONSET/$file" > /dev/null
+            images+="${images:+,}{\"idiom\":\"mac\",\"size\":\"${size}x${size}\",\"scale\":\"${scale}x\",\"filename\":\"$file\"}"
+        done
+    done
+    printf '{"images":[%s],"info":{"author":"xcode","version":1}}\n' "$images" > "$ICONSET/Contents.json"
+    xcrun actool "$ASSETS" --compile "$APP/Contents/Resources" --platform macosx --minimum-deployment-target 14.0 \
+        --app-icon AppIcon --output-partial-info-plist "$SIGNING/assets-info.plist" \
+        --errors --warnings --output-format human-readable-text > /dev/null
+    [[ -f "$APP/Contents/Resources/Assets.car" ]] || { echo "error: actool made no Assets.car" >&2; exit 1; }
+fi
 if [[ "${BUNDLE_TOOLS:-1}" == "1" ]]; then
     mkdir -p "$APP/Contents/Helpers"
     cp build/tools/ffmpeg build/tools/ffprobe build/tools/fpcalc "$APP/Contents/Helpers/"
