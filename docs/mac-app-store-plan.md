@@ -272,3 +272,17 @@ Discovery:
 - 2026-11-19: PR #82 merged by the user; **1.37.0 released** (tag v1.37.0) on the user's choice to test the
   settings handoff with a GitHub release first: install it, open it once and quit (writes the settings file and moves
   the keys), then install the TestFlight build.
+- 2026-11-19 (late): the user's TestFlight test **passed** (settings and keys came over through 1.37.0). Pricing set
+  to Free and all 175 territories plus new ones (API); **App Privacy published** (same three entries as the iPhone:
+  Product Interaction and Other User Content linked, Coarse Location not linked, App Functionality, no tracking; done
+  through App Store Connect's web API in the user's Chrome). Store build **1.37.0 (202611191855)** uploaded from the
+  v1.37.0 commit, VALID; version renamed 1.0 → 1.37.0 and the build attached. Draft review submission
+  4e4e591c-5761-4923-aee6-6ab90f683e92 made, but **adding the version is refused**: new apps can't be submitted while
+  App Compliance's China mainland forms (Security Assessment, AI Generated or Synthetic Content) are missing. The
+  user decides: fill them in, or leave China mainland out of availability.
+- 2026-11-19: on the user's choice, **China mainland turned off** in the Mac app's availability (its compliance
+  forms block a new app's submission; turn it back on after filling App Compliance ▸ Security Assessment and AI
+  Generated or Synthetic Content). Then, on the user's yes, **Mac 1.37.0 (202611191855) submitted for review**:
+  review submission 4e4e591c-5761-4923-aee6-6ab90f683e92, Waiting for Review, released automatically once approved.
+  Still to do after approval: `MAC_INSTALLER_CERTIFICATE` secrets (`scripts/set-signing-secret.sh`, the user runs it)
+  and `gh variable set MAC_APP_STORE --body 1` (with the go-ahead) so release tags upload the Mac app too.
