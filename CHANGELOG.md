@@ -16,7 +16,9 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
   later versions (and a copy from the Mac App Store) read them without asking. macOS asks one last time, when this
   version first reads them.
 - Getting the Mac app ready for the Mac App Store: a sandboxed build that asks once per inserted CD for permission to
-  read it and remembers a library folder outside `~/Music` you choose. The download from GitHub stays as it is.
+  read it and remembers a library folder outside `~/Music` you choose. The download from GitHub stays as it is, and
+  leaves its settings in your library folder (`.MusicLibrary-settings.plist`) so the App Store version on the same
+  Mac starts with them: your paired iPhones, your iCloud backup and the rest carry on as before.
 
 ## 1.36.2
 

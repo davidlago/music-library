@@ -52,6 +52,58 @@ import Testing
         #expect(bookmarks.resolve(path: "/tmp/somewhere", for: "libraryRoot") == nil)
     }
 
+    @Test func settingsGoFromTheDownloadToTheStoreBuildOnTheSameMac() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("handoff-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let suite = "handoff-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+        let download: [String: Any] = ["macID": "OLD-MAC", "appearance": "dark", "pairedPhones": Data([1, 2, 3]),
+                                       "libraryRootBookmark": Data([9]), "importedDefaultsFrom": "local.musiclibrary"]
+        #expect(SettingsHandoff.export(download, to: root, machineID: "MAC-1", now: t0))
+        // Unchanged settings aren't written again.
+        #expect(!SettingsHandoff.export(download, to: root, machineID: "MAC-1", now: t0.addingTimeInterval(60)))
+
+        // Another Mac's file is ignored.
+        #expect(SettingsHandoff.importIfNeeded(from: root, into: defaults, machineID: "MAC-2") == 0)
+        // The store build had already made its own Mac ID: the download's replaces it, bookmarks and markers stay out.
+        defaults.set("NEW-MAC", forKey: "macID")
+        #expect(SettingsHandoff.importIfNeeded(from: root, into: defaults, machineID: "MAC-1") == 3)
+        #expect(defaults.string(forKey: "macID") == "OLD-MAC")
+        #expect(defaults.string(forKey: "appearance") == "dark")
+        #expect(defaults.data(forKey: "pairedPhones") == Data([1, 2, 3]))
+        #expect(defaults.object(forKey: "libraryRootBookmark") == nil)
+        #expect(defaults.object(forKey: "importedDefaultsFrom") == nil)
+        // Once per exported file: a setting changed in the store build afterwards stays…
+        defaults.set("light", forKey: "appearance")
+        #expect(SettingsHandoff.importIfNeeded(from: root, into: defaults, machineID: "MAC-1") == 0)
+        #expect(defaults.string(forKey: "appearance") == "light")
+        // …until the download's settings change again.
+        var changed = download
+        changed["appearance"] = "system"
+        #expect(SettingsHandoff.export(changed, to: root, machineID: "MAC-1", now: t0.addingTimeInterval(120)))
+        #expect(SettingsHandoff.importIfNeeded(from: root, into: defaults, machineID: "MAC-1") == 3)
+        #expect(defaults.string(forKey: "appearance") == "system")
+    }
+
+    @Test func malformedHandoffFilesAreIgnored() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("handoff-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let suite = "handoff-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let file = root.appendingPathComponent(SettingsHandoff.fileName)
+        try Data("not a plist".utf8).write(to: file)
+        #expect(SettingsHandoff.importIfNeeded(from: root, into: defaults, machineID: "MAC-1") == 0)
+        let wrongFormat: [String: Any] = ["format": 99, "machine": "MAC-1", "exportedAt": Date(), "settings": ["a": 1]]
+        try PropertyListSerialization.data(fromPropertyList: wrongFormat, format: .binary, options: 0).write(to: file)
+        #expect(SettingsHandoff.importIfNeeded(from: root, into: defaults, machineID: "MAC-1") == 0)
+        #expect(SettingsHandoff.machineID?.isEmpty == false)
+    }
+
     @Test func unsandboxedToolsIncludeInstalledOnes() {
         #expect(!AppSandbox.isActive)
         #expect(ToolLocator().searchPaths.contains("/opt/homebrew/bin"))

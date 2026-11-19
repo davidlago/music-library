@@ -448,6 +448,7 @@ final class AppModel {
                 self?.finishPlay()
                 self?.savePlayerState()
                 self?.vinyl.finish()
+                self?.exportHandedOverSettings()
             }
             matcher.restoreAll()
         }
@@ -499,6 +500,7 @@ final class AppModel {
             catalog.open(database: database)
             reloadLibrary()
             vinyl?.libraryOpened()
+            exportHandedOverSettings()
             Task { await backfillAudioFormats() }
         } catch {
             database = nil
@@ -541,6 +543,12 @@ final class AppModel {
         libraryRoot = url
         UserDefaults.standard.set(url.path, forKey: Keys.root)
         FolderBookmarks.shared.save(url, for: Keys.root)
+        // A library folder the store build could only reach once the user chose it may hold the download's settings.
+        if AppSandbox.isActive, !SampleLibraryCopy.isSample(url), SettingsHandoff.importIfNeeded(from: url) > 0 {
+            UserDefaults.standard.set(url.path, forKey: Keys.root)
+            errorMessage = "Your settings from the Music Library download were brought over from this folder. "
+                + "Quit and reopen Music Library to use them."
+        }
         database = nil
         tracks = []; albums = []; artists = []; playlists = []; smartPlaylists = []; likedDates = [:]; totalTracks = 0
         playTotals = [:]; artistPlayTotals = [:]; albumPlayTotals = [:]; albumAddedDates = [:]
@@ -1989,6 +1997,26 @@ final class AppModel {
     func importURLs(_ urls: [URL]) {
         importer.enqueue(urls)
         sidebar = .importQueue
+    }
+
+    // MARK: Settings handoff
+
+    /// The store build, before anything reads a setting: takes the download's settings from the library folder it
+    /// opens (the saved one, else ~/Music/MusicLibrary), if they're there and newer than the ones it took last.
+    static func importHandedOverSettings() {
+        guard AppSandbox.isActive else { return }
+        let stored = UserDefaults.standard.string(forKey: Keys.root)
+        let root = stored.map { FolderBookmarks.shared.resolve(path: $0, for: Keys.root) ?? URL(fileURLWithPath: $0, isDirectory: true) }
+            ?? LibraryLocation.defaultRoot
+        SettingsHandoff.importIfNeeded(from: root)
+    }
+
+    /// The download (unsandboxed): leaves its settings in the library folder for the store build. At launch and when
+    /// it quits; the file is only rewritten when they changed. Never the sample library's folder.
+    func exportHandedOverSettings() {
+        guard !AppSandbox.isActive, !isSampleLibrary, database != nil, let id = Bundle.main.bundleIdentifier,
+              let domain = UserDefaults.standard.persistentDomain(forName: id) else { return }
+        SettingsHandoff.export(domain, to: libraryRoot)
     }
 
     // MARK: Sample library

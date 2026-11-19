@@ -251,6 +251,12 @@ it matters:
 - The app's entitlements are `Resources/MusicLibrary-AppStore.entitlements` (sandbox, ~/Music, user-selected files and
   bookmarks, network client and server for the web and iPhone sync, audio input), plus iCloud's from the profile.
 - A sandboxed app can't read another app's defaults, so it doesn't import `local.musiclibrary`'s (DefaultsImport).
+  It also can't read the download's own settings (they're outside its container), so the download leaves them in the
+  library folder as `.MusicLibrary-settings.plist` (at launch and when it quits, only when they changed, with this
+  Mac's hardware UUID), and the store build takes them before anything reads a setting, replacing its own, once per
+  exported file (`SettingsHandoff`). Above all that carries the Mac's ID (`syncMacID`), which the iCloud backup and
+  the paired iPhones know it by: without it the store build's backup stops with "moved to another Mac". Secrets come
+  over through the keychain (below); the eBay sign-in (the download's web data) doesn't, so it's signed in again.
 
 Both builds have the sample library (File ▸ **Explore a Sample Library**, and on Listen Now when the library is empty):
 the iPhone app's `SampleLibrary.bundle`, copied to Application Support and its history moved up to today

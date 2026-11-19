@@ -262,3 +262,8 @@ Discovery:
   which a sandboxed app can't read; eBay's cookies are in the GitHub copy's web data. The backup check throws before
   writing anything, so nothing in iCloud changed. **To fix before submitting**: carry the settings (above all
   `macID`) and secrets over to the store build on its first launch.
+- 2026-11-19 (night): **settings handoff built** (`SettingsHandoff`, on the user's go-ahead): the download writes its
+  settings to `<library>/.MusicLibrary-settings.plist`, the store build imports them first thing (Mac ID included).
+  Tested end to end with two test copies on a throwaway library in ~/Music (since removed): the sandboxed copy took the
+  download copy's `syncMacID` in place of its own, and its appearance. 818 tests pass. For the user's own test the
+  download must have this code (the next GitHub release); until then the store build can't see the settings.
