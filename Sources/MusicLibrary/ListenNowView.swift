@@ -20,6 +20,7 @@ struct ListenNowView: View {
                         let side = !model.player.queue.upcoming.isEmpty || shelfCopy(album) != nil
                         let wide = geo.size.width >= 980 && side
                         VStack(alignment: .leading, spacing: 28) {
+                            if model.isSampleLibrary { SampleLibraryBanner() }
                             ListenNowHero(album: album)
                             if wide {
                                 HStack(alignment: .top, spacing: 24) {
@@ -39,8 +40,19 @@ struct ListenNowView: View {
                         .frame(maxWidth: .infinity)
                     }
                 } else {
-                    ContentUnavailableView("Nothing to Listen To Yet", systemImage: "play.circle",
-                                           description: Text("Import some music, or add the CDs and records you own."))
+                    ContentUnavailableView {
+                        Label("Nothing to Listen To Yet", systemImage: "play.circle")
+                    } description: {
+                        Text("Import some music (drop files on Songs, or File ▸ Import…), or add the CDs and records you own.")
+                    } actions: {
+                        Button("Import…") { model.chooseFilesToImport() }
+                        Button("Add to Physical Collection…") { model.addToCollection() }
+                        if model.hasSampleLibrary && !model.isSampleLibrary {
+                            Button("Explore a Sample Library") { model.exploreSampleLibrary() }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(model.isPreparingSample)
+                        }
+                    }
                 }
             }
         }
@@ -307,4 +319,24 @@ private struct WeekTile: View {
 
 private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
+}
+
+/// Says the sample library is open and leads back to the user's own.
+struct SampleLibraryBanner: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "sparkles").font(.title2).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("You're exploring a sample library").font(.headline)
+                Text("Fictional artists, CDs and records to try the app with. Nothing here is synced or backed up.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Use My Own Library") { model.leaveSampleLibrary() }
+        }
+        .padding(14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
 }

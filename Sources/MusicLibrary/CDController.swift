@@ -150,6 +150,9 @@ final class CDController {
     nonisolated(unsafe) static var volumesDirectory = URL(fileURLWithPath: "/Volumes")
 
     var discs: [CDDisc] = []
+    /// Audio CDs the sandboxed store build can't read yet: the user lets it, once per disc, by choosing the disc in an
+    /// open panel (`allowAccess`). Always empty outside the sandbox.
+    var lockedDiscs: [URL] = []
     @ObservationIgnored private unowned let model: AppModel
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
@@ -179,13 +182,20 @@ final class CDController {
     func volumeMounted(_ url: URL) {
         let path = url.path
         guard !discs.contains(where: { $0.id == path }) else { return }
-        guard let volume = try? AudioCDVolume.load(at: url) else { return }
+        guard let volume = try? AudioCDVolume.load(at: url) else {
+            if AppSandbox.isActive, Self.isAudioCD(url), !lockedDiscs.contains(where: { $0.path == path }) {
+                lockedDiscs.append(url)
+            }
+            return
+        }
+        lockedDiscs.removeAll { $0.path == path }
         let disc = CDDisc(volume: volume)
         discs.append(disc)
         Task { await lookup(disc) }
     }
 
     func volumeUnmounted(_ url: URL) {
+        lockedDiscs.removeAll { $0.path == url.path }
         guard let disc = discs.first(where: { $0.id == url.path }) else { return }
         disc.removed = true
         if disc.isRipping {
@@ -196,6 +206,40 @@ final class CDController {
         }
         discs.removeAll { $0.id == disc.id }
         if model.sidebar == .cd(disc.id) { model.sidebar = .songs }
+    }
+
+    // MARK: Sandbox access
+
+    /// An audio CD's file system (macOS mounts one as `cddafs`), read from the mount itself so it works before the
+    /// sandbox lets the app list the disc.
+    nonisolated static func isAudioCD(_ url: URL) -> Bool {
+        var info = statfs()
+        guard statfs(url.path, &info) == 0 else { return false }
+        let type = withUnsafeBytes(of: info.f_fstypename) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
+        return type == "cddafs"
+    }
+
+    /// Asks the user to choose the disc in an open panel, which lets the sandboxed app read it until it's ejected,
+    /// then opens it like any inserted CD.
+    func allowAccess(_ url: URL) {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = url
+        panel.prompt = "Allow Access"
+        panel.message = "Click Allow Access to let Music Library read \"\(url.lastPathComponent)\" (asked once per disc)."
+        guard panel.runModal() == .OK, let chosen = panel.url else { return }
+        guard chosen.standardizedFileURL.path == url.standardizedFileURL.path else {
+            model.errorMessage = "Choose the disc \"\(url.lastPathComponent)\" itself to let Music Library read it."
+            return
+        }
+        volumeMounted(url)
+        if discs.contains(where: { $0.id == url.path }) {
+            model.sidebar = .cd(url.path)
+        } else {
+            model.errorMessage = "Music Library still can't read \"\(url.lastPathComponent)\"."
+        }
     }
 
     // MARK: Lookup

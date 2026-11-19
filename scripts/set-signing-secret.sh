@@ -3,6 +3,7 @@
 #
 #   scripts/set-signing-secret.sh "Developer ID Application" DEVELOPER_ID_CERTIFICATE
 #   scripts/set-signing-secret.sh "Apple Distribution" APPLE_DISTRIBUTION_CERTIFICATE
+#   scripts/set-signing-secret.sh "3rd Party Mac Developer Installer" MAC_INSTALLER_CERTIFICATE
 #
 # The first argument is the start of the identity's name (exactly one valid identity must match), the second the
 # secrets' prefix: <PREFIX>_P12 (the certificate and its private key as a base64 .p12) and <PREFIX>_PASSWORD (a new
@@ -15,8 +16,12 @@ trap 'echo "error: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 PREFIX_NAME="${1:?usage: $0 <identity name prefix> <secret prefix>}"
 SECRET="${2:?usage: $0 <identity name prefix> <secret prefix>}"
 REPO="${REPO:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
+# Installer certificates (the Mac App Store .pkg's) aren't code signing ones, so they're looked up without that policy.
+POLICY=(-p codesigning)
+TOOL=/usr/bin/codesign
+if [[ "$PREFIX_NAME" == *Installer* ]]; then POLICY=(); TOOL=/usr/bin/productbuild; fi
 
-matches="$(security find-identity -v -p codesigning | sed -n "s/^ *[0-9]*) [0-9A-F]\{40\} \"\(${PREFIX_NAME}: .*\)\"$/\1/p" | sort -u)"
+matches="$(security find-identity -v ${POLICY[@]+"${POLICY[@]}"} | sed -n "s/^ *[0-9]*) [0-9A-F]\{40\} \"\(${PREFIX_NAME}: .*\)\"$/\1/p" | sort -u)"
 if [ "$(grep -c . <<< "$matches" || true)" != 1 ]; then
     echo "error: expected one valid \"${PREFIX_NAME}\" identity in your keychain, found:" >&2
     sed 's/^/  /' <<< "${matches:-(none)}" >&2
@@ -61,8 +66,8 @@ security export -k "$WORK_KC" -t identities -f pkcs12 -P "$p12pw" -o "$S/cert.p1
 echo "3/4 Checking it imports the way CI imports it"
 security create-keychain -p "$kcpw" "$CHECK_KC"
 security unlock-keychain -p "$kcpw" "$CHECK_KC"
-security import "$S/cert.p12" -k "$CHECK_KC" -P "$p12pw" -T /usr/bin/codesign > /dev/null
-if ! only_identity "$CHECK_KC" || ! security find-identity -v -p codesigning "$CHECK_KC" | grep -qF "\"$IDENTITY\""; then
+security import "$S/cert.p12" -k "$CHECK_KC" -P "$p12pw" -T "$TOOL" > /dev/null
+if ! only_identity "$CHECK_KC" || ! security find-identity -v ${POLICY[@]+"${POLICY[@]}"} "$CHECK_KC" | grep -qF "\"$IDENTITY\""; then
     echo "error: the .p12 didn't import as exactly one valid ${IDENTITY} identity" >&2
     identities "$CHECK_KC" | sed 's/^/  /' >&2
     exit 1

@@ -128,6 +128,23 @@ Get the companion Mac app
 Your music comes from Music Library for Mac (free, macOS 14 or later): it catalogs your CDs and records, imports, rips and digitizes your music, then syncs both collections to your iPhone. Download it, and find the full documentation and the source code, at https://davidlago.github.io/music-library/
 ```
 
+**What's New in 1.36.2** (submitted 2026-11-19; the live version is 1.34.0, so it covers the iPhone changes of 1.35.0,
+1.35.1, 1.36.0, 1.36.1 and 1.36.2; 1.35.1 and 1.36.2 only changed the Mac app):
+
+```
+Pressing and condition
+• A CD's or record's page now shows its pressing and condition, entered in Music Library on your Mac: the runouts for each side (or each disc) and a grade for the record or disc and for its sleeve or case, on the Goldmine scale Discogs uses.
+• A Grading Guide on the copy's page explains each grade for a record, a CD and a sleeve or case, with drawings of the wear to look for.
+• Search your collection by runout: and grade: (grade:vg+, grade:>=vg+, grade:none).
+
+What your records are worth
+• What a copy is worth now comes from Discogs alone: its own pressing at Discogs' suggested price for its grade (Very Good to Near Mint when it isn't graded), else what that pressing has sold for on Discogs, else its cheapest copy for sale.
+• The Shop's price at the top is now Discogs' suggested price for the album's most common pressing.
+
+Also
+• Songs removed on your Mac and added back (the CD ripped or the record digitized again) get back their plays, listening history and like.
+```
+
 **What's New in 1.34.0** (the live version is 1.31.0, so it covers the iPhone changes of 1.32.0, 1.32.1, 1.33.0 and
 1.34.0; 1.32.0–1.33.0 were never submitted):
 
@@ -245,7 +262,91 @@ Optional features need the user's own accounts or keys, entered by the user: Las
 
 The Shop tab works without any account: it searches Discogs' public database for what the user types or scans, and reads eBay's public listings for the album. The barcode scanner uses the camera on the device only; nothing it sees is kept or sent except the barcode's digits. Optionally the user can sign in to eBay on eBay's own sign-in page shown in the app (the app never sees the password, only eBay's cookies) to see recent sold prices, and a Discogs token set up in the Mac app adds Discogs' suggested prices. With the Radio DJ set up, the Shop's "Show a Record" sends the photo the user takes to Anthropic (or OpenRouter) with the user's own key, like the DJ's photos.
 
-The Buy List (Collection tab and the Shop tab) keeps albums the user wants to buy, with prices read from the same public Discogs and eBay pages as the Shop; it works in the sample library too. A CD's or record's page shows what that edition is worth, read the same way (at most once a day per item). The Shop's track lists and 30-second song previews come from Apple's public iTunes Search API, and "Open in Apple Music" opens the album in Apple's Music app with a music:// link; nothing is bought or played through the app's own player except the previews.
+The Buy List (Collection tab and the Shop tab) keeps albums the user wants to buy, with prices read from the same public Discogs and eBay pages as the Shop; it works in the sample library too. A CD's or record's page shows what that copy is worth, read from Discogs alone (its public release pages, plus its suggested prices when a Discogs token is set up; at most once a day per item). The Shop's track lists and 30-second song previews come from Apple's public iTunes Search API, and "Open in Apple Music" opens the album in Apple's Music app with a music:// link; nothing is bought or played through the app's own player except the previews.
 ```
 
 **Attachment:** the demo video (`build/app-store/review-demo.mp4`).
+
+## The Mac app (Mac App Store)
+
+The Mac app has its own App Store Connect record, **Dave's Music Library for Mac** (app ID 6836856394, SKU
+`music-library-macos`, bundle ID `io.github.davidlago.MusicLibrary`; the iPhone app's bundle ID differs, so it can't be a
+second platform of the iPhone record). The store build is sandboxed; the Developer ID download from GitHub isn't
+(docs/distribution.md ▸ The Mac App Store). App Information, App Privacy, the age rating and pricing are the iPhone
+app's answers above, entered again for this record: the same third-party services, with the same data.
+
+**Screenshots** (`mac/`, 2880 × 1800, no alpha): the sample library in a sandboxed test build
+(`BUNDLE_ID=local.musiclibrary.sandboxtest SANDBOX=1 scripts/build-app.sh`), opened from a copy under another folder
+name so Listen Now doesn't show the sample banner, light mode, the window at 1440 × 900 points (its saved `NSWindow
+Frame` default), captured with `screencapture -l <window id> -o -x` while in front and flattened onto white with
+ffmpeg. In order: Listen Now, the Shelf, a record's page, Insights ▸ Listening, Insights ▸ Owned, Music DNA, an artist
+page.
+
+**Promotional text:**
+
+```
+Catalog every CD and record you own with a label number on its case, rip and digitize them, and see what your collection is worth. Free and open source.
+```
+
+**Keywords:**
+
+```
+cd,vinyl,record,collection,rip,ripper,flac,lossless,hi-res,discogs,musicbrainz,scrobble,lastfm,dj
+```
+
+**Description:**
+
+```
+Music Library is for people who own their music: the CDs and records on your shelf and the files on your Mac. Catalog every copy you own with a label number on its case, rip and digitize them, tag everything from MusicBrainz, and explore your collection in ways streaming apps don't. Free and open source.
+
+Your shelf, by its label
+Add a CD or record by barcode, catalog number or name, pick the exact edition from MusicBrainz or Discogs, and give it the next label number. Keep what you paid, when and where, its runouts and its condition on the Goldmine scale. Find by Label shows what's at a number and what sits beside it on the shelf.
+
+Rip CDs and digitize records
+Insert a CD and Music Library names it, rips it to FLAC with its cover and tags, and checks every track against AccurateRip, reading a misread track again until it's right. Record your turntable through any audio input, cut the recording into tracks on its waveform, and save them with the release's track list.
+
+A library that looks after itself
+Imported music is tagged from MusicBrainz (with AcoustID fingerprints when the tags don't say), organized into Artist / Album folders, and given its cover. Album and artist pages bring descriptions, credits, ratings and photos from Wikipedia, Wikidata and Last.fm.
+
+What it's worth, and what to buy next
+Every copy shows what that pressing sells for on Discogs, against what you paid. The Shop finds an album's editions and the cheapest copies for sale across Discogs, eBay and other stores, with previews of every song; your Buy List watches prices and flags a deal.
+
+A radio DJ who knows your records
+With your own Claude API key, a DJ tells you the story behind the album or artist you're looking at, searches the web and your own collection to answer your questions, and links straight to your albums.
+
+Insights and Music DNA
+How much of your collection is digitized, your free label numbers, what you've spent and what it's worth now; a listening report for the week, month, year or all time; and Music DNA, a map of who played, wrote and produced with whom.
+
+Play it properly
+Gapless playback, the output switched to each song's own sample rate and bit depth, a play queue, Liked Songs, and Last.fm scrobbling.
+
+Take it with you
+Sync both collections to Dave's Music Library on your iPhone over Wi-Fi, encrypted, or through your own iCloud, which can also back up your library and keep rarely played albums off your Mac. Export albums and playlists to a music player or a drive.
+
+New to it? Choose File > Explore a Sample Library to try everything with fictional artists, CDs and records.
+
+Your library stays yours: no account, no ads, no tracking. Documentation and source code: https://davidlago.github.io/music-library/
+```
+
+**Review notes:**
+
+```
+Music Library catalogs the CDs and records the user owns and manages their music files. It's free and open source (https://github.com/davidlago/music-library, documentation at https://davidlago.github.io/music-library/docs/); the same app is also distributed outside the store as a notarized download.
+
+To review without a library: on first launch, Listen Now offers "Explore a Sample Library" (also File > Explore a Sample Library). It opens a library built into the app (fictional artists and albums; the songs were synthesized for it, the covers and pictures drawn for it), so nearly every feature can be tried: Listen Now, the Shelf (CDs and records with label numbers), Albums, Songs, playback, album and artist pages, Insights, Music DNA, the Shop and the Buy List. "Use My Own Library" on Listen Now goes back. The sample is never synced or backed up.
+
+The attached video shows the app with the developer's own library: the Shelf, a CD's album page with a song playing and its "What It's Worth" value and copy details, a record waiting to be digitized, Local Library CDs, the Shop looking up a record's price guide and copies for sale, and the iPhone sync page.
+
+Features that need hardware or the user's own accounts:
+- Ripping CDs needs a CD drive. In the sandbox the app asks once per inserted disc for permission to read it (an Allow Access button opens the system's open panel at the disc).
+- Digitize Vinyl records from an audio input (a turntable through an audio interface); the app asks for microphone access only when recording starts.
+- Syncing with the iPhone app (Dave's Music Library on the App Store) needs an iPhone on the same Wi-Fi network; the app asks for local network access for this.
+- iCloud backup (Settings > iCloud) uses the app's private container in the user's own iCloud.
+- Optional keys or accounts the user enters: Last.fm (scrobbling), AcoustID, Ticketmaster or JamBase (concerts), Discogs (a personal token, for suggested prices and Sync to Discogs), eBay (signed in on eBay's own page, for sold prices), and the Radio DJ (the user's own Anthropic Claude API key or OpenRouter key; without one the DJ doesn't appear). The DJ sends the page being viewed and the user's questions to Anthropic or OpenRouter only when the user asks it something.
+- Local Library CDs reads a public library's online catalog (Minuteman Library Network by default) like its website.
+
+The library folder is ~/Music/MusicLibrary by default; another folder the user chooses is remembered with a security-scoped bookmark. The app never modifies the original files it imports.
+```
+
+**Attachment:** the review video (the developer's recording of the Mac app, shrunk to 1920 px wide H.264 without
+sound), uploaded through the API (`appStoreReviewAttachments`).

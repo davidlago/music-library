@@ -7,6 +7,19 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+- New to the Mac app? **File ▸ Explore a Sample Library** (also on Listen Now while your library is empty) opens a
+  library of fictional artists, CDs and records to try everything with, as on the iPhone; **Use My Own Library** goes
+  back. It's never synced to your iPhone or backed up. An empty library now opens on Listen Now, with Import, Add to
+  Physical Collection and the sample. See
+  [Getting started](https://github.com/davidlago/music-library/blob/main/docs/guide/getting-started.md#try-it-with-the-sample-library).
+- The iCloud build of the Mac app keeps your keys and passwords in the keychain that belongs to the app itself, so
+  later versions (and a copy from the Mac App Store) read them without asking. macOS asks one last time, when this
+  version first reads them.
+- Getting the Mac app ready for the Mac App Store: a sandboxed build that asks once per inserted CD for permission to
+  read it and remembers a library folder outside `~/Music` you choose. The download from GitHub stays as it is, and
+  leaves its settings in your library folder (`.MusicLibrary-settings.plist`) so the App Store version on the same
+  Mac starts with them: your paired iPhones, your iCloud backup and the rest carry on as before.
+
 ## 1.36.2
 
 - The Mac's Shop now searches [Discogs](https://www.discogs.com) first, whose database lists far more CD and vinyl

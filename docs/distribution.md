@@ -229,3 +229,69 @@ New screenshots: open the sample library in the iPhone 17 simulator (6.3-inch; s
 `xcrun simctl status_bar booted override --time 9:41`) and take them with `xcrun simctl io booted screenshot`;
 `musiclibrary://album?key=<artist>%01<album>`, `musiclibrary://now-playing` and `musiclibrary://insights?pane=listening`
 open those screens directly. The watch's come from the Apple Watch simulator paired with it.
+
+## The Mac app on the Mac App Store
+
+The Mac app is also on the Mac App Store as **Dave's Music Library for Mac** (its own App Store Connect record, app ID
+6836856394: its bundle ID, `io.github.davidlago.MusicLibrary`, isn't the iPhone app's, so it can't be a second platform
+of the iPhone record). The listing and review notes are in [docs/app-store](app-store/README.md#the-mac-app-mac-app-store).
+The GitHub download carries on unchanged.
+
+**The store build is sandboxed; the GitHub one isn't.** The same code runs in both and asks `AppSandbox.isActive` where
+it matters:
+
+- The default library folder, `~/Music/MusicLibrary`, is reachable through `com.apple.security.assets.music.read-write`.
+  Any other folder the user chooses (the library folder, the Export List's destination) is kept as a security-scoped
+  bookmark next to the path (`FolderBookmarks`); one the sandboxed app can't reach asks to be chosen again.
+- Files to import come through the open panel or a drop, which give access for the session.
+- An inserted audio CD is listed in the sidebar with **Allow Access…**: the system's open panel at the disc gives the
+  app access until it's ejected (once per disc; no temporary-exception entitlement).
+- Only the app's own ffmpeg, ffprobe and fpcalc run, signed with just `com.apple.security.app-sandbox` and
+  `com.apple.security.inherit` (`Resources/Helper-Sandbox.entitlements`) so they run in the app's sandbox.
+- The app's entitlements are `Resources/MusicLibrary-AppStore.entitlements` (sandbox, ~/Music, user-selected files and
+  bookmarks, network client and server for the web and iPhone sync, audio input), plus iCloud's from the profile.
+- A sandboxed app can't read another app's defaults, so it doesn't import `local.musiclibrary`'s (DefaultsImport).
+  It also can't read the download's own settings (they're outside its container), so the download leaves them in the
+  library folder as `.MusicLibrary-settings.plist` (at launch and when it quits, only when they changed, with this
+  Mac's hardware UUID), and the store build takes them before anything reads a setting, replacing its own, once per
+  exported file (`SettingsHandoff`). Above all that carries the Mac's ID (`syncMacID`), which the iCloud backup and
+  the paired iPhones know it by: without it the store build's backup stops with "moved to another Mac". Secrets come
+  over through the keychain (below); the eBay sign-in (the download's web data) doesn't, so it's signed in again.
+
+Both builds have the sample library (File ▸ **Explore a Sample Library**, and on Listen Now when the library is empty):
+the iPhone app's `SampleLibrary.bundle`, copied to Application Support and its history moved up to today
+(`SampleLibraryCopy`). It's never synced to a phone, backed up or offloaded.
+
+On a Mac signed with an App ID (the store and TestFlight builds, and the iCloud Developer ID build), secrets go in the
+data protection keychain, where they belong to the App ID, so every such copy reads them without asking; the item a
+build without an App ID saved in the login keychain moves over the first time it's read (`KeychainStore`).
+
+### One-time setup
+
+1. **The Mac Installer Distribution certificate** ("3rd Party Mac Developer Installer: …", for the .pkg; the team made
+   one on 2026-11-19, valid to 2027-11-19, shared with Jazz Discovery). Store it as this repository's secrets:
+   `scripts/set-signing-secret.sh "3rd Party Mac Developer Installer" MAC_INSTALLER_CERTIFICATE` (macOS asks for your
+   login password). When it expires, `scripts/mac-installer-certificate.sh` makes a new one with the API key.
+2. **The App Store Connect record** (done 2026-11-19): Apps ▸ **+** ▸ New App ▸ macOS, bundle ID
+   `io.github.davidlago.MusicLibrary`, SKU `music-library-macos`. Then, as for the iPhone app: App Information
+   (category, content rights, age rating, privacy policy URL), **App Privacy** (the iPhone app's answers) and Pricing
+   and Availability.
+3. The **Mac App Store profile** is made (or renewed) by `scripts/mac-app-store.sh` with the API key
+   (`scripts/provisioning-profiles.swift --mac-app-store`, "io.github.davidlago.MusicLibrary Mac App Store (CI)", for the
+   Apple Distribution certificate CI already has).
+4. Once a build has been tested: `gh variable set MAC_APP_STORE --body 1`, so release tags upload the Mac app too.
+
+### Each release
+
+1. Tag the release as usual. With `MAC_APP_STORE` set, CI's `mac-app-store` job builds the store version
+   (`scripts/mac-app-store.sh`: universal, sandboxed, signed with Apple Distribution and the profile, wrapped by
+   `productbuild` in a .pkg signed with the installer certificate, checked inside out) and uploads it with `altool`.
+   By hand: Actions ▸ CI ▸ Run workflow with **mac_app_store** `export` (build and check only) or `upload`; locally,
+   `UPLOAD=0 scripts/mac-app-store.sh` with `ASC_KEY`, `ASC_KEY_ID` and `ASC_ISSUER`.
+2. In App Store Connect, the Mac record ▸ **macOS App** ▸ the version (**+** for a new one): **What's New** (after the
+   first), and on the first version the promotional text, description, keywords, URLs, copyright and the screenshots
+   (`docs/app-store/mac`).
+3. **Build**: the one CI uploaded (TestFlight ▸ macOS shows it once processed).
+4. **App Review Information**: no sign-in, the Mac review notes, the review video as the attachment on the first
+   submission.
+5. **Add for Review**, then **Submit for Review**.
