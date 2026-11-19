@@ -274,6 +274,9 @@ The Mac app has its own App Store Connect record, **Dave's Music Library for Mac
 second platform of the iPhone record). The store build is sandboxed; the Developer ID download from GitHub isn't
 (docs/distribution.md ▸ The Mac App Store). App Information, App Privacy, the age rating and pricing are the iPhone
 app's answers above, entered again for this record: the same third-party services, with the same data.
+Availability: every territory except China mainland, whose App Compliance forms (Security Assessment, AI Generated or
+Synthetic Content) block a new app's submission; turn it on once they're filled in. First submitted as 1.37.0 on
+2026-11-19.
 
 **Screenshots** (`mac/`, 2880 × 1800, no alpha): the sample library in a sandboxed test build
 (`BUNDLE_ID=local.musiclibrary.sandboxtest SANDBOX=1 scripts/build-app.sh`), opened from a copy under another folder
