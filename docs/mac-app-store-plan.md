@@ -267,3 +267,8 @@ Discovery:
   Tested end to end with two test copies on a throwaway library in ~/Music (since removed): the sandboxed copy took the
   download copy's `syncMacID` in place of its own, and its appearance. 818 tests pass. For the user's own test the
   download must have this code (the next GitHub release); until then the store build can't see the settings.
+- 2026-11-19 (night): build **1.36.2 (202611191719)** with the settings handoff is VALID in TestFlight (internal
+  group gets every build). Not pushed yet, to let PR CI finish (each push cancels the running CI).
+- 2026-11-19: PR #82 merged by the user; **1.37.0 released** (tag v1.37.0) on the user's choice to test the
+  settings handoff with a GitHub release first: install it, open it once and quit (writes the settings file and moves
+  the keys), then install the TestFlight build.
