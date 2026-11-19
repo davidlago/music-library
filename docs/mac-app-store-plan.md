@@ -250,3 +250,8 @@ Discovery:
   `docs/app-store/mac`. **Still to do**: the App Privacy label (website only: copy the iPhone's), pricing and
   availability (free, all territories), the user's TestFlight test on this Mac, renaming the version to the submitted
   build's, attaching the build, storing MAC_INSTALLER_CERTIFICATE secrets, merging, `MAC_APP_STORE=1`, submitting.
+- 2026-11-19 (evening): the 202611191647 upload failed Apple's processing (90546, no asset catalog): build-app.sh now
+  compiles `Assets.car` with the icon (actool, Xcode only). **Build 1.36.2 (202611191659) is VALID and in internal
+  TestFlight testing** (build 11c19df2-b58b-46ca-8783-0ce42c7f59a3). Internal group "Music Library Testers"
+  (165cfa63-832c-49da-8f11-633f575e58d3, all builds) made on the Mac record with the user in it (invited). Next: the
+  user's TestFlight test (move the GitHub copy out of /Applications first; back up its preferences plist).
