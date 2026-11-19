@@ -170,8 +170,11 @@ HELPER_FLAGS=()
 if [[ "$SANDBOX" == "1" ]]; then HELPER_FLAGS=(--entitlements Resources/Helper-Sandbox.entitlements); fi
 if [[ -d "$APP/Contents/Helpers" ]]; then
     for tool in "$APP"/Contents/Helpers/*; do
+        # A tool with an embedded Info.plist (fpcalc's says org.acoustid.fpcalc) must be signed under its own bundle
+        # identifier: App Store Connect refuses a mismatch.
+        id="$(launchctl plist __TEXT,__info_plist "$tool" 2> /dev/null | sed -n 's/.*"CFBundleIdentifier" = "\(.*\)";/\1/p')"
         codesign "${SIGN_FLAGS[@]}" ${HELPER_FLAGS[@]+"${HELPER_FLAGS[@]}"} \
-            --identifier "local.musiclibrary.$(basename "$tool")" "$tool"
+            --identifier "${id:-local.musiclibrary.$(basename "$tool")}" "$tool"
     done
 fi
 if [[ -n "${PROVISIONING_PROFILE:-}" ]]; then cp "$PROVISIONING_PROFILE" "$APP/Contents/embedded.provisionprofile"; fi

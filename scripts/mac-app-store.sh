@@ -73,8 +73,11 @@ productbuild --component "$APP" /Applications --sign "$INSTALLER_IDENTITY" "$PKG
 
 # Check the package the way App Store Connect will look at it.
 echo "Checking $PKG…"
-pkgutil --check-signature "$PKG" | grep -q "Status: signed by a certificate trusted" || {
-    pkgutil --check-signature "$PKG" >&2; fail "the package isn't signed by a trusted installer certificate"
+# An installer certificate shows as "signed by a developer certificate issued by Apple (Development)"; what matters is
+# that it's signed, by the installer identity.
+signature="$(pkgutil --check-signature "$PKG")"
+grep -q "Status: signed" <<< "$signature" && grep -qF "1. $INSTALLER_IDENTITY" <<< "$signature" || {
+    echo "$signature" >&2; fail "the package isn't signed with $INSTALLER_IDENTITY"
 }
 EXPANDED="$OUT/expanded"
 pkgutil --expand-full "$PKG" "$EXPANDED"
