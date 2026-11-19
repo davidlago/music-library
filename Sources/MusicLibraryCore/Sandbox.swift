@@ -14,7 +14,7 @@ public enum AppSandbox {
         if let dir = getpwuid(getuid())?.pointee.pw_dir {
             return URL(fileURLWithPath: String(cString: dir), isDirectory: true)
         }
-        return FileManager.default.homeDirectoryForCurrentUser
+        return URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
     }
 }
 
