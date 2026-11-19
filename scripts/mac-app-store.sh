@@ -72,7 +72,7 @@ rm -rf "$OUT" && mkdir -p "$OUT"
 productbuild --component "$APP" /Applications --sign "$INSTALLER_IDENTITY" "$PKG"
 
 # Check the package the way App Store Connect will look at it.
-echo "Checking $PKG…"
+echo "Checking ${PKG}…"
 # An installer certificate shows as "signed by a developer certificate issued by Apple (Development)"; what matters is
 # that it's signed, by the installer identity.
 signature="$(pkgutil --check-signature "$PKG")"
