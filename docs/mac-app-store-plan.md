@@ -255,3 +255,10 @@ Discovery:
   TestFlight testing** (build 11c19df2-b58b-46ca-8783-0ce42c7f59a3). Internal group "Music Library Testers"
   (165cfa63-832c-49da-8f11-633f575e58d3, all builds) made on the Mac record with the user in it (invited). Next: the
   user's TestFlight test (move the GitHub copy out of /Applications first; back up its preferences plist).
+- 2026-11-19 (user's TestFlight test): **settings didn't come across** (dark mode, the Discogs token, the eBay
+  sign-in) and iCloud backup stopped with "moved to David's MacBook Pro". Cause: the sandboxed copy has its own user
+  defaults (in its container) and can't read the GitHub copy's: the Mac's sync/backup ID (`SyncStore` `Keys.macID`)
+  is a new one, so `backup.json`'s ID looks like another Mac's. Secrets are in the GitHub copy's login keychain item,
+  which a sandboxed app can't read; eBay's cookies are in the GitHub copy's web data. The backup check throws before
+  writing anything, so nothing in iCloud changed. **To fix before submitting**: carry the settings (above all
+  `macID`) and secrets over to the store build on its first launch.
