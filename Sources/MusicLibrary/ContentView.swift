@@ -188,6 +188,10 @@ struct SidebarView: View {
                         .badge(disc.isRipping ? disc.remainingCount : 0)
                         .tag(SidebarItem.cd(disc.id))
                 }
+                ForEach(model.cd.lockedDiscs, id: \.path) { url in
+                    Label(url.lastPathComponent, systemImage: "opticaldisc")
+                        .tag(SidebarItem.cd(url.path))
+                }
                 Label("Digitize Vinyl", systemImage: "waveform.badge.mic")
                     .tag(SidebarItem.digitizeVinyl)
                 Label("Local Library CDs", systemImage: "building.columns").tag(SidebarItem.catalog)
@@ -336,6 +340,14 @@ struct DetailRouter: View {
         case .cd(let path):
             if let disc = model.cd.discs.first(where: { $0.id == path }) {
                 CDView(disc: disc).id(path)
+            } else if let url = model.cd.lockedDiscs.first(where: { $0.path == path }) {
+                ContentUnavailableView {
+                    Label(url.lastPathComponent, systemImage: "opticaldisc")
+                } description: {
+                    Text("Music Library needs your permission to read this CD. Click Allow Access, then Allow Access again in the window that opens. It's asked once each time you insert a disc.")
+                } actions: {
+                    Button("Allow Access…") { model.cd.allowAccess(url) }.buttonStyle(.borderedProminent)
+                }
             } else {
                 ContentUnavailableView("Disc not found", systemImage: "opticaldisc")
             }

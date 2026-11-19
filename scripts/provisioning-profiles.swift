@@ -1,11 +1,15 @@
 // Makes sure each bundle ID has an App Store provisioning profile that includes the Apple Distribution certificate in
 // the keychain, creating or replacing them through the App Store Connect API, and installs them for Xcode.
 //
-//   swift scripts/provisioning-profiles.swift <key.p8> <key ID> <issuer ID> <bundle ID>...
+//   swift scripts/provisioning-profiles.swift [--mac-app-store] <key.p8> <key ID> <issuer ID> <bundle ID>...
 //
 // Each profile is named "<bundle ID> App Store (CI)" (`profileName` below; scripts/testflight.sh uses the same names).
 // Used by scripts/testflight.sh with DISTRIBUTION_CERTIFICATE=1 (CI), where an App Manager API key can't use Xcode's
 // cloud-managed signing.
+//
+// --mac-app-store makes the Mac app's Mac App Store profiles instead ("<bundle ID> Mac App Store (CI)", for the same
+// Apple Distribution certificate) and saves each as build/profiles/<bundle ID>.provisionprofile, which
+// scripts/mac-app-store.sh embeds (scripts/build-app.sh PROVISIONING_PROFILE=…).
 import CryptoKit
 import Foundation
 import Security
@@ -15,12 +19,17 @@ func fail(_ message: String) -> Never {
     exit(1)
 }
 
-let args = CommandLine.arguments.dropFirst()
-guard args.count >= 4 else { fail("usage: provisioning-profiles.swift <key.p8> <key ID> <issuer ID> <bundle ID>...") }
-let keyPath = args[args.startIndex], keyID = args[args.startIndex + 1], issuer = args[args.startIndex + 2]
+var args = Array(CommandLine.arguments.dropFirst())
+let macAppStore = args.contains("--mac-app-store")
+args.removeAll { $0 == "--mac-app-store" }
+guard args.count >= 4, !args.contains(where: { $0.hasPrefix("--") }) else {
+    fail("usage: provisioning-profiles.swift [--mac-app-store] <key.p8> <key ID> <issuer ID> <bundle ID>...")
+}
+let keyPath = args[0], keyID = args[1], issuer = args[2]
 let bundleIDs = Array(args.dropFirst(3))
 
-func profileName(_ bundleID: String) -> String { "\(bundleID) App Store (CI)" }
+func profileName(_ bundleID: String) -> String { "\(bundleID) \(macAppStore ? "Mac App Store (CI)" : "App Store (CI)")" }
+let profileType = macAppStore ? "MAC_APP_STORE" : "IOS_APP_STORE"
 
 // MARK: App Store Connect API
 
@@ -127,7 +136,7 @@ for bundleID in bundleIDs {
     if content == nil {
         let created = await api("POST", "profiles", body: ["data": [
             "type": "profiles",
-            "attributes": ["name": name, "profileType": "IOS_APP_STORE"],
+            "attributes": ["name": name, "profileType": profileType],
             "relationships": [
                 "bundleId": ["data": ["type": "bundleIds", "id": bundleResourceID]],
                 "certificates": ["data": [["type": "certificates", "id": certificateID]]],
@@ -140,6 +149,15 @@ for bundleID in bundleIDs {
         print("Using \(name)")
     }
     guard let content, let uuid, let data = Data(base64Encoded: content) else { fail("no content for \(name)") }
+    if macAppStore {
+        // The Mac app isn't built by Xcode: scripts/build-app.sh embeds the file.
+        let dir = URL(fileURLWithPath: "build/profiles", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let file = dir.appendingPathComponent("\(bundleID).provisionprofile")
+        guard (try? data.write(to: file)) != nil else { fail("can't save \(file.path)") }
+        print("Saved \(file.path)")
+        continue
+    }
     // Xcode finds installed profiles by file name: <UUID>.mobileprovision.
     for dir in installDirs {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

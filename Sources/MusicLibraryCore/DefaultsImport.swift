@@ -10,7 +10,9 @@ public enum DefaultsImport {
 
     /// Imports the settings of the domain the bundle names, if it names one other than its own.
     public static func runIfAsked(bundle: Bundle = .main, defaults: UserDefaults = .standard) {
-        guard let old = bundle.object(forInfoDictionaryKey: infoKey) as? String, !old.isEmpty,
+        // A sandboxed build can't read another app's defaults (and the store build doesn't name one).
+        guard !AppSandbox.isActive,
+              let old = bundle.object(forInfoDictionaryKey: infoKey) as? String, !old.isEmpty,
               let id = bundle.bundleIdentifier, old != id else { return }
         run(from: old, into: defaults, domain: id)
     }

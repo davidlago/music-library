@@ -16,7 +16,12 @@
 #                   the iCloud entitlements for ICLOUD_CONTAINER (default iCloud.io.github.davidlago.MusicLibrary) and
 #                   takes its bundle ID from the profile. Needs SIGN_IDENTITY. Such a build has its own user defaults, so
 #                   it imports local.musiclibrary's once at launch (DefaultsImport). Without a profile the app is
-#                   local.musiclibrary, has no iCloud and shows none (docs/icloud-plan.md).
+#                   local.musiclibrary, has no iCloud and shows none (docs/icloud-plan.md). A Mac App Store profile
+#                   (scripts/mac-app-store.sh) is taken the same way and implies SANDBOX=1 (no defaults import).
+#   SANDBOX=1       sign the app for the App Sandbox (Resources/MusicLibrary-AppStore.entitlements) and the helpers to
+#                   inherit it (Resources/Helper-Sandbox.entitlements), as the Mac App Store build is
+#   BUNDLE_ID=…     another bundle ID for a build without a profile (default local.musiclibrary), for a test copy that
+#                   keeps its own settings and container, e.g. BUNDLE_ID=local.musiclibrary.sandboxtest SANDBOX=1
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -32,17 +37,38 @@ if [[ -z "${SDKROOT:-}" ]]; then
 fi
 
 # iCloud needs an explicit App ID, an embedded profile that allows the container and entitlements matching it.
+fail() { echo "error: $1" >&2; exit 1; }
 DEFAULT_BUNDLE_ID=local.musiclibrary
-BUNDLE_ID="$DEFAULT_BUNDLE_ID"
-ENTITLEMENTS=Resources/MusicLibrary.entitlements
+BUNDLE_ID="${BUNDLE_ID:-$DEFAULT_BUNDLE_ID}"
+SANDBOX="${SANDBOX:-0}"
 EXTRA_INFO=""
+SIGNING=build/signing
+rm -rf "$SIGNING" && mkdir -p "$SIGNING"
 if [[ -n "${PROVISIONING_PROFILE:-}" ]]; then
-    fail() { echo "error: $1" >&2; exit 1; }
     [[ "${SIGN_IDENTITY:--}" != "-" ]] || fail "PROVISIONING_PROFILE needs SIGN_IDENTITY (an ad-hoc signature can't use a profile)"
-    SIGNING=build/signing
-    rm -rf "$SIGNING" && mkdir -p "$SIGNING"
     security cms -D -i "$PROVISIONING_PROFILE" > "$SIGNING/profile.plist" 2> /dev/null \
         || fail "can't read the provisioning profile $PROVISIONING_PROFILE"
+    # A Developer ID profile provisions every Mac; a Mac App Store one names no devices at all (a development
+    # profile lists them, and isn't for either).
+    profile_key() { /usr/libexec/PlistBuddy -c "Print :$1" "$SIGNING/profile.plist" 2> /dev/null || true; }
+    if [[ "$(profile_key ProvisionsAllDevices)" == "true" ]]; then
+        MAC_APP_STORE=0
+    elif [[ -z "$(profile_key ProvisionedDevices)" ]]; then
+        MAC_APP_STORE=1
+        SANDBOX=1
+        [[ "$SIGN_IDENTITY" == "Apple Distribution"* || "$SIGN_IDENTITY" == "3rd Party Mac Developer Application"* ]] \
+            || fail "a Mac App Store profile needs an Apple Distribution SIGN_IDENTITY"
+    else
+        fail "the profile is a development profile; use a Developer ID or Mac App Store one"
+    fi
+fi
+ENTITLEMENTS="$SIGNING/MusicLibrary.entitlements"
+if [[ "$SANDBOX" == "1" ]]; then
+    cp Resources/MusicLibrary-AppStore.entitlements "$ENTITLEMENTS"
+else
+    cp Resources/MusicLibrary.entitlements "$ENTITLEMENTS"
+fi
+if [[ -n "${PROVISIONING_PROFILE:-}" ]]; then
     allowed() { /usr/libexec/PlistBuddy -c "Print :Entitlements:$1" "$SIGNING/profile.plist" 2> /dev/null || true; }
     APP_IDENTIFIER="$(allowed com.apple.application-identifier)"
     TEAM_ID="$(allowed com.apple.developer.team-identifier)"
@@ -57,8 +83,6 @@ if [[ -n "${PROVISIONING_PROFILE:-}" ]]; then
     allowed com.apple.developer.icloud-services | sed 's/^ *//' | grep -qxF -e CloudDocuments -e '*' \
         || fail "the profile doesn't allow iCloud Documents (com.apple.developer.icloud-services)"
 
-    ENTITLEMENTS="$SIGNING/MusicLibrary.entitlements"
-    cp Resources/MusicLibrary.entitlements "$ENTITLEMENTS"
     entitle() { /usr/libexec/PlistBuddy -c "$1" "$ENTITLEMENTS" > /dev/null; }
     entitle "Add :com.apple.application-identifier string $APP_IDENTIFIER"
     entitle "Add :com.apple.developer.team-identifier string $TEAM_ID"
@@ -68,12 +92,13 @@ if [[ -n "${PROVISIONING_PROFILE:-}" ]]; then
     done
     entitle "Add :com.apple.developer.icloud-services array"
     entitle "Add :com.apple.developer.icloud-services:0 string CloudDocuments"
-    # Developer ID builds use the production iCloud environment; only name it when the profile does.
+    # Developer ID and App Store builds use the production iCloud environment; only name it when the profile does.
     if [[ -n "$(allowed com.apple.developer.icloud-container-environment)" ]]; then
         entitle "Add :com.apple.developer.icloud-container-environment string Production"
     fi
     EXTRA_INFO="    <key>MusicLibraryICloudContainer</key><string>$ICLOUD_CONTAINER</string>"
-    if [[ "$BUNDLE_ID" != "$DEFAULT_BUNDLE_ID" ]]; then
+    # A sandboxed build can't read another app's defaults, so it doesn't ask to (DefaultsImport).
+    if [[ "$BUNDLE_ID" != "$DEFAULT_BUNDLE_ID" && "$SANDBOX" != "1" ]]; then
         EXTRA_INFO+=$'\n'"    <key>MusicLibraryImportsDefaultsFrom</key><string>$DEFAULT_BUNDLE_ID</string>"
     fi
 fi
@@ -103,6 +128,10 @@ if [[ "${BUNDLE_TOOLS:-1}" == "1" ]]; then
     cp build/tools/ffmpeg build/tools/ffprobe build/tools/fpcalc "$APP/Contents/Helpers/"
     cp -R build/tools/Licenses "$APP/Contents/Resources/Licenses"
 fi
+# The sample library (the iPhone app's, scripts/make-sample-library.sh) for File ▸ Explore a Sample Library.
+cp -R iOS/MusicLibraryMobile/SampleLibrary.bundle "$APP/Contents/Resources/SampleLibrary.bundle"
+# The required-reason APIs the app uses (the Mac App Store asks for it).
+cp Resources/PrivacyInfo.xcprivacy "$APP/Contents/Resources/PrivacyInfo.xcprivacy"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -126,6 +155,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>NSBonjourServices</key><array><string>_musiclib-sync._tcp</string><string>_musiclib-mac._tcp</string></array>
     <key>NSHumanReadableCopyright</key><string>© 2026 Dave Lago. MIT License.</string>
     <key>NSPrincipalClass</key><string>NSApplication</string>
+    <key>ITSAppUsesNonExemptEncryption</key><false/>
 ${EXTRA_INFO}
 </dict>
 </plist>
@@ -135,14 +165,17 @@ IDENTITY="${SIGN_IDENTITY:--}"
 SIGN_FLAGS=(--force --sign "$IDENTITY")
 if [[ "$IDENTITY" != "-" ]]; then SIGN_FLAGS+=(--options runtime); fi
 if [[ "$IDENTITY" == "Developer ID Application"* ]]; then SIGN_FLAGS+=(--timestamp); fi
-# Helpers first, then the app around them (no --deep).
+# Helpers first, then the app around them (no --deep). Sandboxed, each runs in the app's sandbox and has nothing else.
+HELPER_FLAGS=()
+if [[ "$SANDBOX" == "1" ]]; then HELPER_FLAGS=(--entitlements Resources/Helper-Sandbox.entitlements); fi
 if [[ -d "$APP/Contents/Helpers" ]]; then
     for tool in "$APP"/Contents/Helpers/*; do
-        codesign "${SIGN_FLAGS[@]}" --identifier "local.musiclibrary.$(basename "$tool")" "$tool"
+        codesign "${SIGN_FLAGS[@]}" ${HELPER_FLAGS[@]+"${HELPER_FLAGS[@]}"} \
+            --identifier "local.musiclibrary.$(basename "$tool")" "$tool"
     done
 fi
 if [[ -n "${PROVISIONING_PROFILE:-}" ]]; then cp "$PROVISIONING_PROFILE" "$APP/Contents/embedded.provisionprofile"; fi
 # The hardened runtime blocks recording without the audio input entitlement (Digitize Vinyl).
 codesign "${SIGN_FLAGS[@]}" --entitlements "$ENTITLEMENTS" "$APP"
 codesign --verify --strict --deep "$APP"
-echo "Built $APP ($BUNDLE_ID $VERSION, $(lipo -archs "$APP/Contents/MacOS/MusicLibrary"), signed: $IDENTITY${EXTRA_INFO:+, iCloud: ${ICLOUD_CONTAINER:-}})"
+echo "Built $APP ($BUNDLE_ID $VERSION, $(lipo -archs "$APP/Contents/MacOS/MusicLibrary"), signed: $IDENTITY${EXTRA_INFO:+, iCloud: ${ICLOUD_CONTAINER:-}}$([[ "$SANDBOX" == "1" ]] && echo ", sandboxed"))"

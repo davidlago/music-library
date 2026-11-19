@@ -128,7 +128,8 @@ public struct ToolLocator: Sendable {
             self.searchPaths = searchPaths
         } else {
             let override = ProcessInfo.processInfo.environment["MUSICLIB_TOOLS_DIR"].map { [$0] } ?? []
-            self.searchPaths = override + [Self.bundledToolsPath] + Self.installedSearchPaths
+            // The sandboxed store build runs only its own copies (signed to inherit its sandbox).
+            self.searchPaths = override + [Self.bundledToolsPath] + (AppSandbox.isActive ? [] : Self.installedSearchPaths)
         }
     }
 

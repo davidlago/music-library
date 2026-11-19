@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- The Mac App Store build (scripts/build-app.sh SANDBOX=1): the App Sandbox, with ~/Music (the default library
+     folder), folders the user chooses (kept as security-scoped bookmarks), web services, Wi-Fi sync with the iPhone
+     (a listener and Bonjour) and recording records. scripts/build-app.sh adds iCloud's from the profile. -->
+<dict>
+    <key>com.apple.security.app-sandbox</key><true/>
+    <key>com.apple.security.assets.music.read-write</key><true/>
+    <key>com.apple.security.files.user-selected.read-write</key><true/>
+    <key>com.apple.security.files.bookmarks.app-scope</key><true/>
+    <key>com.apple.security.network.client</key><true/>
+    <key>com.apple.security.network.server</key><true/>
+    <key>com.apple.security.device.audio-input</key><true/>
+</dict>
+</plist>

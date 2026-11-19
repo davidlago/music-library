@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- ffmpeg, ffprobe and fpcalc in the sandboxed build: they run inside the app's sandbox (and nothing else, as the
+     Mac App Store requires of an app's helper tools). -->
+<dict>
+    <key>com.apple.security.app-sandbox</key><true/>
+    <key>com.apple.security.inherit</key><true/>
+</dict>
+</plist>

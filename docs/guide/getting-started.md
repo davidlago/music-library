@@ -17,6 +17,13 @@ choose **Always Allow**. (See [Troubleshooting](troubleshooting.md#keychain-prom
 > Coming from a release before 1.13? Those needed **Open Anyway** in System Settings and Homebrew's ffmpeg. Neither is
 > needed now; you can uninstall Homebrew's ffmpeg unless something else uses it.
 
+## Try it with the sample library
+
+Before your own music is in, **File ▸ Explore a Sample Library** (also on Listen Now while the library is empty) opens
+a library built into the app: fictional artists, CDs and records, with songs, covers and a listening history, so you can
+try the Shelf, album pages, Insights, Music DNA and the Shop. Nothing in it is synced to your iPhone or backed up.
+**Use My Own Library** on Listen Now (or in the File menu) goes back to your library folder.
+
 ## Your library folder
 
 Your library lives in `~/Music/MusicLibrary` unless you choose another folder in **Settings ▸ General ▸ Library

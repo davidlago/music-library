@@ -4,7 +4,8 @@ import Foundation
 public enum LibraryLocation {
     public static var defaultRoot: URL {
         #if os(macOS)
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Music/MusicLibrary", isDirectory: true)
+        // The real home, also in the sandbox (whose ~/Music is covered by com.apple.security.assets.music.read-write).
+        AppSandbox.realHome.appendingPathComponent("Music/MusicLibrary", isDirectory: true)
         #else
         // The companion app keeps its synced library where Finder's Files tab and the Files app can reach it.
         URL.documentsDirectory.appendingPathComponent(phoneFolderName, isDirectory: true)

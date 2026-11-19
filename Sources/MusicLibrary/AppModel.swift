@@ -264,7 +264,11 @@ final class AppModel {
     var exportPlaylistFiles: Bool { didSet { UserDefaults.standard.set(exportPlaylistFiles, forKey: Keys.exportPlaylistFiles) } }
     /// Where the Export List is copied to (e.g. a USB music player), kept between launches.
     private(set) var exportDestination: URL? {
-        didSet { UserDefaults.standard.set(exportDestination?.path, forKey: Keys.exportDestination) }
+        didSet {
+            UserDefaults.standard.set(exportDestination?.path, forKey: Keys.exportDestination)
+            if let exportDestination { FolderBookmarks.shared.save(exportDestination, for: Keys.exportDestination) }
+            else { FolderBookmarks.shared.forget(Keys.exportDestination) }
+        }
     }
     /// Bumped when an export ends, so views showing the destination's contents rescan it.
     private(set) var exportRevision = 0
@@ -336,7 +340,11 @@ final class AppModel {
 
     init() {
         let defaults = UserDefaults.standard
-        let root = defaults.string(forKey: Keys.root).map { URL(fileURLWithPath: $0, isDirectory: true) } ?? LibraryLocation.defaultRoot
+        // The sandboxed store build reopens a folder the user chose through its bookmark (FolderBookmarks); one it
+        // can't reach (no bookmark) fails to open and asks for the folder again (`openLibrary`).
+        let storedRoot = defaults.string(forKey: Keys.root)
+        let root = storedRoot.map { FolderBookmarks.shared.resolve(path: $0, for: Keys.root) ?? URL(fileURLWithPath: $0, isDirectory: true) }
+            ?? LibraryLocation.defaultRoot
         libraryRoot = root
         mbContact = defaults.string(forKey: Keys.contact) ?? ""
         acoustIDKey = KeychainStore.app.migratedString(for: Keys.acoustID, from: defaults, key: Keys.acoustID) ?? ""
@@ -349,7 +357,9 @@ final class AppModel {
         exportList = defaults.data(forKey: Keys.exportList).flatMap { try? JSONDecoder().decode([ExportItem].self, from: $0) } ?? []
         exportBackupDatabase = defaults.bool(forKey: Keys.exportDatabase)
         exportPlaylistFiles = defaults.object(forKey: Keys.exportPlaylistFiles) == nil ? true : defaults.bool(forKey: Keys.exportPlaylistFiles)
-        exportDestination = defaults.string(forKey: Keys.exportDestination).map { URL(fileURLWithPath: $0, isDirectory: true) }
+        exportDestination = defaults.string(forKey: Keys.exportDestination).map {
+            FolderBookmarks.shared.resolve(path: $0, for: Keys.exportDestination) ?? URL(fileURLWithPath: $0, isDirectory: true)
+        }
         ejectAfterRip = defaults.object(forKey: Keys.ejectAfterRip) == nil ? true : defaults.bool(forKey: Keys.ejectAfterRip)
         // Off by default: a CD with no copy in the collection is added as a new one, a switch already on (§4.3).
         askCDOwnership = defaults.bool(forKey: Keys.askCDOwnership)
@@ -381,9 +391,10 @@ final class AppModel {
             self.loadPurchases()
             self.historyVersion += 1
         }
-        iPhone.context = { [unowned self] in self.syncContext }
+        // The sample library is never synced to a phone, backed up or offloaded (exploreSampleLibrary).
+        iPhone.context = { [unowned self] in self.isSampleLibrary ? nil : self.syncContext }
         iPhone.onSynced = { [unowned self] in self.buyList.reload(); self.cdShop.reloadFinds() }
-        cloud.context = { [unowned self] in self.database.map { (self.libraryRoot, $0) } }
+        cloud.context = { [unowned self] in self.isSampleLibrary ? nil : self.database.map { (self.libraryRoot, $0) } }
         cloud.tracks = { [unowned self] in self.tracks(for: $0) }
         cloud.allTracks = { [unowned self] in self.tracks }
         cloud.iPhoneTracks = { [unowned self] in self.iPhone.phones.isEmpty ? [] : self.iPhoneTracks() }
@@ -395,7 +406,7 @@ final class AppModel {
         SidebarReclick.install { [weak self] in self?.sidebarReselected() }
         cloud.onPublished = { [unowned self] in self.offload.runAutomatically() }
         cloud.onMoved = { [unowned self] in self.databaseRestored() }
-        offload.context = { [unowned self] in self.database.map { (self.libraryRoot, $0) } }
+        offload.context = { [unowned self] in self.isSampleLibrary ? nil : self.database.map { (self.libraryRoot, $0) } }
         offload.tracks = { [unowned self] in self.tracks(for: $0) }
         offload.allTracks = { [unowned self] in self.tracks }
         offload.lastPlayed = { [unowned self] in self.playTotals.compactMapValues(\.lastPlayed) }
@@ -491,7 +502,12 @@ final class AppModel {
             Task { await backfillAudioFormats() }
         } catch {
             database = nil
-            errorMessage = error.localizedDescription
+            if AppSandbox.isActive, !FileManager.default.isReadableFile(atPath: libraryRoot.path) {
+                errorMessage = "Music Library needs your permission to open the library folder \(libraryRoot.path). "
+                    + "Choose it again in Settings ▸ General (Library folder: Change…)."
+            } else {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -524,6 +540,7 @@ final class AppModel {
         albumInfo.cancel()
         libraryRoot = url
         UserDefaults.standard.set(url.path, forKey: Keys.root)
+        FolderBookmarks.shared.save(url, for: Keys.root)
         database = nil
         tracks = []; albums = []; artists = []; playlists = []; smartPlaylists = []; likedDates = [:]; totalTracks = 0
         playTotals = [:]; artistPlayTotals = [:]; albumPlayTotals = [:]; albumAddedDates = [:]
@@ -1230,12 +1247,11 @@ final class AppModel {
         catalog.collection = collection
         values.recompute()
         refreshCollectionPlaylistCounts()
-        // The app opens on Listen Now once there's anything to show, unless something else was picked already
-        // (a page opened or a search typed while it loaded counts too). An empty library stays on Songs, which
-        // explains how to import.
+        // The app opens on Listen Now, unless something else was picked already (a page opened or a search typed
+        // while it loaded counts too). For an empty library it explains how to start and offers the sample library.
         if !appliedDefaultSidebar {
             appliedDefaultSidebar = true
-            if !sidebarChosen, searchText.isEmpty, navigationPath.isEmpty, !tracks.isEmpty || !collection.items.isEmpty {
+            if !sidebarChosen, searchText.isEmpty, navigationPath.isEmpty {
                 sidebar = .listenNow
             }
         }
@@ -1975,12 +1991,59 @@ final class AppModel {
         sidebar = .importQueue
     }
 
+    // MARK: Sample library
+
+    /// True while the built-in sample library is open (`SampleLibraryCopy`).
+    var isSampleLibrary: Bool { SampleLibraryCopy.isSample(libraryRoot) }
+    /// This build has the sample library to explore.
+    var hasSampleLibrary: Bool { SampleLibraryCopy.bundled() != nil }
+    var isPreparingSample = false
+
+    /// Opens a fresh copy of the built-in sample library (fictional artists, CDs and records, with a listening history
+    /// up to today), remembering the library folder to go back to. It's never synced, backed up or offloaded.
+    func exploreSampleLibrary() {
+        guard let source = SampleLibraryCopy.bundled(), !isPreparingSample else { return }
+        let defaults = UserDefaults.standard
+        if !isSampleLibrary {
+            defaults.set(libraryRoot.path, forKey: Keys.root + "BeforeSample")
+            defaults.set(defaults.data(forKey: Keys.root + "Bookmark"), forKey: Keys.root + "BeforeSampleBookmark")
+        }
+        isPreparingSample = true
+        Task {
+            let result = await Task.detached { Result { try SampleLibraryCopy.install(from: source) } }.value
+            isPreparingSample = false
+            switch result {
+            case .success(let copy):
+                setLibraryRoot(copy)
+                sidebar = .listenNow
+            case .failure(let error):
+                errorMessage = "Couldn't open the sample library: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// Leaves the sample library for the library folder that was open before it (the default one if none was).
+    func leaveSampleLibrary() {
+        let defaults = UserDefaults.standard
+        let previous = defaults.string(forKey: Keys.root + "BeforeSample")
+        let url = previous.map {
+            FolderBookmarks.shared.resolve(path: $0, for: Keys.root + "BeforeSample") ?? URL(fileURLWithPath: $0, isDirectory: true)
+        } ?? LibraryLocation.defaultRoot
+        defaults.removeObject(forKey: Keys.root + "BeforeSample")
+        setLibraryRoot(url)
+        FolderBookmarks.shared.forget(Keys.root + "BeforeSample")
+        try? FileManager.default.removeItem(at: SampleLibraryCopy.copyLocation)
+        sidebar = .listenNow
+    }
+
     func chooseLibraryRoot() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.prompt = "Use Folder"
+        // Starts at the current folder, so a sandboxed build that lost access can be given it again in one click.
+        panel.directoryURL = libraryRoot
         guard panel.runModal() == .OK, let url = panel.url else { return }
         setLibraryRoot(url)
     }

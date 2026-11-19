@@ -39,6 +39,11 @@ struct MusicLibraryApp: App {
                     .disabled(model.collectionSheet != nil || model.smartPlaylistDraft != nil)
                 Button("Import…") { model.chooseFilesToImport() }
                     .keyboardShortcut("o", modifiers: .command)
+                if model.isSampleLibrary {
+                    Button("Use My Own Library") { model.leaveSampleLibrary() }
+                } else if model.hasSampleLibrary {
+                    Button("Explore a Sample Library") { model.exploreSampleLibrary() }.disabled(model.isPreparingSample)
+                }
                 if model.cloud.isAvailable {
                     Divider()
                     Button("Restore from iCloud…") { model.restoreFromICloud() }
