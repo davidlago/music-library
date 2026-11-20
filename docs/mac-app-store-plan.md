@@ -291,6 +291,7 @@ Discovery:
   listens so a paired iPhone can start a sync) and explained, on the user's yes: reply in Resolution Center (thread
   43e4477f-b1b4-3d68-8f38-ee591f99a6dc, read and answered through the web API `/iris/v1/resolutionCenterThreads?filter[reviewSubmission]=…`
   and the page's Reply form) and the same paragraph added to the review notes (API and `docs/app-store/README.md`).
-  **Resubmitting is refused for now**: Resubmit to App Review and Add for Review are greyed out, and `PATCH
-  reviewSubmissions submitted:true` answers 409 "Version is not ready to be submitted yet, please try again later";
-  waiting for App Review's answer to the reply.
+  Resubmitting: the submission's item stays `REJECTED` (Resubmit to App Review greyed out; `PATCH
+  reviewSubmissions submitted:true` answers 409 "Version is not ready to be submitted yet") until the version page's
+  **Update Review** button (shown in place of Add for Review once the version can go back) puts it back as Ready for
+  Review; then Resubmit to App Review works. **Resubmitted** the same build that day: Waiting for Review.
