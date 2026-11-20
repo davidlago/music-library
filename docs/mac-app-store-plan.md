@@ -286,3 +286,12 @@ Discovery:
   review submission 4e4e591c-5761-4923-aee6-6ab90f683e92, Waiting for Review, released automatically once approved.
   Still to do after approval: `MAC_INSTALLER_CERTIFICATE` secrets (`scripts/set-signing-secret.sh`, the user runs it)
   and `gh variable set MAC_APP_STORE --body 1` (with the go-ahead) so release tags upload the Mac app too.
+- 2026-11-20: **rejected by an automated check**, Guideline 2.4.5 (Hardware Compatibility, macOS): the build has
+  `com.apple.security.network.server` without visible matching functionality. Kept (the Mac's `SyncAdvertiser`
+  listens so a paired iPhone can start a sync) and explained, on the user's yes: reply in Resolution Center (thread
+  43e4477f-b1b4-3d68-8f38-ee591f99a6dc, read and answered through the web API `/iris/v1/resolutionCenterThreads?filter[reviewSubmission]=…`
+  and the page's Reply form) and the same paragraph added to the review notes (API and `docs/app-store/README.md`).
+  Resubmitting: the submission's item stays `REJECTED` (Resubmit to App Review greyed out; `PATCH
+  reviewSubmissions submitted:true` answers 409 "Version is not ready to be submitted yet") until the version page's
+  **Update Review** button (shown in place of Add for Review once the version can go back) puts it back as Ready for
+  Review; then Resubmit to App Review works. **Resubmitted** the same build that day: Waiting for Review.
