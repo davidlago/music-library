@@ -72,7 +72,7 @@ struct MusicDNAView: View {
                 .zIndex(1)
             Divider()
             if graph.people.isEmpty {
-                ContentUnavailableView("No Credits Yet", systemImage: "point.3.connected.trianglepath.dotted",
+                EmptyState("No Credits Yet", systemImage: "point.3.connected.trianglepath.dotted",
                                        description: Text("Music DNA maps who played, wrote and produced together. It fills in as you import music matched to MusicBrainz."))
             } else if let center {
                 let hood = graph.neighborhood(of: center.id, depth: model.dnaDepth)
@@ -84,7 +84,7 @@ struct MusicDNAView: View {
                 }
                 .onChange(of: center.id) { hovered = nil }
             } else if let name = model.dnaCenter {
-                ContentUnavailableView("\(name) Isn't in Your Credits", systemImage: "person.crop.circle.badge.questionmark",
+                EmptyState("\(name) Isn't in Your Credits", systemImage: "person.crop.circle.badge.questionmark",
                                        description: Text("Nobody by that name appears in the credits of the music in your digital and physical collections."))
             } else {
                 DNALanding()
@@ -159,7 +159,7 @@ struct PersonPicker: View {
                 }
                 .padding(.vertical, 4)
                 .frame(width: 300)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .windowBackgroundColor)))
+                .background(RoundedRectangle(cornerRadius: 8).fill(AppColor.background))
                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(AppColor.separator, lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
                 .offset(y: 36)
@@ -182,7 +182,7 @@ struct DNALanding: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Music DNA").font(.largeTitle.bold())
+                    Text("Music DNA").font(AppFont.display(44))
                     Text("See who played, wrote and produced with whom across your digital and physical collections. Pick someone to put them at the center; click any bubble to follow the connections.")
                         .foregroundStyle(.secondary).frame(maxWidth: 640, alignment: .leading)
                 }
@@ -356,7 +356,7 @@ struct DNADetailPanel: View {
                 HStack(spacing: 12) {
                     PersonBubble(person: person, size: 64, highlighted: true)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(person.name).font(.title3.bold()).lineLimit(2)
+                        Text(person.name).font(AppFont.display(24, weight: .heavy)).lineLimit(2)
                         HStack(spacing: 4) {
                             Circle().fill(DNAColor.of(person.category)).frame(width: 7, height: 7)
                             Text(person.category.rawValue).font(.caption).foregroundStyle(.secondary)

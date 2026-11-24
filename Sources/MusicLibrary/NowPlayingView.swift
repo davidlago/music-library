@@ -70,12 +70,13 @@ struct NowPlayingView: View {
             HStack(alignment: .top, spacing: 40) {
                 cover(player.cover, side: side)
                 VStack(alignment: .leading, spacing: 6) {
+                    Kicker("Now Playing")
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(m.title).font(.largeTitle.bold()).lineLimit(2)
+                        PageTitle(m.title, size: 54, lineLimit: 2)
                         LikeButton(model: model, track: track, font: .title)
                     }
-                    Text(m.artist).font(.title2).foregroundStyle(.secondary).lineLimit(1)
-                    Text(albumLine(m)).font(.title3).foregroundStyle(.secondary).lineLimit(1)
+                    Text(m.artist).font(AppFont.serif(26).italic()).foregroundStyle(AppColor.accent).lineLimit(1)
+                    Text(albumLine(m)).font(.title3).foregroundStyle(AppColor.muted).lineLimit(1)
                     FormatCaption(player: player, font: .callout, lineLimit: 2)
                     ScrobbleCaption()
                     ScrollView {
@@ -92,11 +93,11 @@ struct NowPlayingView: View {
                 cover(player.cover, side: side)
                     .padding(.bottom, 12)
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(m.title).font(.title.bold()).lineLimit(2).multilineTextAlignment(.center)
+                    PageTitle(m.title, size: 38, lineLimit: 2).multilineTextAlignment(.center)
                     LikeButton(model: model, track: track, font: .title2)
                 }
-                Text(m.artist).font(.title3).foregroundStyle(.secondary).lineLimit(1)
-                Text(albumLine(m)).font(.headline).foregroundStyle(.secondary).lineLimit(1)
+                Text(m.artist).font(AppFont.serif(21).italic()).foregroundStyle(AppColor.accent).lineLimit(1)
+                Text(albumLine(m)).font(.headline).foregroundStyle(AppColor.muted).lineLimit(1)
                 FormatCaption(player: player, font: .callout, lineLimit: 2)
                 ScrobbleCaption()
             }

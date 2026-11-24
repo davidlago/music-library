@@ -1,5 +1,6 @@
 import AVKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// The bar above the tab bar: the current song with play/pause; tapping it opens Now Playing.
@@ -97,7 +98,7 @@ struct NowPlayingView: View {
                         .padding()
                     }
                 } else {
-                    ContentUnavailableView("Not Playing", systemImage: "music.note")
+                    EmptyState("Not Playing", systemImage: "music.note")
                 }
             }
             .toolbar {
@@ -123,9 +124,9 @@ struct NowPlayingView: View {
         .padding(.horizontal, 12)
 
         VStack(spacing: 4) {
-            Text(track.title).font(.title2.bold()).multilineTextAlignment(.center)
-            Text(track.artist).font(.title3).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            Text(track.album).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            PageTitle(track.title, size: 32, lineLimit: 2).multilineTextAlignment(.center)
+            Text(track.artist).font(AppFont.serif(20).italic()).foregroundStyle(AppColor.accent).multilineTextAlignment(.center)
+            Text(track.album).font(.callout).foregroundStyle(AppColor.muted).multilineTextAlignment(.center)
             if let format = track.audioFormat {
                 Text(format.compact)
                     .font(.caption.monospaced())

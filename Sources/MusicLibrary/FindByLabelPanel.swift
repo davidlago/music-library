@@ -24,7 +24,7 @@ struct FindByLabelPanel: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .center, spacing: 14) {
                 Image(systemName: "number.square").font(.title).foregroundStyle(.secondary)
-                Text("Find by Label").font(.title2.bold())
+                Text("Find by Label").font(AppFont.display(28, weight: .heavy))
                 Spacer()
                 Picker("Series", selection: $series) {
                     ForEach(StickerSeries.allCases, id: \.self) { Text($0.name).tag($0) }
@@ -34,7 +34,7 @@ struct FindByLabelPanel: View {
             }
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(series == .cd ? "CD #" : "Vinyl #")
-                    .font(.system(size: 30, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
+                    .font(AppFont.display(34, weight: .heavy)).foregroundStyle(.secondary)
                 TextField("Label number", text: $text, prompt: Text("12"))
                     .font(.system(size: 34, weight: .semibold, design: .monospaced))
                     .textFieldStyle(.plain)
@@ -177,7 +177,7 @@ struct LabelLookupCard: View {
             .buttonStyle(.plain)
             VStack(alignment: .leading, spacing: 5) {
                 if let s = item.sticker { StickerPill(sticker: s, size: 14) }
-                Text(item.album.isEmpty ? "Unknown Album" : item.album).font(.title3.bold()).lineLimit(2)
+                Text(item.album.isEmpty ? "Unknown Album" : item.album).font(AppFont.display(24, weight: .heavy)).lineLimit(2)
                 Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).foregroundStyle(.secondary).lineLimit(1)
                 let meta = [item.year.map(String.init), item.formatDetail, item.recordLabel].compactMap { $0 }
                 if !meta.isEmpty { Text(meta.joined(separator: " · ")).font(.callout).foregroundStyle(.secondary).lineLimit(1) }

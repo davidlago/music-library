@@ -69,7 +69,7 @@ public struct RadioDJLineView: View {
                     Spacer(minLength: RadioDJMetrics.bubbleInset)
                     Text(line.text)
                         .textSelection(.enabled)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppColor.onAccent)
                         .padding(RadioDJMetrics.bubblePadding)
                         .background(RoundedRectangle(cornerRadius: RadioDJMetrics.bubbleRadius).fill(AppColor.accent))
                 }

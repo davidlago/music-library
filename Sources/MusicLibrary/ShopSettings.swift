@@ -15,7 +15,7 @@ struct ShopSettings: View {
                 Text("The Shop's price guide shows what an album sells for: Discogs' marketplace (the cheapest copies and how many people have and want each edition) and eBay's listings. With your Discogs account it adds Discogs' suggested prices by condition and the versions already in your Discogs collection; signed in to eBay, it adds what copies actually sold for recently.")
                     .font(.callout).foregroundStyle(.secondary)
             }
-            Section("Discogs") {
+            Section {
                 LabeledContent("Account") {
                     if let user = discogs.username, discogs.hasToken {
                         Label("Connected as \(user)", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
@@ -23,7 +23,7 @@ struct ShopSettings: View {
                         Text("Not connected: connect in the Discogs tab").foregroundStyle(.secondary)
                     }
                 }
-            }
+            } header: { ListHeader("Discogs") }
             Section {
                 LabeledContent("Sold listings") {
                     HStack {
@@ -39,7 +39,7 @@ struct ShopSettings: View {
                     }
                 }
             } header: {
-                Text("eBay")
+                ListHeader("eBay")
             } footer: {
                 Text("eBay shows sold listings only to signed-in visitors. You sign in on eBay's own page: Music Library never sees your password, it keeps only eBay's cookies, and reads a sold search only when you open an album in the Shop or ask the Radio DJ about a price. Signing out forgets them.")
                     .font(.caption).foregroundStyle(.secondary)

@@ -7,7 +7,7 @@ own music: what's on the shelf right now, what you already own, and what you hav
 It works with library catalogs run on [Aspen Discovery](https://aspendiscovery.org), like the
 [Minuteman Library Network](https://www.minlib.net) in Massachusetts (the default).
 
-![Local Library CDs: the downloaded catalog searched for genre:jazz, with genre and decade chips, covers and On Shelf at Natick](../screenshots/library-cds.png)
+![Local Library CDs: the downloaded catalog, newest first, with genre and decade chips, covers and On Shelf at Natick](../screenshots/library-cds.png)
 
 ## Set it up
 

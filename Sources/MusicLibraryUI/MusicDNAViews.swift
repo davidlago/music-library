@@ -8,9 +8,9 @@ import SwiftUI
 public enum DNAColor {
     public static func of(_ c: CollaborationGraph.Category) -> Color {
         switch c {
-        case .performance: Color(light: 0x2a78d6, dark: 0x3987e5)
-        case .writing: Color(light: 0x1baf7a, dark: 0x199e70)
-        case .production: Color(light: 0xeb6834, dark: 0xd95926)
+        case .performance: Color(light: 0x5E3FC0, dark: 0x8F74E6)
+        case .writing: Color(light: 0x0E7F76, dark: 0x19C3B5)
+        case .production: Color(light: 0xB35A16, dark: 0xE8833A)
         }
     }
 }
@@ -56,11 +56,7 @@ public struct DNABubble<Photo: View>: View {
         self.photo = photo
     }
 
-    #if os(macOS)
     static var surface: Color { AppColor.card }
-    #else
-    static var surface: Color { Color(.secondarySystemBackground) }
-    #endif
 
     public var body: some View {
         let color = DNAColor.of(person.category)
@@ -71,7 +67,7 @@ public struct DNABubble<Photo: View>: View {
                 photo
             } else {
                 Text(DNABubbleInitials.of(person.name))
-                    .font(.system(size: max(9, size * 0.32), weight: .semibold, design: .rounded))
+                    .font(AppFont.display(max(10, size * 0.37), weight: .heavy))
                     .foregroundStyle(color)
                     .minimumScaleFactor(0.5)
             }

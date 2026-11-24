@@ -405,7 +405,7 @@ public struct BuyListCard: View {
 
     private func stat(_ value: String, _ label: String, color: Color = .primary) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(value).font(.title3.weight(.semibold)).monospacedDigit().foregroundStyle(color)
+            Text(value).font(AppFont.display(24, weight: .heavy)).monospacedDigit().foregroundStyle(color)
             Text(label).font(.caption).foregroundStyle(.secondary)
         }
     }

@@ -295,9 +295,9 @@ public struct GradingGuide: View {
                     if choose != nil {
                         if grade == highlighted {
                             Label("Chosen", systemImage: "checkmark.circle.fill").font(.caption.weight(.semibold))
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(AppColor.accent)
                         } else if grade == hovered {
-                            Text("Choose").font(.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
+                            Text("Choose").font(.caption.weight(.semibold)).foregroundStyle(AppColor.accent)
                         }
                     }
                 }
@@ -318,10 +318,10 @@ public struct GradingGuide: View {
         .card()
         .overlay {
             if grade == hovered, grade != highlighted {
-                RoundedRectangle(cornerRadius: Metrics.cardRadius).strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: Metrics.cardRadius).strokeBorder(AppColor.accent.opacity(0.45), lineWidth: 1.5)
             }
             if grade == highlighted {
-                RoundedRectangle(cornerRadius: Metrics.cardRadius).strokeBorder(Color.accentColor, lineWidth: 2)
+                RoundedRectangle(cornerRadius: Metrics.cardRadius).strokeBorder(AppColor.accent, lineWidth: 2)
             }
         }
     }

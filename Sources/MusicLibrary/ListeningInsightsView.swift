@@ -14,7 +14,7 @@ struct ListeningContent: View {
 
     var body: some View {
         if !stats.hasHistory {
-            ContentUnavailableView("No Listening History Yet", systemImage: "headphones",
+            EmptyState("No Listening History Yet", systemImage: "headphones",
                                    description: Text("Play some music and this page fills in with what, when and how much you listen."))
         } else {
             ScrollView {

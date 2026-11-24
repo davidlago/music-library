@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 struct DetailRow: View {
@@ -86,7 +87,7 @@ struct TrackInfoSheet: View {
             HStack(alignment: .top, spacing: 16) {
                 CoverThumb(url: track.coverURL(root: model.libraryRoot), size: 120, revision: model.coverRevision)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(m.title).font(.title2.bold())
+                    Text(m.title).font(AppFont.display(28, weight: .heavy))
                     Text(m.artist)
                     Text(m.album).foregroundStyle(.secondary)
                 }

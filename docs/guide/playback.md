@@ -34,7 +34,7 @@ it. **Space** plays and pauses (except while typing).
 Click the cover to expand **Now Playing**: a large cover, the song's details and credits (click a name for
 [Music DNA](music-dna.md)), and whether it was scrobbled to Last.fm. **Esc** closes it.
 
-![Now Playing: the Mystery Girl cover large, with the song's composer, writers, producers, engineer, label and release details](../screenshots/now-playing.png)
+![Now Playing: the Round Midnight soundtrack's cover large, with the song's genre, label, catalog number, barcode and release details](../screenshots/now-playing.png)
 
 ## The play queue
 
@@ -46,7 +46,7 @@ The queue works like a streaming app's: the list you started playing from, plus 
 - The queue pane (**View ▸ Show Queue**, ⌥⌘U, or the queue button) shows **Now Playing**, **Next in Queue** and **Next
   From** the album or playlist you started. Drag to reorder, press Delete to remove, **Clear** to empty your additions.
 
-![The queue pane beside an album page: Now Playing and Next From: Roy Orbison](../screenshots/queue.png)
+![The queue pane beside an album page: Now Playing and Next From: Round Midnight](../screenshots/queue.png)
 
 The queue and the position in the current song are saved when you quit and restored, paused, the next time.
 

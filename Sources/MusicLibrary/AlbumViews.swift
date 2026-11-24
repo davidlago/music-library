@@ -100,20 +100,18 @@ struct AlbumDetail: View {
         VStack(alignment: .leading, spacing: 10) {
             coverArt(size: coverSize).padding(.bottom, 10)
 
-            Text(typeLine(info)).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.secondary)
-            Text(title).font(.system(size: 30, weight: .bold)).lineLimit(3).minimumScaleFactor(0.7)
+            Kicker(typeLine(info))
+            PageTitle(title, size: 46, lineLimit: 4)
                 .textSelection(.enabled)
             artistButton
-            if let meta = metaLine(info) { Text(meta).font(.callout).foregroundStyle(.secondary) }
+            if let meta = metaLine(info) { Text(meta).font(.callout).foregroundStyle(AppColor.muted) }
             if let info, let rating = info.rating { RatingView(rating: rating, votes: info.ratingVotes) }
             let genres = displayGenres(info)
             if !genres.isEmpty {
                 FlowLayout(spacing: 6) {
                     ForEach(genres, id: \.self) { g in
                         Button { model.search(SearchFilterKey.token("genre", g)) } label: {
-                            Text(g.capitalized).font(.caption)
-                                .padding(.horizontal, 9).padding(.vertical, 4)
-                                .background(Capsule().fill(AppColor.fill))
+                            TagChip(g.capitalized, tint: AppColor.tag(g))
                         }
                         .buttonStyle(.plain)
                     }
@@ -121,9 +119,9 @@ struct AlbumDetail: View {
             }
             HStack(spacing: 10) {
                 Button { play(tracks, at: 0) } label: { Label("Play", systemImage: "play.fill").frame(minWidth: 70) }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.prominent)
                 Button { play(tracks.shuffled(), at: 0) } label: { Label("Shuffle", systemImage: "shuffle") }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.outline)
                 Menu {
                     QueueMenuButtons(player: model.player) { tracks }
                     Divider()
@@ -145,7 +143,7 @@ struct AlbumDetail: View {
                     Divider()
                     RemoveFromLibraryButton(album: album)
                 } label: { Image(systemName: "ellipsis") }
-                    .menuStyle(.button).buttonStyle(.bordered).menuIndicator(.hidden).fixedSize()
+                    .menuStyle(.button).buttonStyle(.outline).menuIndicator(.hidden).fixedSize()
                     .help("Play Next, Add to Queue, check the rip with AccurateRip, shop for the CD or record, or remove the album")
             }
             .controlSize(.large)
@@ -232,14 +230,14 @@ struct AlbumDetail: View {
             Button { model.navigationPath.append(artist) } label: {
                 HStack(spacing: 8) {
                     ArtistPhoto(name: artist.name, size: 26)
-                    Text(name).font(.title3.weight(.medium))
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Text(name).font(AppFont.serif(22).italic()).foregroundStyle(AppColor.accent)
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(AppColor.muted)
                 }
             }
             .buttonStyle(.plain)
             .help("Go to \(name)")
         } else {
-            Text(name).font(.title3.weight(.medium))
+            Text(name).font(AppFont.serif(22).italic()).foregroundStyle(AppColor.accent)
         }
     }
 
@@ -316,7 +314,7 @@ struct AlbumDetail: View {
     private func about(_ text: String, _ info: AlbumInfo) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: "About")
-            Text(text).lineSpacing(3).lineLimit(descriptionExpanded ? nil : 6).textSelection(.enabled)
+            Text(text).font(AppFont.serif(15)).lineSpacing(3).lineLimit(descriptionExpanded ? nil : 6).textSelection(.enabled)
             HStack(spacing: 14) {
                 if text.count > 350 {
                     Button(descriptionExpanded ? "Show Less" : "Read More") { withAnimation(.snappy) { descriptionExpanded.toggle() } }
@@ -339,7 +337,7 @@ struct AlbumDetail: View {
                         Label(link.title, systemImage: ArtistDetail.icon(link.kind))
                             .font(.callout)
                             .padding(.horizontal, 11).padding(.vertical, 6)
-                            .background(Capsule().fill(AppColor.fill))
+                            .overlay(Capsule().strokeBorder(AppColor.text.opacity(0.3), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                     .help(link.url.absoluteString)

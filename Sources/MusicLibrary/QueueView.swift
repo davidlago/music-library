@@ -13,7 +13,7 @@ struct QueueView: View {
         let queue = player.queue
         VStack(spacing: 0) {
             HStack {
-                Text("Queue").font(.title3.bold())
+                Text("QUEUE").font(AppFont.label(13)).tracking(2.2)
                 Spacer()
                 Button { model.showsQueue = false } label: { Image(systemName: "xmark") }
                     .buttonStyle(.borderless)
@@ -58,7 +58,7 @@ struct QueueView: View {
             .onDeleteCommand { remove(selection) }
             .overlay {
                 if queue.current == nil {
-                    ContentUnavailableView("Nothing Playing", systemImage: "list.bullet",
+                    EmptyState("Nothing Playing", systemImage: "list.bullet",
                                            description: Text("Right-click songs, albums or playlists and choose Add to Queue."))
                         .allowsHitTesting(false)
                 }

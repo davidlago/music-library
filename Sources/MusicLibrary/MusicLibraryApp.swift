@@ -23,6 +23,7 @@ struct MusicLibraryApp: App {
         DefaultsImport.runIfAsked()
         // The store build (sandboxed) takes the settings the download left in the library folder (SettingsHandoff).
         AppModel.importHandedOverSettings()
+        AppModel.useNeutralSystemAccent()
         _model = State(initialValue: AppModel())
         CloudContainer.logAvailability()
     }

@@ -13,7 +13,7 @@ struct DiscogsSyncSheet: View {
         let store = model.discogsSync
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Sync to Discogs").font(.title2.bold())
+                Text("Sync to Discogs").font(AppFont.display(28, weight: .heavy))
                 Text(store.username.map { "Adds your CDs and records to \($0)'s collection on Discogs. Nothing in your collection here changes." }
                      ?? "Adds your CDs and records to your collection on Discogs. Nothing in your collection here changes.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -41,7 +41,7 @@ struct DiscogsSyncSheet: View {
     @ViewBuilder
     private func content(_ store: DiscogsSyncStore) -> some View {
         if !store.isConnected {
-            ContentUnavailableView {
+            EmptyState {
                 Label("Connect Discogs", systemImage: "person.crop.circle.badge.plus")
             } description: {
                 Text("Paste a personal access token from your Discogs settings in Settings ▸ Discogs, then sync again.")
@@ -69,7 +69,7 @@ struct DiscogsSyncSheet: View {
             case .finished(let outcome):
                 finished(outcome, store: store)
             case .failed(let message):
-                ContentUnavailableView {
+                EmptyState {
                     Label("Couldn't Sync", systemImage: "exclamationmark.triangle")
                 } description: {
                     Text(message)
@@ -143,7 +143,7 @@ private struct PlanList: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(summary).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if plan.additions.isEmpty && plan.removals.isEmpty && plan.unmatched.isEmpty && plan.gradeUpdates.isEmpty {
-                ContentUnavailableView("Discogs Is Up to Date", systemImage: "checkmark.circle",
+                EmptyState("Discogs Is Up to Date", systemImage: "checkmark.circle",
                                        description: Text(plan.adoptions.isEmpty ? "Every CD and record here is in your Discogs collection."
                                                          : "Save the matches so later syncs know which copy is which."))
             } else {
@@ -270,7 +270,7 @@ private struct PlanList: View {
                 }
             }
         } header: {
-            Text("Not Found on Discogs (\(plan.unmatched.count.formatted()))")
+            ListHeader("Not Found on Discogs (\(plan.unmatched.count.formatted()))")
         } footer: {
             Text("Pick their Discogs edition with Change Edition… on the item's page (choose Discogs as the source), or add a barcode.")
                 .font(.caption).foregroundStyle(.secondary)
@@ -347,7 +347,7 @@ struct DiscogsSettings: View {
                     Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange)
                 }
             } header: {
-                Text("Account")
+                ListHeader("Account")
             } footer: {
                 Text("The token is stored in your keychain on this Mac and sent only to Discogs, and to your iPhone when you sync (the Shop there uses it for suggested prices and your Discogs collection).")
                     .font(.caption).foregroundStyle(.secondary)

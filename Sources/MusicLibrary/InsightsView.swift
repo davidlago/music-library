@@ -21,10 +21,10 @@ struct InsightsView: View {
     var body: some View {
         Group {
             if model.totalTracks == 0 && model.collection.items.isEmpty {
-                ContentUnavailableView("No Insights Yet", systemImage: "chart.bar.xaxis",
+                EmptyState("No Insights Yet", systemImage: "chart.bar.xaxis",
                                        description: Text("Add the CDs, records and downloads you own, or import some music, and this page fills in with stats about it."))
             } else if model.totalTracks == 0 && pane != .owned {
-                ContentUnavailableView("No Music Yet", systemImage: "music.note",
+                EmptyState("No Music Yet", systemImage: "music.note",
                                        description: Text("Import some music, or rip one of your CDs, and this pane fills in with stats about your digital collection."))
             } else {
                 switch pane {

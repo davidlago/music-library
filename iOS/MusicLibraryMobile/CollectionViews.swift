@@ -111,7 +111,7 @@ struct CollectionHome: View {
             .padding(.top, 4)
             .padding(.bottom, 28)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(AppColor.background)
         .refreshable { model.reload() }
         .radioDJPage(.page("the Physical Collection home", details: [
             "\(collection.count(.cds)) CDs, \(collection.count(.vinyl)) records, \(collection.count(.downloads)) downloads; \(collection.count(.toDigitize)) to digitize; \(ready.count) ready to download to this iPhone"]))
@@ -119,7 +119,7 @@ struct CollectionHome: View {
 
     private var sampleNote: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "sparkles").foregroundStyle(Color.accentColor).font(.title3)
+            Image(systemName: "sparkles").foregroundStyle(AppColor.accent).font(.title3)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Sample Library").font(.headline)
                 Text("A made-up physical collection of CDs and records, so you can try the app. Your own replaces it after your first sync.")
@@ -151,13 +151,13 @@ struct CollectionHome: View {
         NavigationLink(value: route) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
-                    Image(systemName: icon).font(.callout).foregroundStyle(Color.accentColor)
+                    Image(systemName: icon).font(.callout).foregroundStyle(AppColor.accent)
                     Spacer(minLength: 0)
                     InsightChevron()
                 }
-                Text(value.formatted()).font(.system(size: 24, weight: .semibold, design: .rounded)).lineLimit(1)
-                Text(label).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                Text(detail ?? " ").font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                Text(value.formatted()).font(AppFont.display(30, weight: .heavy)).lineLimit(1)
+                Text(label.uppercased()).font(AppFont.label(9)).tracking(1.3).foregroundStyle(AppColor.accent).lineLimit(1)
+                Text(detail ?? " ").font(.caption2).foregroundStyle(AppColor.muted).lineLimit(1).minimumScaleFactor(0.8)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -207,7 +207,7 @@ struct CollectionHome: View {
 
     private func row(_ title: String, systemImage: String, count: Int, detail: String) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: systemImage).foregroundStyle(Color.accentColor).frame(width: 26)
+            Image(systemName: systemImage).foregroundStyle(AppColor.accent).frame(width: 26)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                 Text(detail).font(.caption).foregroundStyle(.secondary)
@@ -309,7 +309,7 @@ struct CollectionCell: View {
         }
         .frame(width: width, alignment: .leading)
         .padding(6)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.accentColor.opacity(highlighted ? 0.18 : 0)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(AppColor.accent.opacity(highlighted ? 0.18 : 0)))
         .padding(-6)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
@@ -413,9 +413,9 @@ struct CollectionListPage: View {
         .overlay {
             if items.isEmpty {
                 if text.isEmpty {
-                    ContentUnavailableView(emptyTitle, systemImage: "books.vertical")
+                    EmptyState(emptyTitle, systemImage: "books.vertical")
                 } else {
-                    ContentUnavailableView.search(text: text)
+                    EmptyState.search(text: text)
                 }
             }
         }
@@ -441,6 +441,7 @@ struct CollectionListPage: View {
                         Label("List", systemImage: "list.bullet").tag(CollectionLayout.list)
                     }
                 }
+                .listRowBackground(AppColor.card)
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
             }
@@ -525,8 +526,8 @@ struct CollectionListPage: View {
 
     private func header(_ section: ShelfSection) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(section.title ?? "").font(.headline)
-            if let detail = section.detail { Text(detail).font(.caption).foregroundStyle(.secondary) }
+            SectionHeader(title: section.title ?? "").fixedSize()
+            if let detail = section.detail { Text(detail).font(.caption).foregroundStyle(AppColor.muted) }
             Spacer()
         }
         .padding(.vertical, 6)
@@ -564,7 +565,7 @@ struct CollectionListPage: View {
                         NavigationLink(value: CollectionItemRoute(id: item.id)) {
                             CollectionRow(item: item)
                         }
-                        .listRowBackground(highlighted == item.id ? Color.accentColor.opacity(0.18) : nil)
+                        .listRowBackground(highlighted == item.id ? AppColor.accent.opacity(0.18) : nil)
                         .id(item.id)
                     }
                 } header: {
@@ -602,7 +603,7 @@ struct ReadyToDownloadPage: View {
                               systemImage: "arrow.down.circle")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.prominent)
                     .controlSize(.large)
                     .disabled(waiting.isEmpty)
                     .listRowBackground(Color.clear)
@@ -612,16 +613,18 @@ struct ReadyToDownloadPage: View {
                          ? "\(items.count) album\(items.count == 1 ? "" : "s") · \(songCount(songs)) not on this iPhone. They download from \(model.sync.macName ?? "your Mac") over Wi-Fi, or from its iCloud backup when it's not nearby."
                          : "\(items.count) album\(items.count == 1 ? "" : "s") · \(songCount(songs)) not on this iPhone. They download at the first sync after you pair with your Mac (Sync, on Listen Now).")
                 }
+                .listRowBackground(AppColor.card)
             }
             Section {
                 ForEach(items) { item in
                     NavigationLink(value: CollectionItemRoute(id: item.id)) { CollectionRow(item: item) }
                 }
             }
+            .listRowBackground(AppColor.card)
         }
         .overlay {
             if items.isEmpty {
-                ContentUnavailableView("All Here", systemImage: "checkmark.circle",
+                EmptyState("All Here", systemImage: "checkmark.circle",
                                        description: Text("Every CD and record you've digitized is on this iPhone."))
             }
         }
@@ -655,6 +658,7 @@ struct LabelCheckPage: View {
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets())
             }
+            .listRowBackground(AppColor.card)
             Section {
                 if let high = numbered.max() {
                     LabeledContent("Labels used", value: "#1–#\(high)")
@@ -664,6 +668,7 @@ struct LabelCheckPage: View {
                 }
                 LabeledContent("Next label", value: "\(series.name) #\(c.nextNumber(in: series))")
             }
+            .listRowBackground(AppColor.card)
             Section {
                 if gaps.isEmpty {
                     Text("None: every number up to the highest is used.").foregroundStyle(.secondary)
@@ -674,8 +679,9 @@ struct LabelCheckPage: View {
                         .monospacedDigit()
                 }
             } header: {
-                Text("Free Numbers")
+                ListHeader("Free Numbers")
             }
+            .listRowBackground(AppColor.card)
             if !duplicates.isEmpty {
                 ForEach(duplicates, id: \.key) { number, items in
                     Section {
@@ -683,21 +689,24 @@ struct LabelCheckPage: View {
                             NavigationLink(value: CollectionItemRoute(id: item.id)) { CollectionRow(item: item) }
                         }
                     } header: {
-                        Text("\(series.name) #\(number) is on \(items.count) items")
+                        ListHeader("\(series.name) #\(number) is on \(items.count) items")
                     }
+                    .listRowBackground(AppColor.card)
                 }
             }
             if !unlabeled.isEmpty {
-                Section("Without a Label") {
+                Section {
                     ForEach(unlabeled) { item in
                         NavigationLink(value: CollectionItemRoute(id: item.id)) { CollectionRow(item: item) }
                     }
-                }
+                } header: { ListHeader("Without a Label") }
+                .listRowBackground(AppColor.card)
             }
             Section {
             } footer: {
                 Text("Labels are put on and changed in Music Library on your Mac.")
             }
+            .listRowBackground(AppColor.card)
         }
         .navigationTitle("Label Check")
         .navigationBarTitleDisplayMode(.inline)

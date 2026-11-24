@@ -40,7 +40,7 @@ struct ListenNowView: View {
                         .frame(maxWidth: .infinity)
                     }
                 } else {
-                    ContentUnavailableView {
+                    EmptyState {
                         Label("Nothing to Listen To Yet", systemImage: "play.circle")
                     } description: {
                         Text("Import some music (drop files on Songs, or File ▸ Import…), or add the CDs and records you own.")
@@ -49,7 +49,7 @@ struct ListenNowView: View {
                         Button("Add to Physical Collection…") { model.addToCollection() }
                         if model.hasSampleLibrary && !model.isSampleLibrary {
                             Button("Explore a Sample Library") { model.exploreSampleLibrary() }
-                                .buttonStyle(.borderedProminent)
+                                .buttonStyle(.prominent)
                                 .disabled(model.isPreparingSample)
                         }
                     }
@@ -82,8 +82,8 @@ struct ListenNowView: View {
                                 CopyArt(mark: model.copyMark(for: a), url: model.coverURL(forAlbum: a), width: 140, revision: model.coverRevision,
                                         iCloud: model.offload.placement(model.tracks(of: a)))
                                     .padding(.bottom, 4)
-                                Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.headline).lineLimit(1)
-                                Text(a.artist.isEmpty ? "Unknown Artist" : a.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                                Text(a.album.isEmpty ? "Unknown Album" : a.album).font(.callout.weight(.semibold)).lineLimit(1)
+                                Text(a.artist.isEmpty ? "Unknown Artist" : a.artist).font(.subheadline).foregroundStyle(AppColor.muted).lineLimit(1)
                             }
                             .frame(width: 140, alignment: .leading)
                         }
@@ -147,7 +147,7 @@ struct ListenNowView: View {
                                 HStack(spacing: 6) {
                                     Text(entry.track.title).font(.callout.weight(.medium)).lineLimit(1)
                                     if entry.isQueued {
-                                        Text("NEXT").font(.caption2.weight(.heavy)).foregroundStyle(.white)
+                                        Text("NEXT").font(.caption2.weight(.heavy)).foregroundStyle(AppColor.onAccent)
                                             .padding(.horizontal, 5).padding(.vertical, 1)
                                             .background(Capsule().fill(AppColor.accent))
                                     }
@@ -162,7 +162,7 @@ struct ListenNowView: View {
                     }
                 }
                 .padding(.horizontal, 14).padding(.vertical, 6)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .card()
             }
         }
     }
@@ -203,7 +203,7 @@ struct ListenNowView: View {
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .card()
             }
         }
     }
@@ -229,17 +229,16 @@ private struct ListenNowHero: View {
             .buttonStyle(.plain)
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Text(playing ? "NOW PLAYING" : lastPlayed != nil ? "LAST PLAYED" : "RECENTLY ADDED")
-                        .font(.caption.weight(.semibold)).kerning(1.2).foregroundStyle(.secondary)
+                    Kicker(playing ? "Now Playing" : lastPlayed != nil ? "Last Played" : "Recently Added")
                     if let sticker { StickerPill(sticker: sticker) }
                 }
-                Text(album.album.isEmpty ? "Unknown Album" : album.album)
-                    .font(.system(size: 40, weight: .heavy)).lineLimit(2)
+                PageTitle(album.album.isEmpty ? "Unknown Album" : album.album, size: 56, lineLimit: 2)
                 NavigationLink(value: ArtistRoute(name: album.artist)) {
-                    Text(album.artist.isEmpty ? "Unknown Artist" : album.artist).font(.title2.weight(.semibold))
+                    Text(album.artist.isEmpty ? "Unknown Artist" : album.artist)
+                        .font(AppFont.serif(26).italic()).foregroundStyle(AppColor.accent)
                 }
                 .buttonStyle(.plain)
-                Text(meta(lastPlayed: playing ? nil : lastPlayed)).font(.callout).foregroundStyle(.secondary)
+                Text(meta(lastPlayed: playing ? nil : lastPlayed)).font(.callout).foregroundStyle(AppColor.muted)
                 if playing, let track = player.currentTrack {
                     HStack(spacing: 10) {
                         Text(track.title).font(.callout).lineLimit(1)
@@ -255,17 +254,18 @@ private struct ListenNowHero: View {
                         Label(playing && player.isPlaying ? "Pause" : "Play", systemImage: playing && player.isPlaying ? "pause.fill" : "play.fill")
                             .frame(minWidth: 64)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.prominent)
                     Button { play(shuffled: true) } label: { Label("Shuffle", systemImage: "shuffle") }
+                        .buttonStyle(.outline)
                     NavigationLink(value: album) { Text("Open Album") }
+                        .buttonStyle(.outline)
                 }
                 .controlSize(.large)
                 .padding(.top, 8)
             }
             Spacer(minLength: 0)
         }
-        .padding(22)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+        .padding(.vertical, 12)
     }
 
     private func meta(lastPlayed: Date?) -> String {
@@ -290,9 +290,9 @@ private struct ListenNowHeader<Trailing: View>: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(title).font(.title3.weight(.semibold))
+            SectionHeader(title: title)
             Spacer()
-            trailing.font(.callout)
+            trailing.font(.callout).tint(AppColor.muted)
         }
     }
 }
@@ -305,15 +305,15 @@ private struct WeekTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(value).font(.system(size: 24, weight: .heavy)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
-            Text(label).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+            Text(value).font(AppFont.display(34, weight: .heavy)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
+            Text(label.uppercased()).font(AppFont.label(9.5)).tracking(1.4).foregroundStyle(AppColor.accent).lineLimit(1)
             if let detail {
-                Text(detail).font(.caption).foregroundStyle(.tertiary).lineLimit(2).padding(.top, 4)
+                Text(detail).font(AppFont.serif(13)).foregroundStyle(AppColor.muted).lineLimit(2).padding(.top, 4)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .card()
     }
 }
 
@@ -337,6 +337,6 @@ struct SampleLibraryBanner: View {
             Button("Use My Own Library") { model.leaveSampleLibrary() }
         }
         .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .card()
     }
 }

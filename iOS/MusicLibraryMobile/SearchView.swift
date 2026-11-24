@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// The Mac app's search: the same query language (`artist:`, `decade:90s`, `format:flac`, `own:vinyl`…) and
@@ -14,7 +15,7 @@ struct SearchTab: View {
             Group {
                 if let library = model.library, !library.isEmpty {
                     if text.trimmingCharacters(in: .whitespaces).isEmpty {
-                        ContentUnavailableView("Search Your Music", systemImage: "magnifyingglass",
+                        EmptyState("Search Your Music", systemImage: "magnifyingglass",
                                                description: Text("Try “radiohead”, “decade:90s”, “format:flac”, “own:vinyl” or a label like “cd 12”."))
                     } else {
                         SearchResultsList(results: results, text: text, library: library)
@@ -101,18 +102,19 @@ struct SearchResultsList: View {
         let items = found.items.filter { !labelIDs.contains($0.id) }
         if results.tracks.isEmpty && results.albums.isEmpty && results.artists.isEmpty && results.issues.isEmpty
             && found.labelHits.isEmpty && items.isEmpty {
-            ContentUnavailableView.search(text: text)
+            EmptyState.search(text: text)
         } else {
             List {
                 if !found.labelHits.isEmpty {
-                    Section("Label") {
+                    Section {
                         ForEach(found.labelHits) { item in
                             NavigationLink(value: CollectionItemRoute(id: item.id)) { CollectionRow(item: item) }
                         }
-                    }
+                    } header: { ListHeader("Label") }
+                    .listRowBackground(AppColor.card)
                 }
                 if !items.isEmpty {
-                    Section("Owned") {
+                    Section {
                         ForEach(items.prefix(showAllItems ? 200 : 6)) { item in
                             NavigationLink(value: CollectionItemRoute(id: item.id)) { CollectionRow(item: item) }
                         }
@@ -122,18 +124,21 @@ struct SearchResultsList: View {
                             }
                             .font(.callout.weight(.medium))
                         }
-                    }
+                    } header: { ListHeader("Owned") }
+                    .listRowBackground(AppColor.card)
                 }
                 if !results.issues.isEmpty {
                     Section {
                         ForEach(results.issues, id: \.self) { Label($0, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
                     }
+                    .listRowBackground(AppColor.card)
                 }
                 if let corrected = results.correctedText {
                     Section { Text("Showing results for “\(corrected)”").font(.callout).foregroundStyle(.secondary) }
+                    .listRowBackground(AppColor.card)
                 }
                 if !results.artists.isEmpty {
-                    Section("Artists") {
+                    Section {
                         ForEach(results.artists.prefix(5)) { artist in
                             NavigationLink(value: artist) {
                                 HStack(spacing: 12) {
@@ -142,10 +147,11 @@ struct SearchResultsList: View {
                                 }
                             }
                         }
-                    }
+                    } header: { ListHeader("Artists") }
+                    .listRowBackground(AppColor.card)
                 }
                 if !results.albums.isEmpty {
-                    Section("Albums") {
+                    Section {
                         ForEach(results.albums.prefix(10)) { album in
                             let tracks = library.tracks(album: album)
                             NavigationLink(value: album) {
@@ -161,13 +167,15 @@ struct SearchResultsList: View {
                             }
                             .contextMenu { AlbumMenu(album: album) }
                         }
-                    }
+                    } header: { ListHeader("Albums") }
+                    .listRowBackground(AppColor.card)
                 }
                 if !results.tracks.isEmpty {
-                    Section("Songs") {
+                    Section {
                         PlayButtons(tracks: results.tracks, source: text)
                         TrackRows(tracks: results.tracks, source: text)
-                    }
+                    } header: { ListHeader("Songs") }
+                    .listRowBackground(AppColor.card)
                 }
             }
         }

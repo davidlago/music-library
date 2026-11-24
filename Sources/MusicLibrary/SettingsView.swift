@@ -22,6 +22,8 @@ struct SettingsView: View {
             LibraryCatalogSettings().tabItem { Label("Local Library", systemImage: "building.columns") }
         }
         .frame(width: 600)
+        .pageBackground()
+        .appPalette()
     }
 }
 
@@ -31,7 +33,7 @@ struct GeneralSettings: View {
     var body: some View {
         @Bindable var model = model
         Form {
-            Section("Library Folder") {
+            Section {
                 LabeledContent("Folder") {
                     VStack(alignment: .trailing) {
                         Text(model.libraryRoot.path).textSelection(.enabled).lineLimit(2).truncationMode(.middle)
@@ -40,8 +42,8 @@ struct GeneralSettings: View {
                 }
                 Text("Changing the folder opens (or creates) a library there. Existing files and the database are not moved or migrated.")
                     .font(.caption).foregroundStyle(.secondary)
-            }
-            Section("Export") {
+            } header: { ListHeader("Library Folder") }
+            Section {
                 LabeledContent("Destination") {
                     VStack(alignment: .trailing) {
                         Text(model.exportDestination?.path ?? "None").textSelection(.enabled).lineLimit(2).truncationMode(.middle)
@@ -53,19 +55,19 @@ struct GeneralSettings: View {
                 }
                 Text("Where the Export List is copied to, such as a USB music player or a backup drive.")
                     .font(.caption).foregroundStyle(.secondary)
-            }
-            Section("MusicBrainz") {
+            } header: { ListHeader("Export") }
+            Section {
                 TextField("Contact email", text: $model.mbContact, prompt: Text("you@example.com"))
                 Text("Sent in the User-Agent of MusicBrainz requests, as their API etiquette asks.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Auto-match confident results (score ≥ 95, duration within 5 s)", isOn: $model.autoMatch)
-            }
-            Section("AcoustID fingerprinting (optional)") {
+            } header: { ListHeader("MusicBrainz") }
+            Section {
                 TextField("API key", text: $model.acoustIDKey)
                 Link("Get an API key at acoustid.org", destination: URL(string: "https://acoustid.org/new-application")!)
                 toolRow("fpcalc", url: model.tools.fpcalc, hint: "Install with `brew install chromaprint`")
-            }
-            Section("Artist & album info") {
+            } header: { ListHeader("AcoustID fingerprinting (optional)") }
+            Section {
                 Toggle("Download artist photos, bios, album descriptions and links automatically", isOn: Binding(
                     get: { model.artistInfo.autoSync }, set: { model.artistInfo.autoSync = $0 }))
                 Text("From MusicBrainz, Wikipedia and Wikimedia Commons (and Last.fm when it's connected). Photos are saved in the Artist Images folder of your library folder.")
@@ -75,21 +77,21 @@ struct GeneralSettings: View {
                         .disabled(model.artistInfo.isSyncing)
                     SyncStatus(showsUpdateButton: false)
                 }
-            }
-            Section("CD ripping") {
+            } header: { ListHeader("Artist & album info") }
+            Section {
                 Toggle("Eject CD after ripping", isOn: $model.ejectAfterRip)
-            }
-            Section("Physical Collection") {
+            } header: { ListHeader("CD ripping") }
+            Section {
                 Toggle("Ask whether a CD is yours when it's inserted", isOn: $model.askCDOwnership)
                     .help("Off: a CD that isn't in your physical collection yet is added to it when you rip it, unless you say otherwise")
                 Toggle("Eject after cataloging", isOn: $model.ejectAfterCataloging)
                     .help("Eject a CD once Catalog Without Ripping has added it to your physical collection")
-            }
-            Section("Tools") {
+            } header: { ListHeader("Physical Collection") }
+            Section {
                 toolRow("ffmpeg", url: model.tools.ffmpeg, hint: "Install with `brew install ffmpeg`")
                 toolRow("ffprobe", url: model.tools.ffprobe, hint: "Installed together with ffmpeg")
                 Button("Re-check") { model.refreshTools() }
-            }
+            } header: { ListHeader("Tools") }
         }
         .formStyle(.grouped)
         .onAppear { model.refreshTools() }
@@ -113,12 +115,12 @@ struct PlaybackSettings: View {
     var body: some View {
         @Bindable var model = model
         Form {
-            Section("Output") {
+            Section {
                 Toggle("Match output device sample rate to the song", isOn: $model.matchOutputRate)
                 Toggle("Match output bit depth", isOn: $model.matchOutputBitDepth).disabled(!model.matchOutputRate)
                 Text("Changes your output device's format for all apps while playing. The original format is restored when you quit or turn this off. Has no effect on devices with a fixed rate (e.g. Bluetooth/AirPlay).")
                     .font(.caption).foregroundStyle(.secondary)
-            }
+            } header: { ListHeader("Output") }
         }
         .formStyle(.grouped)
     }
@@ -165,18 +167,18 @@ struct LastFMSettings: View {
                      destination: URL(string: "https://www.last.fm/api/account/create")!)
                     .font(.caption)
             } header: {
-                Text("API account")
+                ListHeader("API account")
             } footer: {
                 Text("Last.fm needs an API key and shared secret for each app. Both are stored in your keychain on this Mac.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Account") {
+            Section {
                 accountRow(scrobbler)
                 if let error = scrobbler.lastError {
                     Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange)
                 }
-            }
-            Section("Scrobbling") {
+            } header: { ListHeader("Account") }
+            Section {
                 Toggle("Scrobble songs I play", isOn: $scrobbler.scrobblingEnabled)
                 Toggle("Show what's playing now on my profile", isOn: $scrobbler.sendsNowPlaying)
                     .disabled(!scrobbler.scrobblingEnabled)
@@ -188,9 +190,9 @@ struct LastFMSettings: View {
                         if scrobbler.pendingCount > 0 { Button("Send Now") { scrobbler.flush() }.disabled(scrobbler.isSending) }
                     }
                 }
-            }
+            } header: { ListHeader("Scrobbling") }
             if !scrobbler.recent.isEmpty {
-                Section("Recently scrobbled") {
+                Section {
                     ForEach(scrobbler.recent) { s in
                         HStack {
                             Text(s.track).lineLimit(1)
@@ -200,7 +202,7 @@ struct LastFMSettings: View {
                                 .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                         }
                     }
-                }
+                } header: { ListHeader("Recently scrobbled") }
             }
         }
         .formStyle(.grouped)
@@ -258,7 +260,7 @@ struct LibraryCatalogSettings: View {
                 Text("Browse your local library's music CDs, see which libraries have them on the shelf and which are already in your digital or physical collection. Works with library catalogs run on Aspen Discovery, like the Minuteman Library Network.")
                     .font(.callout).foregroundStyle(.secondary)
             }
-            Section("Catalog") {
+            Section {
                 CatalogSiteField()
                 Picker("My local library", selection: $catalog.homeLibrary) {
                     Text("None").tag("")
@@ -266,23 +268,23 @@ struct LibraryCatalogSettings: View {
                 }
                 Text("Selected when browsing, listed first in availability, and offered for “Available now at”.")
                     .font(.caption).foregroundStyle(.secondary)
-            }
+            } header: { ListHeader("Catalog") }
             Section {
                 TextField("Library card number or username", text: $catalog.username)
                 SecureField("PIN or password", text: $catalog.password)
                 LabeledContent("Status") { accountStatus }
             } header: {
-                Text("Account")
+                ListHeader("Account")
             } footer: {
                 Text("Used to show what you have checked out. The password is stored in your keychain on this Mac.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             CatalogDownloadSettings()
-            Section("Album details") {
+            Section {
                 Toggle("Look up track lists, covers and info on MusicBrainz as CDs load", isOn: $catalog.autoLookup)
                 Text("Each CD is matched by its barcode (or its title and artist) once, then remembered in your library database. This also recognizes CDs you already have when the catalog spells them differently.")
                     .font(.caption).foregroundStyle(.secondary)
-            }
+            } header: { ListHeader("Album details") }
         }
         .formStyle(.grouped)
         .frame(height: 640)

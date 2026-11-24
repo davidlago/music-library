@@ -199,9 +199,9 @@ public struct DigitizedTile: View {
             }
             .frame(width: 20, height: 20)
             Text(stats.digitizedShare.formatted(.percent.precision(.fractionLength(0))))
-                .font(.system(size: Self.valueSize, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.6)
-            Text("Digitized").font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            Text("of \(stats.physicalCount.formatted()) CDs and records").font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                .font(AppFont.display((Self.valueSize) * 1.15, weight: .heavy)).lineLimit(1).minimumScaleFactor(0.6)
+            Text("DIGITIZED").font(AppFont.label(9.5)).tracking(1.4).foregroundStyle(AppColor.muted).lineLimit(1)
+            Text("of \(stats.physicalCount.formatted()) CDs and records").font(.caption2).foregroundStyle(AppColor.muted).lineLimit(2)
                 .minimumScaleFactor(0.8).fixedSize(horizontal: false, vertical: true)
         }
         .padding(Self.padding)

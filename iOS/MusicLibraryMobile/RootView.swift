@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import MusicLibraryGlance
 import SwiftUI
 
@@ -103,7 +104,7 @@ struct LibraryStatusView: View {
             ProgressView("Loading Your Music…")
         case .missing where model.cloud.isUsable && (model.cloud.status == .checking || model.cloud.arriving != nil):
             // A new iPhone gets the library from iCloud without the Mac (D22): say so while the first check runs.
-            ContentUnavailableView {
+            EmptyState {
                 Label("Looking for Your Library in iCloud…", systemImage: "icloud.and.arrow.down")
             } description: {
                 if let arriving = model.cloud.arriving {
@@ -119,7 +120,7 @@ struct LibraryStatusView: View {
                 ProgressView()
             }
         case .missing:
-            ContentUnavailableView {
+            EmptyState {
                 Label("No Music Library Yet", systemImage: "music.note.house")
             } description: {
                 Text("""
@@ -129,14 +130,14 @@ struct LibraryStatusView: View {
                 """)
             } actions: {
                 Button("Sync with Your Mac") { model.showsSync = true }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.prominent)
                 Button("Check Again") { model.reload() }
                 if PhoneModel.sampleRoot != nil {
                     Button("Explore a Sample Library") { model.showSample() }
                 }
             }
         case .failed(let message):
-            ContentUnavailableView {
+            EmptyState {
                 Label("Couldn't Open the Music Library", systemImage: "exclamationmark.triangle")
             } description: {
                 Text(message)
@@ -144,7 +145,7 @@ struct LibraryStatusView: View {
                 Button("Try Again") { model.reload() }
             }
         case .loaded:
-            ContentUnavailableView {
+            EmptyState {
                 Label("No Music Yet", systemImage: "music.note")
             } description: {
                 Text("Your digital and physical collections are empty on this iPhone. Add music or your CDs and records on the Mac, then sync.")

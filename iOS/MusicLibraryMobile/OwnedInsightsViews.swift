@@ -15,7 +15,7 @@ struct CollectionInsightsPane: View {
 
     var body: some View {
         if stats.itemCount == 0 {
-            ContentUnavailableView("Nothing Owned Yet", systemImage: "books.vertical",
+            EmptyState("Nothing Owned Yet", systemImage: "books.vertical",
                                    description: Text("Add the CDs, records and downloads you own in Music Library on your Mac, with when you bought them and what you paid, and this page fills in."))
                 .padding(.top, 40)
         } else {

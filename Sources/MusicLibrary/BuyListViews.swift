@@ -50,7 +50,7 @@ struct BuyListView: View {
         }
         .overlay {
             if store.shown.isEmpty {
-                ContentUnavailableView {
+                EmptyState {
                     Label("Nothing on Your Buy List", systemImage: "bag")
                 } description: {
                     Text("Price an album in the Shop and choose Add to Buy List, or add one by name. Its prices are kept here, and you'll see when one is at or under the most you'd pay.")
@@ -59,7 +59,7 @@ struct BuyListView: View {
                     Button("Open the Shop") { model.sidebar = .cdShop }
                 }
             } else if rows.isEmpty {
-                ContentUnavailableView("Nothing Here", systemImage: "line.3.horizontal.decrease.circle",
+                EmptyState("Nothing Here", systemImage: "line.3.horizontal.decrease.circle",
                                        description: Text(filter == .deals ? "Nothing is at or under the most you'd pay right now." : "No albums in this format."))
             }
         }
@@ -104,7 +104,7 @@ struct BuyListView: View {
             if let cost = totals.cost {
                 figure("≈ \(PriceGuide.text(cost))", "to get them all at fair prices")
             }
-            figure("\(totals.deals)", totals.deals == 1 ? "at or under your max" : "at or under your max", color: totals.deals > 0 ? .green : .primary)
+            figure("\(totals.deals)", totals.deals == 1 ? "at or under your max" : "at or under your max", color: totals.deals > 0 ? .green : AppColor.text)
             Spacer()
             if let progress = store.progress {
                 HStack(spacing: 8) {
@@ -116,10 +116,10 @@ struct BuyListView: View {
         }
     }
 
-    private func figure(_ value: String, _ label: String, color: Color = .primary) -> some View {
+    private func figure(_ value: String, _ label: String, color: Color = AppColor.text) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(value).font(.title2.weight(.semibold)).monospacedDigit().foregroundStyle(color)
-            Text(label).font(.caption).foregroundStyle(.secondary)
+            Text(value).font(AppFont.display(30, weight: .heavy)).monospacedDigit().foregroundStyle(color)
+            Text(label.uppercased()).font(AppFont.label(9.5)).tracking(1.4).foregroundStyle(AppColor.accent)
         }
     }
 }
@@ -284,7 +284,7 @@ struct WantedEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text({ if case .add = request { "Add to Buy List" } else { "Edit" } }()).font(.title2.bold())
+            Text({ if case .add = request { "Add to Buy List" } else { "Edit" } }()).font(AppFont.display(28, weight: .heavy))
             Form {
                 TextField("Album", text: $album)
                 TextField("Artist", text: $artist)

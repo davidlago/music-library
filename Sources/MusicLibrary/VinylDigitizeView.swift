@@ -17,13 +17,13 @@ struct VinylDigitizeView: View {
             } else if let item = vinyl.item {
                 VinylSessionPage(vinyl: vinyl, item: item)
             } else if records.isEmpty {
-                ContentUnavailableView {
+                EmptyState {
                     Label("Add a Record First", systemImage: "record.circle")
                 } description: {
                     Text("Digitizing records a record you own. Add it to your Physical Collection, then come back here to record it.")
                 } actions: {
                     Button("Add a Record…") { model.collectionSheet = .add(medium: .vinyl, prefill: nil) }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.prominent)
                     Button("Go to Vinyl") { model.sidebar = .collection(.vinyl) }
                 }
             } else {
@@ -161,7 +161,7 @@ private struct VinylSessionPage: View {
             CopyArt(mark: model.collection.mark(item: item), url: model.coverURL(for: item), width: 96,
                     revision: model.coverRevision, title: item.album)
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.album.isEmpty ? "Unknown Album" : item.album).font(.title2.bold()).lineLimit(2)
+                Text(item.album.isEmpty ? "Unknown Album" : item.album).font(AppFont.display(28, weight: .heavy)).lineLimit(2)
                 Text(item.artist.isEmpty ? "Unknown Artist" : item.artist).font(.title3).foregroundStyle(.secondary)
                 HStack(spacing: 8) {
                     if let sticker = item.sticker { StickerPill(sticker: sticker) }
@@ -195,7 +195,7 @@ private struct VinylSessionPage: View {
                     Label(count == 0 ? "Save to Digital Collection" : "Save \(count) \(count == 1 ? "Track" : "Tracks") to Digital Collection",
                           systemImage: "square.and.arrow.down")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.prominent)
                 .controlSize(.large)
                 .disabled(count == 0 || vinyl.state == .recording || vinyl.state == .paused)
                 .help("Saves each named cut as a FLAC file in your library, like a ripped CD")
@@ -488,7 +488,7 @@ private struct VinylWaveformEditor: View {
                 .help("Zoom in")
             Button("Fit") { visibleStart = 0; visibleLength = duration }
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.outline)
         .controlSize(.small)
     }
 

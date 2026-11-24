@@ -212,7 +212,7 @@ struct OffloadSettingsSection: View {
                 }
             }
         } header: {
-            Text("Offloading from This Mac")
+            ListHeader("Offloading from This Mac")
         }
         .alert("Offload Music Automatically?", isPresented: Binding(get: { pendingThreshold != nil }, set: { if !$0 { pendingThreshold = nil } })) {
             Button("Offload Automatically") {

@@ -49,7 +49,7 @@ struct ConcertRow: View {
                 Link(destination: url) {
                     Label(concert.sources.first == .ticketmaster ? "Tickets" : "Details", systemImage: "ticket")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.outline)
                 .help("Open on \(concert.sources.first?.name ?? "the web")")
             }
         }
@@ -211,7 +211,7 @@ struct ConcertsView: View {
                     header(store, count: items.count)
                     ForEach(months(items), id: \.title) { month in
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(month.title).font(.title3.bold())
+                            SectionHeader(title: month.title)
                             VStack(spacing: 0) {
                                 ForEach(Array(month.items.enumerated()), id: \.element.id) { i, item in
                                     ConcertRow(concert: item.concert, store: store, pageArtist: item.artist,
@@ -292,7 +292,7 @@ struct ConcertsView: View {
     @ViewBuilder
     private func emptyState(_ store: ConcertStore, items: [ArtistConcert]) -> some View {
         if !store.isConfigured {
-            ContentUnavailableView {
+            EmptyState {
                 Label("Concerts Near You", systemImage: "ticket")
             } description: {
                 Text("See when artists in your digital and physical collections play near you. Add your \(store.codeName.lowercased()) and a free Ticketmaster or JamBase key in Settings.")
@@ -301,10 +301,10 @@ struct ConcertsView: View {
             }
         } else if items.isEmpty, let scan = store.scan, !store.isScanning {
             if scan.items.isEmpty {
-                ContentUnavailableView("No Upcoming Concerts", systemImage: "ticket",
+                EmptyState("No Upcoming Concerts", systemImage: "ticket",
                                        description: Text("None of your artists have concerts \(store.areaDescription) yet."))
             } else {
-                ContentUnavailableView.search(text: filter)
+                EmptyState.search(text: filter)
             }
         } else if store.scan == nil, store.isScanning {
             ProgressView("Looking for concerts \(store.areaDescription)…")
@@ -350,27 +350,27 @@ struct ConcertSettings: View {
                 Text("See upcoming concerts near you on artist pages, and every artist in your digital and physical collections on the Concerts page.")
                     .font(.callout).foregroundStyle(.secondary)
             }
-            Section("Where you live") {
+            Section {
                 PostalCodeField(store: store)
                 LabeledContent("Location") { locationStatus(store) }
                 Picker("Distance", selection: $store.radius) {
                     ForEach(ConcertStore.radiusChoices, id: \.self) { Text("Within \($0) \(store.unit.abbreviation)").tag($0) }
                 }
-            }
+            } header: { ListHeader("Where you live") }
             Section {
                 keyField("Ticketmaster Consumer Key", text: $store.ticketmasterKey, source: .ticketmaster,
                          note: "Arenas, theaters and larger clubs. Free: in your Ticketmaster developer account, open your app and copy its Consumer Key (the Consumer Secret isn't needed).")
                 keyField("JamBase API key", text: $store.jambaseKey, source: .jambase,
                          note: "Venue calendars, including small clubs and independent venues: better for smaller bands. Free for personal use (1,000 requests a month).")
             } header: {
-                Text("Concert listings")
+                ListHeader("Concert listings")
             } footer: {
                 Text("Use either or both; shows listed by both appear once. Keys are stored in your keychain on this Mac. Results are saved for a day (two for all your artists) to stay within the free limits.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Artist pages") {
+            Section {
                 Toggle("Show upcoming concerts on artist pages", isOn: $store.showsOnArtistPages)
-            }
+            } header: { ListHeader("Artist pages") }
         }
         .formStyle(.grouped)
         .frame(height: 600)

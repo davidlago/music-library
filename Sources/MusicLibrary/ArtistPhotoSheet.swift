@@ -42,7 +42,7 @@ struct ArtistPhotoSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Artist Photo").font(.title2.bold())
+            Text("Artist Photo").font(AppFont.display(28, weight: .heavy))
             HStack(alignment: .top, spacing: 20) {
                 preview
                 Divider()

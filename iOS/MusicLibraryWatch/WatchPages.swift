@@ -18,7 +18,7 @@ struct NowPlayingPage: View {
             }
         }
         .navigationTitle("Now Playing")
-        .containerBackground(Color.pink.gradient, for: .tabView)
+        .containerBackground(WatchStyle.brass.gradient, for: .tabView)
     }
 
     private func nowPlaying(_ p: Glance.NowPlaying) -> some View {
@@ -26,7 +26,7 @@ struct NowPlayingPage: View {
             HStack(spacing: 8) {
                 WatchCover(name: p.song.cover, title: p.song.album, size: 44)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(p.song.title).font(.headline).lineLimit(2)
+                    Text(p.song.title).font(WatchStyle.display(19)).lineLimit(2)
                     Text(p.song.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -124,7 +124,7 @@ struct ListeningPage: View {
             VStack(alignment: .leading, spacing: 8) {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(GlanceFormat.listened(l.listened))
-                        .font(.system(.title, design: .rounded, weight: .bold))
+                        .font(WatchStyle.display(34, weight: .black))
                     HStack(spacing: 4) {
                         Text("past \(l.days) days")
                         if let change = l.change {
@@ -162,10 +162,10 @@ struct ListeningPage: View {
             }
         }
         .navigationTitle("Listening")
-        .containerBackground(Color.orange.gradient, for: .tabView)
+        .containerBackground(WatchStyle.orange.gradient, for: .tabView)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(month ? "30d" : "7d") { month.toggle() }
+                Button { month.toggle() } label: { Text(month ? "30d" : "7d").foregroundStyle(WatchStyle.ink) }
                     .accessibilityLabel(month ? "Showing 30 days; show 7" : "Showing 7 days; show 30")
             }
         }
@@ -212,7 +212,7 @@ struct PlayPage: View {
             }
         }
         .navigationTitle("Play")
-        .containerBackground(Color.indigo.gradient, for: .tabView)
+        .containerBackground(WatchStyle.purple.gradient, for: .tabView)
     }
 }
 
@@ -224,12 +224,12 @@ struct AlbumPage: View {
         ScrollView {
             VStack(spacing: 6) {
                 WatchCover(name: album.cover, title: album.title, size: 96)
-                Text(album.title).font(.headline).multilineTextAlignment(.center)
+                Text(album.title).font(WatchStyle.display(19)).multilineTextAlignment(.center)
                 Text([album.artist, album.year.map(String.init)].compactMap { $0 }.joined(separator: " · "))
                     .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 if album.playable {
                     Button { model.send(.playAlbum(key: album.key)) } label: { Label("Play on iPhone", systemImage: "play.fill") }
-                        .tint(.pink)
+                        .tint(WatchStyle.brass)
                 } else {
                     Text("Not on your iPhone. Download it there to play it.")
                         .font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -313,7 +313,7 @@ struct SectionTitle: View {
     init(_ title: String) { self.title = title }
 
     var body: some View {
-        Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 4)
+        Text(title.uppercased()).font(WatchStyle.label(10)).tracking(1.2).foregroundStyle(WatchStyle.brass).padding(.top, 4)
     }
 }
 
@@ -333,5 +333,28 @@ struct WatchBars: View {
             }
         }
         .accessibilityLabel("Listening per day")
+    }
+}
+
+/// The app's look on the watch (it can't link `MusicLibraryUI`; keep the values in step with its `Theme.swift`, dark
+/// side): brass and the tag colours for the pages, heavy condensed titles and numbers, tracked-out labels.
+enum WatchStyle {
+    static func rgb(_ hex: UInt32) -> Color {
+        Color(red: Double((hex >> 16) & 0xff) / 255, green: Double((hex >> 8) & 0xff) / 255, blue: Double(hex & 0xff) / 255)
+    }
+
+    static let brass = rgb(0xE9B949)
+    /// Type on brass.
+    static let ink = rgb(0x0F0E0D)
+    static let orange = rgb(0xE8833A)
+    static let purple = rgb(0x7A5BD8)
+    static let teal = rgb(0x19B3A6)
+
+    static func display(_ size: CGFloat, weight: Font.Weight = .heavy) -> Font {
+        .system(size: size, weight: weight).width(.condensed)
+    }
+
+    static func label(_ size: CGFloat) -> Font {
+        .system(size: size, weight: .semibold).width(.expanded)
     }
 }

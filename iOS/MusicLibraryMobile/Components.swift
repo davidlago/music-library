@@ -119,12 +119,11 @@ struct StatGrid<Content: View>: View {
 struct QueryChip: View {
     let text: String
     let query: String
+    var tint: Color = AppColor.accent
 
     var body: some View {
         NavigationLink(value: QueryRoute(query: query, title: text)) {
-            Text(text).font(.caption)
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(Capsule().fill(Color(.tertiarySystemFill)))
+            TagChip(text, tint: tint)
         }
         .buttonStyle(.plain)
     }
@@ -136,7 +135,9 @@ struct GenreChips: View {
 
     var body: some View {
         FlowLayout(spacing: 6) {
-            ForEach(genres, id: \.self) { g in QueryChip(text: g.capitalized, query: SearchFilterKey.token("genre", g)) }
+            ForEach(genres, id: \.self) { g in
+                QueryChip(text: g.capitalized, query: SearchFilterKey.token("genre", g), tint: AppColor.tag(g))
+            }
         }
     }
 }
@@ -152,7 +153,7 @@ struct LinkChips: View {
                     Label(link.title, systemImage: Self.icon(link.kind))
                         .font(.callout)
                         .padding(.horizontal, 11).padding(.vertical, 6)
-                        .background(Capsule().fill(Color(.tertiarySystemFill)))
+                        .overlay(Capsule().strokeBorder(AppColor.text.opacity(0.3), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
@@ -184,7 +185,7 @@ struct PersonLink: View {
 
     var body: some View {
         NavigationLink(value: DNARoute(name: name)) {
-            Text(name).foregroundStyle(Color.accentColor)
+            Text(name).foregroundStyle(AppColor.accent)
         }
         .buttonStyle(.plain)
     }
@@ -280,7 +281,7 @@ struct PhotoImage: View {
 /// A count in a tinted capsule, at the end of a Library row.
 struct CountPill: View {
     let count: Int
-    var tint: Color = .accentColor
+    var tint: Color = AppColor.accent
 
     var body: some View {
         Text(count.formatted())
@@ -301,7 +302,7 @@ struct AvailabilityMark: View {
     var body: some View {
         Group {
             if pending {
-                Image(systemName: "arrow.down.circle.dotted").foregroundStyle(Color.accentColor).accessibilityLabel("Waiting to download")
+                Image(systemName: "arrow.down.circle.dotted").foregroundStyle(AppColor.accent).accessibilityLabel("Waiting to download")
             } else {
                 switch availability {
                 case .onPhone, .empty: EmptyView()
@@ -335,7 +336,7 @@ struct AvailabilityBar: View {
         return HStack(spacing: 12) {
             Image(systemName: icon(availability, pending)).font(.title3)
                 .symbolEffect(.pulse, isActive: pending && model.cloud.fetching != nil)
-                .foregroundStyle(pending ? Color.accentColor : (availability == .onPhone ? Color.green : Color.secondary))
+                .foregroundStyle(pending ? AppColor.accent : (availability == .onPhone ? Color.green : Color.secondary))
                 .frame(width: 28)
             VStack(alignment: .leading, spacing: 1) {
                 Text(pending && model.cloud.fetching != nil ? "Downloading from iCloud" : title(availability, pending))
@@ -347,7 +348,7 @@ struct AvailabilityBar: View {
             Spacer(minLength: 8)
             if availability != .onPhone && availability != .empty && !pending {
                 Button { model.download(item) } label: { Label("Download", systemImage: "arrow.down") }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.prominent)
                     .controlSize(.small)
                     .disabled(!model.canDownload)
             }

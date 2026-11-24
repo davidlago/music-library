@@ -59,7 +59,7 @@ private struct CDShopSearchBar: View {
             Button { store.unlock(); store.search() } label: {
                 if store.searchState == .searching { ProgressView().controlSize(.small) } else { Text("Find") }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.prominent)
             .keyboardShortcut(.defaultAction)
             .disabled(store.query.isEmpty || store.searchState == .searching)
             Spacer(minLength: 0)
@@ -85,7 +85,7 @@ private struct CDShopEditionsSection: View {
         switch store.searchState {
         case .idle:
             if store.finds.isEmpty {
-                ContentUnavailableView {
+                EmptyState {
                     Label("Find a CD or Record", systemImage: "cart")
                 } description: {
                     Text("Pick CD or Vinyl, then search by album and artist, by artist alone to browse their albums, or by the barcode or catalog number on the case or sleeve. Pick the edition you want, then compare copies for sale on Discogs, eBay, CDandLP and Alibris. No accounts needed.")
@@ -100,14 +100,14 @@ private struct CDShopEditionsSection: View {
             Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
         default:
             if store.albums.isEmpty {
-                ContentUnavailableView {
+                EmptyState {
                     Label("Not on Discogs or MusicBrainz", systemImage: format.symbol)
                 } description: {
                     Text(store.discography.map { "Discogs and MusicBrainz list no \(format.name) albums for \($0)." }
                          ?? (store.query.isArtistAlone ? "Neither Discogs nor MusicBrainz has an artist by that name."
                              : "Neither Discogs nor MusicBrainz has \(format.name) editions matching that. New, local and rare releases are sometimes missing there; the stores may still have it."))
                 } actions: {
-                    Button("Search the Stores by Name") { store.shopByName() }.buttonStyle(.borderedProminent)
+                    Button("Search the Stores by Name") { store.shopByName() }.buttonStyle(.prominent)
                 }
                 .padding(.top, 40)
             } else {
@@ -138,7 +138,7 @@ private struct CDShopRecentFinds: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Recent Finds").font(.title3.bold())
+                SectionHeader(title: "Recent Finds")
                 Text("Priced in the Shop on this Mac or your iPhone").font(.caption).foregroundStyle(.secondary)
             }
             VStack(spacing: 0) {
@@ -269,7 +269,7 @@ private struct CDShopEditionRow: View {
             Spacer()
             Button("I Own This…") { model.addToCollection(medium: format.medium, prefill: CDShopOwnedNote.prefill(edition)) }
                 .help("Add this edition to your physical collection, with your label number and what you paid")
-            Button("Shop This Edition", action: choose).buttonStyle(.bordered)
+            Button("Shop This Edition", action: choose).buttonStyle(.outline)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(hovering ? AppColor.fill.opacity(0.5) : Color.clear)
@@ -318,7 +318,7 @@ private struct CDShopOffersSection: View {
             ForEach(sections(shown), id: \.title) { section in
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline) {
-                        Text(section.title).font(.title3.bold())
+                        SectionHeader(title: section.title)
                         Text(section.subtitle).font(.caption).foregroundStyle(.secondary)
                     }
                     VStack(spacing: 0) {
@@ -348,9 +348,9 @@ private struct CDShopOffersSection: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(target.isByName ? "\(target.format.name.uppercased()) BY NAME"
                      : target.edition == nil ? "ANY \(target.format.name.uppercased()) EDITION" : "THIS \(target.format.name.uppercased()) EDITION")
-                    .font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.secondary)
-                Text(target.album).font(.title2.bold())
-                Text(target.artist).foregroundStyle(.secondary)
+                    .font(AppFont.label(11)).tracking(2.4).foregroundStyle(AppColor.accent)
+                PageTitle(target.album, size: 34, lineLimit: 2)
+                Text(target.artist).font(AppFont.serif(18).italic()).foregroundStyle(AppColor.accent)
                 if target.isByName {
                     Text("Not on Discogs or MusicBrainz, so these are the stores' own search results: check each listing is the \(target.format.noun) you want.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -474,7 +474,7 @@ private struct CDShopOffersSection: View {
                 ForEach(CDShop.searched + CDShop.linked) { shop in
                     if let url = CDShopURLs.browse(shop, for: target)?.webLink {
                         Link(destination: url) { Label(shop.name, systemImage: "arrow.up.right.square") }
-                            .buttonStyle(.bordered).controlSize(.small)
+                            .buttonStyle(.outline).controlSize(.small)
                     }
                 }
             }
@@ -511,7 +511,7 @@ private struct CDOfferRow: View {
             .frame(minWidth: 110, alignment: .trailing)
             if let url = offer.url.webLink {
                 Link(destination: url) { Text(offer.shop.name).frame(minWidth: 64) }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.outline)
                     .help("Open this listing on \(offer.shop.name)")
             }
         }

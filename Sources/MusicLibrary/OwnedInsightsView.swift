@@ -15,7 +15,7 @@ struct CollectionContent: View {
     var body: some View {
         if stats.itemCount == 0 {
             VStack(spacing: 14) {
-                ContentUnavailableView("Nothing Owned Yet", systemImage: "books.vertical",
+                EmptyState("Nothing Owned Yet", systemImage: "books.vertical",
                                        description: Text("Add the CDs, records and downloads you own: by barcode or by name, from an album page, or when you rip a CD. Add when you bought them and what you paid, and this page fills in."))
                 HStack {
                     Button("Add to Physical Collection…") { model.addToCollection() }

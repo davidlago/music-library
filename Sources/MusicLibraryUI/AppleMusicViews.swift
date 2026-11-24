@@ -62,7 +62,7 @@ public struct AppleAlbumTracks: View {
                     } label: {
                         Label(playingHere ? "Pause" : "Play Previews", systemImage: playingHere ? "pause.fill" : "play.fill")
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.outline)
                     #if os(macOS)
                     .help("Play 30-second previews of the songs from Apple Music, one after another")
                     #endif
@@ -186,7 +186,7 @@ public struct OpenInAppleMusicButton: View {
         } label: {
             Label("Open in Apple Music", systemImage: "arrow.up.forward.app")
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.outline)
         #if os(macOS)
         .help("Open the album in the Music app, ready to play")
         #endif

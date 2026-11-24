@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// The iPhone page: paired phones (and ones nearby asking to pair), the list the phone keeps (with what's been
@@ -17,7 +18,7 @@ struct IPhoneSyncView: View {
             phones(store, total: tracks.count)
             Divider()
             if store.selection.isEmpty {
-                ContentUnavailableView(store.phones.contains { store.collectionScope(for: $0) != .off } ? "Nothing Else on the List" : "Nothing to Sync Yet",
+                EmptyState(store.phones.contains { store.collectionScope(for: $0) != .off } ? "Nothing Else on the List" : "Nothing to Sync Yet",
                                        systemImage: "iphone",
                                        description: Text("Add albums, artists, playlists or songs with Add to iPhone in their menus, or tap Download on the iPhone. The iPhone keeps exactly this list, plus the digital copies its Owned Music on iPhone setting adds. Everything you own is always listed on the iPhone, with its covers."))
                     .frame(maxHeight: .infinity)

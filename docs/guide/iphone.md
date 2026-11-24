@@ -6,7 +6,7 @@ shows both your collections and plays the music you choose to keep on the phone,
 Mac app over your Wi-Fi network, encrypted, with no account or cloud service in between, and, with
 [iCloud backup](icloud.md) turned on on the Mac, from your own iCloud when the Mac isn't nearby.
 
-![The iPhone app: the Physical tab with Find by Label on CD #14, the records left to digitize, and the item page for Mystery Girl on CD #14](../screenshots/iphone-collection.png)
+![The iPhone app: the Collection tab with Find by Label, the Vinyl shelf, and the item page for Mystery Girl on CD #14](../screenshots/iphone-collection.png)
 
 ## Try it first
 
@@ -88,7 +88,7 @@ Items with no digital copy are shown at full brightness with a disc or record ba
 Download button: there's nothing to download until you rip or digitize them. Press and hold a sticker or badge to see
 what it means.
 
-![The iPhone app: the Albums grid in cases and sleeves, the album page for Till the Sun Turns Black on CD #43, and Ray LaMontagne's artist page](../screenshots/iphone.png)
+![The iPhone app: Listen Now with the album playing, the album page for Till the Sun Turns Black on CD #43, and Ray LaMontagne's artist page](../screenshots/iphone.png)
 
 Album and artist pages have what the Mac's have: description, rating, the full track list, release details, credits,
 your copies, plays, links, and concerts near you. They take their color from the cover or the artist's photo.

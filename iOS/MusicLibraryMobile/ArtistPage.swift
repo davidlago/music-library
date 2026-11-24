@@ -87,25 +87,21 @@ private struct ArtistPageContent: View {
                 .overlay(Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.25), radius: 16, y: 6)
                 .padding(.top, 12)
-            Text("ARTIST").font(.caption.weight(.semibold)).foregroundStyle(.secondary).tracking(1.2)
-            Text(name).font(.largeTitle.bold()).multilineTextAlignment(.center).lineLimit(3).minimumScaleFactor(0.6)
-            if let info {
-                let summary = [info.summary(), info.disambiguation].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
-                if !summary.isEmpty {
-                    Text(summary).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                }
-                if !info.genres.isEmpty { GenreChips(genres: info.genres) }
-            }
+            let summary = info.map { [$0.summary(), $0.disambiguation].compactMap { $0 }.filter { !$0.isEmpty } } ?? []
+            Kicker(summary.isEmpty ? "Artist" : summary.joined(separator: " · "))
+                .multilineTextAlignment(.center)
+            PageTitle(name, size: 46, lineLimit: 3).multilineTextAlignment(.center)
+            if let info, !info.genres.isEmpty { GenreChips(genres: info.genres) }
             HStack(spacing: 10) {
                 Button { player.play(queue: playable, source: name) } label: {
                     Label("Play", systemImage: "play.fill").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.prominent)
                 .disabled(playable.isEmpty)
                 Button { player.play(queue: playable.shuffled(), source: name) } label: {
                     Label("Shuffle", systemImage: "shuffle").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.outline)
                 .disabled(playable.isEmpty)
                 Menu {
                     Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { player.playNext(playable) }
@@ -120,7 +116,7 @@ private struct ArtistPageContent: View {
                 } label: {
                     Image(systemName: "ellipsis").frame(height: 20)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.outline)
                 .accessibilityLabel("More")
             }
             .controlSize(.large)
@@ -253,7 +249,7 @@ private struct ArtistSongRow: View {
         HStack(spacing: 12) {
             Group {
                 if isCurrent {
-                    Image(systemName: "speaker.wave.2.fill").font(.caption).foregroundStyle(Color.accentColor)
+                    Image(systemName: "speaker.wave.2.fill").font(.caption).foregroundStyle(AppColor.accent)
                 } else {
                     Text("\(index)").monospacedDigit().foregroundStyle(.secondary)
                 }
@@ -422,7 +418,7 @@ private struct ConcertRow: View {
                 Link(destination: url) {
                     Image(systemName: "ticket")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.outline)
                 .accessibilityLabel(concert.sources.first == .ticketmaster ? "Tickets" : "Details")
             }
         }
@@ -472,6 +468,7 @@ struct SongInfoSheet: View {
                         }
                     }
                 }
+                .listRowBackground(AppColor.card)
                 Section {
                     row("Album Artist", m.albumArtist)
                     if !m.composer.isEmpty { people("Composer", CollaborationGraph.splitNames(m.composer)) }
@@ -491,9 +488,10 @@ struct SongInfoSheet: View {
                     row("MusicBrainz Release ID", m.mbReleaseId ?? "")
                     row("File", track.path)
                 }
+                .listRowBackground(AppColor.card)
                 let fields = m.extended.displayFields
                 if !fields.isEmpty {
-                    Section("Details") {
+                    Section {
                         ForEach(Array(fields.enumerated()), id: \.offset) { _, field in
                             if Self.peopleFields.contains(field.label) {
                                 people(field.label, CollaborationGraph.splitNames(field.value).map(CollaborationGraph.stripParenthetical))
@@ -501,11 +499,12 @@ struct SongInfoSheet: View {
                                 row(field.label, field.value)
                             }
                         }
-                    }
+                    } header: { ListHeader("Details") }
+                    .listRowBackground(AppColor.card)
                 }
                 let credits = CreditFormatter.grouped(m.extended.credits)
                 if !credits.isEmpty {
-                    Section("Credits") {
+                    Section {
                         ForEach(Array(credits.enumerated()), id: \.offset) { _, p in
                             NavigationLink(value: DNARoute(name: p.name)) {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -514,7 +513,8 @@ struct SongInfoSheet: View {
                                 }
                             }
                         }
-                    }
+                    } header: { ListHeader("Credits") }
+                    .listRowBackground(AppColor.card)
                 }
             }
             .navigationTitle("Song Info")

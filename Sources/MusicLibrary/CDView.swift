@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 struct CDView: View {
@@ -73,7 +74,7 @@ struct CDView: View {
             if disc.isUnmatched {
                 // No release to take a cover from: a file, or an image dropped here.
                 DataImage(data: disc.cover, size: 160)
-                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: coverTargeted ? 3 : 0))
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(AppColor.accent, lineWidth: coverTargeted ? 3 : 0))
                     .dropDestination(for: URL.self) { urls, _ in
                         guard let url = urls.first else { return false }
                         Task { await setCover(from: url) }
@@ -84,7 +85,7 @@ struct CDView: View {
                 DataImage(data: disc.cover, size: 160)
             }
             VStack(alignment: .leading, spacing: 6) {
-                Text(disc.title).font(.title2.bold()).lineLimit(2)
+                Text(disc.title).font(AppFont.display(28, weight: .heavy)).lineLimit(2)
                 if let release = disc.release {
                     Text(release.albumArtist).font(.title3).foregroundStyle(.secondary)
                     Text(details(release)).font(.callout).foregroundStyle(.secondary)
@@ -353,7 +354,7 @@ struct CDView: View {
                 Button("Rip \(disc.selectedCount) Track\(disc.selectedCount == 1 ? "" : "s")") {
                     if disc.collectionChoice == nil { askOwnership = true } else { model.cd.rip(disc) }
                 }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.prominent)
                     .disabled((disc.release == nil && !disc.canRipUnmatched) || disc.selectedCount == 0 || !model.ffmpegAvailable)
                     .help(disc.release == nil && disc.isUnmatched && !disc.canRipUnmatched
                           ? "Type the album's name above to rip this disc into your digital collection" : "")

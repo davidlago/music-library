@@ -464,7 +464,7 @@ struct LinkAlbumPicker: View {
             content(item)
         } else {
             VStack {
-                ContentUnavailableView("Copy Not Found", systemImage: "books.vertical")
+                EmptyState("Copy Not Found", systemImage: "books.vertical")
                 Button("Close") { dismiss() }.keyboardShortcut(.cancelAction)
             }
             .padding(20).frame(width: 480, height: 300)
@@ -474,7 +474,7 @@ struct LinkAlbumPicker: View {
     private func content(_ item: CollectionItem) -> some View {
         let matching = matches
         return VStack(alignment: .leading, spacing: 12) {
-            Text("Link the Digital Copy").font(.title2.bold())
+            Text("Link the Digital Copy").font(AppFont.display(28, weight: .heavy))
             HStack(spacing: 6) {
                 Text("Which album in your digital collection is the digital copy of").foregroundStyle(.secondary)
                 if let s = item.sticker { StickerPill(sticker: s, size: 10) }
@@ -614,7 +614,7 @@ struct BulkAddSheet: View {
     var body: some View {
         let next = (cd: model.nextNumber(in: .cd), vinyl: model.nextNumber(in: .vinyl))
         VStack(alignment: .leading, spacing: 12) {
-            Text("Add Albums You Own").font(.title2.bold())
+            Text("Add Albums You Own").font(AppFont.display(28, weight: .heavy))
             Text("Check the albums in your digital collection that you own on CD, on vinyl or as a download, and say how. Albums you already own aren't listed.")
                 .font(.callout).foregroundStyle(.secondary)
             HStack {

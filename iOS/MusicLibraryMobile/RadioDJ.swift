@@ -375,7 +375,7 @@ struct RadioDJConversation: View {
                                 Button(question) { session.send(question, page: page) }
                                     .font(.subheadline)
                                     .buttonStyle(.glass)
-                                    .tint(question == session.suggestions.first ? .accentColor : nil)
+                                    .tint(question == session.suggestions.first ? AppColor.accent : nil)
                             }
                         }
                     }
@@ -384,7 +384,7 @@ struct RadioDJConversation: View {
                     if let error = session.error {
                         VStack(alignment: .leading, spacing: 8) {
                             Label(error, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.orange)
-                            Button("Try Again") { session.retry() }.buttonStyle(.bordered).controlSize(.small)
+                            Button("Try Again") { session.retry() }.buttonStyle(.outline).controlSize(.small)
                         }
                     }
                     Color.clear.frame(height: 1).id("bottom")
@@ -472,10 +472,10 @@ struct RadioDJConversation: View {
             Label(note, systemImage: "headphones").font(.caption).foregroundStyle(.secondary)
         } else if let track = dj.previews.current, dj.previews.isPlaying {
             HStack(spacing: 8) {
-                Image(systemName: "headphones").foregroundStyle(Color.accentColor)
+                Image(systemName: "headphones").foregroundStyle(AppColor.accent)
                 Text("Preview: “\(track.title)” — \(track.artist)").font(.caption).lineLimit(1)
                 Spacer(minLength: 0)
-                Button("Stop") { dj.previews.stop() }.buttonStyle(.bordered).controlSize(.mini)
+                Button("Stop") { dj.previews.stop() }.buttonStyle(.outline).controlSize(.mini)
             }
         }
     }
@@ -781,10 +781,11 @@ struct RadioDJSettingsSection: View {
             LabeledContent("All time", value: DollarFormat.string(dj.usage.allTime.dollars))
             LabeledContent("Segments", value: "\(dj.usage.allTime.segments)")
         } header: {
-            Text("Radio DJ")
+            ListHeader("Radio DJ")
         } footer: {
             Text("Tap the radio button at the top of any page to put the DJ on the air; tap the camera beside its text field to show it a record or CD. The API keys, the model, the DJ's name and yours come from your Mac when you sync; change them there. Spending on this iPhone (calendar months, UTC) is estimated at Claude API list prices, or is what OpenRouter says each reply cost, and shows on your Mac after the next sync.")
         }
+        .listRowBackground(AppColor.card)
     }
 }
 

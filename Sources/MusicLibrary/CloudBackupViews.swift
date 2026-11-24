@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Settings ▸ iCloud (only in builds with an iCloud container): what's backed up, the status and Back Up Now.
@@ -31,28 +32,28 @@ struct ICloudSettings: View {
                     LabeledContent("Size", value: "About \(Self.bytes(estimate.bytes(cloud.scope)))")
                 }
             } header: {
-                Text("iCloud Backup")
+                ListHeader("iCloud Backup")
             }
             if cloud.setupBackup != nil {
-                Section("Set Up from iCloud") {
+                Section {
                     Text("This Mac's library is empty, and iCloud holds the library from \(cloud.setupBackup?.macName ?? "another Mac"). Move it here: the music stays in iCloud and downloads when you play it.")
                         .font(.caption).foregroundStyle(.secondary)
                     Button("Set Up from iCloud…") { model.showsCloudSetup = true }
-                }
+                } header: { ListHeader("Set Up from iCloud") }
             }
             if cloud.scope != .off || !model.offload.offloaded.isEmpty {
                 OffloadSettingsSection()
             }
-            Section("Restore") {
+            Section {
                 Text("Get your library back as it was on a day the backup kept: into a new folder, with the music the backup holds, or just its database into the library that's open.")
                     .font(.caption).foregroundStyle(.secondary)
                 Button("Restore from iCloud…") { model.restoreFromICloud() }
-            }
+            } header: { ListHeader("Restore") }
             if cloud.scope != .off {
-                Section("Status") {
+                Section {
                     ICloudStatus(cloud: cloud, confirmingReplace: $confirmingReplace)
                     Button("Back Up Now") { cloud.backUpNow() }.disabled(cloud.isPublishing)
-                }
+                } header: { ListHeader("Status") }
             }
         }
         .formStyle(.grouped)
@@ -273,7 +274,7 @@ struct ICloudBackupView: View {
             .padding(14)
             Divider()
             if cloud.selection.isEmpty {
-                ContentUnavailableView("Nothing Chosen Yet", systemImage: "icloud",
+                EmptyState("Nothing Chosen Yet", systemImage: "icloud",
                                        description: Text("Add albums, artists, playlists or songs with Add to iCloud in their menus. Your library database, covers and artist photos are always backed up."))
                     .frame(maxHeight: .infinity)
             } else {

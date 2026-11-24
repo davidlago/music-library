@@ -48,7 +48,7 @@ struct CollectionCoverSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Cover").font(.title2.bold())
+            Text("Cover").font(AppFont.display(28, weight: .heavy))
             HStack(alignment: .top, spacing: 20) {
                 preview
                 Divider()

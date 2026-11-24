@@ -153,7 +153,7 @@ struct CDCoverSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("CD Cover").font(.title2.bold())
+            Text("CD Cover").font(AppFont.display(28, weight: .heavy))
             HStack(alignment: .top, spacing: 20) {
                 preview
                 Divider()

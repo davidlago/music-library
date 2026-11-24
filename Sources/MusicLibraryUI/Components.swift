@@ -69,12 +69,12 @@ public struct InitialsBadge: View {
             #if os(macOS)
             Circle().fill(.quaternary)
             #else
-            Circle().fill(Color(.tertiarySystemFill))
+            Circle().fill(AppColor.raised)
             #endif
             if initials.isEmpty {
                 Image(systemName: "music.mic").font(.system(size: size / 3)).foregroundStyle(.secondary)
             } else {
-                Text(initials.uppercased()).font(.system(size: size / 3, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
+                Text(initials.uppercased()).font(AppFont.display(size / 3 * 1.15, weight: .heavy)).foregroundStyle(.secondary)
             }
         }
         .frame(width: size, height: size)
@@ -99,7 +99,7 @@ public struct RatingView: View {
                     Image(systemName: fill >= 0.75 ? "star.fill" : (fill >= 0.25 ? "star.leadinghalf.filled" : "star"))
                 }
             }
-            .foregroundStyle(Color.accentColor)
+            .foregroundStyle(AppColor.accent)
             Text(String(format: "%.1f", rating)).monospacedDigit().fontWeight(.semibold)
             Text("· \(votes) MusicBrainz rating\(votes == 1 ? "" : "s")").foregroundStyle(.secondary)
         }

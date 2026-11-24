@@ -89,14 +89,14 @@ struct DownloadedCatalogView: View {
         let catalog = model.catalog
         if catalog.index.count == 0 {
             if let progress = catalog.downloadProgress {
-                ContentUnavailableView {
+                EmptyState {
                     Label("Downloading \(progress.library)'s CDs", systemImage: "arrow.down.circle")
                 } description: {
                     Text("The whole catalog is downloaded once, then kept up to date. You can search it as soon as this page finishes.")
                 }
             }
         } else if result.records.isEmpty {
-            ContentUnavailableView("No CDs Match", systemImage: "magnifyingglass",
+            EmptyState("No CDs Match", systemImage: "magnifyingglass",
                                    description: Text("Try fewer filters, or search the whole network live from the libraries menu."))
         }
     }
@@ -159,18 +159,18 @@ struct DownloadedSearchBar: View {
         let catalog = model.catalog
         let keys = ["artist", "album", "title", "genre", "label", "year", "decade", "time", "added", "track", "disc", "is", "has", "missing"]
         return Menu {
-            Section("Like the rest of the app") {
+            Section {
                 ForEach(keys, id: \.self) { name in
                     if let key = SearchFilterKey.all.first(where: { $0.name == name }) {
                         Button("\(key.example) — \(help(key))") { catalog.addToLocalSearch(key.example) }
                     }
                 }
-            }
-            Section("Local library catalog") {
+            } header: { ListHeader("Like the rest of the app") }
+            Section {
                 ForEach(CatalogSearchQuery.keys, id: \.name) { key in
                     Button("\(key.example) — \(key.help)") { catalog.addToLocalSearch(key.example) }
                 }
-            }
+            } header: { ListHeader("Local library catalog") }
             Section {
                 Text("-word excludes, OR combines, \"quotes\" match a phrase")
             }
@@ -295,7 +295,7 @@ struct CatalogDownloadSettings: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         } header: {
-            Text("Downloaded catalogs")
+            ListHeader("Downloaded catalogs")
         } footer: {
             Text("Every CD these libraries own is downloaded and searched on your Mac. New titles and availability are checked when the download is more than 12 hours old; album details are looked up once.")
                 .font(.caption).foregroundStyle(.secondary)

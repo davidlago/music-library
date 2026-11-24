@@ -46,7 +46,7 @@ struct LibraryWidgetView: View {
             Spacer(minLength: 0)
             VStack(alignment: .leading, spacing: 0) {
                 Text(l.albums.formatted())
-                    .font(.system(.title, design: .rounded, weight: .bold))
+                    .font(WidgetPalette.display(32, weight: .black))
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
                 Text(l.albums == 1 ? "album" : "albums").font(.caption2).foregroundStyle(.secondary)
@@ -69,7 +69,7 @@ struct LibraryWidgetView: View {
 
     private func recent(_ l: Glance.LibraryCounts) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("RECENTLY ADDED").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+            Text("RECENTLY ADDED").font(WidgetPalette.label(8.5)).tracking(1).foregroundStyle(WidgetPalette.accent)
             let albums = Array(l.recentlyAdded.prefix(4))
             Grid(horizontalSpacing: 6, verticalSpacing: 6) {
                 ForEach(0..<2, id: \.self) { row in

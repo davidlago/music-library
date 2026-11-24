@@ -71,10 +71,11 @@ private struct ShopHome: View {
                 }
                 .buttonStyle(.borderless)
             } header: {
-                Text("Look It Up")
+                ListHeader("Look It Up")
             } footer: {
                 Text("Searches Discogs. Each album shows its price guide (Discogs and eBay), whether it's in your collection and where to buy it.")
             }
+            .listRowBackground(AppColor.card)
             if searching {
                 HStack { ProgressView(); Text("Searching Discogs…").foregroundStyle(.secondary) }
             } else if let error {
@@ -104,6 +105,7 @@ private struct ShopHome: View {
                     } icon: { Image(systemName: "bag") }
                 }
             }
+            .listRowBackground(AppColor.card)
             if !shop.finds.isEmpty {
                 Section {
                     ForEach(shop.finds) { find in
@@ -111,10 +113,11 @@ private struct ShopHome: View {
                     }
                     .onDelete { offsets in shop.remove(Set(offsets.map { shop.finds[$0].id })) }
                 } header: {
-                    Text("Recent Finds")
+                    ListHeader("Recent Finds")
                 } footer: {
                     Text("Albums priced here or in the Shop on your Mac; they sync with it.")
                 }
+                .listRowBackground(AppColor.card)
             }
         }
         .sheet(isPresented: $scanning) {
@@ -148,6 +151,7 @@ private struct ShopHome: View {
                 }
             }
         }
+        .listRowBackground(AppColor.card)
     }
 
     private func run(_ query: String, opening: Bool = false) {
@@ -281,7 +285,7 @@ struct ShopAlbumPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title).font(.title2.bold())
+                    Text(title).font(AppFont.display(28, weight: .heavy))
                     if !artist.isEmpty { Text(artist).font(.title3).foregroundStyle(.secondary) }
                 }
                 Picker("Format", selection: $format) {
@@ -387,7 +391,7 @@ private struct ShopDJPage: View {
                                     autoCamera: route.camera)
                     .id(ObjectIdentifier(session))
             } else {
-                ContentUnavailableView("\(model.radioDJ.name) Is Off the Air", systemImage: RadioDJIcon.name,
+                EmptyState("\(model.radioDJ.name) Is Off the Air", systemImage: RadioDJIcon.name,
                                        description: Text("The Radio DJ is on once your Mac hands over an API key when you sync."))
             }
         }
@@ -429,7 +433,7 @@ private struct BarcodeScannerSheet: View {
                 if BarcodeScanner.isAvailable {
                     BarcodeScanner(onCode: onCode).ignoresSafeArea()
                 } else {
-                    ContentUnavailableView("Camera Not Available", systemImage: "barcode.viewfinder",
+                    EmptyState("Camera Not Available", systemImage: "barcode.viewfinder",
                                            description: Text("Allow Music Library to use the camera in Settings ▸ Privacy & Security ▸ Camera, or type the barcode's digits."))
                 }
             }

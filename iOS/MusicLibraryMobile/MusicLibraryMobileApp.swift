@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 import UIKit
 
@@ -10,11 +11,20 @@ struct MusicLibraryMobileApp: App {
 
     init() {
         CloudContainer.logAvailability()
+        Self.styleNavigationBars()
+    }
+
+    /// Page titles in the app's poster type: large titles heavy and condensed, inline ones in the same face.
+    private static func styleNavigationBars() {
+        let bar = UINavigationBar.appearance()
+        bar.largeTitleTextAttributes = [.font: UIFont.systemFont(ofSize: 38, weight: .black, width: .condensed)]
+        bar.titleTextAttributes = [.font: UIFont.systemFont(ofSize: 19, weight: .heavy, width: .condensed)]
     }
 
     var body: some Scene {
         WindowGroup {
             RootView()
+                .appPalette()
                 .environment(model)
                 .environment(model.player)
                 .onChange(of: appearance, initial: true) { _, mode in applyAppearance(mode) }
@@ -48,7 +58,10 @@ struct MusicLibraryMobileApp: App {
         case .dark: .dark
         }
         for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
-            for window in scene.windows { window.overrideUserInterfaceStyle = style }
+            for window in scene.windows {
+                window.overrideUserInterfaceStyle = style
+                window.tintColor = .appAccent
+            }
         }
     }
 }

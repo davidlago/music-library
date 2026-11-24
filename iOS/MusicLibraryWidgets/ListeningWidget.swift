@@ -104,7 +104,7 @@ struct ListeningWidgetView: View {
 
     // MARK: Home screen
 
-    private func summary(_ l: Glance.Listening, big: Font = .system(.title, design: .rounded, weight: .bold)) -> some View {
+    private func summary(_ l: Glance.Listening, big: Font = WidgetPalette.display(32, weight: .black)) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(GlanceFormat.listened(l.listened))
                 .font(big)
@@ -180,7 +180,7 @@ struct ListeningWidgetView: View {
                 streakOrPlays(l)
             }
             HStack(alignment: .bottom, spacing: 12) {
-                summary(l, big: .system(.largeTitle, design: .rounded, weight: .bold))
+                summary(l, big: WidgetPalette.display(40, weight: .black))
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(GlanceFormat.count(l.plays, "play")).font(.caption.weight(.semibold))
@@ -244,7 +244,7 @@ struct ListeningWidgetView: View {
     private func rectangular(_ l: Glance.Listening) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Label(GlanceFormat.listened(l.listened), systemImage: "waveform")
-                .font(.headline)
+                .font(WidgetPalette.display(18))
                 .widgetAccentable()
             Text(l.topArtists.first.map { "Top: \($0.item)" } ?? l.periodText)
                 .font(.caption)
@@ -285,7 +285,7 @@ struct TopLine: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(label.uppercased()).font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+            Text(label.uppercased()).font(WidgetPalette.label(8.5)).tracking(1).foregroundStyle(WidgetPalette.accent)
             Text(title).font(.caption.weight(.semibold)).lineLimit(1)
             if let detail { Text(detail).font(.caption2).foregroundStyle(.secondary).lineLimit(1) }
         }
@@ -298,10 +298,12 @@ extension View {
     func widgetBackground() -> some View {
         containerBackground(for: .widget) {
             #if os(iOS)
-            Color(uiColor: .systemBackground)
+            WidgetPalette.background
             #else
             Color.clear
             #endif
         }
+        .foregroundStyle(WidgetPalette.text)
+        .tint(WidgetPalette.accent)
     }
 }

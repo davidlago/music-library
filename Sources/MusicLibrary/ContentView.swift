@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 struct ContentView: View {
@@ -57,6 +58,8 @@ struct MainWindow: View {
                 }
             }
         }
+        .background(AppColor.background)
+        .appPalette()
         .animation(.spring(duration: 0.35), value: expanded)
         .animation(.easeInOut(duration: 0.25), value: model.radioDJ.session == nil)
         .onChange(of: model.player.currentTrack == nil) { _, noTrack in
@@ -77,16 +80,16 @@ struct MainWindow: View {
                 // Every page leaves room under its last row for the floating player. Each page root gets it: on macOS a
                 // NavigationStack doesn't pass its own safe area on to the pages pushed onto it.
                 NavigationStack(path: $model.navigationPath) {
-                    DetailRouter().playerClearance()
-                        .navigationDestination(for: AlbumSummary.self) { AlbumDetail(album: $0).playerClearance() }
-                        .navigationDestination(for: ArtistSummary.self) { ArtistDetail(artist: $0).playerClearance() }
-                        .navigationDestination(for: ArtistRoute.self) { ArtistDetail(name: $0.name).playerClearance() }
-                        .navigationDestination(for: CatalogItem.self) { CatalogDetail(item: $0).playerClearance() }
-                        .navigationDestination(for: CollectionItemRoute.self) { CollectionItemDetail(id: $0.id).playerClearance() }
+                    DetailRouter().page()
+                        .navigationDestination(for: AlbumSummary.self) { AlbumDetail(album: $0).page() }
+                        .navigationDestination(for: ArtistSummary.self) { ArtistDetail(artist: $0).page() }
+                        .navigationDestination(for: ArtistRoute.self) { ArtistDetail(name: $0.name).page() }
+                        .navigationDestination(for: CatalogItem.self) { CatalogDetail(item: $0).page() }
+                        .navigationDestination(for: CollectionItemRoute.self) { CollectionItemDetail(id: $0.id).page() }
                 }
             }
         }
-        .toolbarBackground(.windowBackground, for: .windowToolbar)
+        .toolbarBackground(AppColor.background, for: .windowToolbar)
         .searchable(text: $model.searchText, placement: .toolbar, prompt: "Search or filter (genre:jazz)")
         .toolbar {
             if model.radioDJ.isEnabled {
@@ -101,7 +104,7 @@ struct MainWindow: View {
         } isTargeted: { dropTargeted = $0 }
         .overlay {
             if dropTargeted {
-                RoundedRectangle(cornerRadius: 12).strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
+                RoundedRectangle(cornerRadius: 12).strokeBorder(AppColor.accent, style: StrokeStyle(lineWidth: 3, dash: [8]))
                     .padding(6).allowsHitTesting(false)
             }
         }
@@ -155,6 +158,9 @@ struct SidebarView: View {
     var body: some View {
         @Bindable var model = model
         List(selection: $model.sidebar) {
+            Wordmark()
+                .padding(.top, 2).padding(.bottom, 6)
+                .selectionDisabled()
             Label("Listen Now", systemImage: "play.circle").tag(SidebarItem.listenNow)
             // Both collections together: what's on the shelf first, then what's digital (downloads are digital).
             Section("Collection") {
@@ -262,6 +268,20 @@ struct SidebarView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(AppColor.sidebar)
+    }
+}
+
+/// The app's name at the top of the sidebar, set like a record label: MUSIC in poster type over LIBRARY in brass.
+struct Wordmark: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text("MUSIC").font(AppFont.display(34)).foregroundStyle(AppColor.text)
+            Text("LIBRARY").font(AppFont.label(9.5)).tracking(5.2).foregroundStyle(AppColor.accent)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Music Library")
     }
 }
 
@@ -341,27 +361,27 @@ struct DetailRouter: View {
             if let disc = model.cd.discs.first(where: { $0.id == path }) {
                 CDView(disc: disc).id(path)
             } else if let url = model.cd.lockedDiscs.first(where: { $0.path == path }) {
-                ContentUnavailableView {
+                EmptyState {
                     Label(url.lastPathComponent, systemImage: "opticaldisc")
                 } description: {
                     Text("Music Library needs your permission to read this CD. Click Allow Access, then Allow Access again in the window that opens. It's asked once each time you insert a disc.")
                 } actions: {
-                    Button("Allow Access…") { model.cd.allowAccess(url) }.buttonStyle(.borderedProminent)
+                    Button("Allow Access…") { model.cd.allowAccess(url) }.buttonStyle(.prominent)
                 }
             } else {
-                ContentUnavailableView("Disc not found", systemImage: "opticaldisc")
+                EmptyState("Disc not found", systemImage: "opticaldisc")
             }
         case .playlist(let id):
             if let p = model.playlists.first(where: { $0.id == id }) {
                 PlaylistView(playlist: p).id(id)
             } else {
-                ContentUnavailableView("Playlist not found", systemImage: "music.note.list")
+                EmptyState("Playlist not found", systemImage: "music.note.list")
             }
         case .smartPlaylist(let id):
             if let p = model.smartPlaylists.first(where: { $0.id == id }) {
                 SmartPlaylistView(playlist: p).id(id)
             } else {
-                ContentUnavailableView("Playlist not found", systemImage: "gearshape")
+                EmptyState("Playlist not found", systemImage: "gearshape")
             }
         }
     }

@@ -19,7 +19,7 @@ struct CollectionItemDetail: View {
         if let item = model.item(id: id) {
             page(item)
         } else {
-            ContentUnavailableView("Copy Not Found", systemImage: "books.vertical",
+            EmptyState("Copy Not Found", systemImage: "books.vertical",
                                    description: Text("This copy was removed from what you own."))
         }
     }
@@ -93,31 +93,29 @@ struct CollectionItemDetail: View {
         let album = model.linkedAlbum(for: item)
         return VStack(alignment: .leading, spacing: 10) {
             coverArt(item, size: coverSize).padding(.bottom, 10)
-            Text(item.album.isEmpty ? "Unknown Album" : item.album)
-                .font(.system(size: 30, weight: .bold)).lineLimit(3).minimumScaleFactor(0.7)
+            Kicker(item.sticker.map { "\(item.medium.name) #\($0.number)" } ?? item.medium.name)
+            PageTitle(item.album.isEmpty ? "Unknown Album" : item.album, size: 46, lineLimit: 4)
                 .textSelection(.enabled)
             artistButton(item)
-            if let meta = metaLine(item) { Text(meta).font(.callout).foregroundStyle(.secondary).textSelection(.enabled) }
+            if let meta = metaLine(item) { Text(meta).font(.callout).foregroundStyle(AppColor.muted).textSelection(.enabled) }
             if let info, let rating = info.rating { RatingView(rating: rating, votes: info.ratingVotes) }
             if let genres = info?.genres, !genres.isEmpty {
                 FlowLayout(spacing: 6) {
                     ForEach(genres, id: \.self) { g in
-                        Text(g.capitalized).font(.caption)
-                            .padding(.horizontal, 9).padding(.vertical, 4)
-                            .background(Capsule().fill(AppColor.fill))
+                        TagChip(g.capitalized, tint: AppColor.tag(g))
                     }
                 }
             }
             HStack(spacing: 10) {
                 if state.hasMusic {
                     Button { model.play(item: item) } label: { Label("Play", systemImage: "play.fill").frame(minWidth: 70) }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.prominent)
                     Button { model.play(item: item, shuffled: true) } label: { Label("Shuffle", systemImage: "shuffle") }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.outline)
                 }
                 if let album {
                     Button("Open Album") { model.navigationPath.append(album) }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.outline)
                         .help("Go to the album in your digital collection")
                 }
                 moreMenu(item, album: album)
@@ -164,13 +162,13 @@ struct CollectionItemDetail: View {
     private func artistButton(_ item: CollectionItem) -> some View {
         let name = item.artist.isEmpty ? "Unknown Artist" : item.artist
         if item.artist.isEmpty {
-            Text(name).font(.title3.weight(.medium))
+            Text(name).font(AppFont.serif(22).italic()).foregroundStyle(AppColor.accent)
         } else {
             Button { model.showArtist(named: item.artist) } label: {
                 HStack(spacing: 8) {
                     ArtistPhoto(name: item.artist, size: 26)
-                    Text(name).font(.title3.weight(.medium))
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Text(name).font(AppFont.serif(22).italic()).foregroundStyle(AppColor.accent)
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(AppColor.muted)
                 }
             }
             .buttonStyle(.plain)
@@ -225,7 +223,7 @@ struct CollectionItemDetail: View {
                 Button(item.medium.isPhysical ? "Remove from Physical Collection…" : "Remove from Downloads…", role: .destructive) { model.confirmItemRemoval(item) }
             }
         } label: { Image(systemName: "ellipsis") }
-            .menuStyle(.button).buttonStyle(.bordered).menuIndicator(.hidden).fixedSize()
+            .menuStyle(.button).buttonStyle(.outline).menuIndicator(.hidden).fixedSize()
             .help("Cover, link to the digital collection, the digital copy, the queue, digitizing, shopping and removing")
     }
 
@@ -339,7 +337,7 @@ struct CollectionItemDetail: View {
             if let disc {
                 status("opticaldisc.fill", "This CD is in the drive")
                 HStack {
-                    Button("Rip Now") { model.cd.show(disc, for: item) }.buttonStyle(.borderedProminent)
+                    Button("Rip Now") { model.cd.show(disc, for: item) }.buttonStyle(.prominent)
                     actions(item, importTitle: "Import Files…")
                 }
             } else {
@@ -351,7 +349,7 @@ struct CollectionItemDetail: View {
             HStack {
                 if item.isEditable {
                     Button("Digitize…") { model.vinyl.show(item) }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.prominent)
                         .help("Record this record from your turntable and save its tracks as FLAC")
                 }
                 actions(item, importTitle: "Import a Transfer…")
@@ -544,7 +542,7 @@ struct CollectionItemDetail: View {
                             Label(link.title, systemImage: ArtistDetail.icon(link.kind))
                                 .font(.callout)
                                 .padding(.horizontal, 11).padding(.vertical, 6)
-                                .background(Capsule().fill(AppColor.fill))
+                                .overlay(Capsule().strokeBorder(AppColor.text.opacity(0.3), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
                         .help(url.absoluteString)

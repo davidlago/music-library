@@ -1,5 +1,6 @@
 import AppKit
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Restore from iCloud… (File menu, Settings ▸ iCloud): the backup's database copies, newest first, restored into a
@@ -30,7 +31,7 @@ struct ICloudRestoreSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Restore from iCloud").font(.title2.bold())
+                Text("Restore from iCloud").font(AppFont.display(28, weight: .heavy))
                 Text(store.map { $0.coordinated ? "Copies of your library's database in iCloud, newest first." : "The backup in \($0.root.path)." }
                      ?? "Copies of your library's database in iCloud, newest first.")
                     .font(.callout).foregroundStyle(.secondary).lineLimit(2).truncationMode(.middle)
@@ -64,7 +65,7 @@ struct ICloudRestoreSheet: View {
         case .loading:
             ProgressView()
         case .failed(let message):
-            ContentUnavailableView("Can't Restore", systemImage: "exclamationmark.icloud", description: Text(message))
+            EmptyState("Can't Restore", systemImage: "exclamationmark.icloud", description: Text(message))
         case .restoring(let done, let total):
             VStack(spacing: 10) {
                 ProgressView(value: total == 0 ? 0 : Double(done), total: Double(max(total, 1))).frame(width: 340)
@@ -73,7 +74,7 @@ struct ICloudRestoreSheet: View {
                 Text("Files only in iCloud are downloaded first.").font(.caption).foregroundStyle(.tertiary)
             }
         case .restoredFolder(let root, let result):
-            ContentUnavailableView {
+            EmptyState {
                 Label("Library Restored", systemImage: "checkmark.icloud")
             } description: {
                 Text("\(result.files.formatted()) files (\(ByteCountFormatter.string(fromByteCount: result.bytes, countStyle: .file))) and the database are in \(root.lastPathComponent)."
@@ -86,7 +87,7 @@ struct ICloudRestoreSheet: View {
                 .keyboardShortcut(.defaultAction)
             }
         case .restoredDatabase(let before):
-            ContentUnavailableView {
+            EmptyState {
                 Label("Database Restored", systemImage: "checkmark.icloud")
             } description: {
                 Text("The database from before is kept as \(before.lastPathComponent) in the library folder.")
@@ -95,7 +96,7 @@ struct ICloudRestoreSheet: View {
             }
         case .ready:
             if snapshots.isEmpty {
-                ContentUnavailableView("No Backups Yet", systemImage: "icloud",
+                EmptyState("No Backups Yet", systemImage: "icloud",
                                        description: Text(store?.coordinated == false ? "That folder doesn't hold a backup: it should have backup.json and a Snapshots folder."
                                                          : "Turn on the backup in Settings ▸ iCloud first."))
             } else {

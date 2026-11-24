@@ -77,7 +77,7 @@ struct SearchLabelHits: View {
         var stickers = Array(Set(hits.compactMap(\.sticker))).sorted()
         if let wanted, !stickers.contains(wanted) { stickers.insert(wanted, at: 0) }
         return VStack(alignment: .leading, spacing: 8) {
-            Text("Label").font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.secondary)
+            SectionHeader(title: "Label")
             ForEach(stickers, id: \.self) { sticker in
                 LabelLookupCard(sticker: sticker, coverWidth: 96, open: { model.showItem(id: $0.id) }, step: nil)
             }
@@ -96,7 +96,7 @@ struct CollectionHitsStrip: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("What You Own").font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.secondary)
+                SectionHeader(title: "What You Own")
                 Spacer()
                 Button(total > 12 ? "Show All \(total)" : "Show on Shelf") { model.showShelf(query: model.searchText) }
                     .buttonStyle(.link).font(.caption)

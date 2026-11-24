@@ -131,7 +131,7 @@ struct NowPlayingWidgetView: View {
                     .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(p.song.title).font(.headline).lineLimit(1)
+                Text(p.song.title).font(WidgetPalette.display(18)).lineLimit(1)
                 Text(p.song.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                 Text(p.song.album).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
                 Spacer(minLength: 4)
@@ -175,7 +175,7 @@ struct NowPlayingWidgetView: View {
             VStack(alignment: .leading, spacing: 6) {
                 WidgetHeader(title: "Now Playing", systemImage: "music.note", tint: .pink)
                 Spacer(minLength: 0)
-                Text("Nothing playing").font(.headline)
+                Text("Nothing playing").font(WidgetPalette.display(18))
                 Text(GlanceFormat.count(glance.library.songsOnPhone, "song") + " on this iPhone")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 #if os(iOS)
@@ -218,7 +218,7 @@ struct NowPlayingWidgetView: View {
     private func rectangular(_ p: Glance.NowPlaying) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Label(p.song.title, systemImage: p.isPlaying ? "play.fill" : "pause.fill")
-                .font(.headline)
+                .font(WidgetPalette.display(18))
                 .lineLimit(1)
                 .widgetAccentable()
             Text(p.song.artist).font(.caption).lineLimit(1)
