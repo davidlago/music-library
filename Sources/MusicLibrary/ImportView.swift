@@ -28,7 +28,7 @@ struct ImportView: View {
             }
             .overlay {
                 if importer.entries.isEmpty {
-                    ContentUnavailableView("Nothing to Import", systemImage: "square.and.arrow.down",
+                    EmptyState("Nothing to Import", systemImage: "square.and.arrow.down",
                                            description: Text("Drop audio files or folders anywhere in the window, or press ⌘O."))
                         .allowsHitTesting(false)
                 }
@@ -37,7 +37,7 @@ struct ImportView: View {
                 if let entry = importer.selectedEntry {
                     ImportDetail(entry: entry).id(entry.id)
                 } else {
-                    ContentUnavailableView("Select an item", systemImage: "music.note")
+                    EmptyState("Select an item", systemImage: "music.note")
                 }
             }
             .frame(minWidth: 480)
@@ -143,7 +143,7 @@ struct ImportDetail: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(entry.url.lastPathComponent).font(.title3.bold()).lineLimit(1)
+            Text(entry.url.lastPathComponent).font(AppFont.display(24, weight: .heavy)).lineLimit(1)
             Text(entry.url.deletingLastPathComponent().path).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             HStack {
                 Text(entry.status.label).foregroundStyle(.secondary)
@@ -405,9 +405,9 @@ struct ImportLinkPicker: View {
             List {
                 Button("None") { importer.chooseLink(nil); done() }.buttonStyle(.plain)
                 if !candidates.matching.isEmpty {
-                    Section("This Album") { ForEach(candidates.matching) { row($0) } }
+                    Section { ForEach(candidates.matching) { row($0) } } header: { ListHeader("This Album") }
                 }
-                Section("Not Digitized Yet") { ForEach(others.prefix(200)) { row($0) } }
+                Section { ForEach(others.prefix(200)) { row($0) } } header: { ListHeader("Not Digitized Yet") }
             }
             .frame(width: 380, height: 360)
         }

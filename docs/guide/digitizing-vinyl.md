@@ -4,7 +4,7 @@
 tracks in your Digital Collection, lossless FLAC tagged and filed like a ripped CD, linked to the record in your
 [Physical Collection](physical-collection.md).
 
-![Digitize Vinyl: The Big Reunion recorded at 24-bit / 96 kHz, cut into four tracks on its waveform, two already saved](../screenshots/digitize-vinyl.png)
+![Digitize Vinyl: The Big Reunion recorded at 16-bit / 44.1 kHz, cut into four tracks on its waveform, two already saved](../screenshots/digitize-vinyl.png)
 
 ## What you need
 

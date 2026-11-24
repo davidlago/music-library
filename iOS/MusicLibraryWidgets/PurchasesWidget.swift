@@ -107,7 +107,7 @@ struct PurchasesWidgetView: View {
         VStack(alignment: .leading, spacing: 4) {
             WidgetHeader(title: "Physical", systemImage: "books.vertical", tint: Self.tint)
             Spacer(minLength: 0)
-            Text("Nothing in your physical collection yet").font(.headline)
+            Text("Nothing in your physical collection yet").font(WidgetPalette.display(18))
             Text("Add CDs and records in Music Library on your Mac.")
                 .font(.caption2).foregroundStyle(.secondary).lineLimit(3)
         }
@@ -240,7 +240,7 @@ struct PurchasesWidgetView: View {
     private func rectangular(_ c: Glance.Collection) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Label(Self.counts(c), systemImage: "books.vertical")
-                .font(.headline)
+                .font(WidgetPalette.display(18))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .widgetAccentable()
@@ -279,7 +279,7 @@ struct PurchasesWidgetView: View {
         VStack(alignment: .leading, spacing: 4) {
             WidgetHeader(title: "Purchases", systemImage: "bag", tint: Self.tint)
             Spacer(minLength: 0)
-            Text(owned.ownedCount == 0 ? "No purchases yet" : "\(GlanceFormat.count(owned.ownedCount, "album")) owned").font(.headline)
+            Text(owned.ownedCount == 0 ? "No purchases yet" : "\(GlanceFormat.count(owned.ownedCount, "album")) owned").font(WidgetPalette.display(18))
             Text("Add CDs, records and downloads in Music Library on your Mac.")
                 .font(.caption2).foregroundStyle(.secondary).lineLimit(3)
         }
@@ -373,7 +373,7 @@ struct PurchasesWidgetView: View {
     private func ownedRectangular(_ glance: Glance, _ owned: Glance.Owned) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Label(glance.money(owned.spentThisYear, whole: true), systemImage: "bag")
-                .font(.headline)
+                .font(WidgetPalette.display(18))
                 .widgetAccentable()
             Text("\(GlanceFormat.count(owned.boughtThisYear, "album")) this year").font(.caption).lineLimit(1)
             if let latest = owned.recent.first {
@@ -391,7 +391,7 @@ struct Stat: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(value).font(.system(.title3, design: .rounded, weight: .bold)).lineLimit(1).minimumScaleFactor(0.6)
+            Text(value).font(WidgetPalette.display(23, weight: .black)).lineLimit(1).minimumScaleFactor(0.6)
             Text(label).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

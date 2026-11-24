@@ -94,7 +94,7 @@ CD you rip is added to your collection unless you say otherwise) and **Eject aft
 
 Click any CD or record to open its page.
 
-![The item page for The Köln Concert on Vinyl #2: its sleeve, the record's sides, one of four songs digitized with Digitize the Rest…, and Your Copy](../screenshots/collection-item.png)
+![The item page for The Köln Concert on Vinyl #2: its sleeve, the record's sides and songs, its digital copy and what it's worth](../screenshots/collection-item.png)
 
 - The case or sleeve with its label, and the release: record label, catalog number, country, format.
 - **‹ Previous on Shelf** and **Next on Shelf ›** (⌘[ and ⌘]) walk along the shelf.
@@ -163,7 +163,7 @@ background. Values sync to the iPhone.
 **Find by Label** (⌘L, from anywhere) tells you what's at a label and what sits on either side of it, so you can go and
 grab it.
 
-![Find by Label on CD #14: Mystery Girl by Roy Orbison, ripped, bought October 11, between CD #13 and CD #15](../screenshots/find-by-label.png)
+![Find by Label on CD #14: Mystery Girl by Roy Orbison, ripped, between CD #13 and CD #15](../screenshots/find-by-label.png)
 
 Choose CD or Vinyl and type the number. **↑** and **↓** step along the shelf, **⇥** switches series, **↩** opens the
 item. Typing a label in the search field (`#142`, `cd 142`, `vinyl 12`) shows the item above the results too.

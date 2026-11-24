@@ -66,9 +66,9 @@ struct ArtistsView: View {
         }
         .overlay {
             if model.allArtists.isEmpty {
-                ContentUnavailableView("No Artists", systemImage: "music.mic")
+                EmptyState("No Artists", systemImage: "music.mic")
             } else if shown.isEmpty {
-                ContentUnavailableView.search(text: filter)
+                EmptyState.search(text: filter)
             }
         }
         .sheet(item: $photoArtist) { ArtistPhotoSheet(name: $0.name, request: CoverSheetRequest()) }
@@ -297,21 +297,17 @@ struct ArtistDetail: View {
         HStack(alignment: .center, spacing: 28) {
             photo(size: 190)
             VStack(alignment: .leading, spacing: 8) {
-                Text("ARTIST").font(.caption.weight(.semibold)).foregroundStyle(.secondary).tracking(1.2)
-                Text(name).font(.system(size: 36, weight: .bold)).lineLimit(2).minimumScaleFactor(0.6)
+                // What the artist is, tracked out over the name like a sleeve's credit line.
+                let summary = info.map { [$0.summary(), $0.disambiguation].compactMap { $0 }.filter { !$0.isEmpty } } ?? []
+                Kicker(summary.isEmpty ? "Artist" : summary.joined(separator: " · "))
+                    .lineLimit(2)
+                PageTitle(name, size: 60, lineLimit: 2)
                 if let info {
-                    let summary = info.summary()
-                    if !summary.isEmpty || info.disambiguation != nil {
-                        Text([summary, info.disambiguation].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
-                            .font(.title3).foregroundStyle(.secondary)
-                    }
                     if !info.genres.isEmpty {
                         FlowLayout(spacing: 6) {
                             ForEach(info.genres, id: \.self) { g in
                                 Button { model.search(SearchFilterKey.token("genre", g)) } label: {
-                                    Text(g.capitalized).font(.caption)
-                                        .padding(.horizontal, 9).padding(.vertical, 4)
-                                        .background(Capsule().fill(AppColor.fill))
+                                    TagChip(g.capitalized, tint: AppColor.tag(g))
                                 }
                                 .buttonStyle(.plain)
                                 .help("Search your digital collection for \(g)")
@@ -323,20 +319,20 @@ struct ArtistDetail: View {
                 }
                 HStack(spacing: 10) {
                     Button { play(tracks, at: 0) } label: { Label("Play", systemImage: "play.fill").frame(minWidth: 70) }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.prominent)
                     Button { play(tracks.shuffled(), at: 0) } label: { Label("Shuffle", systemImage: "shuffle") }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.outline)
                     if model.collaborations.person(named: artistName) != nil {
                         Button { model.showMusicDNA(artistName) } label: {
                             Label("Music DNA", systemImage: "point.3.connected.trianglepath.dotted")
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.outline)
                         .help("See who \(name) worked with")
                     }
                     Menu {
                         QueueMenuButtons(player: model.player) { tracks }
                     } label: { Image(systemName: "ellipsis") }
-                        .menuStyle(.button).buttonStyle(.bordered).menuIndicator(.hidden).fixedSize()
+                        .menuStyle(.button).buttonStyle(.outline).menuIndicator(.hidden).fixedSize()
                         .help("Play Next or Add to Queue")
                 }
                 .controlSize(.large)
@@ -405,7 +401,7 @@ struct ArtistDetail: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader(title: "About")
             Text(bio)
-                .font(.body)
+                .font(AppFont.serif(15))
                 .lineSpacing(3)
                 .lineLimit(bioExpanded ? nil : 5)
                 .textSelection(.enabled)
@@ -442,7 +438,7 @@ struct ArtistDetail: View {
                         Label(link.title, systemImage: Self.icon(link.kind))
                             .font(.callout)
                             .padding(.horizontal, 11).padding(.vertical, 6)
-                            .background(Capsule().fill(AppColor.fill))
+                            .overlay(Capsule().strokeBorder(AppColor.text.opacity(0.3), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                     .help(link.url.absoluteString)

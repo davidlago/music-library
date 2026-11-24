@@ -62,7 +62,7 @@ struct RediscoverWidgetView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     WidgetHeader(title: "Rediscover", systemImage: "sparkles", tint: Self.tint)
                     Spacer(minLength: 0)
-                    Text("Nothing forgotten").font(.headline)
+                    Text("Nothing forgotten").font(WidgetPalette.display(18))
                     Text("Songs you played often and haven't heard in three months show up here.")
                         .font(.caption2).foregroundStyle(.secondary).lineLimit(3)
                 }
@@ -108,7 +108,7 @@ struct RediscoverWidgetView: View {
             VStack(alignment: .leading, spacing: 2) {
                 WidgetHeader(title: "Rediscover", systemImage: "sparkles", tint: Self.tint)
                 Spacer(minLength: 2)
-                Text(pick.item.title).font(.headline).lineLimit(2)
+                Text(pick.item.title).font(WidgetPalette.display(18)).lineLimit(2)
                 Text(pick.item.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                 Text(lastPlayed(pick)).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                 Spacer(minLength: 4)

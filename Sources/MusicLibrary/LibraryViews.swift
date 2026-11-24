@@ -46,7 +46,7 @@ struct TrackTable: View {
         }
         .overlay {
             if tracks.isEmpty, emptyState == nil, !model.isSearching, let backup = model.cloud.setupBackup {
-                ContentUnavailableView {
+                EmptyState {
                     Label("Your Library Is in iCloud", systemImage: "icloud.and.arrow.down")
                 } description: {
                     Text("\(backup.macName) backed up a library with \(songCount(backup.tracks)). Set this Mac up with it, or drop audio files here to start a new one.")
@@ -57,7 +57,7 @@ struct TrackTable: View {
                 let empty = emptyState ?? (model.isSearching
                     ? ("No Results", "Nothing matches “\(model.searchText)”.")
                     : ("No Songs", "Drop audio files or folders here, or use File ▸ Import…"))
-                ContentUnavailableView(empty.title, systemImage: "music.note", description: Text(empty.message))
+                EmptyState(empty.title, systemImage: "music.note", description: Text(empty.message))
                     .allowsHitTesting(false)
             }
         }
@@ -178,7 +178,7 @@ struct AlbumsView: View {
                 }
                 if shown.isEmpty, !model.albums.isEmpty {
                     // Below the controls, not over them, so the filter can be switched back.
-                    ContentUnavailableView(filter == .inCollection ? "No Albums You Own" : "No Albums",
+                    EmptyState(filter == .inCollection ? "No Albums You Own" : "No Albums",
                                            systemImage: "opticaldisc",
                                            description: Text(filter == .inCollection
                                                              ? "Add a copy on an album's page, or right-click an album and choose I Own This."
@@ -189,7 +189,7 @@ struct AlbumsView: View {
             .padding(20)
         }
         .overlay {
-            if model.albums.isEmpty { ContentUnavailableView("No Albums", systemImage: "square.stack") }
+            if model.albums.isEmpty { EmptyState("No Albums", systemImage: "square.stack") }
         }
         .navigationTitle("Albums")
         .navigationSubtitle(shown.count == 1 ? "1 album" : "\(shown.count) albums")
@@ -299,7 +299,7 @@ struct PlaylistView: View {
         } primaryAction: { positions in play(from: positions.min() ?? 0) }
         .overlay {
             if tracks.isEmpty {
-                ContentUnavailableView("Empty Playlist", systemImage: "music.note.list",
+                EmptyState("Empty Playlist", systemImage: "music.note.list",
                                        description: Text("Right-click songs in your digital collection and choose Add to Playlist."))
                     .allowsHitTesting(false)
             }

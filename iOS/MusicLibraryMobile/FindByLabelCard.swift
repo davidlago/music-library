@@ -50,7 +50,7 @@ struct FindByLabelCard: View {
                 .font(.system(size: 34, weight: .semibold, design: .monospaced))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color(.tertiarySystemFill)))
+                .background(RoundedRectangle(cornerRadius: 10).fill(AppColor.raised))
                 .onTapGesture { editing = true }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(series.name) label number")
@@ -88,7 +88,7 @@ struct FindByLabelCard: View {
         } label: {
             Image(systemName: systemImage).font(.title3.weight(.semibold)).frame(width: 30, height: 36)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.outline)
         .buttonRepeatBehavior(.enabled)
         .disabled(step < 0 ? number <= 1 : number >= Sticker.maxNumber)
         .accessibilityLabel(label)

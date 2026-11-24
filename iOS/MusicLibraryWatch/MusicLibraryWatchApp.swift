@@ -9,6 +9,7 @@ struct MusicLibraryWatchApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .tint(WatchStyle.brass)
                 .environment(model)
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { model.refresh() }

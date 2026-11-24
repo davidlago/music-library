@@ -8,7 +8,7 @@ to it, and a row opens its album, artist or item. The same panes are on the iPho
 
 Your CDs, records and downloads.
 
-![Insights, Owned pane: 51 items, 94% digitized, 3 to digitize, spending, cost per play, your label series, how you own your music by medium and spending over time](../screenshots/insights-owned.png)
+![Insights, Owned pane: 86 items, all digitized, spending, cost per play, your label series, how you own your music by medium and spending over time](../screenshots/insights-owned.png)
 
 - **Totals**: items, how much is digitized, what's left to digitize, what you've spent (in all and this year) and the
   cost per play and per hour listened.
@@ -35,7 +35,7 @@ Prices are in your Mac's currency. Plays count once per album, whichever copy th
 
 Your music files.
 
-![Insights, Digital Collection pane: 574 songs, 48 albums, 43 artists, a day and 17 hours of music, 16.68 GB, 95% lossless, a timeline through the years, genres, top artists and audio quality](../screenshots/insights.png)
+![Insights, Digital Collection pane: 1,018 songs, 86 albums, 71 artists, three days of music, 34 GB, 97% lossless, a timeline through the years, genres, top artists and audio quality](../screenshots/insights.png)
 
 Totals (songs, albums, artists, length, size, how much is lossless), **Through the Years** (by release year or decade),
 **Genres**, **Top Artists** (by songs, time or albums), **Audio Quality** (hi-res, CD quality, lossy; formats, sample
@@ -46,7 +46,7 @@ engineers.
 
 A listening report, inspired by Last.fm's, over **7 Days**, **30 Days**, **12 Months** or **All Time**.
 
-![Insights, Listening pane for 7 days: 130 plays over a blurred photo of Ray LaMontagne, each day next to the week before, and Top Charts with the top artist, album and song](../screenshots/listening.png)
+![Insights, Listening pane for 30 days: 741 plays, each day next to the 30 days before, and Top Charts with the top artist, album and song](../screenshots/listening.png)
 
 - **The banner**: plays and time listened over a blurred photo of your top artist, each day's plays next to the same
   span before, and how much more or less you listened.

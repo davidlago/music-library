@@ -25,7 +25,7 @@ Tapping a widget opens the app on its album, item, Now Playing or Insights.
 The watch app (watchOS 26 or later) installs with the iPhone app, or from the Watch app on the phone under **Available
 Apps**. It's a remote for the iPhone's player, a window on your listening, and a way to find a label on your shelf.
 
-![The Apple Watch app: Now Playing, the Physical page with 44 CDs · 5 records and Find by Label, and Find by Label on CD #43 between CD #42 and CD #44](../screenshots/watch.png)
+![The Apple Watch app: Now Playing, the Physical page with 53 CDs · 31 records and Find by Label, and Find by Label on CD #53 after CD #52](../screenshots/watch.png)
 
 Swipe or turn the Digital Crown between its pages:
 

@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 struct SettingsView: View {
@@ -18,20 +19,22 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                     .labelsHidden()
                 } header: {
-                    Text("Appearance")
+                    ListHeader("Appearance")
                 } footer: {
                     Text(appearance == .system ? "Follows your iPhone's light or dark setting." : "Always \(appearance.name.lowercased()), whatever your iPhone uses.")
                 }
+                .listRowBackground(AppColor.card)
                 Section {
                     Toggle("Match the DAC's sample rate", isOn: $player.matchSampleRate)
                     if let output = player.output {
                         LabeledContent("Output", value: output.summary)
                     }
                 } header: {
-                    Text("Playback")
+                    ListHeader("Playback")
                 } footer: {
                     Text("Before each song, the output switches to the song's sample rate, so a USB DAC plays it at its own rate. Songs at the same rate play without gaps. For bit-perfect output, keep the iPhone's volume at maximum and use the DAC's or amplifier's volume. AirPlay speakers play at their own rate, so on AirPlay every song plays without gaps.")
                 }
+                .listRowBackground(AppColor.card)
                 ShopSettingsSection(shop: model.shop)
                 if model.radioDJ.isEnabled {
                     RadioDJSettingsSection(dj: model.radioDJ)
@@ -53,25 +56,29 @@ struct SettingsView: View {
                         }
                         Button("Hide Sample Library") { model.hideSample() }
                     } header: {
-                        Text("Music Library")
+                        ListHeader("Music Library")
                     } footer: {
                         Text("The sample library's artists and albums are fictional. Your own music replaces it after your first sync, or as soon as it arrives from iCloud.")
                     }
+                    .listRowBackground(AppColor.card)
                 } else if let library = model.library {
-                    Section("Music Library") {
+                    Section {
                         LabeledContent("Songs on this iPhone", value: "\(library.presentIDs.count) of \(library.tracks.count)")
                         if !model.collection.items.isEmpty {
                             LabeledContent("Owned", value: collectionSummary)
                         }
                         LabeledContent("Folder", value: library.root.lastPathComponent)
                         Button("Reload Music Library") { model.reload() }
-                    }
+                    } header: { ListHeader("Music Library") }
+                    .listRowBackground(AppColor.card)
                 } else if PhoneModel.sampleRoot != nil {
-                    Section("Music Library") {
+                    Section {
                         Button("Explore a Sample Library") { model.showSample() }
-                    }
+                    } header: { ListHeader("Music Library") }
+                    .listRowBackground(AppColor.card)
                 }
             }
+            .pageBackground()
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -116,6 +123,7 @@ struct LastFMSettings: View {
                 Text("Scrobbling sends the songs you play to your Last.fm profile. A song counts once you've listened to half of it or 4 minutes, whichever comes first (songs under 30 seconds don't count).")
                     .font(.callout).foregroundStyle(.secondary)
             }
+            .listRowBackground(AppColor.card)
             Section {
                 TextField("API key", text: $scrobbler.apiKey)
                     .font(.system(.body, design: .monospaced))
@@ -126,17 +134,19 @@ struct LastFMSettings: View {
                      destination: URL(string: "https://www.last.fm/api/account/create")!)
                     .font(.caption)
             } header: {
-                Text("API account")
+                ListHeader("API account")
             } footer: {
                 Text("Last.fm needs an API key and shared secret for each app. You can reuse the ones from the Mac app. Both are stored in this iPhone's keychain.")
             }
-            Section("Account") {
+            .listRowBackground(AppColor.card)
+            Section {
                 accountRow(scrobbler)
                 if let error = scrobbler.lastError {
                     Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange)
                 }
-            }
-            Section("Scrobbling") {
+            } header: { ListHeader("Account") }
+            .listRowBackground(AppColor.card)
+            Section {
                 Toggle("Scrobble songs I play", isOn: $scrobbler.scrobblingEnabled)
                 Toggle("Show what's playing now on my profile", isOn: $scrobbler.sendsNowPlaying)
                     .disabled(!scrobbler.scrobblingEnabled)
@@ -149,9 +159,10 @@ struct LastFMSettings: View {
                 if scrobbler.pendingCount > 0 {
                     Button("Send Now") { scrobbler.flush() }.disabled(scrobbler.isSending)
                 }
-            }
+            } header: { ListHeader("Scrobbling") }
+            .listRowBackground(AppColor.card)
             if !scrobbler.recent.isEmpty {
-                Section("Recently scrobbled") {
+                Section {
                     ForEach(scrobbler.recent) { s in
                         VStack(alignment: .leading) {
                             Text(s.track).lineLimit(1)
@@ -163,9 +174,11 @@ struct LastFMSettings: View {
                             .font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                }
+                } header: { ListHeader("Recently scrobbled") }
+                .listRowBackground(AppColor.card)
             }
         }
+        .pageBackground()
         .navigationTitle("Last.fm")
     }
 
@@ -232,7 +245,7 @@ struct ICloudSettingsSection: View {
                 Button("Check Now") { cloud.check() }.disabled(cloud.status == .checking)
             }
         } header: {
-            Text("iCloud")
+            ListHeader("iCloud")
         } footer: {
             if let at = cloud.backupAt, cloud.isEnabled {
                 Text("Latest backup\(cloud.macName.map { " from \($0)" } ?? ""): \(at.formatted(date: .abbreviated, time: .shortened)). Your library, covers and artist photos come from it, so they stay up to date without the Mac nearby.")
@@ -240,5 +253,6 @@ struct ICloudSettingsSection: View {
                 Text("Your library, covers and artist photos come from your Mac's iCloud backup (Settings ▸ iCloud on the Mac), so they stay up to date without the Mac nearby.")
             }
         }
+        .listRowBackground(AppColor.card)
     }
 }

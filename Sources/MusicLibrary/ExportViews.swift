@@ -95,7 +95,7 @@ struct ExportListView: View {
         .onDeleteCommand { remove(selection) }
         .overlay {
             if model.exportList.isEmpty {
-                ContentUnavailableView("Nothing to Export", systemImage: "externaldrive",
+                EmptyState("Nothing to Export", systemImage: "externaldrive",
                                        description: Text("Right-click albums, songs, artists or playlists and choose Add to Export List, or add your entire digital collection."))
             }
         }
@@ -280,11 +280,11 @@ struct DestinationContentsView: View {
     @ViewBuilder
     private var content: some View {
         if let error {
-            ContentUnavailableView("Couldn't Read the Destination", systemImage: "exclamationmark.triangle", description: Text(error))
+            EmptyState("Couldn't Read the Destination", systemImage: "exclamationmark.triangle", description: Text(error))
                 .frame(maxHeight: .infinity)
         } else if let preview {
             if !preview.isAvailable {
-                ContentUnavailableView("Destination Not Available", systemImage: "externaldrive.badge.exclamationmark",
+                EmptyState("Destination Not Available", systemImage: "externaldrive.badge.exclamationmark",
                                        description: Text("Connect the drive, or choose another destination."))
                     .frame(maxHeight: .infinity)
             } else {
@@ -312,7 +312,7 @@ struct DestinationContentsView: View {
         }
         .overlay {
             if folders.isEmpty {
-                ContentUnavailableView(onlyChanges ? "No Changes" : "No Music Yet", systemImage: "music.note",
+                EmptyState(onlyChanges ? "No Changes" : "No Music Yet", systemImage: "music.note",
                                        description: Text(onlyChanges ? "Everything picked is already at the destination." : "Nothing in a Music folder here yet."))
                     .allowsHitTesting(false)
             }
@@ -425,10 +425,10 @@ struct ExportListFooter: View {
                 Spacer()
                 if let dest = model.exportDestination {
                     Button { model.runExportList() } label: { Label("Export to “\(dest.lastPathComponent)”", systemImage: "square.and.arrow.up") }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.prominent)
                         .disabled(!canExport)
                 } else {
-                    Button("Choose Destination…") { model.chooseExportDestination() }.buttonStyle(.borderedProminent)
+                    Button("Choose Destination…") { model.chooseExportDestination() }.buttonStyle(.prominent)
                 }
             }
             .padding(.top, 4)

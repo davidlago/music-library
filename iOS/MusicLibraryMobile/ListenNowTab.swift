@@ -65,7 +65,7 @@ private struct ListenNowPage: View {
 
     private var sampleNote: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "sparkles").foregroundStyle(Color.accentColor).font(.title3)
+            Image(systemName: "sparkles").foregroundStyle(AppColor.accent).font(.title3)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Sample Library").font(.headline)
                 Text("Fictional artists and albums, made up so you can try the app. Your own music replaces it after your first sync.")
@@ -127,11 +127,11 @@ private struct ListenNowPage: View {
                                 CopyArt(mark: model.copyMark(for: item), url: library.coverURL(item: item), width: 96, title: item.album)
                                     .overlay {
                                         if item.id == copy.id {
-                                            RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: 2.5).padding(-4)
+                                            RoundedRectangle(cornerRadius: 6).strokeBorder(AppColor.accent, lineWidth: 2.5).padding(-4)
                                         }
                                     }
                                 Text(item.album).font(.caption).lineLimit(1)
-                                    .foregroundStyle(item.id == copy.id ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                                    .foregroundStyle(item.id == copy.id ? AnyShapeStyle(AppColor.accent) : AnyShapeStyle(.secondary))
                             }
                             .frame(maxWidth: .infinity)
                         }
@@ -165,9 +165,9 @@ private struct ListenNowPage: View {
 
     private func tile(_ value: String, _ label: String, detail: String?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(value).font(.system(size: 24, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.7)
-            Text(label).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            Text(detail ?? " ").font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+            Text(value).font(AppFont.display(30, weight: .heavy)).lineLimit(1).minimumScaleFactor(0.7)
+            Text(label.uppercased()).font(AppFont.label(9)).tracking(1.3).foregroundStyle(AppColor.accent).lineLimit(1)
+            Text(detail ?? " ").font(AppFont.serif(12)).foregroundStyle(AppColor.muted).lineLimit(1).minimumScaleFactor(0.8)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -204,9 +204,9 @@ private struct ListenNowPage: View {
                             }
                             Spacer(minLength: 8)
                             if entry.isQueued {
-                                Text("NEXT").font(.caption2.weight(.heavy)).foregroundStyle(.white)
+                                Text("NEXT").font(.caption2.weight(.heavy)).foregroundStyle(AppColor.onAccent)
                                     .padding(.horizontal, 6).padding(.vertical, 2)
-                                    .background(Capsule().fill(Color.accentColor))
+                                    .background(Capsule().fill(AppColor.accent))
                             }
                             Text(Format.time(entry.track.duration)).font(.caption).monospacedDigit().foregroundStyle(.secondary)
                         }
@@ -245,12 +245,11 @@ private struct ListenNowHero: View {
             .buttonStyle(.plain)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(current ? "NOW PLAYING" : lastPlayed != nil ? "LAST PLAYED" : "RECENTLY ADDED")
-                        .font(.caption2.weight(.semibold)).kerning(1).foregroundStyle(.secondary)
+                    Kicker(current ? "Now Playing" : lastPlayed != nil ? "Last Played" : "Recently Added")
                     if let sticker { StickerPill(sticker: sticker) }
                 }
-                Text(album.album.isEmpty ? "Unknown Album" : album.album).font(.title3.bold()).lineLimit(2)
-                Text(album.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                PageTitle(album.album.isEmpty ? "Unknown Album" : album.album, size: 28, lineLimit: 2)
+                Text(album.artist).font(AppFont.serif(17).italic()).foregroundStyle(AppColor.accent).lineLimit(1)
                 if current, let track = player.currentTrack {
                     Text(track.title).font(.caption).lineLimit(1).padding(.top, 2)
                     ProgressView(value: min(player.currentTime, max(player.duration, 1)), total: max(player.duration, 1))
@@ -264,11 +263,11 @@ private struct ListenNowHero: View {
                         Label(current && player.isPlaying ? "Pause" : "Play", systemImage: current && player.isPlaying ? "pause.fill" : "play.fill")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.prominent)
                     Button { player.play(queue: playable.shuffled(), source: album.album) } label: {
                         Image(systemName: "shuffle").frame(height: 20)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.outline)
                     .accessibilityLabel("Shuffle")
                 }
                 .disabled(playable.isEmpty && !current)

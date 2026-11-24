@@ -28,6 +28,9 @@ device's format for all apps while playing, and restore it when you quit or turn
 **System** (the default) follows your Mac's light or dark setting. **Light** and **Dark** keep the app in one mode,
 whatever the Mac uses. The same choice is in **View ▸ Appearance**, and the iPhone app has its own in its Settings.
 
+Dark is warm ink with cream type and a brass accent; Light is cream paper with ink type and a deeper brass. The app
+keeps its own brass whatever accent colour your Mac uses, and selected rows in the sidebar are grey.
+
 > Versions before 1.28 had color themes. They're gone: a theme you had picked became its mode the first time you opened
 > this version. Themes that came in light and dark became **System**, and the others became **Light** or **Dark**.
 

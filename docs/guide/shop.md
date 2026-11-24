@@ -10,7 +10,7 @@ barcode, or show the AI a photo of it.
 No accounts are needed. Connecting Discogs (on the Mac) and signing in to eBay (optional, in **Settings ▸ Shop**) add
 more to the price guide.
 
-![The Shop: the 2002 US Blue Note edition of Come Away With Me on CD, with listings from Discogs and eBay, prices and shipping](../screenshots/cd-shop.png)
+![The Shop: the 2002 US Blue Note edition of Come Away With Me on CD, with its Discogs price guide (this edition, the most common pressing and the latest reissue) and its track list](../screenshots/cd-shop.png)
 
 ## Find the CD or record
 

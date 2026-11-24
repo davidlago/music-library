@@ -19,7 +19,7 @@ struct MusicDNAPage: View {
             if let library = model.library {
                 let graph = library.collaborations
                 if graph.people.isEmpty {
-                    ContentUnavailableView("No Credits Yet", systemImage: "point.3.connected.trianglepath.dotted",
+                    EmptyState("No Credits Yet", systemImage: "point.3.connected.trianglepath.dotted",
                                            description: Text("Music DNA maps who played, wrote and produced together. It fills in as you add music, CDs and records matched to MusicBrainz on your Mac."))
                         .navigationTitle("Music DNA")
                 } else if let name {
@@ -28,7 +28,7 @@ struct MusicDNAPage: View {
                             DNAPersonPage(graph: graph, center: center)
                                 .radioDJPage(.page("Music DNA, centered on \(name)", details: ["Who \(name) played, wrote and produced with across their collection."]))
                         } else {
-                            ContentUnavailableView("\(name) Isn't in Your Credits", systemImage: "person.crop.circle.badge.questionmark",
+                            EmptyState("\(name) Isn't in Your Credits", systemImage: "person.crop.circle.badge.questionmark",
                                                    description: Text("Nobody by that name appears in the credits of your music, digital or physical."))
                                 .navigationTitle("Music DNA")
                         }
@@ -98,7 +98,7 @@ private struct DNALanding: View {
                     NavigationLink(value: DNARoute(name: p.name)) { DNAPersonRow(person: p) }
                 }
                 .listStyle(.plain)
-                .overlay { if results.isEmpty { ContentUnavailableView.search(text: query) } }
+                .overlay { if results.isEmpty { EmptyState.search(text: query) } }
             }
         }
         .navigationTitle("Music DNA")
@@ -129,7 +129,7 @@ private struct DNASearchSheet: View {
                 }
             }
             .listStyle(.plain)
-            .overlay { if !empty, results.isEmpty { ContentUnavailableView.search(text: query) } }
+            .overlay { if !empty, results.isEmpty { EmptyState.search(text: query) } }
             .navigationTitle("Find Someone")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Find anyone in your credits")
@@ -284,7 +284,7 @@ private struct DNAGraph: View {
                 ForEach(neighborhood.edges) { e in
                     let active = selected == e.a || selected == e.b
                     DNAEdgeShape(from: point(e.a), to: point(e.b))
-                        .stroke(active ? Color.accentColor : Color.primary.opacity(e.isTree ? 0.3 : 0.1),
+                        .stroke(active ? AppColor.accent : Color.primary.opacity(e.isTree ? 0.3 : 0.1),
                                 lineWidth: active ? 2 : (e.isTree ? min(4, 1 + log2(CGFloat(max(1, e.weight)))) : 0.75))
                         .allowsHitTesting(false)
                 }
@@ -396,7 +396,7 @@ private struct DNADetail: View {
             HStack(spacing: 12) {
                 PersonBubble(person: person, size: 64, highlighted: true)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(person.name).font(.title3.bold()).lineLimit(2)
+                    Text(person.name).font(AppFont.display(24, weight: .heavy)).lineLimit(2)
                     HStack(spacing: 4) {
                         Circle().fill(DNAColor.of(person.category)).frame(width: 7, height: 7)
                         Text(person.category.rawValue).font(.caption).foregroundStyle(.secondary)
@@ -419,7 +419,7 @@ private struct DNADetail: View {
                 FlowLayout(spacing: 5) {
                     ForEach(person.roles.prefix(8), id: \.self) { r in
                         Text(r).font(.caption).padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(Capsule().fill(Color(.tertiarySystemFill)))
+                            .background(Capsule().fill(AppColor.raised))
                     }
                 }
             }
@@ -454,18 +454,18 @@ private struct DNADetail: View {
                 Button { openRoute(DNARoute(name: selected.person.name)) } label: {
                     Label("Center on \(selected.person.name)", systemImage: "scope").lineLimit(1)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.prominent)
             } else {
                 let tracks = model.playable(graph.tracks(of: person.id).compactMap { model.library?.track(id: $0) })
                 Button { player.play(queue: tracks, source: person.name) } label: {
                     Label("Play All", systemImage: "play.fill")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.prominent)
                 .disabled(tracks.isEmpty)
             }
             if let artist {
                 NavigationLink(value: artist) { Label("Artist Page", systemImage: "music.mic") }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.outline)
                     .accessibilityHint("Opens \(artist.name)'s artist page")
             }
         }
@@ -481,7 +481,7 @@ private struct DNADetail: View {
                     NavigationLink(value: DNARoute(name: c.person.name)) {
                         HStack(spacing: 10) {
                             Circle().fill(DNAColor.of(c.person.category)).frame(width: 8, height: 8)
-                            Text(c.person.name).foregroundStyle(Color.accentColor).lineLimit(1)
+                            Text(c.person.name).foregroundStyle(AppColor.accent).lineLimit(1)
                             Spacer(minLength: 8)
                             Text("\(c.shared)").font(.caption).monospacedDigit().foregroundStyle(.secondary)
                                 .accessibilityLabel("\(c.shared) shared song\(c.shared == 1 ? "" : "s")")

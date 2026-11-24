@@ -48,7 +48,7 @@ struct InsightsTab: View {
     private var content: some View {
         if let library = model.library {
             if library.isEmpty {
-                ContentUnavailableView("No Insights Yet", systemImage: "chart.bar.xaxis",
+                EmptyState("No Insights Yet", systemImage: "chart.bar.xaxis",
                                        description: Text("Add music or the CDs and records you own in Music Library on your Mac and sync, and this page fills in with stats about them."))
             } else {
                 ScrollView {
@@ -60,7 +60,7 @@ struct InsightsTab: View {
                     }
                     .padding(16)
                 }
-                .background(Color(.systemGroupedBackground))
+                .background(AppColor.background)
             }
         } else {
             LibraryStatusView()
@@ -72,7 +72,7 @@ struct InsightsTab: View {
         switch pane {
         case .library where model.library?.tracks.isEmpty == true, .listening where model.library?.tracks.isEmpty == true:
             // A collection without songs yet.
-            ContentUnavailableView("No Music Yet", systemImage: "music.note",
+            EmptyState("No Music Yet", systemImage: "music.note",
                                    description: Text("Rip a CD or add music on your Mac and sync, and this pane fills in."))
                 .padding(.top, 40)
         case .library:
@@ -128,7 +128,7 @@ private struct InsightsExplore: View {
     private func row<Route: Hashable>(_ route: Route, _ title: String, _ detail: String, symbol: String) -> some View {
         NavigationLink(value: route) {
             HStack(spacing: 12) {
-                Image(systemName: symbol).foregroundStyle(Color.accentColor).frame(width: 26)
+                Image(systemName: symbol).foregroundStyle(AppColor.accent).frame(width: 26)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                     Text(detail).font(.caption).foregroundStyle(.secondary)
@@ -420,7 +420,7 @@ struct InsightChip: View {
     private var label: some View {
         Text(text).font(.caption).monospacedDigit()
             .padding(.horizontal, 10).padding(.vertical, 5)
-            .background(Capsule().fill(Color(.tertiarySystemFill)))
+            .background(Capsule().fill(AppColor.raised))
     }
 }
 
@@ -540,7 +540,7 @@ struct InsightFactsGrid: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color(.tertiarySystemGroupedBackground)))
+        .background(RoundedRectangle(cornerRadius: 10).fill(AppColor.raised))
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }

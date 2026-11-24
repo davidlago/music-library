@@ -5,7 +5,7 @@ Plain words match titles, artists, albums, genres, composers, record labels and 
 The same language works in the Shelf's filter, on the iPhone, in [Local Library CDs](local-library.md) and in smart
 playlists.
 
-![Search results for genre:jazz year:1950-1975: What You Own (Birth of the Cool on CD, The Big Reunion and The Köln Concert on vinyl), artists and albums, and the matching songs](../screenshots/search.png)
+![Search results for genre:jazz year:1950-1975: What You Own (The Big Reunion, The Köln Concert, Trio Days and more), artists and albums, and the matching songs](../screenshots/search.png)
 
 ## Results
 

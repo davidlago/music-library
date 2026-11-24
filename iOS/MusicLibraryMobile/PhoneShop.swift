@@ -197,10 +197,11 @@ struct ShopSettingsSection: View {
                 Button(shop.ebay.expired ? "Sign In to eBay Again…" : "Sign In to eBay…") { signingIn = true }
             }
         } header: {
-            Text("Shop")
+            ListHeader("Shop")
         } footer: {
             Text("The price guide uses Discogs and eBay. Connect Discogs on your Mac (Settings ▸ Discogs) and sync to add its suggested prices by condition and the versions in your Discogs collection. eBay shows sold listings only when you're signed in: you sign in on eBay's own page, and Music Library keeps only eBay's cookies, never your password.")
         }
+        .listRowBackground(AppColor.card)
         .sheet(isPresented: $signingIn) {
             EbaySignInView(session: shop.ebay) { signingIn = false }
         }

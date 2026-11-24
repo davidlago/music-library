@@ -86,11 +86,11 @@ private struct AlbumPageContent: View {
             CopyArt(mark: model.copyMark(for: album), url: library.coverURL(album: album), width: 310, title: album.album)
             .padding(.top, 8)
             .padding(.bottom, 8)
-            Text(typeLine).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.secondary)
-            Text(title).font(.title2.bold()).multilineTextAlignment(.center).textSelection(.enabled)
+            Kicker(typeLine)
+            PageTitle(title, size: 36, lineLimit: 4).multilineTextAlignment(.center).textSelection(.enabled)
             artistButton
             if let meta = metaLine {
-                Text(meta).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Text(meta).font(.footnote).foregroundStyle(AppColor.muted).multilineTextAlignment(.center)
             }
             if let info, let rating = info.rating { RatingView(rating: rating, votes: info.ratingVotes) }
             let genres = displayGenres
@@ -106,13 +106,13 @@ private struct AlbumPageContent: View {
             NavigationLink(value: artist) {
                 HStack(spacing: 8) {
                     ArtistPhoto(name: artist.name, size: 26)
-                    Text(name).font(.title3.weight(.medium))
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Text(name).font(AppFont.serif(21).italic()).foregroundStyle(AppColor.accent)
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(AppColor.muted)
                 }
             }
             .buttonStyle(.plain)
         } else {
-            Text(name).font(.title3.weight(.medium))
+            Text(name).font(AppFont.serif(21).italic()).foregroundStyle(AppColor.accent)
         }
     }
 
@@ -152,18 +152,18 @@ private struct AlbumPageContent: View {
             Button { player.play(queue: playable, source: title) } label: {
                 Label("Play", systemImage: "play.fill").frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.prominent)
             Button { player.play(queue: playable.shuffled(), source: title) } label: {
                 Label("Shuffle", systemImage: "shuffle").frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.outline)
             Menu {
                 Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { player.playNext(playable) }
                 Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { player.addToQueue(playable) }
             } label: {
                 Image(systemName: "ellipsis").frame(height: 20)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.outline)
             .accessibilityLabel("Play Next or Add to Queue")
         }
         .controlSize(.large)
@@ -372,7 +372,7 @@ struct AlbumTrackList: View {
         return HStack(spacing: 12) {
             Group {
                 if isCurrent {
-                    Image(systemName: "speaker.wave.2.fill").font(.caption).foregroundStyle(Color.accentColor)
+                    Image(systemName: "speaker.wave.2.fill").font(.caption).foregroundStyle(AppColor.accent)
                 } else {
                     Text(entry?.position ?? track.trackNo.map(String.init) ?? entry.map { String($0.number) } ?? "")
                         .monospacedDigit().foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)

@@ -104,10 +104,10 @@ struct LiveCatalogView: View {
         let catalog = model.catalog
         if catalog.hasSearched, !catalog.isLoading, catalog.error == nil, shown == 0 {
             if catalog.items.isEmpty {
-                ContentUnavailableView("No CDs Found", systemImage: "opticaldisc",
+                EmptyState("No CDs Found", systemImage: "opticaldisc",
                                        description: Text("Try other words, more libraries, or any availability."))
             } else if !catalog.hasMore {
-                ContentUnavailableView("Nothing Matches These Filters", systemImage: "line.3.horizontal.decrease.circle")
+                EmptyState("Nothing Matches These Filters", systemImage: "line.3.horizontal.decrease.circle")
             }
         }
     }
@@ -475,8 +475,8 @@ struct CatalogDetail: View {
             .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
             .padding(.bottom, 10)
 
-            Text(typeLine(details)).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(.secondary)
-            Text(item.displayTitle).font(.system(size: 30, weight: .bold)).lineLimit(3).minimumScaleFactor(0.7)
+            Kicker(typeLine(details))
+            PageTitle(item.displayTitle, size: 46, lineLimit: 4)
                 .textSelection(.enabled)
             if let mbTitle = details?.mbTitle, CatalogText.key(mbTitle) != CatalogText.key(item.displayTitle) {
                 Text("Released as “\(mbTitle)”").font(.callout).foregroundStyle(.secondary)
@@ -487,16 +487,14 @@ struct CatalogDetail: View {
             if let genres = details?.album?.genres, !genres.isEmpty {
                 FlowLayout(spacing: 6) {
                     ForEach(genres, id: \.self) { g in
-                        Text(g.capitalized).font(.caption)
-                            .padding(.horizontal, 9).padding(.vertical, 4)
-                            .background(Capsule().fill(AppColor.fill))
+                        TagChip(g.capitalized, tint: AppColor.tag(g))
                     }
                 }
             }
             HStack(spacing: 10) {
                 if let owned {
                     Button { model.navigationPath.append(owned) } label: { Label("In Your Digital Collection", systemImage: "checkmark.circle.fill") }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.prominent)
                         .help("Open \(owned.album) in your digital collection")
                 } else {
                     // Short, so the buttons beside it keep their full titles.
@@ -506,10 +504,10 @@ struct CatalogDetail: View {
                         .padding(.trailing, 6)
                         .help("This CD isn't in your digital collection")
                 }
-                CatalogListButton(item: item).buttonStyle(.bordered)
+                CatalogListButton(item: item).buttonStyle(.outline)
                 if let url = catalog.webURL(item.pagePath) {
                     Link(destination: url) { Label("Open in Catalog", systemImage: "safari") }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.outline)
                         .help("See this CD on the local library's website, where you can place a hold")
                 }
             }
@@ -532,14 +530,14 @@ struct CatalogDetail: View {
             Button { model.navigationPath.append(artist) } label: {
                 HStack(spacing: 8) {
                     ArtistPhoto(name: artist.name, size: 26)
-                    Text(name).font(.title3.weight(.medium))
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Text(name).font(AppFont.serif(22).italic()).foregroundStyle(AppColor.accent)
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(AppColor.muted)
                 }
             }
             .buttonStyle(.plain)
             .help("Go to \(artist.name) in your digital collection")
         } else {
-            Text(name).font(.title3.weight(.medium)).textSelection(.enabled)
+            Text(name).font(AppFont.serif(22).italic()).foregroundStyle(AppColor.accent).textSelection(.enabled)
         }
     }
 
@@ -750,7 +748,7 @@ struct CatalogDetail: View {
                 } label: {
                     Label(playingHere ? "Pause Preview" : "Play Previews", systemImage: playingHere ? "pause.fill" : "play.fill")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.outline)
                 .help("Play 30-second previews of the songs from Apple Music, one after another")
             }
         }
@@ -996,7 +994,7 @@ struct CatalogCheckoutsView: View {
         let catalog = model.catalog
         switch catalog.account {
         case .signedOut, .failed:
-            ContentUnavailableView {
+            EmptyState {
                 Label("Not Signed In", systemImage: "person.crop.circle.badge.questionmark")
             } description: {
                 Text(catalogFailure ?? "Sign in to your local library account in Settings to see what you have checked out.")
@@ -1007,7 +1005,7 @@ struct CatalogCheckoutsView: View {
             ProgressView("Signing in…")
         case .signedIn:
             if catalog.checkoutsLoaded, list.isEmpty {
-                ContentUnavailableView(allFormats ? "Nothing Checked Out" : "No CDs Checked Out", systemImage: "books.vertical")
+                EmptyState(allFormats ? "Nothing Checked Out" : "No CDs Checked Out", systemImage: "books.vertical")
             }
         }
     }

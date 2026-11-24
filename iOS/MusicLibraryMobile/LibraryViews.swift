@@ -63,7 +63,7 @@ struct DigitalCollectionCard: View {
     private func link<Route: Hashable>(_ route: Route, _ title: String, systemImage: String, count: Int?) -> some View {
         NavigationLink(value: route) {
             HStack(spacing: 12) {
-                Image(systemName: systemImage).foregroundStyle(Color.accentColor).frame(width: 26)
+                Image(systemName: systemImage).foregroundStyle(AppColor.accent).frame(width: 26)
                 Text(title).lineLimit(1)
                 Spacer(minLength: 8)
                 if let count { CountPill(count: count) }
@@ -89,10 +89,11 @@ private struct SampleLibraryNote: View {
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
             } icon: {
-                Image(systemName: "sparkles").foregroundStyle(Color.accentColor)
+                Image(systemName: "sparkles").foregroundStyle(AppColor.accent)
             }
             Button("Hide Sample Library", systemImage: "eye.slash") { model.hideSample() }
         }
+        .listRowBackground(AppColor.card)
     }
 }
 
@@ -139,6 +140,7 @@ struct LibraryHome: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
             }
+            .listRowBackground(AppColor.card)
             Section {
                 NavigationLink(value: LibraryRoute.albums) { row("Albums", systemImage: "square.stack", count: counts.albums) }
                 NavigationLink(value: LibraryRoute.songs) { row("Songs", systemImage: "music.note", count: counts.songs) }
@@ -159,14 +161,15 @@ struct LibraryHome: View {
                                 Image(systemName: "arrow.down.circle")
                             }
                             Spacer()
-                            CountPill(count: downloads, tint: .accentColor)
+                            CountPill(count: downloads, tint: AppColor.accent)
                         }
                     }
                 }
             }
+            .listRowBackground(AppColor.card)
             let playlists = library.playlists.filter { scope == .all || model.availability($0.tracks) != .notOnPhone }
             if !playlists.isEmpty || !library.smartPlaylists.isEmpty {
-                Section("Playlists") {
+                Section {
                     ForEach(playlists) { item in
                         NavigationLink(value: LibraryRoute.playlist(item.id)) {
                             HStack {
@@ -181,17 +184,19 @@ struct LibraryHome: View {
                             Label(p.name, systemImage: "gearshape")
                         }
                     }
-                }
+                } header: { ListHeader("Playlists") }
+                .listRowBackground(AppColor.card)
             }
             Section {
             } footer: {
                 Text(footer)
             }
+            .listRowBackground(AppColor.card)
         }
         .refreshable { model.reload() }
     }
 
-    private func row(_ title: String, systemImage: String, count: Int, tint: Color = .accentColor) -> some View {
+    private func row(_ title: String, systemImage: String, count: Int, tint: Color = AppColor.accent) -> some View {
         HStack {
             Label(title, systemImage: systemImage)
             Spacer()
@@ -230,17 +235,17 @@ extension View {
     /// Where library links go; every tab's stack uses the same pages.
     /// `djButton`: every page has the Radio DJ's button at the top (not in sheets, which can't show the DJ's).
     func libraryDestinations(djButton: Bool = true) -> some View {
-        radioDJButton(djButton)
-            .navigationDestination(for: LibraryRoute.self) { LibraryRoutePage(route: $0).radioDJButton(djButton) }
-            .navigationDestination(for: AlbumSummary.self) { AlbumPage(album: $0).radioDJButton(djButton) }
-            .navigationDestination(for: ArtistSummary.self) { ArtistPage(artist: $0).radioDJButton(djButton) }
-            .navigationDestination(for: ArtistNameRoute.self) { ArtistPage(name: $0.name).radioDJButton(djButton) }
-            .navigationDestination(for: DNARoute.self) { MusicDNAPage(name: $0.name).radioDJButton(djButton) }
-            .navigationDestination(for: QueryRoute.self) { QueryPage(route: $0).radioDJButton(djButton) }
-            .navigationDestination(for: CollectionRoute.self) { CollectionRoutePage(route: $0).radioDJButton(djButton) }
-            .navigationDestination(for: CollectionItemRoute.self) { CollectionItemPage(id: $0.id).radioDJButton(djButton) }
-            .navigationDestination(for: BuyListRoute.self) { BuyListRoutePage(route: $0).radioDJButton(djButton) }
-            .navigationDestination(for: ShopAlbumRoute.self) { ShopAlbumPage(route: $0).radioDJButton(djButton) }
+        radioDJButton(djButton).pageBackground()
+            .navigationDestination(for: LibraryRoute.self) { LibraryRoutePage(route: $0).radioDJButton(djButton).pageBackground() }
+            .navigationDestination(for: AlbumSummary.self) { AlbumPage(album: $0).radioDJButton(djButton).pageBackground() }
+            .navigationDestination(for: ArtistSummary.self) { ArtistPage(artist: $0).radioDJButton(djButton).pageBackground() }
+            .navigationDestination(for: ArtistNameRoute.self) { ArtistPage(name: $0.name).radioDJButton(djButton).pageBackground() }
+            .navigationDestination(for: DNARoute.self) { MusicDNAPage(name: $0.name).radioDJButton(djButton).pageBackground() }
+            .navigationDestination(for: QueryRoute.self) { QueryPage(route: $0).radioDJButton(djButton).pageBackground() }
+            .navigationDestination(for: CollectionRoute.self) { CollectionRoutePage(route: $0).radioDJButton(djButton).pageBackground() }
+            .navigationDestination(for: CollectionItemRoute.self) { CollectionItemPage(id: $0.id).radioDJButton(djButton).pageBackground() }
+            .navigationDestination(for: BuyListRoute.self) { BuyListRoutePage(route: $0).radioDJButton(djButton).pageBackground() }
+            .navigationDestination(for: ShopAlbumRoute.self) { ShopAlbumPage(route: $0).radioDJButton(djButton).pageBackground() }
     }
 }
 
@@ -317,7 +322,7 @@ struct ArtistList: View {
         }
         .listStyle(.plain)
         .searchable(text: $filter, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Filter artists")
-        .overlay { if shown.isEmpty { ContentUnavailableView.search(text: filter) } }
+        .overlay { if shown.isEmpty { EmptyState.search(text: filter) } }
     }
 }
 
@@ -377,10 +382,10 @@ struct AlbumGrid: View {
         .overlay {
             if filter != .all, shown.isEmpty, !albums.isEmpty {
                 if filter == .inCollection {
-                    ContentUnavailableView("No Albums You Own", systemImage: "books.vertical",
+                    EmptyState("No Albums You Own", systemImage: "books.vertical",
                                            description: Text("Albums you add as CDs, records or downloads in Music Library on your Mac show up here."))
                 } else {
-                    ContentUnavailableView("You Own Them All", systemImage: "books.vertical",
+                    EmptyState("You Own Them All", systemImage: "books.vertical",
                                            description: Text("You own a copy of every album in your digital collection."))
                 }
             }
@@ -401,6 +406,7 @@ struct AlbumGrid: View {
                         ForEach(AlbumCollectionFilter.allCases) { Label($0.label, systemImage: $0.icon).tag($0) }
                     }
                 }
+                .listRowBackground(AppColor.card)
             } label: {
                 Image(systemName: filter != .all ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
             }
@@ -481,6 +487,7 @@ struct AlbumMenu: View {
         let meanings = model.copyMark(for: album).meanings
         if !meanings.isEmpty {
             Section { ForEach(meanings, id: \.self) { Text($0) } }
+            .listRowBackground(AppColor.card)
         }
         if !tracks.isEmpty {
             Button("Play", systemImage: "play") { player.play(queue: tracks, source: album.album) }
@@ -532,6 +539,7 @@ struct TrackListPage: View {
                             Text(sort.directionLabels.descending).tag(false)
                         }
                     }
+                    .listRowBackground(AppColor.card)
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
                 }
@@ -557,7 +565,7 @@ struct PlayButtons: View {
                 Label("Shuffle", systemImage: "shuffle").frame(maxWidth: .infinity)
             }
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.outline)
         .controlSize(.large)
         .disabled(playable.isEmpty)
         .listRowSeparator(.hidden)
@@ -650,7 +658,7 @@ struct TrackRow: View {
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.title.isEmpty ? "Untitled" : track.title)
-                    .foregroundStyle(isCurrent ? Color.accentColor : .primary)
+                    .foregroundStyle(isCurrent ? AppColor.accent : .primary)
                     .lineLimit(1)
                 let subtitle = numbered ? (track.artist == track.effectiveAlbumArtist ? "" : track.artist)
                     : [track.artist, track.album].filter { !$0.isEmpty }.joined(separator: " · ")

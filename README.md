@@ -75,9 +75,9 @@ playback, and a Claude-powered radio DJ who tells you the story behind every rec
 | ![Digitize Vinyl with a recording cut into tracks](docs/screenshots/digitize-vinyl.png) | ![Search results for jazz from 1950 to 1975](docs/screenshots/search.png) |
 | **Digitize Vinyl**: record a side, cut it into tracks, save as FLAC | **Search**: filters, what you own, smart playlists |
 
-![The iPhone app: the Physical tab with Find by Label, records to digitize, and an item page](docs/screenshots/iphone-collection.png)
+![The iPhone app: the Collection tab with Find by Label, the Vinyl shelf, and an item page](docs/screenshots/iphone-collection.png)
 
-![The iPhone app: the Albums grid, an album page and an artist page](docs/screenshots/iphone.png)
+![The iPhone app: Listen Now, an album page and an artist page](docs/screenshots/iphone.png)
 
 ![The Apple Watch app: Now Playing, the Physical page and Find by Label](docs/screenshots/watch.png)
 

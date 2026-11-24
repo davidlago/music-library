@@ -1,4 +1,5 @@
 import MusicLibraryCore
+import MusicLibraryUI
 import SwiftUI
 
 /// Sync with the Mac, a sheet opened from Listen Now (or from a page asking to pair). The phone listens for the Mac only
@@ -27,6 +28,7 @@ struct SyncTab: View {
                         Label("You're exploring the sample library. After your first sync, your own digital and physical collections replace it.", systemImage: "sparkles")
                             .foregroundStyle(.secondary)
                     }
+                    .listRowBackground(AppColor.card)
                 }
                 if model.cloud.isAvailable, model.cloud.isEnabled, let at = model.cloud.backupAt {
                     Section {
@@ -40,6 +42,7 @@ struct SyncTab: View {
                             Image(systemName: "icloud")
                         }
                     }
+                    .listRowBackground(AppColor.card)
                 }
                 if case .pairing(let code) = sync.status {
                     pairing(code)
@@ -51,6 +54,7 @@ struct SyncTab: View {
                     } footer: {
                         Text("The iPhone and the Mac need to be on the same Wi-Fi network.")
                     }
+                    .listRowBackground(AppColor.card)
                 } else {
                     paired(sync)
                 }
@@ -58,6 +62,7 @@ struct SyncTab: View {
                     Section {
                         Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
                     }
+                    .listRowBackground(AppColor.card)
                 }
                 if !model.requests.isEmpty {
                     Section {
@@ -72,16 +77,18 @@ struct SyncTab: View {
                             }
                         }
                     } header: {
-                        Text("Waiting for the Mac")
+                        ListHeader("Waiting for the Mac")
                     } footer: {
                         Text("These go to \(sync.macName ?? "the Mac") at the next sync.")
                     }
+                    .listRowBackground(AppColor.card)
                 }
                 if let date = sync.lastSync, let summary = sync.lastSummary {
-                    Section("Last sync") {
+                    Section {
                         LabeledContent("When") { Text(date.formatted(.relative(presentation: .named))) }
                         Text(SyncText.summary(summary)).foregroundStyle(.secondary)
-                    }
+                    } header: { ListHeader("Last sync") }
+                    .listRowBackground(AppColor.card)
                 }
                 if sync.isPaired {
                     Section {
@@ -90,6 +97,7 @@ struct SyncTab: View {
                         }
                         Button("Unpair", systemImage: "link.badge.minus", role: .destructive) { sync.unpair() }
                     }
+                    .listRowBackground(AppColor.card)
                 }
             }
             .navigationTitle("Sync")
@@ -113,10 +121,11 @@ struct SyncTab: View {
             .padding(.vertical, 8)
             Button("Cancel", role: .cancel) { model.sync.cancelPairing() }
         } header: {
-            Text("Pairing code")
+            ListHeader("Pairing code")
         } footer: {
             Text("Keep this screen open until the Mac says it's paired.")
         }
+        .listRowBackground(AppColor.card)
     }
 
     @ViewBuilder
@@ -153,6 +162,7 @@ struct SyncTab: View {
         } footer: {
             Text("Keep the app open while syncing: iOS pauses it in the background. Download or remove music from album, artist and playlist pages and on the Collection tab (its Ready to Download gets every CD and record you've digitized); the iPhone syncs with the Mac as soon as it's around.")
         }
+        .listRowBackground(AppColor.card)
     }
 }
 

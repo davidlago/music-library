@@ -128,6 +128,17 @@ Get the companion Mac app
 Your music comes from Music Library for Mac (free, macOS 14 or later): it catalogs your CDs and records, imports, rips and digitizes your music, then syncs both collections to your iPhone. Download it, and find the full documentation and the source code, at https://davidlago.github.io/music-library/
 ```
 
+**What's New in 1.38.0** (the live version is 1.36.2; 1.37.0 only changed the Mac app):
+
+```
+A new look
+• Dark mode is now a record shop at night: warm ink pages, cream type and a brass accent. Light mode is the same shop by day: cream paper and ink.
+• Album, artist and copy pages lead with the title in bold poster type, the artist in italic, and a brass Play button. Genres are coloured tags, and album notes and biographies are set in a serif.
+• Insights, the Listening report and your collection's counts use the same bold numbers; sections open with a short brass bar.
+• Music DNA's people are purple (performance), teal (writing) and orange (production).
+• The widgets and the Apple Watch app wear the same colours and type.
+```
+
 **What's New in 1.36.2** (submitted 2026-11-19; the live version is 1.34.0, so it covers the iPhone changes of 1.35.0,
 1.35.1, 1.36.0, 1.36.1 and 1.36.2; 1.35.1 and 1.36.2 only changed the Mac app):
 
@@ -284,6 +295,12 @@ name so Listen Now doesn't show the sample banner, light mode, the window at 144
 Frame` default), captured with `screencapture -l <window id> -o -x` while in front and flattened onto white with
 ffmpeg. In order: Listen Now, the Shelf, a record's page, Insights ▸ Listening, Insights ▸ Owned, Music DNA, an artist
 page.
+
+**What's New in 1.38.0** (the first update after 1.37.0, the first version):
+
+```
+A new look: dark mode is now a record shop at night, with warm ink pages, cream type and a brass accent, and light mode is the same shop by day. Album, artist and copy pages lead with the title in bold poster type, genres are coloured tags, album notes and biographies are set in a serif, and Insights uses the same bold numbers.
+```
 
 **Promotional text:**
 

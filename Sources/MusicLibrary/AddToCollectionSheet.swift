@@ -340,7 +340,7 @@ struct AddToCollectionSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(chosenMedium == .download ? "Add a Download" : "Add to Physical Collection").font(.title2.bold())
+                Text(chosenMedium == .download ? "Add a Download" : "Add to Physical Collection").font(AppFont.display(28, weight: .heavy))
                 Spacer()
                 Picker("Medium", selection: $chosenMedium) {
                     ForEach(CollectionMedium.known, id: \.self) { Text($0.name).tag($0) }
@@ -562,7 +562,7 @@ struct AddToCollectionSheet: View {
                 .help("Add it and start on the next one (⌥⌘↩)")
             Button("Add") { add(next: false) }
                 .keyboardShortcut(.return, modifiers: .command)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.prominent)
                 .disabled(makeItem(numbered: true) == nil)
                 .help("Add it and open its page (⌘↩)")
         }
@@ -815,7 +815,7 @@ struct ChangeEditionSheet: View {
     var body: some View {
         let item = model.item(id: itemID)
         VStack(alignment: .leading, spacing: 12) {
-            Text("Change Edition").font(.title2.bold())
+            Text("Change Edition").font(AppFont.display(28, weight: .heavy))
             if let item {
                 HStack(spacing: 6) {
                     Text("Which edition is").foregroundStyle(.secondary)

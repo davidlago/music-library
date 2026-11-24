@@ -32,6 +32,7 @@ struct BuyListPage: View {
                 Section {
                     summary(market)
                 }
+                .listRowBackground(AppColor.card)
             }
             Section {
                 ForEach(market.shown) { album in
@@ -42,7 +43,7 @@ struct BuyListPage: View {
                         Button("Remove", systemImage: "trash", role: .destructive) { market.remove([album.id]) }
                     }
                     .swipeActions(edge: .leading) {
-                        Button("Refresh", systemImage: "arrow.clockwise") { market.refresh(ids: [album.id]) }.tint(.blue)
+                        Button("Refresh", systemImage: "arrow.clockwise") { market.refresh(ids: [album.id]) }.tint(AppColor.accent)
                     }
                 }
             } footer: {
@@ -50,10 +51,11 @@ struct BuyListPage: View {
                     Text("The big price is the cheapest copy for sale on Discogs or eBay's typical asking price for a used copy; “fair” comes from recent eBay sales or Discogs' suggestions. Your Mac gets the list, and what you change here, at the next sync.")
                 }
             }
+            .listRowBackground(AppColor.card)
         }
         .overlay {
             if market.shown.isEmpty {
-                ContentUnavailableView {
+                EmptyState {
                     Label("Nothing on Your Buy List", systemImage: "bag")
                 } description: {
                     Text("Look an album up in the Shop (or scan its barcode) and tap Add to Buy List. Its prices are kept here, and you'll see when one is at or under the most you'd pay.")
@@ -98,7 +100,7 @@ struct BuyListPage: View {
 
     private func figure(_ value: String, _ label: String, color: Color = .primary) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(value).font(.title3.weight(.semibold)).monospacedDigit().foregroundStyle(color)
+            Text(value).font(AppFont.display(24, weight: .heavy)).monospacedDigit().foregroundStyle(color)
             Text(label).font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -153,7 +155,7 @@ private struct WantedAlbumPage: View {
         if let album = model.market.album(id: id) {
             content(album)
         } else {
-            ContentUnavailableView("Not on Your Buy List", systemImage: "bag", description: Text("It was removed from the list."))
+            EmptyState("Not on Your Buy List", systemImage: "bag", description: Text("It was removed from the list."))
         }
     }
 
@@ -166,7 +168,7 @@ private struct WantedAlbumPage: View {
                 HStack(alignment: .top, spacing: 14) {
                     WantedThumb(album: album, side: 96)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(album.album).font(.title2.bold())
+                        Text(album.album).font(AppFont.display(28, weight: .heavy))
                         Text(album.artist).font(.title3).foregroundStyle(.secondary)
                         Text([album.format.name, album.editionDetails].filter { !$0.isEmpty }.joined(separator: " · "))
                             .font(.caption).foregroundStyle(.secondary)
@@ -267,6 +269,7 @@ struct WantedEditorSheet: View {
                     }
                     TextField("Barcode (optional)", text: $barcode).keyboardType(.numberPad)
                 }
+                .listRowBackground(AppColor.card)
                 Section {
                     TextField("Most you'd pay", value: $maxPrice, format: .currency(code: album?.currency ?? currencyCode))
                         .keyboardType(.decimalPad)
@@ -274,7 +277,9 @@ struct WantedEditorSheet: View {
                 } footer: {
                     Text("You'll see when something's at or under the most you'd pay.")
                 }
+                .listRowBackground(AppColor.card)
             }
+            .pageBackground()
             .navigationTitle(album == nil ? "Add to Buy List" : "Edit")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

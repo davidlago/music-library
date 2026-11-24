@@ -30,7 +30,7 @@ struct ShelfPage: View {
             }
         }
         .navigationTitle("Physical")
-        .containerBackground(Color.green.gradient, for: .tabView)
+        .containerBackground(WatchStyle.teal.gradient, for: .tabView)
     }
 
     @ViewBuilder
@@ -41,7 +41,7 @@ struct ShelfPage: View {
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 Text(Self.counts(c))
-                    .font(.system(.headline, design: .rounded, weight: .bold))
+                    .font(WatchStyle.display(20, weight: .black))
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 if let more = Self.moreCounts(c) {
@@ -98,7 +98,7 @@ struct ShelfPage: View {
     private func ownedContent(_ owned: Glance.Owned) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(glance.money(owned.spentThisYear, whole: owned.spentThisYear >= 1000))
-                .font(.system(.title, design: .rounded, weight: .bold))
+                .font(WatchStyle.display(34, weight: .black))
                 .minimumScaleFactor(0.6)
             Text("\(GlanceFormat.count(owned.boughtThisYear, "album")) this year")
                 .font(.caption2).foregroundStyle(.secondary)
@@ -160,14 +160,14 @@ struct ShelfItemPage: View {
         ScrollView {
             VStack(spacing: 6) {
                 WatchCover(name: item.cover, title: item.title, size: 96)
-                Text(item.title).font(.headline).multilineTextAlignment(.center)
+                Text(item.title).font(WatchStyle.display(19)).multilineTextAlignment(.center)
                 Text([item.artist, item.year.map(String.init)].compactMap { $0 }.joined(separator: " · "))
                     .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 Label(item.stickerText ?? ShelfMedium.name(item.medium), systemImage: ShelfMedium.symbol(item.medium))
                     .font(.caption.weight(.semibold))
                 if item.playable == true {
                     Button { model.send(.playAlbum(key: item.albumKey)) } label: { Label("Play on iPhone", systemImage: "play.fill") }
-                        .tint(.pink)
+                        .tint(WatchStyle.brass)
                 } else if item.digitized == false {
                     Text(["No digital copy", item.stickerText].compactMap { $0 }.joined(separator: " · "))
                         .font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -217,8 +217,11 @@ struct WatchFindPage: View {
             if model.shelf != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     // Short, so the watch's toolbar doesn't clip it next to the title.
-                    Button(series == "vinyl" ? "CDs" : "Vinyl") {
+                    Button {
                         model.setFind(model.find.with(series: series == "vinyl" ? "cd" : "vinyl"))
+                    } label: {
+                        // Ink on the brass the toolbar fills it with.
+                        Text(series == "vinyl" ? "CDs" : "Vinyl").foregroundStyle(WatchStyle.ink)
                     }
                     .accessibilityLabel(series == "vinyl" ? "Showing vinyl; show CDs" : "Showing CDs; show vinyl")
                 }
@@ -266,7 +269,7 @@ struct WatchFindPage: View {
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(.secondary)
                         Text("#\(number)")
-                            .font(.system(size: 40, weight: .bold, design: .rounded).monospacedDigit())
+                            .font(WatchStyle.display(46, weight: .black).monospacedDigit())
                             .lineLimit(1)
                             .minimumScaleFactor(0.4)
                     }

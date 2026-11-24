@@ -38,7 +38,7 @@ albums you own"). Filter by name, genre or country, and sort by name, songs, alb
 
 An artist page has:
 
-![The artist page for Norah Jones: photo, genres, songs, albums, copies you own, time listened, plays and Last.fm scrobbles, her biography and links](../screenshots/artist.png)
+![The artist page for Roy Orbison: photo, genres, songs, albums, copies you own, time listened and plays, his biography and links](../screenshots/artist.png)
 
 - Their photo, type, country and years, and genres.
 - **Play**, **Shuffle**, **Music DNA** and **…**.

@@ -21,44 +21,43 @@ struct AppearanceSwatch: View {
             }
             .frame(width: 150, height: 92)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(selected ? Color.accentColor : Color(nsColor: .separatorColor),
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(selected ? AppColor.accent : Color(nsColor: .separatorColor),
                                                                      lineWidth: selected ? 3 : 0.5))
             Text(mode.name).font(.callout.weight(selected ? .semibold : .regular))
         }
         .contentShape(Rectangle())
     }
 
+    /// The page, sidebar, a card and the brass, drawn in one appearance (the palette's colours resolve by scheme).
     private func preview(dark: Bool) -> some View {
-        let base = dark ? Color(white: 0.16) : Color(white: 0.96)
-        let side = dark ? Color(white: 0.12) : Color(white: 0.9)
-        let card = dark ? Color(white: 0.21) : .white
-        let text = dark ? Color(white: 0.9) : Color(white: 0.15)
-        return HStack(spacing: 0) {
-            side.frame(width: 24)
+        HStack(spacing: 0) {
+            AppColor.sidebar.frame(width: 24)
                 .overlay(alignment: .top) {
                     VStack(spacing: 5) {
-                        Capsule().fill(Color.accentColor).frame(width: 13, height: 3)
-                        Capsule().fill(text.opacity(0.5)).frame(width: 13, height: 3)
-                        Capsule().fill(text.opacity(0.5)).frame(width: 13, height: 3)
+                        Capsule().fill(AppColor.text).frame(width: 15, height: 4)
+                        Capsule().fill(AppColor.accent).frame(width: 13, height: 2)
+                        Capsule().fill(AppColor.muted.opacity(0.6)).frame(width: 13, height: 3).padding(.top, 3)
+                        Capsule().fill(AppColor.muted.opacity(0.6)).frame(width: 13, height: 3)
                     }
-                    .padding(.top, 10)
+                    .padding(.top, 9)
                 }
-            base.overlay {
-                VStack(alignment: .leading, spacing: 6) {
-                    Capsule().fill(text).frame(width: 40, height: 5)
-                    RoundedRectangle(cornerRadius: 4).fill(card)
+            AppColor.background.overlay {
+                VStack(alignment: .leading, spacing: 5) {
+                    Capsule().fill(AppColor.accent).frame(width: 26, height: 3)
+                    RoundedRectangle(cornerRadius: 1).fill(AppColor.text).frame(width: 46, height: 7)
+                    RoundedRectangle(cornerRadius: 4).fill(AppColor.card)
                         .overlay(alignment: .bottomLeading) {
                             HStack(alignment: .bottom, spacing: 3) {
                                 ForEach([0.5, 0.8, 0.6, 1.0], id: \.self) { h in
-                                    RoundedRectangle(cornerRadius: 1).fill(VizColor.series).frame(width: 6, height: 30 * h)
+                                    RoundedRectangle(cornerRadius: 1).fill(VizColor.series).frame(width: 6, height: 26 * h)
                                 }
                             }
-                            .environment(\.colorScheme, dark ? .dark : .light)
                             .padding(5)
                         }
                 }
                 .padding(9)
             }
         }
+        .environment(\.colorScheme, dark ? .dark : .light)
     }
 }

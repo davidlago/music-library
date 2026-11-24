@@ -192,7 +192,7 @@ public enum ListeningText {
     }
 
     /// The panel colour when there's no picture to take one from.
-    public static let defaultPanel = ArtworkTint.panel(from: RGB(0x2a78d6))
+    public static let defaultPanel = ArtworkTint.panel(from: RGB(0x8F6200))
 
     /// A panel colour taken from a picture, dark enough for white text.
     public static func panelTint(_ image: ListeningImage?) -> RGB? {
@@ -261,7 +261,7 @@ enum ListeningMetrics {
     #if os(macOS)
     static let spacing: CGFloat = 22
     static let gridSpacing: CGFloat = 14
-    static let sectionTitle = Font.system(size: 20, weight: .bold, design: .rounded)
+    static let sectionTitle = AppFont.display(23, weight: .heavy)
     static let rowFont = Font.callout
     static let rowDetailFont = Font.callout
     static let rowArt: CGFloat = 32
@@ -615,9 +615,9 @@ public struct ListeningHero: View {
                 }
             }
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(stats.plays.formatted()).font(.system(size: ListeningMetrics.heroPlays, weight: .heavy, design: .rounded))
+                Text(stats.plays.formatted()).font(AppFont.display((ListeningMetrics.heroPlays) * 1.15, weight: .heavy))
                     .lineLimit(1).minimumScaleFactor(0.5)
-                Text(stats.plays == 1 ? "play" : "plays").font(.system(size: ListeningMetrics.heroUnit, weight: .bold, design: .rounded))
+                Text(stats.plays == 1 ? "play" : "plays").font(AppFont.display((ListeningMetrics.heroUnit) * 1.15, weight: .heavy))
             }
             Text(summary).font(ListeningMetrics.heroSummary).foregroundStyle(.white.opacity(0.85))
                 .lineLimit(3).fixedSize(horizontal: false, vertical: true)
@@ -833,7 +833,7 @@ public struct SpotlightCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(kind.plural).font(ListeningMetrics.spotlightLabel).foregroundStyle(.white.opacity(0.85))
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(ranking.total.formatted()).font(.system(size: ListeningMetrics.spotlightCount, weight: .bold, design: .rounded))
+                    Text(ranking.total.formatted()).font(AppFont.display((ListeningMetrics.spotlightCount) * 1.15, weight: .heavy))
                     if let delta = ListeningText.change(Double(ranking.total), previous.map(Double.init)) { DeltaLabel(delta: delta, onPanel: true) }
                 }
             }
@@ -973,7 +973,7 @@ public struct ListeningClockCard: View {
     private func stat(_ title: String, _ value: String, detail: String?) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.system(size: ListeningMetrics.clockStat, weight: .bold, design: .rounded)).lineLimit(1)
+            Text(value).font(AppFont.display((ListeningMetrics.clockStat) * 1.15, weight: .heavy)).lineLimit(1)
             if let detail { Text(detail).font(ListeningMetrics.clockDetail).foregroundStyle(.secondary) }
         }
         .accessibilityElement(children: .combine)
@@ -1284,7 +1284,7 @@ public struct QuickFacts: View {
             }
             .font(ListeningMetrics.factTitle)
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(f.value).font(.system(size: ListeningMetrics.factValue, weight: .bold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.6)
+                Text(f.value).font(AppFont.display((ListeningMetrics.factValue) * 1.15, weight: .heavy)).lineLimit(1).minimumScaleFactor(0.6)
                 if let delta = f.delta { DeltaLabel(delta: delta) }
             }
             Group {

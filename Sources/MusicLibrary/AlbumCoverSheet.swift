@@ -110,7 +110,7 @@ struct AlbumCoverSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Album Cover").font(.title2.bold())
+            Text("Album Cover").font(AppFont.display(28, weight: .heavy))
             HStack(alignment: .top, spacing: 20) {
                 preview
                 Divider()

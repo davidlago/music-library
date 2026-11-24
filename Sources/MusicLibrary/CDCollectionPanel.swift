@@ -141,7 +141,7 @@ struct CDCollectionSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Is this CD yours?").font(.title3.bold())
+            Text("Is this CD yours?").font(AppFont.display(24, weight: .heavy))
             if let release = disc.release {
                 Text("\(release.album) — \(release.albumArtist)").foregroundStyle(.secondary)
             } else if !disc.searchAlbum.isEmpty {

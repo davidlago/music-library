@@ -19,7 +19,7 @@ struct CollectionItemPage: View {
         } else if model.library == nil {
             LibraryStatusView()
         } else {
-            ContentUnavailableView("No Longer Owned", systemImage: "books.vertical",
+            EmptyState("No Longer Owned", systemImage: "books.vertical",
                                    description: Text("It was removed in Music Library on the Mac."))
         }
     }
@@ -87,10 +87,11 @@ private struct CollectionItemContent: View {
             CopyArt(mark: collection.mark(item: item), url: library.coverURL(item: item), width: 300, title: item.album)
                 .padding(.top, 8)
                 .padding(.bottom, 8)
-            Text(title).font(.title2.bold()).multilineTextAlignment(.center).textSelection(.enabled)
+            Kicker(item.sticker.map { "\(item.medium.name) #\($0.number)" } ?? item.medium.name)
+            PageTitle(title, size: 36, lineLimit: 4).multilineTextAlignment(.center).textSelection(.enabled)
             artistButton
             if let meta = metaLine {
-                Text(meta).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Text(meta).font(.footnote).foregroundStyle(AppColor.muted).multilineTextAlignment(.center)
             }
             shelfSteps
         }
@@ -105,13 +106,13 @@ private struct CollectionItemContent: View {
             NavigationLink(value: ArtistNameRoute(name: library.artist(named: item.artist)?.name ?? item.artist)) {
                 HStack(spacing: 8) {
                     ArtistPhoto(name: item.artist, size: 26)
-                    Text(name).font(.title3.weight(.medium))
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Text(name).font(AppFont.serif(21).italic()).foregroundStyle(AppColor.accent)
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(AppColor.muted)
                 }
             }
             .buttonStyle(.plain)
         } else {
-            Text(name).font(.title3.weight(.medium))
+            Text(name).font(AppFont.serif(21).italic()).foregroundStyle(AppColor.accent)
         }
     }
 
@@ -165,7 +166,7 @@ private struct CollectionItemContent: View {
             .disabled(neighbors.next == nil)
             .accessibilityLabel("Next on the shelf")
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.outline)
         .controlSize(.small)
         .font(.footnote.monospacedDigit())
         .padding(.top, 4)
@@ -224,16 +225,16 @@ private struct CollectionItemContent: View {
                 Button { player.play(queue: playable, source: title) } label: {
                     Label("Play", systemImage: "play.fill").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.prominent)
                 Button { player.play(queue: playable.shuffled(), source: title) } label: {
                     Label("Shuffle", systemImage: "shuffle").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.outline)
                 if let album {
                     NavigationLink(value: album) {
                         Image(systemName: "square.stack").frame(height: 20)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.outline)
                     .accessibilityLabel("Open Album")
                 }
             }

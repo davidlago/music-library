@@ -17,7 +17,7 @@ public struct ConcertDateTile: View {
         VStack(spacing: 0) {
             Text(date.formatted(.dateTime.month(.abbreviated)).uppercased())
                 .font(.caption2.weight(.bold)).foregroundStyle(AppColor.accent)
-            Text(date.formatted(.dateTime.day())).font(.system(size: 20, weight: .semibold, design: .rounded))
+            Text(date.formatted(.dateTime.day())).font(AppFont.display(24, weight: .heavy))
             Text(date.formatted(.dateTime.weekday(.abbreviated))).font(.caption2).foregroundStyle(.secondary)
         }
         .frame(width: 48, height: 56)

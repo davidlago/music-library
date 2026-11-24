@@ -473,6 +473,19 @@ final class AppModel {
         }
     }
 
+    /// AppKit draws list selections, focus rings and text highlights in the system accent, which SwiftUI's tint
+    /// doesn't reach. The app's own accent is brass (`AppColor.accent`, applied as the tint), and a brass selection
+    /// can't hold the white type AppKit puts on it, so AppKit's accent is graphite for this app: selected sidebar rows
+    /// are a quiet grey, as on a record shop's dark shelves. Set in the argument domain, so nothing is saved and the
+    /// user's own accent is untouched everywhere else.
+    static func useNeutralSystemAccent() {
+        let defaults = UserDefaults.standard
+        var arguments = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
+        arguments["AppleAccentColor"] = -1
+        arguments["AppleHighlightColor"] = "0.847059 0.847059 0.862745 Graphite"
+        defaults.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+    }
+
     // MARK: Tools
 
     var ffmpegAvailable: Bool { tools.ffmpeg != nil && tools.ffprobe != nil }

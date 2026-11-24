@@ -75,7 +75,7 @@ struct GradingGuideSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Grading Guide").font(.title2.bold())
+                Text("Grading Guide").font(AppFont.display(28, weight: .heavy))
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
             }

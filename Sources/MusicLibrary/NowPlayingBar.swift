@@ -57,9 +57,9 @@ struct TransportControls: View {
                 if large {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 22))
-                        .foregroundStyle(Color(nsColor: .windowBackgroundColor))
+                        .foregroundStyle(AppColor.onAccent)
                         .frame(width: 52, height: 52)
-                        .background(Circle().fill(Color.primary))
+                        .background(Circle().fill(AppColor.accent))
                 } else {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").frame(width: 20)
                 }
@@ -195,9 +195,11 @@ struct NowPlayingBar: View {
         }
         .padding(.leading, 9).padding(.trailing, 20).padding(.vertical, 9)
         .frame(maxWidth: 980)
+        // The panel colour over a blur, so the page barely shows through and the bar reads as one of the app's cards.
         .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.white.opacity(0.12), lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.22), radius: 22, y: 10)
+        .background(AppColor.card.opacity(0.88), in: Capsule())
+        .overlay(Capsule().strokeBorder(AppColor.separator, lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.28), radius: 22, y: 10)
         .overlay(alignment: .top) {
             if player.isDownloading {
                 Label("Downloading from iCloud…", systemImage: "icloud.and.arrow.down").font(.caption).foregroundStyle(.secondary)
@@ -217,4 +219,7 @@ struct NowPlayingBar: View {
 extension View {
     /// Room under a page's last row so it scrolls clear of the floating player.
     func playerClearance() -> some View { safeAreaPadding(.bottom, NowPlayingBar.clearance) }
+
+    /// A page root on the window's stack: room for the floating player under its last row, on the page's surface.
+    func page() -> some View { playerClearance().pageBackground() }
 }

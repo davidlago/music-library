@@ -13,7 +13,7 @@ whom, across both your collections.
 ## Reading the map
 
 The person you chose is in the middle, surrounded by everyone they share songs with in your library; choose how many
-**Levels** of connections to show (1 to 3). Colors say how someone's credited: blue for performance, green for writing,
+**Levels** of connections to show (1 to 3). Colors say how someone's credited: purple for performance, teal for writing,
 orange for production. Bigger circles mean more shared songs.
 
 Click a bubble to put that person in the middle. The panel beside the map lists their roles, **Top collaborators** (with

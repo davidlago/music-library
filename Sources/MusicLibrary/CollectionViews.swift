@@ -84,7 +84,7 @@ struct CollectionView: View {
                 }
                 Divider().opacity(0.5)
                 if items.isEmpty {
-                    ContentUnavailableView {
+                    EmptyState {
                         Label("Nothing here", systemImage: scope.symbol)
                     } description: {
                         Text(model.shelfQuery.isEmpty && show == .any ? (scope == .all ? "Nothing on the Shelf." : "No items in \(scope.title).")
@@ -297,7 +297,7 @@ struct CollectionView: View {
                                     Spacer()
                                 }
                                 .padding(.vertical, 6)
-                                .background(Color(nsColor: .windowBackgroundColor))
+                                .background(AppColor.background)
                             }
                         }
                     }
@@ -412,13 +412,13 @@ struct CollectionView: View {
     // MARK: Empty
 
     private var emptyShelf: some View {
-        ContentUnavailableView {
+        EmptyState {
             Label("Your shelf is empty", systemImage: "books.vertical")
         } description: {
             Text("Catalog the CDs and records you own, ripped or not, with the label number on each case.")
         } actions: {
             Button("Add to Physical Collection…") { model.addToCollection() }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.prominent)
             if !model.albums.isEmpty {
                 Button("Add Albums You Own from Your Digital Collection…") { model.collectionSheet = .addLibraryAlbums }
             }
@@ -427,13 +427,13 @@ struct CollectionView: View {
     }
 
     private var emptyDownloads: some View {
-        ContentUnavailableView {
+        EmptyState {
             Label("No downloads yet", systemImage: CollectionScope.downloads.symbol)
         } description: {
             Text("Keep track of the albums you bought as downloads, with when you bought them and what you paid.")
         } actions: {
             Button("Add Download…") { model.addToCollection(medium: .download) }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.prominent)
             if !model.albums.isEmpty {
                 Button("Add Albums You Own from Your Digital Collection…") { model.collectionSheet = .addLibraryAlbums }
             }
@@ -540,7 +540,7 @@ struct CollectionTable: View {
     @Binding var selection: Set<CollectionItem.ID>
     /// The item Go to found, outlined for a moment, and the one to scroll to (cleared once scrolled).
     var highlighted: String?
-    var highlight: Color = .accentColor
+    var highlight: Color = AppColor.accent
     @Binding var scrollTarget: String?
     @State private var sortOrder: [KeyPathComparator<CollectionItem>] = []
 
@@ -648,7 +648,7 @@ struct LabelCheckSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Label Check").font(.title2.bold())
+            Text("Label Check").font(AppFont.display(28, weight: .heavy))
             Text("Numbers missing from each series, and numbers on more than one item. Saving a number already used is refused, so duplicates come from older versions of the app or other copies of your library folder.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             ScrollView {

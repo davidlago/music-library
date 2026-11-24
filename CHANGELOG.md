@@ -7,6 +7,17 @@ Releases before 1.8.0 are described on the [Releases page](https://github.com/da
 
 ## Unreleased
 
+## 1.38.0
+
+- A new look on the Mac and the iPhone, borrowed from a record shop at night: in dark mode, warm ink pages, cream type
+  and a brass accent; album, artist and copy pages lead with the title in heavy condensed capitals under a tracked-out
+  line (Album · 1959), the artist in italic serif, and Play as a brass capsule; sections open with a short brass bar;
+  genres are coloured tags; album notes and biographies are set in a serif. Light mode is the same shop by day: cream
+  paper, ink type and a deeper brass. The sidebar opens with the app's name, and its selection is a quiet grey.
+  Figures in Insights, the Listening report and the Buy List are set in the same condensed type, empty pages lead with
+  a brass symbol and a poster title, list and settings sections have brass headings, Music DNA's people are purple,
+  teal and orange, and the iPhone's widgets and the Apple Watch app wear the same colours and type.
+
 ## 1.37.0
 
 - New to the Mac app? **File ▸ Explore a Sample Library** (also on Listen Now while your library is empty) opens a

@@ -41,6 +41,41 @@ struct GlanceProvider: TimelineProvider {
     }
 }
 
+// MARK: Palette
+
+/// The app's palette and type for the widgets and the watch (they can't link `MusicLibraryUI`; keep the values in step
+/// with its `Theme.swift`): warm ink and cream with a brass accent, paper and ink by day. The watch is always dark.
+enum WidgetPalette {
+    static func color(light: UInt32, dark: UInt32) -> Color {
+        #if os(iOS)
+        Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? rgb(dark) : rgb(light) })
+        #else
+        Color(uiColor: rgb(dark))
+        #endif
+    }
+
+    private static func rgb(_ hex: UInt32) -> UIColor {
+        UIColor(red: CGFloat((hex >> 16) & 0xff) / 255, green: CGFloat((hex >> 8) & 0xff) / 255, blue: CGFloat(hex & 0xff) / 255,
+                alpha: 1)
+    }
+
+    static let background = color(light: 0xF4EFE6, dark: 0x0F0E0D)
+    static let card = color(light: 0xFCFAF5, dark: 0x1A1816)
+    static let text = color(light: 0x1A1816, dark: 0xF3EDE2)
+    static let muted = color(light: 0x6B655C, dark: 0xA69E91)
+    static let accent = color(light: 0x8F6200, dark: 0xE9B949)
+
+    /// Titles: heavy condensed, like a record sleeve's.
+    static func display(_ size: CGFloat, weight: Font.Weight = .heavy) -> Font {
+        .system(size: size, weight: weight).width(.condensed)
+    }
+
+    /// Small labels, set in capitals and tracked out.
+    static func label(_ size: CGFloat) -> Font {
+        .system(size: size, weight: .semibold).width(.expanded)
+    }
+}
+
 // MARK: Covers
 
 /// An album cover from the summary's thumbnails, or a tinted placeholder.
@@ -74,7 +109,10 @@ struct CoverArt: View {
 
     /// A gradient picked by the title, so placeholders differ from one another.
     static func placeholderColors(_ title: String) -> [Color] {
-        let palettes: [[Color]] = [[.pink, .orange], [.indigo, .purple], [.teal, .blue], [.orange, .red], [.mint, .teal], [.purple, .pink]]
+        // The app's tag colours, in pairs.
+        func c(_ hex: UInt32) -> Color { WidgetPalette.color(light: hex, dark: hex) }
+        let palettes: [[Color]] = [[c(0xF0679E), c(0xE8833A)], [c(0x5E3FC0), c(0x8F74E6)], [c(0x0E7F76), c(0x2253B5)],
+                                   [c(0xE8833A), c(0xB3242B)], [c(0x34B58C), c(0x0E7F76)], [c(0x9233A6), c(0xF0679E)]]
         let sum = title.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
         return palettes[abs(sum) % palettes.count]
     }
@@ -232,7 +270,8 @@ struct WidgetHeader: View {
 
     var body: some View {
         Label(title.uppercased(), systemImage: systemImage)
-            .font(.caption2.weight(.semibold))
+            .font(WidgetPalette.label(9.5))
+            .tracking(1.2)
             .foregroundStyle(tint)
             .lineLimit(1)
             .widgetAccentable()

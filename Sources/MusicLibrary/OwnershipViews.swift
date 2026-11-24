@@ -187,7 +187,7 @@ struct AddExistingItemSheet: View {
     var body: some View {
         let (suggested, others) = candidates
         VStack(alignment: .leading, spacing: 12) {
-            Text("Add Existing Item").font(.title2.bold())
+            Text("Add Existing Item").font(AppFont.display(28, weight: .heavy))
             Text("Which item you own is a copy of “\(album.album)”? Items with music of their own aren't listed.")
                 .font(.callout).foregroundStyle(.secondary)
             TextField("Search what you own", text: $query, prompt: Text("Search what you own"))

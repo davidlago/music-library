@@ -679,14 +679,14 @@ struct RadioDJSettings: View {
                 Link("Get an API key at platform.claude.com", destination: URL(string: "https://platform.claude.com/settings/keys")!)
                     .font(.caption)
             } header: {
-                Text("Claude API")
+                ListHeader("Claude API")
             }
             Section {
                 keyField(dj, .openRouter, text: $dj.openRouterKey)
                 Link("Get an API key at openrouter.ai", destination: URL(string: "https://openrouter.ai/settings/keys")!)
                     .font(.caption)
             } header: {
-                Text("OpenRouter")
+                ListHeader("OpenRouter")
             } footer: {
                 Text("Either key or both. Stored in your keychain and handed to your iPhone when you sync. Remove them to turn the DJ off on both.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -696,7 +696,7 @@ struct RadioDJSettings: View {
                 TextField("DJ's name", text: $dj.name, prompt: Text(RadioDJ.defaultName))
                 TextField("Your name", text: $dj.listenerName, prompt: Text("Optional"))
             } header: {
-                Text("On the air")
+                ListHeader("On the air")
             } footer: {
                 Text("What the DJ calls themself, and what they call you (now and then, like a regular caller).")
                     .font(.caption).foregroundStyle(.secondary)
@@ -760,7 +760,7 @@ struct RadioDJSettings: View {
                 Button("Choose Model…") { choosingModel = true }
             }
         } header: {
-            Text("Model")
+            ListHeader("Model")
         } footer: {
             Text("Claude Opus 5.5 is the DJ the app was made with. Other models know music differently and may follow the app's links less closely. A new model takes over the next time the DJ comes on the air.")
                 .font(.caption).foregroundStyle(.secondary)
@@ -784,7 +784,7 @@ struct RadioDJSettings: View {
                 Text("\(all.segments) on the air, \(all.webSearches) web search\(all.webSearches == 1 ? "" : "es")").foregroundStyle(.secondary)
             }
         } header: {
-            Text("Spending")
+            ListHeader("Spending")
         } footer: {
             Text("Calendar months (UTC). Claude API use is estimated at Anthropic's list prices (web searches $10 per 1,000); OpenRouter use is what OpenRouter says each reply cost. iPhone amounts are as of each phone's last sync. Your actual bills are at platform.claude.com and openrouter.ai.")
                 .font(.caption).foregroundStyle(.secondary)
